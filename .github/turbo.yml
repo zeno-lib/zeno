@@ -1,0 +1,25 @@
+name: Turbo CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize]
+
+jobs:
+  ci:
+    timeout-minutes: 15
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+        cache: 'npm'
+    - name: Install dependencies
+      uses: bahmutov/npm-install@v1
+    - name: Run turbo ci command
+      run: npm run ci
