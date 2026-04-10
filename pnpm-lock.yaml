@@ -15,11 +15,11 @@ importers:
         specifier: 2.7.4
         version: 2.7.4
       typescript:
-        specifier: 5.9.3
-        version: 5.9.3
+        specifier: 6.0.2
+        version: 6.0.2
       ultracite:
         specifier: 7.0.11
-        version: 7.0.11(typescript@5.9.3)
+        version: 7.0.11(typescript@6.0.2)
 
   apps/docs:
     dependencies:
@@ -79,8 +79,8 @@ importers:
         specifier: ^4.1.18
         version: 4.1.18
       typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
+        specifier: ^6.0.2
+        version: 6.0.2
 
   packages/e2e:
     dependencies:
@@ -98,8 +98,8 @@ importers:
         specifier: workspace:*
         version: link:../typescript
       typescript:
-        specifier: 5.9.3
-        version: 5.9.3
+        specifier: 6.0.2
+        version: 6.0.2
 
   packages/example:
     devDependencies:
@@ -107,8 +107,8 @@ importers:
         specifier: workspace:*
         version: link:../vitest
       typescript:
-        specifier: 5.9.3
-        version: 5.9.3
+        specifier: 6.0.2
+        version: 6.0.2
       vitest:
         specifier: 4.0.18
         version: 4.0.18(@types/node@25.0.10)(jiti@2.6.1)(jsdom@27.4.0)(lightningcss@1.30.2)
@@ -303,8 +303,8 @@ importers:
         specifier: workspace:*
         version: link:../typescript
       typescript:
-        specifier: 5.9.3
-        version: 5.9.3
+        specifier: 6.0.2
+        version: 6.0.2
 
   packages/vitest:
     dependencies:
@@ -3710,6 +3710,11 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  typescript@6.0.2:
+    resolution: {integrity: sha512-bGdAIrZ0wiGDo5l8c++HWtbaNCWTS4UTv7RaTH/ThVIgjkveJt83m74bBHMJkuCbslY8ixgLBVZJIOiQlQTjfQ==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   ultracite@7.0.11:
     resolution: {integrity: sha512-YeuJTf/Tu12l7K0qvl1G525NfrPUay6UFVt6TrTL8QfXcFZBI+Tzr0Dg14Hxcb964pRQF5PjBaUk3bJCNQHu+g==}
     hasBin: true
@@ -5574,9 +5579,9 @@ snapshots:
       '@types/react': 19.2.14
       '@types/react-dom': 19.2.3(@types/react@19.2.14)
 
-  '@trpc/server@11.8.1(typescript@5.9.3)':
+  '@trpc/server@11.8.1(typescript@6.0.2)':
     dependencies:
-      typescript: 5.9.3
+      typescript: 6.0.2
 
   '@types/acorn@4.0.6':
     dependencies:
@@ -7473,11 +7478,11 @@ snapshots:
 
   trough@2.2.0: {}
 
-  trpc-cli@0.12.2(@trpc/server@11.8.1(typescript@5.9.3))(zod@4.3.5):
+  trpc-cli@0.12.2(@trpc/server@11.8.1(typescript@6.0.2))(zod@4.3.5):
     dependencies:
       commander: 14.0.0
     optionalDependencies:
-      '@trpc/server': 11.8.1(typescript@5.9.3)
+      '@trpc/server': 11.8.1(typescript@6.0.2)
       zod: 4.3.5
 
   tsconfck@3.1.6(typescript@5.9.3):
@@ -7513,17 +7518,20 @@ snapshots:
       turbo-windows-64: 2.7.4
       turbo-windows-arm64: 2.7.4
 
-  typescript@5.9.3: {}
+  typescript@5.9.3:
+    optional: true
 
-  ultracite@7.0.11(typescript@5.9.3):
+  typescript@6.0.2: {}
+
+  ultracite@7.0.11(typescript@6.0.2):
     dependencies:
       '@clack/prompts': 0.11.0
-      '@trpc/server': 11.8.1(typescript@5.9.3)
+      '@trpc/server': 11.8.1(typescript@6.0.2)
       deepmerge: 4.3.1
       glob: 13.0.0
       jsonc-parser: 3.3.1
       nypm: 0.6.2
-      trpc-cli: 0.12.2(@trpc/server@11.8.1(typescript@5.9.3))(zod@4.3.5)
+      trpc-cli: 0.12.2(@trpc/server@11.8.1(typescript@6.0.2))(zod@4.3.5)
       zod: 4.3.5
     transitivePeerDependencies:
       - '@orpc/server'

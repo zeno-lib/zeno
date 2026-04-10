@@ -6,7 +6,7 @@
   },
   "devDependencies": {
     "@zeno/vitest": "workspace:*",
-    "typescript": "5.9.3",
+    "typescript": "6.0.2",
     "vitest": "4.0.18"
   }
 }
