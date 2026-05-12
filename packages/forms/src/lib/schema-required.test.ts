@@ -65,8 +65,8 @@ describe("getRequiredPaths", () => {
   test(".refine() cross-field issues are tolerated (do not crash)", () => {
     const schema = z
       .object({
-        password: z.string().min(8),
         confirm: z.string().min(8),
+        password: z.string().min(8),
       })
       .refine((value) => value.password === value.confirm, {
         message: "Passwords must match",

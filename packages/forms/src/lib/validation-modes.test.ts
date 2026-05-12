@@ -62,7 +62,7 @@ describe("validation-modes WeakMap state", () => {
   test("state is keyed on store, not the form object identity", () => {
     const store = {}
     const formA = { store } as unknown as AnyFormApi
-    const formB = { store, extra: "spread" } as unknown as AnyFormApi
+    const formB = { extra: "spread", store } as unknown as AnyFormApi
     setFormZenoState(formA, { validation: "change" })
     // Both reach the same WeakMap entry because they share `store` — this
     // mirrors how TanStack's `useForm` spread differs from the FormApi seen

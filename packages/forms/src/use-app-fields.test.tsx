@@ -6,6 +6,12 @@ import { z } from "zod"
 import { Form, FormProvider } from "./form"
 import { useForm } from "./use-form"
 
+const EMAIL_LABEL = /Email/
+const CONTACT_EMAIL_LABEL = /Contact email/
+const PASSWORD_LABEL = /Password/
+const NAME_LABEL = /Name/
+const ACCEPT_NAME = /Accept/
+
 afterEach(() => {
   cleanup()
 })
@@ -25,7 +31,7 @@ describe("EmailField / PasswordField — default name", () => {
       )
     }
     render(<H />)
-    const input = screen.getByLabelText(/Email/) as HTMLInputElement
+    const input = screen.getByLabelText(EMAIL_LABEL) as HTMLInputElement
     expect(input.id).toBe("email")
     expect(input.name).toBe("email")
     expect(input.type).toBe("email")
@@ -46,7 +52,7 @@ describe("EmailField / PasswordField — default name", () => {
       )
     }
     render(<H />)
-    const input = screen.getByLabelText(/Contact email/) as HTMLInputElement
+    const input = screen.getByLabelText(CONTACT_EMAIL_LABEL) as HTMLInputElement
     expect(input.id).toBe("contactEmail")
     expect(input.name).toBe("contactEmail")
     await user.type(input, "u@example.com")
@@ -71,7 +77,7 @@ describe("EmailField / PasswordField — default name", () => {
       )
     }
     render(<H />)
-    const input = screen.getByLabelText(/Password/) as HTMLInputElement
+    const input = screen.getByLabelText(PASSWORD_LABEL) as HTMLInputElement
     expect(input.id).toBe("password")
     expect(input.name).toBe("password")
     expect(input.type).toBe("password")
@@ -99,7 +105,7 @@ describe("validators & listeners props forward into the underlying AppField", ()
       )
     }
     render(<H />)
-    await user.type(screen.getByLabelText(/Name/), "Alice")
+    await user.type(screen.getByLabelText(NAME_LABEL), "Alice")
     expect(validator).toHaveBeenCalled()
   })
 
@@ -123,7 +129,7 @@ describe("validators & listeners props forward into the underlying AppField", ()
       )
     }
     render(<H />)
-    await user.type(screen.getByLabelText(/Name/), "Bob")
+    await user.type(screen.getByLabelText(NAME_LABEL), "Bob")
     expect(listener).toHaveBeenCalled()
   })
 })
@@ -149,7 +155,7 @@ describe("CheckboxField — boolean state wrapper", () => {
     }
     render(<H />)
     // BaseUI renders the checkbox as a <button role="checkbox">.
-    const checkbox = screen.getByRole("checkbox", { name: /Accept/ })
+    const checkbox = screen.getByRole("checkbox", { name: ACCEPT_NAME })
     expect(checkbox.getAttribute("aria-checked")).toBe("false")
     await user.click(checkbox)
     expect(checkbox.getAttribute("aria-checked")).toBe("true")

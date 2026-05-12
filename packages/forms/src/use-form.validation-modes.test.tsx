@@ -33,9 +33,10 @@ function Harness({ mode }: { mode?: ValidationMode }) {
 }
 
 const ERROR = /Enter a valid email/i
+const EMAIL_LABEL = /Email/
 
 function getInput() {
-  return screen.getByLabelText(/Email/) as HTMLInputElement
+  return screen.getByLabelText(EMAIL_LABEL) as HTMLInputElement
 }
 function isInvalid() {
   return getInput().getAttribute("aria-invalid") === "true"

@@ -6,6 +6,9 @@ import { z } from "zod"
 import { Form, FormProvider } from "./form"
 import { useForm } from "./use-form"
 
+const DIET_LABEL = /Diet/
+const SAUSAGE_LABEL = /Sausage/
+
 afterEach(() => {
   cleanup()
 })
@@ -41,8 +44,8 @@ describe("Field listeners — cascade pattern", () => {
       )
     }
     render(<H />)
-    const diet = screen.getByLabelText(/Diet/) as HTMLInputElement
-    const sausage = screen.getByLabelText(/Sausage/) as HTMLInputElement
+    const diet = screen.getByLabelText(DIET_LABEL) as HTMLInputElement
+    const sausage = screen.getByLabelText(SAUSAGE_LABEL) as HTMLInputElement
 
     expect(sausage.value).toBe("yes")
     await user.clear(diet)
@@ -73,7 +76,7 @@ describe("Field listeners — cascade pattern", () => {
       )
     }
     render(<H />)
-    await user.type(screen.getByLabelText(/Diet/), "abc")
+    await user.type(screen.getByLabelText(DIET_LABEL), "abc")
     // "abc" — three keystrokes → listener fired at least three times.
     expect(listener.mock.calls.length).toBeGreaterThanOrEqual(3)
   })

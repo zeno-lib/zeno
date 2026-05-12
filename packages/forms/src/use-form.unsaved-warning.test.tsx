@@ -6,6 +6,8 @@ import { z } from "zod"
 import { Form, FormProvider } from "./form"
 import { useForm } from "./use-form"
 
+const NAME_LABEL = /Name/
+
 let addSpy: ReturnType<typeof vi.spyOn>
 let removeSpy: ReturnType<typeof vi.spyOn>
 
@@ -72,7 +74,7 @@ describe("useUnsavedChangesWarning — 'if-changed' (and `true`)", () => {
     }
     render(<H />)
     expect(countBeforeunloadListeners()).toBe(0)
-    await user.type(screen.getByLabelText(/Name/), "Alice")
+    await user.type(screen.getByLabelText(NAME_LABEL), "Alice")
     expect(countBeforeunloadListeners()).toBe(1)
   })
 
@@ -95,7 +97,7 @@ describe("useUnsavedChangesWarning — 'if-changed' (and `true`)", () => {
     }
     render(<H />)
     expect(countBeforeunloadListeners()).toBe(0)
-    await user.type(screen.getByLabelText(/Name/), "Alice")
+    await user.type(screen.getByLabelText(NAME_LABEL), "Alice")
     expect(countBeforeunloadListeners()).toBe(1)
   })
 
@@ -117,7 +119,7 @@ describe("useUnsavedChangesWarning — 'if-changed' (and `true`)", () => {
       )
     }
     render(<H />)
-    const input = screen.getByLabelText(/Name/) as HTMLInputElement
+    const input = screen.getByLabelText(NAME_LABEL) as HTMLInputElement
     await user.type(input, "Alice")
     expect(countBeforeunloadListeners()).toBe(1)
     await user.clear(input)
@@ -145,7 +147,7 @@ describe("useUnsavedChangesWarning — 'if-touched'", () => {
     }
     render(<H />)
     expect(countBeforeunloadListeners()).toBe(0)
-    const input = screen.getByLabelText(/Name/) as HTMLInputElement
+    const input = screen.getByLabelText(NAME_LABEL) as HTMLInputElement
     await user.type(input, "Alice")
     expect(countBeforeunloadListeners()).toBe(1)
     // Revert — `if-touched` is sticky once edited.
@@ -173,7 +175,7 @@ describe("useUnsavedChangesWarning — beforeunload event behaviour", () => {
       )
     }
     render(<H />)
-    await user.type(screen.getByLabelText(/Name/), "Alice")
+    await user.type(screen.getByLabelText(NAME_LABEL), "Alice")
     const event = new Event("beforeunload", { cancelable: true })
     act(() => {
       window.dispatchEvent(event)

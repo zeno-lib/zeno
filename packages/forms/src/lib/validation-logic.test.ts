@@ -32,7 +32,7 @@ function makeRun() {
   const runValidation = vi.fn(
     (props: { form: AnyFormApi; validators: ObservedValidator[] }) => {
       observed.push(props.validators)
-      return undefined
+      return
     }
   )
   return { observed, runValidation }
@@ -62,7 +62,7 @@ describe("blurThenChangeLogic — form-level path", () => {
   test("missing validators yields []", () => {
     const { observed, runValidation } = makeRun()
     blurThenChangeLogic({
-      event: { type: "change", async: false } as LogicArgs["event"],
+      event: { async: false, type: "change" } as LogicArgs["event"],
       form: makeForm(),
       runValidation,
       validators: undefined,
@@ -74,7 +74,7 @@ describe("blurThenChangeLogic — form-level path", () => {
     const onMount = vi.fn()
     const { observed, runValidation } = makeRun()
     blurThenChangeLogic({
-      event: { type: "mount", async: false } as LogicArgs["event"],
+      event: { async: false, type: "mount" } as LogicArgs["event"],
       form: makeForm(),
       runValidation,
       validators: { onMount } as unknown as Validators,
@@ -86,7 +86,7 @@ describe("blurThenChangeLogic — form-level path", () => {
   test("mount with async event yields [] (no async mount)", () => {
     const { observed, runValidation } = makeRun()
     blurThenChangeLogic({
-      event: { type: "mount", async: true } as LogicArgs["event"],
+      event: { async: true, type: "mount" } as LogicArgs["event"],
       form: makeForm(),
       runValidation,
       validators: SCHEMA_VALIDATORS,
@@ -97,7 +97,7 @@ describe("blurThenChangeLogic — form-level path", () => {
   test("blur fires the live validator regardless of state", () => {
     const { observed, runValidation } = makeRun()
     blurThenChangeLogic({
-      event: { type: "blur", async: false } as LogicArgs["event"],
+      event: { async: false, type: "blur" } as LogicArgs["event"],
       form: makeForm(),
       runValidation,
       validators: SCHEMA_VALIDATORS,
@@ -108,7 +108,7 @@ describe("blurThenChangeLogic — form-level path", () => {
   test("blur falls back to onBlur when onChange is absent", () => {
     const { observed, runValidation } = makeRun()
     blurThenChangeLogic({
-      event: { type: "blur", async: false } as LogicArgs["event"],
+      event: { async: false, type: "blur" } as LogicArgs["event"],
       form: makeForm(),
       runValidation,
       validators: SCHEMA_VALIDATORS_BLUR_ONLY,
@@ -119,7 +119,7 @@ describe("blurThenChangeLogic — form-level path", () => {
   test("change while pristine yields [] (no field blurred, no submit)", () => {
     const { observed, runValidation } = makeRun()
     blurThenChangeLogic({
-      event: { type: "change", async: false } as LogicArgs["event"],
+      event: { async: false, type: "change" } as LogicArgs["event"],
       form: makeForm(),
       runValidation,
       validators: SCHEMA_VALIDATORS,
@@ -130,7 +130,7 @@ describe("blurThenChangeLogic — form-level path", () => {
   test("change after a field was blurred runs the live validator", () => {
     const { observed, runValidation } = makeRun()
     blurThenChangeLogic({
-      event: { type: "change", async: false } as LogicArgs["event"],
+      event: { async: false, type: "change" } as LogicArgs["event"],
       form: makeForm({ blurredFieldNames: ["email"] }),
       runValidation,
       validators: SCHEMA_VALIDATORS,
@@ -141,7 +141,7 @@ describe("blurThenChangeLogic — form-level path", () => {
   test("change after a submit attempt runs the live validator", () => {
     const { observed, runValidation } = makeRun()
     blurThenChangeLogic({
-      event: { type: "change", async: false } as LogicArgs["event"],
+      event: { async: false, type: "change" } as LogicArgs["event"],
       form: makeForm({ submissionAttempts: 1 }),
       runValidation,
       validators: SCHEMA_VALIDATORS,
@@ -152,7 +152,7 @@ describe("blurThenChangeLogic — form-level path", () => {
   test("sync submit yields live + submit + server placeholder", () => {
     const { observed, runValidation } = makeRun()
     blurThenChangeLogic({
-      event: { type: "submit", async: false } as LogicArgs["event"],
+      event: { async: false, type: "submit" } as LogicArgs["event"],
       form: makeForm(),
       runValidation,
       validators: SCHEMA_VALIDATORS,
@@ -167,7 +167,7 @@ describe("blurThenChangeLogic — form-level path", () => {
   test("async submit yields live + submitAsync only (no server placeholder)", () => {
     const { observed, runValidation } = makeRun()
     blurThenChangeLogic({
-      event: { type: "submit", async: true } as LogicArgs["event"],
+      event: { async: true, type: "submit" } as LogicArgs["event"],
       form: makeForm(),
       runValidation,
       validators: SCHEMA_VALIDATORS_ASYNC,

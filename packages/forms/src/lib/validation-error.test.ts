@@ -15,10 +15,7 @@ describe("ValidationError", () => {
   })
 
   test("custom message via options.message", () => {
-    const err = new ValidationError(
-      { email: "Taken" },
-      { message: "Boom" }
-    )
+    const err = new ValidationError({ email: "Taken" }, { message: "Boom" })
     expect(err.message).toBe("Boom")
   })
 

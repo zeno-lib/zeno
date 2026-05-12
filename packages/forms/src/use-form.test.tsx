@@ -8,6 +8,10 @@ import { Form, FormProvider } from "./form"
 import { ValidationError } from "./lib/validation-error"
 import { useForm } from "./use-form"
 
+const EMAIL_LABEL = /Email/
+const VALID_EMAIL_MSG = /Enter a valid email/i
+const SUBMIT_NAME = /Submit/
+
 // @testing-library auto-cleanup only runs with `globals: true`. Our vitest
 // config keeps globals off (we import test helpers explicitly), so add the
 // hook ourselves to keep tests isolated.
@@ -20,9 +24,9 @@ describe("useForm — schema-derived defaults", () => {
   test("strings/arrays fill in from schema, .default flows through, optional booleans only set when user supplies", () => {
     const schema = z.object({
       email: z.email(),
+      newsletter: z.boolean().optional(),
       role: z.string().default("member"),
       tags: z.array(z.string()),
-      newsletter: z.boolean().optional(),
     })
     let capturedValues: unknown
     function Harness() {
@@ -137,11 +141,11 @@ describe("useForm — hideFieldErrors", () => {
       )
     }
     render(<Harness />)
-    const input = screen.getByLabelText(/Email/) as HTMLInputElement
+    const input = screen.getByLabelText(EMAIL_LABEL) as HTMLInputElement
     await user.type(input, "not-an-email")
     await user.tab() // blur → triggers validation
     expect(input.getAttribute("aria-invalid")).toBe("true")
-    expect(screen.queryByText(/Enter a valid email/i)).toBeNull()
+    expect(screen.queryByText(VALID_EMAIL_MSG)).toBeNull()
   })
 })
 
@@ -167,11 +171,9 @@ describe("useForm — ValidationError from onSubmit", () => {
       )
     }
     render(<Harness />)
-    await user.type(screen.getByLabelText(/Email/), "user@example.com")
+    await user.type(screen.getByLabelText(EMAIL_LABEL), "user@example.com")
     await user.click(screen.getByRole("button", { name: "Submit" }))
-    expect(
-      await screen.findByText("Taken on the server")
-    ).not.toBeNull()
+    expect(await screen.findByText("Taken on the server")).not.toBeNull()
   })
 
   test("formError populates the form-level error map", async () => {
@@ -200,7 +202,7 @@ describe("useForm — ValidationError from onSubmit", () => {
       )
     }
     render(<Harness />)
-    await user.type(screen.getByLabelText(/Email/), "user@example.com")
+    await user.type(screen.getByLabelText(EMAIL_LABEL), "user@example.com")
     await user.click(screen.getByRole("button", { name: "Submit" }))
     // TanStack Form normalises the `setErrorMap({ onSubmit: { form, fields } })`
     // payload by surfacing the `form` string directly on `errorMap.onSubmit`.
@@ -229,7 +231,7 @@ describe("useForm — ValidationError from onSubmit", () => {
       )
     }
     render(<Harness />)
-    await user.type(screen.getByLabelText(/Email/), "user@example.com")
+    await user.type(screen.getByLabelText(EMAIL_LABEL), "user@example.com")
     await user.click(screen.getByRole("button", { name: "Submit" }))
     expect(onSubmit).toHaveBeenCalled()
     // Not a ValidationError → no field-level message is applied.
@@ -252,7 +254,7 @@ describe("useForm — ValidationError from onSubmit", () => {
       )
     }
     render(<Harness />)
-    await user.type(screen.getByLabelText(/Email/), "user@example.com")
+    await user.type(screen.getByLabelText(EMAIL_LABEL), "user@example.com")
     await expect(
       user.click(screen.getByRole("button", { name: "Submit" }))
     ).resolves.not.toThrow()
@@ -280,8 +282,10 @@ describe("useForm — SubmitButton state", () => {
       )
     }
     render(<Harness />)
-    await user.type(screen.getByLabelText(/Email/), "user@example.com")
-    const button = screen.getByRole("button", { name: /Submit/ }) as HTMLButtonElement
+    await user.type(screen.getByLabelText(EMAIL_LABEL), "user@example.com")
+    const button = screen.getByRole("button", {
+      name: SUBMIT_NAME,
+    }) as HTMLButtonElement
     await user.click(button)
     expect(button.disabled).toBe(true)
     // Spinner renders Lucide's Loader2 with role="status" + aria-label="Loading".
@@ -337,7 +341,7 @@ describe("useForm — manual path", () => {
       )
     }
     render(<Harness />)
-    const input = screen.getByLabelText(/Email/) as HTMLInputElement
+    const input = screen.getByLabelText(EMAIL_LABEL) as HTMLInputElement
     await user.type(input, "bad")
     expect(onChange).toHaveBeenCalled()
   })
