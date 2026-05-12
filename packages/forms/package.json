@@ -9,6 +9,8 @@
     "./tanstack": "./src/tanstack.ts"
   },
   "scripts": {
+    "test": "vitest --run",
+    "test:watch": "vitest watch",
     "types:check": "tsc --noEmit"
   },
   "peerDependencies": {
@@ -25,10 +27,18 @@
     "@tanstack/react-form-nextjs": "1.29.1"
   },
   "devDependencies": {
+    "@testing-library/react": "16.3.2",
+    "@testing-library/user-event": "14.6.1",
     "@types/node": "25.6.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.1",
     "@zeno/typescript": "workspace:*",
-    "typescript": "6.0.3"
+    "@zeno/vitest": "workspace:*",
+    "jsdom": "29.1.1",
+    "typescript": "6.0.3",
+    "vite-tsconfig-paths": "6.1.1",
+    "vitest": "4.0.18",
+    "zod": "^4.3.6"
   }
 }
