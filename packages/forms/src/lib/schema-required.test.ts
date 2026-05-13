@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest"
+import { describe, expect, test } from "@zeno/vitest"
 import { z } from "zod"
 
 import { getRequiredPaths, type StandardSchemaLike } from "./schema-required"

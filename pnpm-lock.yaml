@@ -183,12 +183,6 @@ importers:
         specifier: '>=19'
         version: 19.2.5(react@19.2.5)
     devDependencies:
-      '@testing-library/react':
-        specifier: 16.3.2
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@testing-library/user-event':
-        specifier: 14.6.1
-        version: 14.6.1(@testing-library/dom@10.4.1)
       '@types/node':
         specifier: 25.6.0
         version: 25.6.0
@@ -198,24 +192,15 @@ importers:
       '@types/react-dom':
         specifier: 19.2.3
         version: 19.2.3(@types/react@19.2.14)
-      '@vitejs/plugin-react':
-        specifier: 6.0.1
-        version: 6.0.1(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(yaml@2.8.3))
       '@zeno/typescript':
         specifier: workspace:*
         version: link:../typescript
       '@zeno/vitest':
         specifier: workspace:*
         version: link:../vitest
-      jsdom:
-        specifier: 29.1.1
-        version: 29.1.1(@noble/hashes@1.8.0)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
-      vite-tsconfig-paths:
-        specifier: 6.1.1
-        version: 6.1.1(typescript@6.0.3)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(yaml@2.8.3))
       vitest:
         specifier: 4.0.18
         version: 4.0.18(@types/node@25.6.0)(jiti@2.6.1)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.32.0)(msw@2.14.3(@types/node@25.6.0)(typescript@6.0.3))(yaml@2.8.3)
@@ -343,13 +328,12 @@ importers:
 
   packages/vitest:
     dependencies:
-      vitest:
-        specifier: '>=4'
-        version: 4.0.18(@types/node@25.6.0)(jiti@2.6.1)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.32.0)(msw@2.14.3(@types/node@25.6.0)(typescript@5.9.3))(yaml@2.8.3)
-    devDependencies:
       '@testing-library/react':
         specifier: 16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@testing-library/user-event':
+        specifier: 14.6.1
+        version: 14.6.1(@testing-library/dom@10.4.1)
       '@vitejs/plugin-react':
         specifier: 6.0.1
         version: 6.0.1(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(yaml@2.8.3))
@@ -362,6 +346,9 @@ importers:
       vite-tsconfig-paths:
         specifier: 6.1.1
         version: 6.1.1(typescript@5.9.3)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(yaml@2.8.3))
+      vitest:
+        specifier: 4.0.18
+        version: 4.0.18(@types/node@25.6.0)(jiti@2.6.1)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.32.0)(msw@2.14.3(@types/node@25.6.0)(typescript@5.9.3))(yaml@2.8.3)
 
 packages:
 
@@ -9944,10 +9931,6 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
-  tsconfck@3.1.6(typescript@6.0.3):
-    optionalDependencies:
-      typescript: 6.0.3
-
   tsconfig-paths@4.2.0:
     dependencies:
       json5: 2.2.3
@@ -10126,16 +10109,6 @@ snapshots:
       debug: 4.4.3
       globrex: 0.1.2
       tsconfck: 3.1.6(typescript@5.9.3)
-      vite: 8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(yaml@2.8.3)
-    transitivePeerDependencies:
-      - supports-color
-      - typescript
-
-  vite-tsconfig-paths@6.1.1(typescript@6.0.3)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(yaml@2.8.3)):
-    dependencies:
-      debug: 4.4.3
-      globrex: 0.1.2
-      tsconfck: 3.1.6(typescript@6.0.3)
       vite: 8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(yaml@2.8.3)
     transitivePeerDependencies:
       - supports-color

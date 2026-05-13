@@ -1,13 +1,18 @@
 {
   "name": "@zeno/vitest",
-  "devDependencies": {
+  "exports": {
+    ".": "./src/vitest.ts",
+    "./react": "./src/configs/react.ts",
+    "./testing-library": "./src/testing-library.ts",
+    "./user-event": "./src/user-event.ts"
+  },
+  "dependencies": {
     "@testing-library/react": "16.3.2",
+    "@testing-library/user-event": "14.6.1",
     "@vitejs/plugin-react": "6.0.1",
     "jsdom": "29.1.1",
+    "vite": "8.0.10",
     "vite-tsconfig-paths": "6.1.1",
-    "vite": "8.0.10"
-  },
-  "peerDependencies": {
-    "vitest": ">=4"
+    "vitest": "4.0.18"
   }
 }

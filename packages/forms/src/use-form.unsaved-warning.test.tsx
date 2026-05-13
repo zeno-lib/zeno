@@ -1,6 +1,6 @@
-import { act, cleanup, render, screen } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, test, vi } from "@zeno/vitest"
+import { act, cleanup, render, screen } from "@zeno/vitest/testing-library"
+import userEvent from "@zeno/vitest/user-event"
 import { z } from "zod"
 
 import { Form, FormProvider } from "./form"

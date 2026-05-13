@@ -1,4 +1,4 @@
-import { expectTypeOf, test } from "vitest"
+import { expectTypeOf, test } from "@zeno/vitest"
 import { z } from "zod"
 
 import { useForm } from "./use-form"
