@@ -9,7 +9,7 @@
     "@zeno/docs": "workspace:*"
   },
   "devDependencies": {
-    "@playwright/test": "1.59.1",
+    "@playwright/test": "1.60.0",
     "@types/node": "^25.6.0",
     "@zeno/typescript": "workspace:*",
     "typescript": "6.0.3"
