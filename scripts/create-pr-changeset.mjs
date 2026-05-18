@@ -191,6 +191,20 @@ function formatGithubHandle(value) {
   return value.startsWith("@") ? value : `@${value}`
 }
 
+function hasManualChangeset(changedFiles, prNumber) {
+  const generatedChangeset = `.changeset/pr-${prNumber}.md`
+
+  return changedFiles.some((filePath) => {
+    if (!(filePath.startsWith(".changeset/") && filePath.endsWith(".md"))) {
+      return false
+    }
+
+    return (
+      filePath !== ".changeset/README.md" && filePath !== generatedChangeset
+    )
+  })
+}
+
 function buildChangesetContent(packageNames, releaseType, summary) {
   const frontmatter = packageNames
     .map((packageName) => `${quotePackageName(packageName)}: ${releaseType}`)
@@ -224,6 +238,15 @@ async function main() {
 
   const workspacePackages = await getWorkspacePackages()
   const changedFiles = await getChangedFiles(baseSha, headSha)
+
+  if (hasManualChangeset(changedFiles, prNumber)) {
+    await removeGeneratedChangeset(generatedChangesetPath)
+    console.log(
+      "Skipped generated changeset because the PR already includes a manual changeset"
+    )
+    return
+  }
+
   const changedPackages = detectChangedPackages(changedFiles, workspacePackages)
 
   if (changedPackages.length === 0) {
