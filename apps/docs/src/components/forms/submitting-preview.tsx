@@ -1,6 +1,6 @@
 "use client"
 
-import { Form, FormProvider, useForm, ValidationSpinner } from "@zeno/forms"
+import { Form, FormProvider, useForm, ValidationSpinner } from "@zeno-lib/forms"
 import {
   Card,
   CardContent,
@@ -8,8 +8,8 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@zeno/ui/card"
-import { FieldGroup } from "@zeno/ui/field"
+} from "@zeno-lib/ui/card"
+import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
 import { toastSubmitted, wrapperClass } from "./preview-utils"

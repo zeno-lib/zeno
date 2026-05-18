@@ -1,6 +1,6 @@
 ---
 title: Examples
-description: Composed @zeno/forms examples, from a simple login to dynamic and array fields
+description: Composed @zeno-lib/forms examples, from a simple login to dynamic and array fields
 icon: Sparkles
 status: in progress
 ---
@@ -43,7 +43,7 @@ submission working (Enter-to-submit, accessibility).
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
 import {
   Card,
   CardContent,
@@ -51,8 +51,8 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@zeno/ui/card"
-import { Field, FieldGroup } from "@zeno/ui/field"
+} from "@zeno-lib/ui/card"
+import { Field, FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
 const schema = z.object({
@@ -104,8 +104,8 @@ Keep the form inside `<DialogContent>` and close the dialog from
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { Button } from "@zeno/ui/button"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Button } from "@zeno-lib/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -114,8 +114,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@zeno/ui/dialog"
-import { FieldGroup } from "@zeno/ui/field"
+} from "@zeno-lib/ui/dialog"
+import { FieldGroup } from "@zeno-lib/ui/field"
 import { useState } from "react"
 import { z } from "zod"
 
@@ -187,8 +187,8 @@ A two-field form with a Zod schema. `name` autocompletes against
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { FieldGroup } from "@zeno/ui/field"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
 const schema = z.object({
@@ -238,8 +238,8 @@ to disable it during the round-trip.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm, ValidationSpinner } from "@zeno/forms"
-import { FieldGroup } from "@zeno/ui/field"
+import { Form, FormProvider, useForm, ValidationSpinner } from "@zeno-lib/forms"
+import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
 const schema = z.object({
@@ -299,8 +299,8 @@ at, here the "Confirm password" field.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { FieldGroup } from "@zeno/ui/field"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
 const schema = z
@@ -355,9 +355,9 @@ bracketed paths like `members[0].name`, typed against the schema.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { Button } from "@zeno/ui/button"
-import { FieldGroup, FieldLegend, FieldSet } from "@zeno/ui/field"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Button } from "@zeno-lib/ui/button"
+import { FieldGroup, FieldLegend, FieldSet } from "@zeno-lib/ui/field"
 import { TrashIcon } from "lucide-react"
 import { z } from "zod"
 
@@ -378,7 +378,7 @@ export function TeamInvites() {
     schema,
   })
   // `Field` is TanStack Form's render-prop component; rename to avoid
-  // clashing with `@zeno/ui/field`'s `Field`.
+  // clashing with `@zeno-lib/ui/field`'s `Field`.
   const {
     EmailField,
     Field: ArrayField,
@@ -452,9 +452,9 @@ between a `SelectField` and an `InputField`.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { FieldGroup } from "@zeno/ui/field"
-import { SelectItem } from "@zeno/ui/select"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { FieldGroup } from "@zeno-lib/ui/field"
+import { SelectItem } from "@zeno-lib/ui/select"
 
 export function Shipping() {
   const form = useForm({
@@ -516,9 +516,9 @@ object (`meals.salad`, `meals.sausage`, `meals.eggs`) so each
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { FieldGroup, FieldLegend, FieldSet } from "@zeno/ui/field"
-import { SelectItem } from "@zeno/ui/select"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { FieldGroup, FieldLegend, FieldSet } from "@zeno-lib/ui/field"
+import { SelectItem } from "@zeno-lib/ui/select"
 import { z } from "zod"
 
 type Diet = "none" | "vegetarian" | "vegan"
@@ -592,9 +592,9 @@ children automatically.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { FieldGroup } from "@zeno/ui/field"
-import { SelectItem } from "@zeno/ui/select"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { FieldGroup } from "@zeno-lib/ui/field"
+import { SelectItem } from "@zeno-lib/ui/select"
 import { z } from "zod"
 
 const categories = [
@@ -640,8 +640,8 @@ returns `value` (the numeric ID) to the form.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { FieldGroup } from "@zeno/ui/field"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
 const categories = [
@@ -699,7 +699,7 @@ equality doesn't bite when `groupsForView` is rebuilt each render.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useFieldContext, useForm } from "@zeno/forms"
+import { Form, FormProvider, useFieldContext, useForm } from "@zeno-lib/forms"
 import {
   Combobox,
   ComboboxChip,
@@ -714,8 +714,8 @@ import {
   ComboboxList,
   ComboboxValue,
   useComboboxAnchor,
-} from "@zeno/ui/combobox"
-import { Field, FieldGroup, FieldLabel } from "@zeno/ui/field"
+} from "@zeno-lib/ui/combobox"
+import { Field, FieldGroup, FieldLabel } from "@zeno-lib/ui/field"
 import { useState } from "react"
 import { z } from "zod"
 
@@ -851,8 +851,8 @@ context the same way and needs no extra wiring.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { FieldGroup } from "@zeno/ui/field"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
 const schema = z.object({
@@ -901,8 +901,8 @@ table on
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { FieldGroup } from "@zeno/ui/field"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { FieldGroup } from "@zeno-lib/ui/field"
 import { useEffect, useState } from "react"
 
 async function searchUsers(query: string): Promise<string[]> {
@@ -980,8 +980,8 @@ the user sees feedback once and it goes away as they fix the value.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm, ValidationError } from "@zeno/forms"
-import { FieldGroup } from "@zeno/ui/field"
+import { Form, FormProvider, useForm, ValidationError } from "@zeno-lib/forms"
+import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
 const schema = z.object({
@@ -1061,9 +1061,9 @@ Two trigger modes:
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { Badge } from "@zeno/ui/badge"
-import { FieldGroup } from "@zeno/ui/field"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Badge } from "@zeno-lib/ui/badge"
+import { FieldGroup } from "@zeno-lib/ui/field"
 
 export function EditPost() {
   const form = useForm({

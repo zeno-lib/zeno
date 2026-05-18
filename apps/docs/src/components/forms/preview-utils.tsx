@@ -1,6 +1,6 @@
 "use client"
 
-import { toast } from "@zeno/ui/sonner"
+import { toast } from "@zeno-lib/ui/sonner"
 
 export const wrapperClass = "w-full max-w-sm"
 

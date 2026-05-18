@@ -1,5 +1,5 @@
 "use client"
-import { cn } from "@zeno/ui/lib/utils"
+import { cn } from "@zeno-lib/ui/lib/utils"
 import { buttonVariants } from "fumadocs-ui/components/ui/button"
 import {
   Popover,

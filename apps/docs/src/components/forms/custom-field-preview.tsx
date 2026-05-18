@@ -6,7 +6,7 @@ import {
   useFieldContext,
   useForm,
   useIsInvalid,
-} from "@zeno/forms"
+} from "@zeno-lib/forms"
 import {
   Card,
   CardContent,
@@ -14,16 +14,16 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@zeno/ui/card"
+} from "@zeno-lib/ui/card"
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
-} from "@zeno/ui/field"
-import { Slider } from "@zeno/ui/slider"
-import { toast } from "@zeno/ui/sonner"
+} from "@zeno-lib/ui/field"
+import { Slider } from "@zeno-lib/ui/slider"
+import { toast } from "@zeno-lib/ui/sonner"
 import { z } from "zod"
 
 function VolumeField({ label }: { label: string }) {

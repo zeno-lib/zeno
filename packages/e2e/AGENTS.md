@@ -1,6 +1,6 @@
-# `@resolve/e2e` — Intent
+# `@zeno-lib/e2e` — Intent
 
-Playwright end-to-end suite for every app in the workspace. Note the package name is `@resolve/e2e` (not `@zeno/e2e`) — keep that scope when referring to it.
+Playwright end-to-end suite for every app in the workspace. Note the package name is `@zeno-lib/e2e` (not `@zeno-lib/e2e`) — keep that scope when referring to it.
 
 ## Purpose & Scope
 
@@ -44,7 +44,7 @@ Run against the docs app locally (uses an existing dev server if one is already 
 
 ```bash
 pnpm exec playwright install --with-deps   # one-time, in this package
-pnpm turbo run e2e --filter @resolve/e2e
+pnpm turbo run e2e --filter @zeno-lib/e2e
 ```
 
 Author a new spec for the docs app:
@@ -75,7 +75,7 @@ Tooling: `@playwright/test@1.59.1`. After `pnpm install`, **every developer must
 
 ## Pitfalls
 
-- **`verify-app-deps.mjs` is the contract enforcement point** for Turbo's `^build` to actually rebuild the app before tests. If you skip listing an app as a workspace dep, Turbo runs e2e against whatever stale build sits on disk and the failure is non-obvious. Always run `pnpm turbo run verify-deps --filter @resolve/e2e` after restructuring.
+- **`verify-app-deps.mjs` is the contract enforcement point** for Turbo's `^build` to actually rebuild the app before tests. If you skip listing an app as a workspace dep, Turbo runs e2e against whatever stale build sits on disk and the failure is non-obvious. Always run `pnpm turbo run verify-deps --filter @zeno-lib/e2e` after restructuring.
 - **`webServer.reuseExistingServer: !process.env.CI`** — locally, Playwright will reuse a dev server you already started; in CI it always boots a fresh `next start`. So locally with a running `pnpm dev`, e2e tests hit the dev server (HMR enabled), not the production build, which can mask production-only bugs. For trustworthy local runs, kill the dev server first.
 - **CI test timeout is 30s, local is 120s** (`playwright.config.ts:57`). Tests that pass locally because they slowly poll a network-idle page can time out in CI; budget accordingly.
 - **`reporter: process.env.CI ? "html" : "list"`** — HTML reports go to a `playwright-report/` directory that should not be committed; ensure it stays in `.gitignore`.

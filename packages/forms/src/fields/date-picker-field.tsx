@@ -1,10 +1,15 @@
 "use client"
 
-import { buttonVariants } from "@zeno/ui/button"
-import { Calendar } from "@zeno/ui/calendar"
-import { Field, FieldDescription, FieldError, FieldLabel } from "@zeno/ui/field"
-import { cn } from "@zeno/ui/lib/utils"
-import { Popover, PopoverContent, PopoverTrigger } from "@zeno/ui/popover"
+import { buttonVariants } from "@zeno-lib/ui/button"
+import { Calendar } from "@zeno-lib/ui/calendar"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@zeno-lib/ui/field"
+import { cn } from "@zeno-lib/ui/lib/utils"
+import { Popover, PopoverContent, PopoverTrigger } from "@zeno-lib/ui/popover"
 import type { ComponentProps, ReactNode } from "react"
 
 import { describedBy } from "../lib/aria"

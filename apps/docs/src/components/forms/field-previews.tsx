@@ -1,9 +1,9 @@
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { RadioGroupFieldItem } from "@zeno/forms/fields"
-import { FieldGroup } from "@zeno/ui/field"
-import { SelectItem } from "@zeno/ui/select"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { RadioGroupFieldItem } from "@zeno-lib/forms/fields"
+import { FieldGroup } from "@zeno-lib/ui/field"
+import { SelectItem } from "@zeno-lib/ui/select"
 import { z } from "zod"
 
 const wrapperClass = "w-full max-w-sm"

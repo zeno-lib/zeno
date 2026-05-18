@@ -13,10 +13,10 @@ Linked entries below have a leaf node — open it before working in that area. E
 - `apps/`
   - [`docs/`](apps/docs/AGENTS.md) — Documentation site (Next.js + Fumadocs) on port 5002
 - `packages/`
-  - [`ui/`](packages/ui/AGENTS.md) — `@zeno/ui` component primitives (Base UI + Tailwind)
-  - [`authentication/`](packages/authentication/AGENTS.md) — `@zeno/authentication` Supabase auth flows (read before touching `verify/` or `email-sent/`)
-  - [`supabase/`](packages/supabase/AGENTS.md) — `@zeno/supabase` SSR client + middleware
-  - [`e2e/`](packages/e2e/AGENTS.md) — `@resolve/e2e` Playwright suite
+  - [`ui/`](packages/ui/AGENTS.md) — `@zeno-lib/ui` component primitives (Base UI + Tailwind)
+  - [`authentication/`](packages/authentication/AGENTS.md) — `@zeno-lib/authentication` Supabase auth flows (read before touching `verify/` or `email-sent/`)
+  - [`supabase/`](packages/supabase/AGENTS.md) — `@zeno-lib/supabase` SSR client + middleware
+  - [`e2e/`](packages/e2e/AGENTS.md) — `@zeno-lib/e2e` Playwright suite
   - `typescript/` — shared `tsconfig` presets
   - `tailwind/` — shared Tailwind globals
   - `vitest/` — shared Vitest config
@@ -44,9 +44,13 @@ Don't update the node for mechanical refactors, formatting, or implementation de
 | `pnpm test` / `pnpm test:watch` | Run / watch Vitest unit tests. `test` depends on `build` and `lint`. |
 | `pnpm e2e` / `pnpm e2e:watch` | Run / watch Playwright. Requires `pnpm exec playwright install --with-deps` once in `packages/e2e/`. |
 | `pnpm lint` / `pnpm lint:fix` | Ultracite check / autofix. |
+| `pnpm changeset` | Create a release note for publishable packages under `packages/`. |
+| `pnpm prerelease:beta:enter` / `pnpm prerelease:beta:exit` | Enter or leave Changesets beta prerelease mode for test publishes. |
+| `pnpm version-packages` | Apply pending Changesets and update package versions/changelogs (with commit links via `@changesets/changelog-git`). |
+| `pnpm release` | Publish the pending package releases to npm. |
 | `pnpm ci` | Full pre-PR pipeline: `lint → types:check → build → test → e2e`. |
 
-Scope a command to one package with `pnpm turbo run <task> --filter <pkg-name>` (e.g. `--filter @zeno/docs`).
+Scope a command to one package with `pnpm turbo run <task> --filter <pkg-name>` (e.g. `--filter @zeno-lib/docs`).
 
 ## Formatting
 

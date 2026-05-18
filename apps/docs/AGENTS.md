@@ -1,4 +1,4 @@
-# `@zeno/docs` — Intent
+# `@zeno-lib/docs` — Intent
 
 Public Fumadocs documentation site. Inherits root conventions; this file covers what's specific to the app.
 
@@ -8,7 +8,7 @@ Next.js 16 App Router site that renders MDX content from `content/docs/`, expose
 
 **Owns:** the site's routes, layouts, marketing pages under `(home)/`, the docs route at `/docs/[[...slug]]`, MDX component overrides (`mdx-components.tsx`), the layout shell.
 
-**Does NOT own:** UI primitives (use `@zeno/ui`), the documentation content's authoritative source — content is just MDX in `content/docs/`, organised by area.
+**Does NOT own:** UI primitives (use `@zeno-lib/ui`), the documentation content's authoritative source — content is just MDX in `content/docs/`, organised by area.
 
 ## Entry Points & Contracts
 
@@ -41,12 +41,12 @@ Adding a docs page:
 
 1. Create `content/docs/<section>/<slug>.mdx` with Fumadocs frontmatter (`title`, `description`).
 2. Update the section's `meta.json` if the page should appear in the sidebar in a specific position.
-3. `pnpm dev --filter @zeno/docs` (or `pnpm turbo run dev --filter @zeno/docs`) — the codegen runs on save.
+3. `pnpm dev --filter @zeno-lib/docs` (or `pnpm turbo run dev --filter @zeno-lib/docs`) — the codegen runs on save.
 
 Importing a UI primitive inside an MDX page:
 
 ```mdx
-import { Button } from "@zeno/ui/button"
+import { Button } from "@zeno-lib/ui/button"
 
 <Button>Try it</Button>
 ```
@@ -62,9 +62,9 @@ import { Button } from "@zeno/ui/button"
 
 ## Dependencies & Edges
 
-Workspace: `@zeno/ui`, `@zeno/typescript`. Stack: `next@16.2.4`, `react@19.2.5`, `fumadocs-core@16.8.5`, `fumadocs-ui@16.8.5`, `fumadocs-mdx@14.3.2`, `tailwindcss@4`, `zod@4`.
+Workspace: `@zeno-lib/ui`, `@zeno-lib/typescript`. Stack: `next@16.2.4`, `react@19.2.5`, `fumadocs-core@16.8.5`, `fumadocs-ui@16.8.5`, `fumadocs-mdx@14.3.2`, `tailwindcss@4`, `zod@4`.
 
-Consumed by: `@resolve/e2e` lists this app as a workspace dep so `turbo run e2e` can build it before booting Playwright (see `packages/e2e/AGENTS.md`).
+Consumed by: `@zeno-lib/e2e` lists this app as a workspace dep so `turbo run e2e` can build it before booting Playwright (see `packages/e2e/AGENTS.md`).
 
 ## Pitfalls
 

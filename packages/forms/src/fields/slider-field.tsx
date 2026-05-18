@@ -6,8 +6,8 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
-} from "@zeno/ui/field"
-import { Slider } from "@zeno/ui/slider"
+} from "@zeno-lib/ui/field"
+import { Slider } from "@zeno-lib/ui/slider"
 import type { ComponentProps, ReactNode } from "react"
 
 import { describedBy } from "../lib/aria"

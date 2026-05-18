@@ -1,6 +1,6 @@
 "use client"
 
-import { Button } from "@zeno/ui/button"
+import { Button } from "@zeno-lib/ui/button"
 import Link from "next/link"
 
 import { Container } from "../components/container"

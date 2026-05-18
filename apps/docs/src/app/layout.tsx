@@ -1,6 +1,6 @@
 import { RootProvider } from "fumadocs-ui/provider/next"
 import "./global.css"
-import { Toaster } from "@zeno/ui/sonner"
+import { Toaster } from "@zeno-lib/ui/sonner"
 import { HomeLayout } from "fumadocs-ui/layouts/home"
 import { Inter } from "next/font/google"
 import { Devtools } from "@/components/devtools"

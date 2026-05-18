@@ -1,6 +1,6 @@
 ---
 title: Fields
-description: Live examples of every shipped @zeno/forms field
+description: Live examples of every shipped @zeno-lib/forms field
 icon: ListChecks
 status: in progress
 ---
@@ -145,7 +145,7 @@ order doesn't matter.
   <AddonInlineIconPreview />
 
 ```tsx
-import { InputGroupAddon } from "@zeno/ui/input-group"
+import { InputGroupAddon } from "@zeno-lib/ui/input-group"
 import { MailIcon } from "lucide-react"
 
 <EmailField placeholder="you@zeno.dev">
@@ -163,7 +163,7 @@ import { MailIcon } from "lucide-react"
   <AddonInlineTextPreview />
 
 ```tsx
-import { InputGroupAddon, InputGroupText } from "@zeno/ui/input-group"
+import { InputGroupAddon, InputGroupText } from "@zeno-lib/ui/input-group"
 
 <InputField label="Handle" name="handle" placeholder="acme">
   <InputGroupAddon align="inline-start">
@@ -187,7 +187,7 @@ counters.
   <AddonBlockToolbarPreview />
 
 ```tsx
-import { InputGroupAddon, InputGroupButton } from "@zeno/ui/input-group"
+import { InputGroupAddon, InputGroupButton } from "@zeno-lib/ui/input-group"
 import { BoldIcon, ItalicIcon } from "lucide-react"
 
 <TextAreaField label="Bio" name="bio" placeholder="I build things on the web.">
@@ -206,7 +206,7 @@ import { BoldIcon, ItalicIcon } from "lucide-react"
 
 ### Async-validation indicator
 
-`@zeno/forms` ships `<ValidationSpinner />` for the common case: a spinner
+`@zeno-lib/forms` ships `<ValidationSpinner />` for the common case: a spinner
 appears in the input while an async validator is in flight, and clears
 when it resolves. See the
 [Async submission example](/docs/feature-modules/components/forms/examples#async-submission)
@@ -216,7 +216,7 @@ for a full setup.
   <AddonValidationSpinnerPreview />
 
 ```tsx
-import { ValidationSpinner } from "@zeno/forms"
+import { ValidationSpinner } from "@zeno-lib/forms"
 
 <EmailField
   placeholder="Try taken@example.com"
@@ -247,7 +247,7 @@ naturally.
 
 ## Select Field
 
-Wraps `@zeno/ui/select`. Pass `<SelectItem>` children for the options. For
+Wraps `@zeno-lib/ui/select`. Pass `<SelectItem>` children for the options. For
 the common case of database rows where the ID is a number, see
 [Numeric IDs](/docs/feature-modules/components/forms/examples#numeric-ids).
 
@@ -255,7 +255,7 @@ the common case of database rows where the ID is a number, see
   <SelectFieldPreview />
 
 ```tsx
-import { SelectItem } from "@zeno/ui/select"
+import { SelectItem } from "@zeno-lib/ui/select"
 
 <SelectField label="Role" name="role" placeholder="Pick a role">
   <SelectItem value="engineer">Engineer</SelectItem>
@@ -298,14 +298,14 @@ import { SelectItem } from "@zeno/ui/select"
 
 ## Radio Group Field
 
-Wraps `@zeno/ui/radio-group`. `<RadioGroupFieldItem>` pairs each radio
+Wraps `@zeno-lib/ui/radio-group`. `<RadioGroupFieldItem>` pairs each radio
 with its label and `htmlFor` so you don't wire IDs by hand.
 
 <Preview>
   <RadioGroupFieldPreview />
 
 ```tsx
-import { RadioGroupFieldItem } from "@zeno/forms/fields"
+import { RadioGroupFieldItem } from "@zeno-lib/forms/fields"
 
 <RadioGroupField label="Plan" name="plan">
   <RadioGroupFieldItem value="free">Free</RadioGroupFieldItem>
@@ -318,7 +318,7 @@ import { RadioGroupFieldItem } from "@zeno/forms/fields"
 
 ## Slider Field
 
-Wraps `@zeno/ui/slider`. The form value is `number` for a single thumb,
+Wraps `@zeno-lib/ui/slider`. The form value is `number` for a single thumb,
 `number[]` for a range (pick by typing your `defaultValues`). Pass
 `formatValue` to render a live readout next to the label.
 
@@ -341,7 +341,7 @@ Wraps `@zeno/ui/slider`. The form value is `number` for a single thumb,
 
 ## OTP Field
 
-Wraps `@zeno/ui/input-otp`. Defaults to a 6-slot group. Override with
+Wraps `@zeno-lib/ui/input-otp`. Defaults to a 6-slot group. Override with
 `maxLength`, restrict input with `pattern` (a string regex), or pass
 `children` to insert a separator between groups.
 
@@ -361,7 +361,7 @@ Wraps `@zeno/ui/input-otp`. Defaults to a 6-slot group. Override with
 
 ## Date Picker Field
 
-Composes `@zeno/ui/popover` and `@zeno/ui/calendar`. The form value is
+Composes `@zeno-lib/ui/popover` and `@zeno-lib/ui/calendar`. The form value is
 `Date | undefined`. The trigger formats the selected date via
 `toLocaleDateString` by default; pass `formatValue` to override or
 `calendarProps` to forward options (`disabled`, `locale`, …) to the
@@ -382,7 +382,7 @@ underlying `<Calendar>`.
 
 ## Combobox Field
 
-Wraps `@zeno/ui/combobox`. Single-select with client-side filtering as the
+Wraps `@zeno-lib/ui/combobox`. Single-select with client-side filtering as the
 user types. Pass plain strings for `string[]` items, or `{ value, label }`
 objects when the value isn't a string — see
 [Numeric IDs](/docs/feature-modules/components/forms/examples#numeric-ids).
@@ -432,9 +432,9 @@ same typed field state and accessibility plumbing the shipped fields use.
 ```tsx lineNumbers
 "use client"
 
-import { useFieldContext, useIsInvalid } from "@zeno/forms"
-import { Field, FieldError, FieldLabel } from "@zeno/ui/field"
-import { Slider } from "@zeno/ui/slider"
+import { useFieldContext, useIsInvalid } from "@zeno-lib/forms"
+import { Field, FieldError, FieldLabel } from "@zeno-lib/ui/field"
+import { Slider } from "@zeno-lib/ui/slider"
 
 function VolumeField({ label }: { label: string }) {
   const field = useFieldContext<number>()

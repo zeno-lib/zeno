@@ -7,10 +7,15 @@ import {
   ComboboxInput,
   ComboboxItem,
   ComboboxList,
-} from "@zeno/ui/combobox"
-import { Field, FieldDescription, FieldError, FieldLabel } from "@zeno/ui/field"
-import { InputGroupAddon } from "@zeno/ui/input-group"
-import { Spinner } from "@zeno/ui/spinner"
+} from "@zeno-lib/ui/combobox"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@zeno-lib/ui/field"
+import { InputGroupAddon } from "@zeno-lib/ui/input-group"
+import { Spinner } from "@zeno-lib/ui/spinner"
 import type { ReactNode } from "react"
 
 import { describedBy } from "../lib/aria"

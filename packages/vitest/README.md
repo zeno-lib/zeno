@@ -2,7 +2,7 @@
 
 In the package you want to do testing, do the following:
 
-- import this package by adding `"@zeno/vitest": "workspace:*"` into `devDependencies` inside `package.json.
+- import this package by adding `"@zeno-lib/vitest": "workspace:*"` into `devDependencies` inside `package.json.
 - also add `vitest` into `devDependencies`.
 - create tests by creating `x.test.ts` files.
 - Here is a content example:

@@ -1,12 +1,22 @@
 {
-  "name": "@zeno/forms",
-  "version": "0.0.0",
+  "name": "@zeno-lib/forms",
   "private": true,
+  "version": "0.0.0",
   "exports": {
     ".": "./src/form.tsx",
     "./addons": "./src/addons/index.ts",
     "./fields": "./src/fields/index.ts",
     "./tanstack": "./src/tanstack.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/forms"
   },
   "scripts": {
     "types:check": "tsc --noEmit"
@@ -14,7 +24,7 @@
   "peerDependencies": {
     "@tanstack/react-devtools": ">=0.10",
     "@tanstack/react-form-devtools": ">=0.2",
-    "@zeno/ui": "workspace:*",
+    "@zeno-lib/ui": "workspace:^",
     "next": ">=16",
     "react": ">=19",
     "react-dom": ">=19",
@@ -28,7 +38,7 @@
     "@types/node": "25.6.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "@zeno/typescript": "workspace:*",
+    "@zeno-lib/typescript": "workspace:^",
     "typescript": "6.0.3"
   }
 }

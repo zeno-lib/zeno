@@ -5,23 +5,23 @@ icon: LayoutGrid
 status: in progress
 ---
 
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@zeno/ui/accordion"
-import { Alert, AlertDescription, AlertTitle } from "@zeno/ui/alert"
-import { Badge } from "@zeno/ui/badge"
-import { Button } from "@zeno/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@zeno/ui/card"
-import { Input } from "@zeno/ui/input"
-import { Label } from "@zeno/ui/label"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@zeno-lib/ui/accordion"
+import { Alert, AlertDescription, AlertTitle } from "@zeno-lib/ui/alert"
+import { Badge } from "@zeno-lib/ui/badge"
+import { Button } from "@zeno-lib/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@zeno-lib/ui/card"
+import { Input } from "@zeno-lib/ui/input"
+import { Label } from "@zeno-lib/ui/label"
 import { TriangleAlertIcon } from "lucide-react"
 
 Zeno ships a set of unstyled-but-themed React primitives in the
-`@zeno/ui` package. They mirror [shadcn/ui](https://ui.shadcn.com)
+`@zeno-lib/ui` package. They mirror [shadcn/ui](https://ui.shadcn.com)
 1:1 in API and naming and are built on top of
 [Base UI](https://base-ui.com).
 
 ```tsx
-import { Button } from "@zeno/ui/button"
-import { Dialog, DialogContent, DialogTrigger } from "@zeno/ui/dialog"
+import { Button } from "@zeno-lib/ui/button"
+import { Dialog, DialogContent, DialogTrigger } from "@zeno-lib/ui/dialog"
 ```
 
 ## Anatomy
@@ -30,18 +30,18 @@ import { Dialog, DialogContent, DialogTrigger } from "@zeno/ui/dialog"
 
 ```tsx
 import Link from "next/link"
-import { Button } from "@zeno/ui/button"
+import { Button } from "@zeno-lib/ui/button"
 
 <Button render={<Link href="/recover">Recover</Link>} variant="link" />
 ```
 
 ## Theming
 
-Theme tokens live in `@zeno/ui/styles/theme.css`. Import it once in
+Theme tokens live in `@zeno-lib/ui/styles/theme.css`. Import it once in
 your consuming app's global stylesheet:
 
 ```css
-@import "@zeno/ui/styles/theme.css";
+@import "@zeno-lib/ui/styles/theme.css";
 ```
 
 See [Theming](/docs/core-framework/building-ui/theming) for token
@@ -127,72 +127,72 @@ overrides and dark mode.
 ## Component index
 
 ### Layout
-- [Aspect Ratio](https://ui.shadcn.com/docs/components/aspect-ratio) — `@zeno/ui/aspect-ratio`
-- [Card](https://ui.shadcn.com/docs/components/card) — `@zeno/ui/card`
-- [Resizable](https://ui.shadcn.com/docs/components/resizable) — `@zeno/ui/resizable`
-- [Scroll Area](https://ui.shadcn.com/docs/components/scroll-area) — `@zeno/ui/scroll-area`
-- [Separator](https://ui.shadcn.com/docs/components/separator) — `@zeno/ui/separator`
-- [Sidebar](https://ui.shadcn.com/docs/components/sidebar) — `@zeno/ui/sidebar`
+- [Aspect Ratio](https://ui.shadcn.com/docs/components/aspect-ratio) — `@zeno-lib/ui/aspect-ratio`
+- [Card](https://ui.shadcn.com/docs/components/card) — `@zeno-lib/ui/card`
+- [Resizable](https://ui.shadcn.com/docs/components/resizable) — `@zeno-lib/ui/resizable`
+- [Scroll Area](https://ui.shadcn.com/docs/components/scroll-area) — `@zeno-lib/ui/scroll-area`
+- [Separator](https://ui.shadcn.com/docs/components/separator) — `@zeno-lib/ui/separator`
+- [Sidebar](https://ui.shadcn.com/docs/components/sidebar) — `@zeno-lib/ui/sidebar`
 
 ### Forms
-- [Button](https://ui.shadcn.com/docs/components/button) — `@zeno/ui/button`
-- [Button Group](https://ui.shadcn.com/docs/components/button-group) — `@zeno/ui/button-group`
-- [Checkbox](https://ui.shadcn.com/docs/components/checkbox) — `@zeno/ui/checkbox`
-- [Field](https://ui.shadcn.com/docs/components/field) — `@zeno/ui/field`
-- [Input](https://ui.shadcn.com/docs/components/input) — `@zeno/ui/input`
-- [Input Group](https://ui.shadcn.com/docs/components/input-group) — `@zeno/ui/input-group`
-- [Input OTP](https://ui.shadcn.com/docs/components/input-otp) — `@zeno/ui/input-otp`
-- [Label](https://ui.shadcn.com/docs/components/label) — `@zeno/ui/label`
-- [Radio Group](https://ui.shadcn.com/docs/components/radio-group) — `@zeno/ui/radio-group`
-- [Select](https://ui.shadcn.com/docs/components/select) — `@zeno/ui/select`
-- [Slider](https://ui.shadcn.com/docs/components/slider) — `@zeno/ui/slider`
-- [Switch](https://ui.shadcn.com/docs/components/switch) — `@zeno/ui/switch`
-- [Textarea](https://ui.shadcn.com/docs/components/textarea) — `@zeno/ui/textarea`
-- [Toggle](https://ui.shadcn.com/docs/components/toggle) — `@zeno/ui/toggle`
-- [Toggle Group](https://ui.shadcn.com/docs/components/toggle-group) — `@zeno/ui/toggle-group`
-- `Native Select` — `@zeno/ui/native-select`. shadcn doesn't ship a native variant; reach for it when you want the OS-level picker, otherwise use [Select](https://ui.shadcn.com/docs/components/select).
+- [Button](https://ui.shadcn.com/docs/components/button) — `@zeno-lib/ui/button`
+- [Button Group](https://ui.shadcn.com/docs/components/button-group) — `@zeno-lib/ui/button-group`
+- [Checkbox](https://ui.shadcn.com/docs/components/checkbox) — `@zeno-lib/ui/checkbox`
+- [Field](https://ui.shadcn.com/docs/components/field) — `@zeno-lib/ui/field`
+- [Input](https://ui.shadcn.com/docs/components/input) — `@zeno-lib/ui/input`
+- [Input Group](https://ui.shadcn.com/docs/components/input-group) — `@zeno-lib/ui/input-group`
+- [Input OTP](https://ui.shadcn.com/docs/components/input-otp) — `@zeno-lib/ui/input-otp`
+- [Label](https://ui.shadcn.com/docs/components/label) — `@zeno-lib/ui/label`
+- [Radio Group](https://ui.shadcn.com/docs/components/radio-group) — `@zeno-lib/ui/radio-group`
+- [Select](https://ui.shadcn.com/docs/components/select) — `@zeno-lib/ui/select`
+- [Slider](https://ui.shadcn.com/docs/components/slider) — `@zeno-lib/ui/slider`
+- [Switch](https://ui.shadcn.com/docs/components/switch) — `@zeno-lib/ui/switch`
+- [Textarea](https://ui.shadcn.com/docs/components/textarea) — `@zeno-lib/ui/textarea`
+- [Toggle](https://ui.shadcn.com/docs/components/toggle) — `@zeno-lib/ui/toggle`
+- [Toggle Group](https://ui.shadcn.com/docs/components/toggle-group) — `@zeno-lib/ui/toggle-group`
+- `Native Select` — `@zeno-lib/ui/native-select`. shadcn doesn't ship a native variant; reach for it when you want the OS-level picker, otherwise use [Select](https://ui.shadcn.com/docs/components/select).
 
 ### Navigation
-- [Breadcrumb](https://ui.shadcn.com/docs/components/breadcrumb) — `@zeno/ui/breadcrumb`
-- [Menubar](https://ui.shadcn.com/docs/components/menubar) — `@zeno/ui/menubar`
-- [Navigation Menu](https://ui.shadcn.com/docs/components/navigation-menu) — `@zeno/ui/navigation-menu`
-- [Pagination](https://ui.shadcn.com/docs/components/pagination) — `@zeno/ui/pagination`
-- [Tabs](https://ui.shadcn.com/docs/components/tabs) — `@zeno/ui/tabs`
+- [Breadcrumb](https://ui.shadcn.com/docs/components/breadcrumb) — `@zeno-lib/ui/breadcrumb`
+- [Menubar](https://ui.shadcn.com/docs/components/menubar) — `@zeno-lib/ui/menubar`
+- [Navigation Menu](https://ui.shadcn.com/docs/components/navigation-menu) — `@zeno-lib/ui/navigation-menu`
+- [Pagination](https://ui.shadcn.com/docs/components/pagination) — `@zeno-lib/ui/pagination`
+- [Tabs](https://ui.shadcn.com/docs/components/tabs) — `@zeno-lib/ui/tabs`
 
 ### Overlays
-- [Alert Dialog](https://ui.shadcn.com/docs/components/alert-dialog) — `@zeno/ui/alert-dialog`
-- [Context Menu](https://ui.shadcn.com/docs/components/context-menu) — `@zeno/ui/context-menu`
-- [Dialog](https://ui.shadcn.com/docs/components/dialog) — `@zeno/ui/dialog`
-- [Drawer](https://ui.shadcn.com/docs/components/drawer) — `@zeno/ui/drawer`
-- [Dropdown Menu](https://ui.shadcn.com/docs/components/dropdown-menu) — `@zeno/ui/dropdown-menu`
-- [Hover Card](https://ui.shadcn.com/docs/components/hover-card) — `@zeno/ui/hover-card`
-- [Popover](https://ui.shadcn.com/docs/components/popover) — `@zeno/ui/popover`
-- [Sheet](https://ui.shadcn.com/docs/components/sheet) — `@zeno/ui/sheet`
-- [Tooltip](https://ui.shadcn.com/docs/components/tooltip) — `@zeno/ui/tooltip`
+- [Alert Dialog](https://ui.shadcn.com/docs/components/alert-dialog) — `@zeno-lib/ui/alert-dialog`
+- [Context Menu](https://ui.shadcn.com/docs/components/context-menu) — `@zeno-lib/ui/context-menu`
+- [Dialog](https://ui.shadcn.com/docs/components/dialog) — `@zeno-lib/ui/dialog`
+- [Drawer](https://ui.shadcn.com/docs/components/drawer) — `@zeno-lib/ui/drawer`
+- [Dropdown Menu](https://ui.shadcn.com/docs/components/dropdown-menu) — `@zeno-lib/ui/dropdown-menu`
+- [Hover Card](https://ui.shadcn.com/docs/components/hover-card) — `@zeno-lib/ui/hover-card`
+- [Popover](https://ui.shadcn.com/docs/components/popover) — `@zeno-lib/ui/popover`
+- [Sheet](https://ui.shadcn.com/docs/components/sheet) — `@zeno-lib/ui/sheet`
+- [Tooltip](https://ui.shadcn.com/docs/components/tooltip) — `@zeno-lib/ui/tooltip`
 
 ### Data display
-- [Accordion](https://ui.shadcn.com/docs/components/accordion) — `@zeno/ui/accordion`
-- [Avatar](https://ui.shadcn.com/docs/components/avatar) — `@zeno/ui/avatar`
-- [Badge](https://ui.shadcn.com/docs/components/badge) — `@zeno/ui/badge`
-- [Calendar](https://ui.shadcn.com/docs/components/calendar) — `@zeno/ui/calendar`
-- [Carousel](https://ui.shadcn.com/docs/components/carousel) — `@zeno/ui/carousel`
-- [Chart](https://ui.shadcn.com/docs/components/chart) — `@zeno/ui/chart`
-- [Collapsible](https://ui.shadcn.com/docs/components/collapsible) — `@zeno/ui/collapsible`
-- [Empty](https://ui.shadcn.com/docs/components/empty) — `@zeno/ui/empty`
-- [Item](https://ui.shadcn.com/docs/components/item) — `@zeno/ui/item`
-- [Kbd](https://ui.shadcn.com/docs/components/kbd) — `@zeno/ui/kbd`
-- [Table](https://ui.shadcn.com/docs/components/table) — `@zeno/ui/table`
+- [Accordion](https://ui.shadcn.com/docs/components/accordion) — `@zeno-lib/ui/accordion`
+- [Avatar](https://ui.shadcn.com/docs/components/avatar) — `@zeno-lib/ui/avatar`
+- [Badge](https://ui.shadcn.com/docs/components/badge) — `@zeno-lib/ui/badge`
+- [Calendar](https://ui.shadcn.com/docs/components/calendar) — `@zeno-lib/ui/calendar`
+- [Carousel](https://ui.shadcn.com/docs/components/carousel) — `@zeno-lib/ui/carousel`
+- [Chart](https://ui.shadcn.com/docs/components/chart) — `@zeno-lib/ui/chart`
+- [Collapsible](https://ui.shadcn.com/docs/components/collapsible) — `@zeno-lib/ui/collapsible`
+- [Empty](https://ui.shadcn.com/docs/components/empty) — `@zeno-lib/ui/empty`
+- [Item](https://ui.shadcn.com/docs/components/item) — `@zeno-lib/ui/item`
+- [Kbd](https://ui.shadcn.com/docs/components/kbd) — `@zeno-lib/ui/kbd`
+- [Table](https://ui.shadcn.com/docs/components/table) — `@zeno-lib/ui/table`
 
 ### Feedback
-- [Alert](https://ui.shadcn.com/docs/components/alert) — `@zeno/ui/alert`
-- [Progress](https://ui.shadcn.com/docs/components/progress) — `@zeno/ui/progress`
-- [Skeleton](https://ui.shadcn.com/docs/components/skeleton) — `@zeno/ui/skeleton`
-- [Sonner](https://ui.shadcn.com/docs/components/sonner) — `@zeno/ui/sonner`
-- [Spinner](https://ui.shadcn.com/docs/components/spinner) — `@zeno/ui/spinner`
+- [Alert](https://ui.shadcn.com/docs/components/alert) — `@zeno-lib/ui/alert`
+- [Progress](https://ui.shadcn.com/docs/components/progress) — `@zeno-lib/ui/progress`
+- [Skeleton](https://ui.shadcn.com/docs/components/skeleton) — `@zeno-lib/ui/skeleton`
+- [Sonner](https://ui.shadcn.com/docs/components/sonner) — `@zeno-lib/ui/sonner`
+- [Spinner](https://ui.shadcn.com/docs/components/spinner) — `@zeno-lib/ui/spinner`
 
 ### Commands & search
-- [Combobox](https://ui.shadcn.com/docs/components/combobox) — `@zeno/ui/combobox`
-- [Command](https://ui.shadcn.com/docs/components/command) — `@zeno/ui/command`
+- [Combobox](https://ui.shadcn.com/docs/components/combobox) — `@zeno-lib/ui/combobox`
+- [Command](https://ui.shadcn.com/docs/components/command) — `@zeno-lib/ui/command`
 
 ### Utilities
-- `Direction` — `@zeno/ui/direction`. No shadcn equivalent; see the [Base UI direction-provider docs](https://base-ui.com/react/utils/direction-provider).
+- `Direction` — `@zeno-lib/ui/direction`. No shadcn equivalent; see the [Base UI direction-provider docs](https://base-ui.com/react/utils/direction-provider).

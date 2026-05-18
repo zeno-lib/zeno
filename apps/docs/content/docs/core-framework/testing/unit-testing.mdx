@@ -9,7 +9,7 @@ Zeno uses [Vitest](https://vitest.dev) for fast, modern unit testing with native
 
 ## Setup
 
-Tests use the shared config from `@zeno/vitest`:
+Tests use the shared config from `@zeno-lib/vitest`:
 
 ```typescript
 // vitest.config.ts
@@ -52,17 +52,17 @@ pnpm test
 pnpm test:watch
 
 # Run for specific package
-pnpm turbo run test --filter @zeno/example
+pnpm turbo run test --filter @zeno-lib/example
 ```
 
 ## Testing React Components
 
-Use `@testing-library/react` (included in `@zeno/vitest`):
+Use `@testing-library/react` (included in `@zeno-lib/vitest`):
 
 ```typescript
 import { render, screen } from "@testing-library/react"
 import { describe, expect, test } from "vitest"
-import { Button } from "@zeno/ui/button"
+import { Button } from "@zeno-lib/ui/button"
 
 describe("Button", () => {
   test("renders with text", () => {

@@ -1,17 +1,19 @@
 {
-  "name": "@resolve/e2e",
+  "name": "@zeno-lib/e2e",
+  "private": true,
+  "version": "0.0.0",
   "scripts": {
     "e2e": "playwright test",
     "e2e:watch": "playwright test --ui",
     "verify-deps": "./verify-app-deps.mjs"
   },
   "dependencies": {
-    "@zeno/docs": "workspace:*"
+    "@zeno-lib/docs": "workspace:*"
   },
   "devDependencies": {
-    "@playwright/test": "1.59.1",
+    "@playwright/test": "1.60.0",
     "@types/node": "^25.6.0",
-    "@zeno/typescript": "workspace:*",
+    "@zeno-lib/typescript": "workspace:^",
     "typescript": "6.0.3"
   }
 }

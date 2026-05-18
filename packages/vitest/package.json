@@ -1,5 +1,20 @@
 {
-  "name": "@zeno/vitest",
+  "name": "@zeno-lib/vitest",
+  "private": true,
+  "version": "0.0.0",
+  "exports": {
+    ".": "./vitest.config.ts"
+  },
+  "files": [
+    "vitest.config.ts"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/vitest"
+  },
   "devDependencies": {
     "@testing-library/react": "16.3.2",
     "@vitejs/plugin-react": "6.0.1",

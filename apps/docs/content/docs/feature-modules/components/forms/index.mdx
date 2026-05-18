@@ -7,9 +7,9 @@ status: in progress
 
 import { NewsletterPreview } from "@/components/forms/newsletter-preview"
 
-`@zeno/forms` is a thin layer over [TanStack Form](https://tanstack.com/form)
+`@zeno-lib/forms` is a thin layer over [TanStack Form](https://tanstack.com/form)
 and [Zod](https://zod.dev) that ships ready-to-use field components built on
-`@zeno/ui` primitives. You get type-safe field names, an automatic submit
+`@zeno-lib/ui` primitives. You get type-safe field names, an automatic submit
 button, and a single `schema` prop instead of hand-wiring validators.
 
 ## Quick start
@@ -22,7 +22,7 @@ A newsletter form, validated with Zod:
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
 import { z } from "zod"
 
 const schema = z.object({
@@ -86,7 +86,7 @@ return (
 
 The destructure list reads like an `import` block: a glance tells you
 which fields the component uses. This is the recommended pattern in
-`@zeno/forms`, and it differs from upstream TanStack Form (which favors
+`@zeno-lib/forms`, and it differs from upstream TanStack Form (which favors
 `form.EmailField`).
 
 ## Validation with Zod

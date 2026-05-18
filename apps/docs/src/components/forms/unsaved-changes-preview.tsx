@@ -1,7 +1,7 @@
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { Badge } from "@zeno/ui/badge"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Badge } from "@zeno-lib/ui/badge"
 import {
   Card,
   CardContent,
@@ -9,8 +9,8 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@zeno/ui/card"
-import { Field, FieldGroup } from "@zeno/ui/field"
+} from "@zeno-lib/ui/card"
+import { Field, FieldGroup } from "@zeno-lib/ui/field"
 
 import { toastSubmitted, wrapperClass } from "./preview-utils"
 

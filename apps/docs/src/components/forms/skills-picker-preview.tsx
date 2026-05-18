@@ -6,7 +6,7 @@ import {
   useFieldContext,
   useForm,
   useIsInvalid,
-} from "@zeno/forms"
+} from "@zeno-lib/forms"
 import {
   Card,
   CardContent,
@@ -14,7 +14,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@zeno/ui/card"
+} from "@zeno-lib/ui/card"
 import {
   Combobox,
   ComboboxChip,
@@ -29,8 +29,8 @@ import {
   ComboboxList,
   ComboboxValue,
   useComboboxAnchor,
-} from "@zeno/ui/combobox"
-import { Field, FieldError, FieldGroup, FieldLabel } from "@zeno/ui/field"
+} from "@zeno-lib/ui/combobox"
+import { Field, FieldError, FieldGroup, FieldLabel } from "@zeno-lib/ui/field"
 import { useState } from "react"
 import { z } from "zod"
 

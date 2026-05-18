@@ -1,7 +1,7 @@
 "use client"
 
-import { InputGroupAddon } from "@zeno/ui/input-group"
-import { Spinner } from "@zeno/ui/spinner"
+import { InputGroupAddon } from "@zeno-lib/ui/input-group"
+import { Spinner } from "@zeno-lib/ui/spinner"
 
 import { useFieldContext } from "../lib/contexts"
 

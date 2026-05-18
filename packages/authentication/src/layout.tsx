@@ -1,9 +1,20 @@
-import type { ReactNode } from "react"
+"use client"
+
+import type { ComponentProps, ReactNode } from "react"
 
 import { AuthProvider } from "./components/context"
 import { Welcome } from "./components/welcome"
 
-interface AuthLayoutProps {
+type AuthProviderProps = ComponentProps<typeof AuthProvider>
+
+interface AuthLayoutProps
+  extends Pick<
+    AuthProviderProps,
+    | "appBaseUrl"
+    | "resetPasswordRedirectPath"
+    | "supabase"
+    | "verifyRedirectPath"
+  > {
   children: ReactNode
   footer?: ReactNode
   imageUrl: string
@@ -14,15 +25,24 @@ interface AuthLayoutProps {
 }
 
 export function AuthLayout({
+  appBaseUrl,
   children,
   imageUrl,
   Logo,
   LocaleToggle,
+  resetPasswordRedirectPath,
+  supabase,
   ThemeToggle,
   title,
+  verifyRedirectPath,
 }: Readonly<AuthLayoutProps>) {
   return (
-    <AuthProvider>
+    <AuthProvider
+      appBaseUrl={appBaseUrl}
+      resetPasswordRedirectPath={resetPasswordRedirectPath}
+      supabase={supabase}
+      verifyRedirectPath={verifyRedirectPath}
+    >
       <main className="flex min-h-screen flex-1 flex-col lg:flex-row">
         <Welcome className="hidden lg:flex" imageUrl={imageUrl} title={title} />
         <div className="flex flex-1 flex-col gap-8 bg-2 p-8">

@@ -1,5 +1,5 @@
 {
-  "extends": "@zeno/typescript/nextjs.json",
+  "extends": "@zeno-lib/typescript/nextjs.json",
   "compilerOptions": {
     "paths": {
       "@/*": ["./src/*"],

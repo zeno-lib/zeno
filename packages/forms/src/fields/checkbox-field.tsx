@@ -1,13 +1,13 @@
 "use client"
 
-import { Checkbox } from "@zeno/ui/checkbox"
+import { Checkbox } from "@zeno-lib/ui/checkbox"
 import {
   Field,
   FieldContent,
   FieldDescription,
   FieldError,
   FieldLabel,
-} from "@zeno/ui/field"
+} from "@zeno-lib/ui/field"
 import type { ComponentProps, ReactNode } from "react"
 
 import { describedBy } from "../lib/aria"

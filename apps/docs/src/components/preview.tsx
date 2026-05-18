@@ -1,7 +1,7 @@
 "use client"
 
-import { Button } from "@zeno/ui/button"
-import { cn } from "@zeno/ui/lib/utils"
+import { Button } from "@zeno-lib/ui/button"
+import { cn } from "@zeno-lib/ui/lib/utils"
 import {
   Children,
   type ComponentProps,

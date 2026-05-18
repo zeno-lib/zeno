@@ -1,4 +1,4 @@
-/* biome-ignore-all lint/performance/noBarrelFile: so consumers depend only on `@zeno/forms`. */
+/* biome-ignore-all lint/performance/noBarrelFile: so consumers depend only on `@zeno-lib/forms`. */
 "use client"
 
 import { type AnyFormApi, createFormHook } from "@tanstack/react-form"

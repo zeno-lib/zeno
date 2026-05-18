@@ -6,7 +6,7 @@
  * ```js
  * images: {
  *   loader: "custom",
- *   loaderFile: "@zeno/supabase/image-loader.tsx",
+ *   loaderFile: "@zeno-lib/supabase/image-loader.tsx",
  * },
  * ```
  */

@@ -1,4 +1,4 @@
-# `@zeno/supabase` — Intent
+# `@zeno-lib/supabase` — Intent
 
 Thin wrapper around `@supabase/ssr` for Next.js App Router. Five files, each with a specific role; the value of this package is in keeping the client/server/middleware split honest.
 
@@ -8,17 +8,17 @@ Provides Next.js–aware factories for Supabase clients (browser, server, middle
 
 **Owns:** the cookie wiring required for SSR auth, env-var resolution with explicit overrides, the standard Next.js middleware matcher pattern.
 
-**Does NOT own:** auth UI (see `@zeno/authentication`), database types/codegen, RLS policies, edge function deployment.
+**Does NOT own:** auth UI (see `@zeno-lib/authentication`), database types/codegen, RLS policies, edge function deployment.
 
 ## Entry Points & Contracts
 
 | Import | Use from | Returns / does |
 |---|---|---|
-| `@zeno/supabase/client` | Client Components, browser code | `createBrowserClient` factory; re-exports `EmailOtpType`, `QueryData`, `SupabaseClient` types |
-| `@zeno/supabase/server` | Server Components, Route Handlers, Server Actions | `createServerClient` with `next/headers` cookies; **async** — must be `await`ed |
-| `@zeno/supabase/next-middleware` | App `middleware.ts` | Default `middleware` export + `config.matcher` |
-| `@zeno/supabase/supabase-middleware` | Custom middleware compositions | `updateSession(request)` — the actual cookie-refresh + auth-gate logic |
-| `@zeno/supabase/image-loader` | `next.config.mjs` `images.loaderFile` | Supabase Storage transformation URL builder |
+| `@zeno-lib/supabase/client` | Client Components, browser code | `createBrowserClient` factory; re-exports `EmailOtpType`, `QueryData`, `SupabaseClient` types |
+| `@zeno-lib/supabase/server` | Server Components, Route Handlers, Server Actions | `createServerClient` with `next/headers` cookies; **async** — must be `await`ed |
+| `@zeno-lib/supabase/next-middleware` | App `middleware.ts` | Default `middleware` export + `config.matcher` |
+| `@zeno-lib/supabase/supabase-middleware` | Custom middleware compositions | `updateSession(request)` — the actual cookie-refresh + auth-gate logic |
+| `@zeno-lib/supabase/image-loader` | `next.config.mjs` `images.loaderFile` | Supabase Storage transformation URL builder |
 
 Both `createClient` factories accept optional `(supabaseUrl, supabaseKey)` and fall back to `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`. They throw `"Missing Supabase ... environment variables"` if neither side provides values — this is the only error path the factories own.
 
@@ -29,14 +29,14 @@ The image loader resolves the project ID from `NEXT_PUBLIC_SUPABASE_STORAGE_PROJ
 Browser:
 
 ```ts
-import { createClient } from "@zeno/supabase/client"
+import { createClient } from "@zeno-lib/supabase/client"
 const supabase = createClient<Database>()  // Database type optional
 ```
 
 Server Component / Route Handler:
 
 ```ts
-import { createClient } from "@zeno/supabase/server"
+import { createClient } from "@zeno-lib/supabase/server"
 const supabase = await createClient<Database>()
 ```
 
@@ -44,7 +44,7 @@ Middleware (default):
 
 ```ts
 // middleware.ts
-export { middleware, config } from "@zeno/supabase/next-middleware"
+export { middleware, config } from "@zeno-lib/supabase/next-middleware"
 ```
 
 `next/image` loader:
@@ -52,7 +52,7 @@ export { middleware, config } from "@zeno/supabase/next-middleware"
 ```js
 // next.config.mjs
 export default {
-  images: { loader: "custom", loaderFile: "@zeno/supabase/image-loader.tsx" },
+  images: { loader: "custom", loaderFile: "@zeno-lib/supabase/image-loader.tsx" },
 }
 ```
 
@@ -67,7 +67,7 @@ export default {
 
 Peer: `@supabase/ssr >=0`, `@supabase/supabase-js >=2`, `supabase >=2`, `next >=16`. No workspace runtime deps.
 
-Used by: `@zeno/authentication` (client + server + types). Used directly by every app that needs auth.
+Used by: `@zeno-lib/authentication` (client + server + types). Used directly by every app that needs auth.
 
 ## Pitfalls
 
