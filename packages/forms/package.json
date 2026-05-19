@@ -43,7 +43,6 @@
     "@zeno-lib/typescript": "workspace:^",
     "@zeno-lib/vitest": "workspace:^",
     "typescript": "6.0.3",
-    "vitest": "4.0.18",
     "zod": "^4.3.6"
   }
 }
