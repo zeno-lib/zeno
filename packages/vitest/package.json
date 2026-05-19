@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "exports": {
     ".": "./src/vitest.ts",
-    "./react": "./src/configs/react.ts",
+    "./configs/react": "./src/configs/react.ts",
+    "./configs/default": "./src/configs/default.ts",
     "./testing-library": "./src/testing-library.ts",
     "./user-event": "./src/user-event.ts"
   },
