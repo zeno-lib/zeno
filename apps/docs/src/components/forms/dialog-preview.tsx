@@ -1,14 +1,14 @@
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { Button } from "@zeno/ui/button"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Button } from "@zeno-lib/ui/button"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@zeno/ui/card"
+} from "@zeno-lib/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -17,9 +17,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@zeno/ui/dialog"
-import { FieldGroup } from "@zeno/ui/field"
-import { toast } from "@zeno/ui/sonner"
+} from "@zeno-lib/ui/dialog"
+import { FieldGroup } from "@zeno-lib/ui/field"
+import { toast } from "@zeno-lib/ui/sonner"
 import { useState } from "react"
 import { z } from "zod"
 

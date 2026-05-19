@@ -1,7 +1,7 @@
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { Button } from "@zeno/ui/button"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Button } from "@zeno-lib/ui/button"
 import {
   Card,
   CardContent,
@@ -9,8 +9,8 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@zeno/ui/card"
-import { Field, FieldGroup, FieldLegend, FieldSet } from "@zeno/ui/field"
+} from "@zeno-lib/ui/card"
+import { Field, FieldGroup, FieldLegend, FieldSet } from "@zeno-lib/ui/field"
 import { TrashIcon } from "lucide-react"
 import { z } from "zod"
 

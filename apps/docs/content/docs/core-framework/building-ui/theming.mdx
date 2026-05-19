@@ -12,8 +12,8 @@ Zeno uses [Tailwind CSS 4](https://tailwindcss.com) with CSS variables for themi
 Import the base styles in your app:
 
 ```css
-@import "@zeno/tailwind/globals.css";
-@import "@zeno/ui/styles/globals.css";
+@import "@zeno-lib/tailwind/globals.css";
+@import "@zeno-lib/ui/styles/globals.css";
 ```
 
 ## CSS Variables
@@ -103,7 +103,7 @@ Override variables in your app's CSS:
 The `cn` function merges Tailwind classes safely:
 
 ```tsx
-import { cn } from "@zeno/ui/lib/utils"
+import { cn } from "@zeno-lib/ui/lib/utils"
 
 // Merges and deduplicates classes
 cn("px-4 py-2", "px-6") // → "py-2 px-6"

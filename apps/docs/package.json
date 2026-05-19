@@ -1,5 +1,5 @@
 {
-  "name": "@zeno/docs",
+  "name": "@zeno-lib/docs",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -13,8 +13,8 @@
   "dependencies": {
     "@tanstack/react-devtools": "^0.10.0",
     "@tanstack/react-form-devtools": "^0.2.0",
-    "@zeno/forms": "workspace:*",
-    "@zeno/ui": "workspace:*",
+    "@zeno-lib/forms": "workspace:*",
+    "@zeno-lib/ui": "workspace:*",
     "fumadocs-core": "16.8.5",
     "fumadocs-mdx": "14.3.2",
     "fumadocs-ui": "16.8.5",
@@ -31,7 +31,7 @@
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@zeno/typescript": "workspace:*",
+    "@zeno-lib/typescript": "workspace:^",
     "postcss": "^8.5.13",
     "tailwindcss": "^4.2.4",
     "typescript": "^6.0.3"

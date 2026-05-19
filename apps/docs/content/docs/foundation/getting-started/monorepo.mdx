@@ -33,14 +33,14 @@ The same mechanism extends to CI through [Turborepo Remote Caching](https://turb
 ```
 zeno/
 ├── apps/               # Applications
-│   └── docs/           # Documentation site (@zeno/docs)
+│   └── docs/           # Documentation site (@zeno-lib/docs)
 ├── packages/           # Shared libraries
-│   ├── ui/             # React components (@zeno/ui)
-│   ├── typescript/     # TypeScript configs (@zeno/typescript)
-│   ├── tailwind/       # Tailwind config (@zeno/tailwind)
-│   ├── supabase/       # Supabase integration (@zeno/supabase)
-│   ├── vitest/         # Vitest config (@zeno/vitest)
-│   └── e2e/            # Playwright E2E tests (@zeno/e2e)
+│   ├── ui/             # React components (@zeno-lib/ui)
+│   ├── typescript/     # TypeScript configs (@zeno-lib/typescript)
+│   ├── tailwind/       # Tailwind config (@zeno-lib/tailwind)
+│   ├── supabase/       # Supabase integration (@zeno-lib/supabase)
+│   ├── vitest/         # Vitest config (@zeno-lib/vitest)
+│   └── e2e/            # Playwright E2E tests (@zeno-lib/e2e)
 ├── turbo.json          # Turborepo task configuration
 └── pnpm-workspace.yaml # Workspace definition
 ```
@@ -74,8 +74,8 @@ pnpm ci               # Run full CI pipeline
 Run commands for a specific package using Turborepo filters:
 
 ```bash
-pnpm turbo run dev --filter @zeno/docs
-pnpm turbo run build --filter @zeno/ui
+pnpm turbo run dev --filter @zeno-lib/docs
+pnpm turbo run build --filter @zeno-lib/ui
 ```
 
 ## Adding Dependencies
@@ -85,7 +85,7 @@ pnpm turbo run build --filter @zeno/ui
 pnpm add -D <package> -w
 
 # Add to a specific package
-pnpm add <package> --filter @zeno/ui
+pnpm add <package> --filter @zeno-lib/ui
 ```
 
 ## Workspace References
@@ -95,8 +95,8 @@ Reference internal packages in any `package.json` using `workspace:*`:
 ```json title="package.json"
 {
   "dependencies": {
-    "@zeno/ui": "workspace:*",
-    "@zeno/typescript": "workspace:*"
+    "@zeno-lib/ui": "workspace:*",
+    "@zeno-lib/typescript": "workspace:*"
   }
 }
 ```

@@ -1,5 +1,5 @@
 import type { AnyFormApi } from "@tanstack/react-form"
-import { describe, expect, test } from "@zeno/vitest"
+import { describe, expect, test } from "@zeno-lib/vitest"
 
 import {
   DEFAULT_VALIDATION_MODE,

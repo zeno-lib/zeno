@@ -1,14 +1,14 @@
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@zeno/ui/card"
-import { FieldGroup } from "@zeno/ui/field"
+} from "@zeno-lib/ui/card"
+import { FieldGroup } from "@zeno-lib/ui/field"
 import { useEffect, useState } from "react"
 
 import { wrapperClass } from "./preview-utils"

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "@zeno/vitest"
+import { describe, expect, test } from "@zeno-lib/vitest"
 
 import { ValidationError } from "./validation-error"
 

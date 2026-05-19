@@ -1,12 +1,12 @@
 "use client"
 
-import { Form, FormProvider, useForm, ValidationSpinner } from "@zeno/forms"
-import { FieldGroup } from "@zeno/ui/field"
+import { Form, FormProvider, useForm, ValidationSpinner } from "@zeno-lib/forms"
+import { FieldGroup } from "@zeno-lib/ui/field"
 import {
   InputGroupAddon,
   InputGroupButton,
   InputGroupText,
-} from "@zeno/ui/input-group"
+} from "@zeno-lib/ui/input-group"
 import { BoldIcon, ItalicIcon, MailIcon } from "lucide-react"
 import { z } from "zod"
 

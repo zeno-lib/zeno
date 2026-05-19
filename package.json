@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "build": "turbo build",
+    "changeset": "changeset",
     "types:check": "turbo types:check",
     "ci": "pnpm run lint && turbo run types:check build test e2e",
     "ci:force": "turbo run types:check build test e2e --force",
@@ -12,11 +13,18 @@
     "e2e:watch": "NODE_ENV=test && turbo run dev e2e:watch",
     "lint": "ultracite check",
     "lint:fix": "ultracite fix",
+    "prerelease:beta:enter": "changeset pre enter beta",
+    "prerelease:beta:exit": "changeset pre exit",
+    "release": "changeset publish",
+    "release:status": "changeset status --verbose",
     "test": "NODE_ENV=test && turbo run test",
-    "test:watch": "NODE_ENV=test && turbo run dev test:watch"
+    "test:watch": "NODE_ENV=test && turbo run dev test:watch",
+    "version-packages": "changeset version"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.14",
+    "@changesets/changelog-git": "^0.2.1",
+    "@changesets/cli": "^2.31.0",
     "turbo": "2.9.7",
     "typescript": "6.0.3",
     "ultracite": "7.6.2"

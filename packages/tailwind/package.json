@@ -1,10 +1,23 @@
 {
-  "name": "@zeno/tailwind",
-  "version": "0.0.0",
+  "name": "@zeno-lib/tailwind",
   "private": true,
+  "version": "0.0.0",
   "exports": {
     "./globals.css": "./globals.css"
   },
+  "files": [
+    "globals.css"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/tailwind"
+  },
+  "sideEffects": [
+    "./globals.css"
+  ],
   "peerDependencies": {
     "tailwindcss": ">=4"
   }

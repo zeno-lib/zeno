@@ -1,8 +1,13 @@
 "use client"
 
-import { Field, FieldDescription, FieldError, FieldLabel } from "@zeno/ui/field"
-import { cn } from "@zeno/ui/lib/utils"
-import { RadioGroup, RadioGroupItem } from "@zeno/ui/radio-group"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@zeno-lib/ui/field"
+import { cn } from "@zeno-lib/ui/lib/utils"
+import { RadioGroup, RadioGroupItem } from "@zeno-lib/ui/radio-group"
 import { type ComponentProps, type ReactNode, useId } from "react"
 
 import { describedBy } from "../lib/aria"

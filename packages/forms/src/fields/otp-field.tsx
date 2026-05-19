@@ -1,7 +1,12 @@
 "use client"
 
-import { Field, FieldDescription, FieldError, FieldLabel } from "@zeno/ui/field"
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@zeno/ui/input-otp"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@zeno-lib/ui/field"
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@zeno-lib/ui/input-otp"
 import type { ReactNode } from "react"
 
 import { describedBy } from "../lib/aria"

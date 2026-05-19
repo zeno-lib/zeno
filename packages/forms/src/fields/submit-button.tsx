@@ -1,7 +1,7 @@
 "use client"
 
-import { Button } from "@zeno/ui/button"
-import { Spinner } from "@zeno/ui/spinner"
+import { Button } from "@zeno-lib/ui/button"
+import { Spinner } from "@zeno-lib/ui/spinner"
 import type { ComponentProps } from "react"
 
 import { useFormContext } from "../lib/contexts"

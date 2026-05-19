@@ -1,7 +1,7 @@
 "use client"
 
-import type { SupabaseClient } from "@zeno/supabase/client"
-import { Spinner } from "@zeno/ui/spinner"
+import type { SupabaseClient } from "@zeno-lib/supabase/client"
+import { Spinner } from "@zeno-lib/ui/spinner"
 import { useRouter } from "next/navigation"
 
 export function SignOut({ supabase }: { supabase: SupabaseClient }) {

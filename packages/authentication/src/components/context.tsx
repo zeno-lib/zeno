@@ -1,7 +1,7 @@
 "use client"
 
-import type { SupabaseClient } from "@zeno/supabase/client"
-import { toast } from "@zeno/ui/sonner"
+import type { SupabaseClient } from "@zeno-lib/supabase/client"
+import { toast } from "@zeno-lib/ui/sonner"
 import { useRouter } from "next/navigation"
 import {
   createContext,

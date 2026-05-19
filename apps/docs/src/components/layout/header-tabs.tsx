@@ -1,7 +1,7 @@
 "use client"
 
-import { cn } from "@zeno/ui/lib/utils"
-import { Tabs, TabsList, TabsTrigger } from "@zeno/ui/tabs"
+import { cn } from "@zeno-lib/ui/lib/utils"
+import { Tabs, TabsList, TabsTrigger } from "@zeno-lib/ui/tabs"
 import { Link, usePathname } from "fumadocs-core/framework"
 import { getSidebarTabs } from "fumadocs-ui/components/sidebar/tabs"
 import { isTabActive } from "fumadocs-ui/components/sidebar/tabs/dropdown"

@@ -1,12 +1,24 @@
 {
-  "name": "@zeno/vitest",
+  "name": "@zeno-lib/vitest",
+  "private": true,
+  "version": "0.0.0",
   "exports": {
     ".": "./src/vitest.ts",
     "./react": "./src/configs/react.ts",
     "./testing-library": "./src/testing-library.ts",
     "./user-event": "./src/user-event.ts"
   },
-  "dependencies": {
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/vitest"
+  },
+  "devDependencies": {
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
     "@vitejs/plugin-react": "6.0.1",

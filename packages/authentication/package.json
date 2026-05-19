@@ -1,11 +1,23 @@
 {
-  "name": "@zeno/authentication",
+  "name": "@zeno-lib/authentication",
+  "private": true,
+  "version": "0.0.0",
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "types:check": "tsc --noEmit"
   },
   "exports": {
     "./*": "./src/*.tsx",
     "./confirm/*": "./src/confirm/*.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/authentication"
   },
   "peerDependencies": {
     "next": ">=16",
@@ -14,11 +26,11 @@
     "react-hook-form": ">=7"
   },
   "dependencies": {
-    "@zeno/supabase": "workspace:*",
-    "@zeno/ui": "workspace:*"
+    "@zeno-lib/supabase": "workspace:^",
+    "@zeno-lib/ui": "workspace:^"
   },
   "devDependencies": {
-    "@zeno/typescript": "workspace:*",
+    "@zeno-lib/typescript": "workspace:^",
     "@types/node": "24.12.2",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3"

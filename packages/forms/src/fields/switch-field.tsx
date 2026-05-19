@@ -6,8 +6,8 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
-} from "@zeno/ui/field"
-import { Switch } from "@zeno/ui/switch"
+} from "@zeno-lib/ui/field"
+import { Switch } from "@zeno-lib/ui/switch"
 import type { ComponentProps, ReactNode } from "react"
 
 import { describedBy } from "../lib/aria"

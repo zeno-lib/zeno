@@ -1,6 +1,6 @@
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
 import {
   Card,
   CardContent,
@@ -8,9 +8,9 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@zeno/ui/card"
-import { Field, FieldGroup } from "@zeno/ui/field"
-import { toast } from "@zeno/ui/sonner"
+} from "@zeno-lib/ui/card"
+import { Field, FieldGroup } from "@zeno-lib/ui/field"
+import { toast } from "@zeno-lib/ui/sonner"
 import { z } from "zod"
 
 import { wrapperClass } from "./preview-utils"

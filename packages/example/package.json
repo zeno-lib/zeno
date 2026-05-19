@@ -1,11 +1,12 @@
 {
-  "name": "@zeno/example",
+  "name": "@zeno-lib/example",
+  "private": true,
   "scripts": {
     "test": "vitest --run",
     "test:watch": "vitest watch"
   },
   "devDependencies": {
-    "@zeno/vitest": "workspace:*",
+    "@zeno-lib/vitest": "workspace:*",
     "typescript": "5.9.3",
     "vitest": "4.0.18"
   }

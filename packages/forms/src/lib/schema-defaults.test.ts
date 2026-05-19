@@ -1,4 +1,4 @@
-import { describe, expect, test } from "@zeno/vitest"
+import { describe, expect, test } from "@zeno-lib/vitest"
 import { z } from "zod"
 
 import { deepMergeDefaults, extractZodDefaults } from "./schema-defaults"

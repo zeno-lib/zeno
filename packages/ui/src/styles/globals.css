@@ -1,4 +1,4 @@
-@import "@zeno/tailwind/globals.css";
+@import "@zeno-lib/tailwind/globals.css";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "./theme.css";

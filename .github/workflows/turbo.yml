@@ -4,6 +4,7 @@
 name: Turbo CI
 
 on:
+  workflow_call:
   push:
     branches: [main]
   pull_request:
@@ -31,14 +32,12 @@ jobs:
     - name: Setup Node.js environment
       uses: actions/setup-node@v6
       with:
-        node-version: latest
+        node-version: lts/*
         cache: 'pnpm'
     - name: Install dependencies
       run: pnpm install
-    # Must use the workspace @playwright/test version — `pnpm dlx playwright`
-    # installs the latest CLI and mismatched browser revisions vs packages/e2e.
     - name: Install Playwright Browsers
-      run: pnpm --filter @resolve/e2e exec playwright install --with-deps chromium
+      run: pnpm --filter @zeno-lib/e2e exec playwright install --with-deps chromium
     - name: Run turbo ci command
       run: pnpm run ci
     - name: Upload Playwright report

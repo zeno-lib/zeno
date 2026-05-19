@@ -12,8 +12,8 @@
  */
 "use client"
 
-import { Button } from "@zeno/ui/button"
-import { toast } from "@zeno/ui/sonner"
+import { Button } from "@zeno-lib/ui/button"
+import { toast } from "@zeno-lib/ui/sonner"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useState } from "react"
 import { Container } from "../components/container"

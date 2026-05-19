@@ -1,8 +1,13 @@
 "use client"
 
-import { Field, FieldDescription, FieldError, FieldLabel } from "@zeno/ui/field"
-import { Input } from "@zeno/ui/input"
-import { InputGroup, InputGroupInput } from "@zeno/ui/input-group"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@zeno-lib/ui/field"
+import { Input } from "@zeno-lib/ui/input"
+import { InputGroup, InputGroupInput } from "@zeno-lib/ui/input-group"
 import { Children, type ComponentProps, type ReactNode } from "react"
 
 import { describedBy } from "../lib/aria"

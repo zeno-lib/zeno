@@ -1,7 +1,7 @@
 "use client"
 
-import { Button } from "@zeno/ui/button"
-import { Dialog, DialogContent, DialogTrigger } from "@zeno/ui/dialog"
+import { Button } from "@zeno-lib/ui/button"
+import { Dialog, DialogContent, DialogTrigger } from "@zeno-lib/ui/dialog"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"

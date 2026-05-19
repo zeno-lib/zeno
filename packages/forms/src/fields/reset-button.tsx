@@ -1,6 +1,6 @@
 "use client"
 
-import { Button } from "@zeno/ui/button"
+import { Button } from "@zeno-lib/ui/button"
 import type { ComponentProps, ReactNode } from "react"
 
 import { useFormContext } from "../lib/contexts"

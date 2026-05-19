@@ -1,4 +1,4 @@
-import { test } from "@zeno/vitest"
+import { test } from "@zeno-lib/vitest"
 import { z } from "zod"
 
 import { useForm } from "./use-form"

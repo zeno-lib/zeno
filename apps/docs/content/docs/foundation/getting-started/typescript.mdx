@@ -1,11 +1,11 @@
 ---
 title: TypeScript
-description: Shared TypeScript configurations with @zeno/typescript
+description: Shared TypeScript configurations with @zeno-lib/typescript
 icon: FileCode
 status: to check
 ---
 
-Zeno uses the `@zeno/typescript` package to share strict TypeScript configurations across all packages and apps.
+Zeno uses the `@zeno-lib/typescript` package to share strict TypeScript configurations across all packages and apps.
 
 You never have to manually configure `tsconfig.json` options like `moduleResolution`, `jsx`, `lib`, `strict`, Next.js `include` globs, or the Next.js plugin — just extend one config and everything is set up correctly.
 
@@ -27,7 +27,7 @@ Extend the appropriate config in your package's `tsconfig.json`:
 
 ```json title="tsconfig.json"
 {
-  "extends": "@zeno/typescript/nextjs.json"
+  "extends": "@zeno-lib/typescript/nextjs.json"
 }
 ```
 
@@ -37,19 +37,19 @@ That's it. No need to configure `compilerOptions`, `include`, or `exclude` — t
 
 | Package type | Config |
 |-------------|--------|
-| Next.js app | `@zeno/typescript/nextjs.json` |
-| React library | `@zeno/typescript/react.json` |
-| Non-React package | `@zeno/typescript/strictest.json` |
-| Loose / legacy | `@zeno/typescript/strict.json` |
+| Next.js app | `@zeno-lib/typescript/nextjs.json` |
+| React library | `@zeno-lib/typescript/react.json` |
+| Non-React package | `@zeno-lib/typescript/strictest.json` |
+| Loose / legacy | `@zeno-lib/typescript/strict.json` |
 
 ### Examples in the Repo
 
 | Package | Config |
 |---------|--------|
-| `apps/docs` | `@zeno/typescript/nextjs.json` |
-| `packages/ui` | `@zeno/typescript/react.json` |
-| `packages/supabase` | `@zeno/typescript/strictest.json` |
-| `packages/e2e` | `@zeno/typescript/strictest.json` |
+| `apps/docs` | `@zeno-lib/typescript/nextjs.json` |
+| `packages/ui` | `@zeno-lib/typescript/react.json` |
+| `packages/supabase` | `@zeno-lib/typescript/strictest.json` |
+| `packages/e2e` | `@zeno-lib/typescript/strictest.json` |
 
 ## What's Included
 
@@ -96,5 +96,5 @@ pnpm types:check
 Or for a specific package:
 
 ```bash
-pnpm turbo run types:check --filter @zeno/ui
+pnpm turbo run types:check --filter @zeno-lib/ui
 ```

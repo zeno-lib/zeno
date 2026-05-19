@@ -1,4 +1,4 @@
-# `@zeno/ui` — Intent
+# `@zeno-lib/ui` — Intent
 
 Headless React primitives styled with Tailwind. Inherits all root conventions (TypeScript, React 19+, Ultracite). This file covers what's specific to this package.
 
@@ -8,7 +8,7 @@ A shared component library of ~57 unstyled-but-themed primitives (Button, Dialog
 
 **Owns:** visual primitives, their variants (`class-variance-authority`), accessibility wiring, theme tokens (`src/styles/theme.css`), `cn` utility, the `useMobile` hook, the `lucide-react`-backed icon set.
 
-**Does NOT own:** business logic, data fetching, auth flows, route layouts, page-level composition. Anything that knows about a domain belongs in a feature package (e.g. `@zeno/authentication`) or an app.
+**Does NOT own:** business logic, data fetching, auth flows, route layouts, page-level composition. Anything that knows about a domain belongs in a feature package (e.g. `@zeno-lib/authentication`) or an app.
 
 ## Entry Points & Contracts
 
@@ -16,14 +16,14 @@ Subpath exports map directly to `src/`:
 
 | Import | Resolves to |
 |---|---|
-| `@zeno/ui/<name>` | `src/components/<name>.tsx` |
-| `@zeno/ui/hooks/<name>` | `src/hooks/<name>.ts` or `.tsx` |
-| `@zeno/ui/icons` | `src/icons/index.tsx` |
-| `@zeno/ui/icons/<name>` | `src/icons/<name>.tsx` |
-| `@zeno/ui/lib/<name>` | `src/lib/<name>.ts` |
-| `@zeno/ui/styles/<name>.css` | `src/styles/<name>.css` |
+| `@zeno-lib/ui/<name>` | `src/components/<name>.tsx` |
+| `@zeno-lib/ui/hooks/<name>` | `src/hooks/<name>.ts` or `.tsx` |
+| `@zeno-lib/ui/icons` | `src/icons/index.tsx` |
+| `@zeno-lib/ui/icons/<name>` | `src/icons/<name>.tsx` |
+| `@zeno-lib/ui/lib/<name>` | `src/lib/<name>.ts` |
+| `@zeno-lib/ui/styles/<name>.css` | `src/styles/<name>.css` |
 
-There is **no barrel** — `import { Button } from "@zeno/ui"` will not work, and a barrel must not be added (root convention forbids it for tree-shaking). Always import from the leaf.
+There is **no barrel** — `import { Button } from "@zeno-lib/ui"` will not work, and a barrel must not be added (root convention forbids it for tree-shaking). Always import from the leaf.
 
 Components are built on `@base-ui/react` (not Radix). They follow a predictable shape:
 - `data-slot="<component-name>"` attribute on the root element for styling/testing hooks
@@ -38,8 +38,8 @@ Peer deps assumed by consumers: `next >=16`, `react >=19`, `react-dom >=19`, `ta
 Standard import + variant:
 
 ```tsx
-import { Button } from "@zeno/ui/button"
-import { Dialog, DialogContent, DialogTrigger } from "@zeno/ui/dialog"
+import { Button } from "@zeno-lib/ui/button"
+import { Dialog, DialogContent, DialogTrigger } from "@zeno-lib/ui/dialog"
 
 <Button size="sm" variant="outline">Action</Button>
 ```
@@ -48,7 +48,7 @@ Composition via Base UI's `render` prop (e.g. button styled as a link):
 
 ```tsx
 import Link from "next/link"
-import { Button } from "@zeno/ui/button"
+import { Button } from "@zeno-lib/ui/button"
 
 <Button render={<Link href="/recover-password">Recover password</Link>} variant="link" />
 ```
@@ -56,7 +56,7 @@ import { Button } from "@zeno/ui/button"
 Tailwind theme tokens come from the consumer's CSS:
 
 ```css
-@import "@zeno/ui/styles/theme.css";
+@import "@zeno-lib/ui/styles/theme.css";
 ```
 
 ## Anti-patterns
@@ -68,11 +68,11 @@ Tailwind theme tokens come from the consumer's CSS:
 
 ## Dependencies & Edges
 
-Workspace: `@zeno/typescript`, `@zeno/tailwind` (dev only — for the shared globals.css used by consuming apps).
+Workspace: `@zeno-lib/typescript`, `@zeno-lib/tailwind` (dev only — for the shared globals.css used by consuming apps).
 
 Notable runtime deps: `@base-ui/react` (primitives), `class-variance-authority` (variants), `tailwind-merge` + `clsx` (class composition), `lucide-react` (icons), `recharts` (chart), `embla-carousel-react`, `react-hook-form`, `react-day-picker`, `cmdk`, `vaul`, `sonner`, `next-themes`.
 
-Consumed by: `@zeno/authentication`, `@zeno/docs`, and any future feature package or app.
+Consumed by: `@zeno-lib/authentication`, `@zeno-lib/docs`, and any future feature package or app.
 
 ## Pitfalls
 

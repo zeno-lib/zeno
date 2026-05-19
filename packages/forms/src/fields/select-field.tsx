@@ -1,12 +1,17 @@
 "use client"
 
-import { Field, FieldDescription, FieldError, FieldLabel } from "@zeno/ui/field"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@zeno-lib/ui/field"
 import {
   Select,
   SelectContent,
   SelectTrigger,
   SelectValue,
-} from "@zeno/ui/select"
+} from "@zeno-lib/ui/select"
 import type { ComponentProps, ReactNode } from "react"
 import { Children, isValidElement, useMemo } from "react"
 

@@ -1,4 +1,4 @@
-import { Construction } from "@zeno/ui/icons"
+import { Construction } from "@zeno-lib/ui/icons"
 
 export default function ChangelogPage() {
   return (

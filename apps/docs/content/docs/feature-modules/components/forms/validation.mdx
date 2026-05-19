@@ -67,8 +67,8 @@ as the user corrects:
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { FieldGroup } from "@zeno/ui/field"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
 const schema = z.object({
@@ -113,8 +113,8 @@ soon as the field is dirty.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { FieldGroup } from "@zeno/ui/field"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
 const schema = z.object({
@@ -161,8 +161,8 @@ schema from `useForm` and validate manually inside `listeners.onChange`:
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { FieldGroup } from "@zeno/ui/field"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
 const schema = z.object({
@@ -243,8 +243,8 @@ even though the form is in the default `'blur-then-change'` mode.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { FieldGroup } from "@zeno/ui/field"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
 const slugRegex = /^[a-z0-9-]+$/
@@ -321,9 +321,9 @@ boolean `required` prop.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { FieldGroup } from "@zeno/ui/field"
-import { SelectItem } from "@zeno/ui/select"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { FieldGroup } from "@zeno-lib/ui/field"
+import { SelectItem } from "@zeno-lib/ui/select"
 import { z } from "zod"
 
 const schema = z.object({
@@ -391,8 +391,8 @@ yourself.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno/forms"
-import { FieldGroup } from "@zeno/ui/field"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
 const schema = z.object({
@@ -482,7 +482,7 @@ the native object when you need finer control:
   is the `schema` *prop* coexisting with the object form.
 - **`validationLogic`**: only accepted in the manual path. The function
   that decides which validator runs for each event.
-  `blurThenChangeLogic` is exported from `@zeno/forms` if you want the
+  `blurThenChangeLogic` is exported from `@zeno-lib/forms` if you want the
   default mode's behavior; otherwise pass TanStack's
   `defaultValidationLogic`.
 
