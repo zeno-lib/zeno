@@ -25,7 +25,7 @@
     "@biomejs/biome": "2.4.14",
     "@changesets/changelog-git": "^0.2.1",
     "@changesets/cli": "^2.31.0",
-    "turbo": "2.9.7",
+    "turbo": "2.9.14",
     "typescript": "6.0.3",
     "ultracite": "7.6.2"
   },
