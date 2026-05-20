@@ -1,6 +1,6 @@
 {
   "name": "@zeno-lib/e2e",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "scripts": {
     "e2e": "playwright test",
     "e2e:watch": "playwright test --ui",

@@ -1,6 +1,6 @@
 {
   "name": "@zeno-lib/supabase",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "scripts": {
     "types:check": "tsc --noEmit"
   },
