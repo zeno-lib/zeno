@@ -1,6 +1,16 @@
 {
   "name": "@zeno-lib/e2e",
   "version": "0.0.1",
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/e2e"
+  },
   "scripts": {
     "e2e": "playwright test",
     "e2e:watch": "playwright test --ui",
