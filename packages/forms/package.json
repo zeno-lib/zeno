@@ -1,6 +1,6 @@
 {
   "name": "@zeno-lib/forms",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "exports": {
     ".": "./src/form.tsx",
     "./addons": "./src/addons/index.ts",
