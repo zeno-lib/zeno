@@ -1,6 +1,5 @@
 {
   "name": "@zeno-lib/e2e",
-  "private": true,
   "version": "0.0.0",
   "scripts": {
     "e2e": "playwright test",

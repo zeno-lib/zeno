@@ -1,6 +1,5 @@
 {
   "name": "@zeno-lib/ui",
-  "private": true,
   "version": "0.0.0",
   "exports": {
     "./*": "./src/components/*.tsx",
