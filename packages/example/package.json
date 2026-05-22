@@ -2,8 +2,16 @@
   "name": "@zeno-lib/example",
   "private": true,
   "scripts": {
+    "dev": "npx supabase start",
+    "reset": "npx supabase db reset && npm run update-types",
+    "diff": "npx supabase db diff --local --schema public --use-migra --file temp && npm run update-types",
+    "migrate": "npx supabase migration up && npm run update-types",
+    "stop": "npx supabase stop",
     "test": "vitest --run",
     "test:watch": "vitest watch"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.106.1"
   },
   "devDependencies": {
     "@zeno-lib/vitest": "workspace:*",
