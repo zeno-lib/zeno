@@ -1,0 +1,29 @@
+{
+  "name": "@zeno-lib/db",
+  "version": "0.0.1",
+  "scripts": {
+    "types:check": "tsc --noEmit"
+  },
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/db"
+  },
+  "peerDependencies": {
+    "drizzle-kit": ">=0.31",
+    "drizzle-orm": ">=0.44",
+    "postgres": ">=3.4"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.0",
+    "@zeno-lib/typescript": "workspace:^"
+  }
+}
