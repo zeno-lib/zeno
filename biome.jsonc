@@ -6,7 +6,7 @@
     "ultracite/biome/next"
   ],
   "files": {
-    "includes": ["!**/src/types.ts"]
+    "includes": ["!**/src/types.ts", "!**/supabase/migrations"]
   },
   "overrides": [
     {
