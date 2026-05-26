@@ -16,6 +16,7 @@ Linked entries below have a leaf node — open it before working in that area. E
   - [`ui/`](packages/ui/AGENTS.md) — `@zeno-lib/ui` component primitives (Base UI + Tailwind)
   - [`authentication/`](packages/authentication/AGENTS.md) — `@zeno-lib/authentication` Supabase auth flows (read before touching `verify/` or `email-sent/`)
   - [`supabase/`](packages/supabase/AGENTS.md) — `@zeno-lib/supabase` SSR client + middleware
+  - [`db/`](packages/db/AGENTS.md) — `@zeno-lib/db` Drizzle ORM client + schema + migrations + RLS
   - [`e2e/`](packages/e2e/AGENTS.md) — `@zeno-lib/e2e` Playwright suite
   - `typescript/` — shared `tsconfig` presets
   - `tailwind/` — shared Tailwind globals
