@@ -1,3 +1,4 @@
+// https://orm.drizzle.team/docs/rls#using-with-supabase  (re-exported roles, authUsers, authUid, realtimeMessages)
 import { timestamp } from "drizzle-orm/pg-core"
 
 // Re-export Supabase primitives from drizzle-orm/supabase so consumers can
