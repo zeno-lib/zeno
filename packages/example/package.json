@@ -3,18 +3,29 @@
   "private": true,
   "scripts": {
     "dev": "npx supabase start",
-    "reset": "npx supabase db reset && npm run update-types",
-    "diff": "npx supabase db diff --local --schema public --use-migra --file temp && npm run update-types",
-    "migrate": "npx supabase migration up && npm run update-types",
     "stop": "npx supabase stop",
+    "reset": "npx supabase db reset && pnpm db:migrate",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
     "test": "vitest --run",
-    "test:watch": "vitest watch"
+    "test:watch": "vitest watch",
+    "types:check": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/supabase-js": "2.106.1"
+    "@supabase/supabase-js": "2.106.1",
+    "@zeno-lib/db": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "24.10.0",
+    "@zeno-lib/typescript": "workspace:^",
     "@zeno-lib/vitest": "workspace:*",
-    "typescript": "5.9.3"
+    "dotenv": "16.4.7",
+    "drizzle-kit": "0.31.5",
+    "drizzle-orm": "0.44.6",
+    "postgres": "3.4.7",
+    "typescript": "5.9.3",
+    "vitest": "4.0.18"
   }
 }
