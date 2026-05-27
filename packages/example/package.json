@@ -4,10 +4,11 @@
   "scripts": {
     "dev": "npx supabase start",
     "stop": "npx supabase stop",
-    "reset": "npx supabase db reset && pnpm db:migrate",
+    "reset": "npx supabase db reset && pnpm db:migrate && pnpm db:seed",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
+    "db:seed": "node src/seed.ts",
     "db:studio": "drizzle-kit studio",
     "test": "vitest --run",
     "test:watch": "vitest watch",
@@ -24,6 +25,7 @@
     "dotenv": "16.4.7",
     "drizzle-kit": "0.31.5",
     "drizzle-orm": "0.44.6",
+    "drizzle-seed": "0.3.1",
     "postgres": "3.4.7",
     "typescript": "5.9.3",
     "vitest": "4.0.18"
