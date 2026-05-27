@@ -30,3 +30,6 @@ export const posts = pgTable(
     }),
   ]
 ).enableRLS()
+
+export type InsertPost = typeof posts.$inferInsert
+export type SelectPost = typeof posts.$inferSelect
