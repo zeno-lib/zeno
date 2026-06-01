@@ -14,7 +14,7 @@ Provides a Drizzle-based interface for everything DB-related against Supabase Po
 
 | Import | Use from | Returns / does |
 |---|---|---|
-| `@zeno-lib/db` | Server code (Server Components, Route Handlers, Server Actions, cron, scripts) | `createSupabaseDrizzle({ schema, supabase?, connectionString?, casing? })` → `{ admin, rls, withAuth, close }`. `admin` bypasses RLS. `rls(...)` runs a transaction after resolving verified claims from the bound Supabase client. `withAuth(supabaseOrClaims).rls(...)` binds request auth at the call site. |
+| `@zeno-lib/db` | Server code (Server Components, Route Handlers, Server Actions, cron, scripts) | `createSupabaseDrizzle({ schema, supabase?, connectionString?, casing? })` → `{ admin, rls, close }`. `admin` bypasses RLS. `rls(...)` runs a transaction after resolving verified claims from the bound Supabase client. Underlying Postgres pools are cached by imported schema object + connection config, so this ergonomic factory can be called with a request-scoped Supabase client. |
 | `@zeno-lib/db/clients` | Lower-level server code | `createDrizzleClients({ schema, connectionString?, casing? })` → `{ getDrizzleSupabaseAdminClient, getDrizzleSupabaseClient, closeDrizzleSupabaseClients }`. Opens two `postgres-js` pools. `getDrizzleSupabaseAdminClient()` returns a Drizzle db that **bypasses RLS**. `getDrizzleSupabaseClient(supabaseOrClaims?)` accepts a Supabase client (preferred) or already-verified Supabase JWT claims and returns `{ runTransaction }`. |
 | `@zeno-lib/db/config` | `drizzle.config.ts` in each consuming package/app | `defineDrizzleConfig({ schema, ...overrides })` — preset that defaults `out` to `./supabase/migrations`, dialect to `postgresql`, reads `DATABASE_URL` from env, and sets `entities.roles.provider: "supabase"`. |
 | `@zeno-lib/db/schema` | Application schema files | Re-exports of `anonRole`, `authenticatedRole`, `serviceRole`, `postgresRole`, `supabaseAuthAdminRole`, `authUsers`, `authUid`, `realtimeMessages`, `realtimeTopic` from `drizzle-orm/supabase`. Plus a local `timestamps` mixin (`createdAt`, `updatedAt`). |
@@ -23,36 +23,34 @@ Both factories read `DATABASE_URL` from `process.env` with an optional `{ connec
 
 ## Usage Patterns
 
-Create the pools once at module scope:
-
-```ts
-// db.ts
-import { createSupabaseDrizzle } from "@zeno-lib/db"
-import * as schema from "./schema"
-
-export const db = createSupabaseDrizzle({ schema })
-```
-
-Admin (bypasses RLS — webhooks, admin tasks, background jobs, seeding):
-
-```ts
-import { db } from "./db"
-import { posts } from "./schema"
-
-await db.admin.select().from(posts) // RLS bypassed
-```
-
-RLS-aware per request — pass the request-scoped Supabase client and queries run inside `rls(...)`:
+RLS-aware per request — pass the request-scoped Supabase client at creation time:
 
 ```ts
 // route.ts
 import { createClient } from "@zeno-lib/supabase/server"
-import { db } from "./db"
+import { createSupabaseDrizzle } from "@zeno-lib/db"
 import { posts } from "./schema"
+import * as schema from "./schema"
 
 const supabase = await createClient()
-const mine = await db.withAuth(supabase).rls((tx) => tx.select().from(posts)) // RLS enforced
+const db = createSupabaseDrizzle({ schema, supabase })
+const mine = await db.rls((tx) => tx.select().from(posts)) // RLS enforced
 ```
+
+`createSupabaseDrizzle(...)` reuses pools for the same imported `schema`, resolved `DATABASE_URL`, and `casing`; do not create fresh schema object literals per request.
+
+Admin (bypasses RLS — webhooks, admin tasks, background jobs, seeding):
+
+```ts
+import { createSupabaseDrizzle } from "@zeno-lib/db"
+import * as schema from "./schema"
+import { posts } from "./schema"
+
+const db = createSupabaseDrizzle({ schema })
+await db.admin.select().from(posts) // RLS bypassed
+```
+
+Calling `db.rls(...)` without a `supabase` option throws immediately; missing request auth should not silently become an anon query.
 
 Schema with an RLS policy:
 
@@ -90,12 +88,12 @@ export default defineDrizzleConfig({ schema: "./src/schema.ts" })
 ## Anti-patterns
 
 - **Do not import `@zeno-lib/db/clients` from a Client Component.** `postgres-js` opens a TCP socket — server-only. Browser code talks to Supabase via REST (`@supabase/supabase-js`) or via your own Server Actions/Route Handlers.
-- **Do not run queries outside `db.rls(...)` / `db.withAuth(...).rls(...)` when you intend RLS to apply.** A query on `db.admin` executes as the connection role, bypassing the policies you authored. The JWT claims + role are only set inside that transaction.
+- **Do not run queries outside `db.rls(...)` when you intend RLS to apply.** A query on `db.admin` executes as the connection role, bypassing the policies you authored. The JWT claims + role are only set inside that transaction.
 - **Do not pass raw JWT strings or unverified session payloads into RLS helpers.** Pass a Supabase client, or verify first with Supabase Auth (`auth.getClaims()` / equivalent) and pass the resulting claims object. The DB package deliberately does not decode raw tokens.
 - **Do not write RLS policies as raw SQL in `supabase/migrations/` by hand.** `pgPolicy(...)` in the schema is the source of truth — drizzle-kit emits `CREATE POLICY` SQL during `generate`. A hand-written policy file will desync from the schema and won't survive the next `drizzle-kit generate`.
 - **Do not declare the Supabase-built-in roles (`anon`, `authenticated`, `service_role`, `postgres_role`, `supabase_auth_admin`).** They're pre-existing in every Supabase project. Reference them via the `.existing()` exports from `@zeno-lib/db/schema`.
 - **Do not omit `prepare: false`** if you ever construct your own `postgres-js` client against a Supabase pooler URL — prepared statements aren't supported in transaction-mode pooling and queries fail at runtime.
-- **Do not call `createSupabaseDrizzle()` per request unless the Supabase client must be bound at construction time.** Each call opens two new connection pools. Prefer a module-scope `db` plus `db.withAuth(supabase).rls(...)` when only auth context is request-scoped.
+- **Do not create fresh schema object literals per request.** `createSupabaseDrizzle()` reuses pools only when callers pass the same imported schema object + connection config.
 - **Do not interpolate an unvalidated `role` into `set local role`.** `getDrizzleSupabaseClient` only accepts `anon | authenticated` (defaulting to `anon`) before interpolating, so a forged `role` claim can't inject SQL or switch into `service_role`. Keep that allowlist if you fork the file.
 
 ## Dependencies & Edges

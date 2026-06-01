@@ -22,9 +22,21 @@ describe("createSupabaseDrizzle", () => {
 
     expect(db.admin).toBeDefined()
     expect(db.rls).toEqual(expect.any(Function))
-    expect(db.withAuth).toEqual(expect.any(Function))
     expect(db.close).toEqual(expect.any(Function))
 
-    await db.close()
+    await db.close({ timeout: 0 })
+  })
+
+  it("fails loudly when rls is used without a Supabase client", async () => {
+    const db = createSupabaseDrizzle({
+      connectionString: LOCAL_DB_URL,
+      schema: {},
+    })
+
+    await expect(db.rls(async () => [])).rejects.toThrow(
+      "Missing Supabase client for RLS"
+    )
+
+    await db.close({ timeout: 0 })
   })
 })

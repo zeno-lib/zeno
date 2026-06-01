@@ -47,53 +47,46 @@ export const posts = pgTable(
 ## 2. Create the database helper
 
 ```ts
-// src/db.ts
+// route.ts
 import { createSupabaseDrizzle } from "@zeno-lib/db"
 import * as schema from "./schema"
-
-export const db = createSupabaseDrizzle({ schema })
-```
-
-Create this once at module scope so the Postgres pools are reused.
-
-## 3. Query with RLS
-
-If your Supabase client is request-scoped, bind it at the call site:
-
-```ts
-// route.ts
-import { createClient } from "@zeno-lib/supabase/server"
-import { db } from "./db"
 import { posts } from "./schema"
+import { createClient } from "@zeno-lib/supabase/server"
 
-const supabase = await createClient()
-
-const mine = await db.withAuth(supabase).rls((tx) =>
-  tx.select().from(posts)
-)
-```
-
-If your module already has the correct request-scoped Supabase client, you can
-bind it up front:
-
-```ts
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ schema, supabase })
 
 const mine = await db.rls((tx) => tx.select().from(posts))
 ```
 
+`createSupabaseDrizzle(...)` reuses the underlying Postgres pools for the same
+imported `schema`, `DATABASE_URL`, and `casing`, so it is safe to call in a
+request after creating the request-scoped Supabase client.
+
+## Admin queries
+
+For trusted server work that does not need user RLS, omit `supabase`:
+
+```ts
+// seed.ts
+import { createSupabaseDrizzle } from "@zeno-lib/db"
+import * as schema from "./schema"
+import { posts } from "./schema"
+
+const db = createSupabaseDrizzle({ schema })
+
+await db.admin.select().from(posts)
+```
+
+Calling `db.rls(...)` without passing `supabase` to `createSupabaseDrizzle(...)`
+throws immediately, so missing auth context does not silently become an anon
+query.
+
 `db.rls(...)` calls `supabase.auth.getClaims()` before the transaction. Those
 claims are the verified JWT payload Supabase returns after validating the
 current access token. The package installs them into transaction-local Postgres
 settings so Supabase helpers like `auth.uid()` and `auth.jwt()` work inside RLS
 policies.
-
-## Admin queries
-
-```ts
-await db.admin.select().from(posts)
-```
 
 `db.admin` bypasses RLS. Use it only for trusted server work: webhooks, cron,
 admin jobs, and seed scripts.
@@ -149,9 +142,8 @@ Drizzle schema, run `drizzle-kit generate`, and commit the generated SQL under
   already-verified claims from `supabase.auth.getClaims()`.
 - Do not use `service_role` through `db.rls`; use `db.admin` for service-role
   work.
-- Do not create the database helper per request unless your Supabase client must
-  be bound at construction time. Prefer `db.withAuth(supabase).rls(...)` when
-  only auth context is request-scoped.
+- Do not create a fresh schema object per request. Import the same schema module
+  object so `createSupabaseDrizzle(...)` can reuse its cached Postgres pools.
 - Do not mix hand-written RLS migrations with Drizzle-authored policies unless
   you are intentionally taking ownership of the desync risk.
 - Keep `casing` consistent between `createSupabaseDrizzle(...)` and

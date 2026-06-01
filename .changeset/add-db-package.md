@@ -6,7 +6,7 @@ Add `@zeno-lib/db`: Drizzle ORM wrapper for Supabase Postgres. Owns schema, migr
 
 Public surface:
 
-- `@zeno-lib/db` — `createSupabaseDrizzle({ schema, supabase?, connectionString?, casing? })` returns `{ admin, rls, withAuth, close }`. `admin` bypasses RLS. `rls(...)` runs a transaction after resolving verified claims from the bound Supabase client. `withAuth(supabaseOrClaims).rls(...)` binds request auth at the call site.
+- `@zeno-lib/db` — `createSupabaseDrizzle({ schema, supabase?, connectionString?, casing? })` returns `{ admin, rls, close }`. `admin` bypasses RLS. `rls(...)` runs a transaction after resolving verified claims from the bound Supabase client. Underlying Postgres pools are cached by imported schema object + connection config, so this ergonomic factory can be called with a request-scoped Supabase client.
 - `@zeno-lib/db/clients` — lower-level `createDrizzleClients({ schema, connectionString?, casing? })` returns `{ getDrizzleSupabaseAdminClient, getDrizzleSupabaseClient, closeDrizzleSupabaseClients }`. `getDrizzleSupabaseClient(supabaseOrClaims?)` accepts a Supabase client or already-verified Supabase JWT claims and returns `{ runTransaction }`.
 - `@zeno-lib/db/config` — `defineDrizzleConfig({ schema, ...overrides })` preset for `drizzle.config.ts`. Defaults `out: "./supabase/migrations"`, dialect `postgresql`, reads `DATABASE_URL`, and sets `entities.roles.provider: "supabase"` so Supabase built-in roles aren't touched.
 - `@zeno-lib/db/schema` — re-exports of `anonRole`, `authenticatedRole`, `serviceRole`, `postgresRole`, `supabaseAuthAdminRole`, `authUsers`, `authUid`, `realtimeMessages`, `realtimeTopic` from `drizzle-orm/supabase`, plus a `timestamps` mixin.

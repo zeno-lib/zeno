@@ -44,6 +44,15 @@ export type CreateSupabaseDrizzleOptions<
   supabase?: SupabaseAuthContext
 }
 
+type DrizzleClients<TSchema extends Record<string, unknown>> = ReturnType<
+  typeof createDrizzleClients<TSchema>
+>
+
+const sharedClients = new WeakMap<
+  Record<string, unknown>,
+  Map<string, DrizzleClients<Record<string, unknown>>>
+>()
+
 export function createDrizzleClients<TSchema extends Record<string, unknown>>(
   options: CreateDrizzleClientsOptions<TSchema>
 ) {
@@ -120,18 +129,66 @@ export function createSupabaseDrizzle<TSchema extends Record<string, unknown>>(
     closeDrizzleSupabaseClients,
     getDrizzleSupabaseAdminClient,
     getDrizzleSupabaseClient,
-  } = createDrizzleClients(options)
-  const createRlsClient = (authContext?: SupabaseAuthContext) =>
-    getDrizzleSupabaseClient(authContext)
+  } = getSharedDrizzleClients(options)
+  const cacheKey = createCacheKey(options)
+  type RlsTransaction = ReturnType<
+    typeof getDrizzleSupabaseClient
+  >["runTransaction"]
+  const rls =
+    options.supabase === undefined
+      ? ((() =>
+          Promise.reject(
+            new Error(
+              "Missing Supabase client for RLS. Pass { supabase } to createSupabaseDrizzle()."
+            )
+          )) as RlsTransaction)
+      : getDrizzleSupabaseClient(options.supabase).runTransaction
 
   return {
     admin: getDrizzleSupabaseAdminClient(),
-    close: closeDrizzleSupabaseClients,
-    rls: createRlsClient(options.supabase).runTransaction,
-    withAuth: (authContext: SupabaseAuthContext) => ({
-      rls: createRlsClient(authContext).runTransaction,
-    }),
+    close: async (
+      closeOptions?: Parameters<typeof closeDrizzleSupabaseClients>[0]
+    ) => {
+      sharedClients.get(options.schema)?.delete(cacheKey)
+      await closeDrizzleSupabaseClients(closeOptions)
+    },
+    rls,
   }
+}
+
+function getSharedDrizzleClients<TSchema extends Record<string, unknown>>(
+  options: CreateDrizzleClientsOptions<TSchema>
+): DrizzleClients<TSchema> {
+  const cacheKey = createCacheKey(options)
+  let schemaClients = sharedClients.get(options.schema)
+  if (!schemaClients) {
+    schemaClients = new Map()
+    sharedClients.set(options.schema, schemaClients)
+  }
+
+  const existingClients = schemaClients.get(cacheKey) as
+    | DrizzleClients<TSchema>
+    | undefined
+  if (existingClients) {
+    return existingClients
+  }
+
+  const clients = createDrizzleClients(options)
+  schemaClients.set(
+    cacheKey,
+    clients as DrizzleClients<Record<string, unknown>>
+  )
+  return clients
+}
+
+function createCacheKey<TSchema extends Record<string, unknown>>(
+  options: CreateDrizzleClientsOptions<TSchema>
+): string {
+  const url = options.connectionString ?? process.env.DATABASE_URL
+  if (!url) {
+    throw new Error("Missing DATABASE_URL environment variable")
+  }
+  return JSON.stringify({ casing: options.casing ?? null, url })
 }
 
 async function resolveTokenClaims(
