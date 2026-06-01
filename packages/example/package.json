@@ -2,9 +2,9 @@
   "name": "@zeno-lib/example",
   "private": true,
   "scripts": {
-    "dev": "npx supabase start",
-    "stop": "npx supabase stop",
-    "reset": "npx supabase db reset && pnpm db:migrate && pnpm db:seed",
+    "dev": "pnpm exec supabase start",
+    "stop": "pnpm exec supabase stop",
+    "reset": "pnpm exec supabase db reset && pnpm db:seed",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
@@ -27,6 +27,7 @@
     "drizzle-orm": "0.44.6",
     "drizzle-seed": "0.3.1",
     "postgres": "3.4.7",
+    "supabase": "2.31.8",
     "typescript": "5.9.3",
     "vitest": "4.0.18"
   }

@@ -202,6 +202,9 @@ importers:
       postgres:
         specifier: 3.4.7
         version: 3.4.7
+      supabase:
+        specifier: 2.31.8
+        version: 2.31.8
       typescript:
         specifier: 5.9.3
         version: 5.9.3
