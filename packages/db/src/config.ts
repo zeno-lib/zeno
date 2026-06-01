@@ -5,14 +5,21 @@ import { type Config, defineConfig } from "drizzle-kit"
 export function defineDrizzleConfig(
   overrides: Partial<Config> = {}
 ): ReturnType<typeof defineConfig> {
+  const { entities, ...configOverrides } = overrides
+  const roleOverrides =
+    typeof entities?.roles === "object" ? entities.roles : {}
+
   return defineConfig({
     dbCredentials: { url: process.env.DATABASE_URL ?? "" },
     dialect: "postgresql",
     // Tells drizzle-kit that Supabase's built-in roles (anon, authenticated,
     // service_role, ...) already exist — don't try to CREATE or DROP them.
-    entities: { roles: { provider: "supabase" } },
+    entities: {
+      ...entities,
+      roles: { ...roleOverrides, provider: "supabase" },
+    },
     out: "./supabase/migrations",
     schema: "./src/schema.ts",
-    ...overrides,
+    ...configOverrides,
   } as Config)
 }
