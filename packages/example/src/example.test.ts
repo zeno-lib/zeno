@@ -1,4 +1,7 @@
-import { createDrizzleClients } from "@zeno-lib/db/clients"
+import {
+  createDrizzleClients,
+  type SupabaseTokenClaims,
+} from "@zeno-lib/db/clients"
 import { eq, isNull, sql } from "drizzle-orm"
 import { beforeAll, describe, expect, it, vi } from "vitest"
 import {
@@ -26,7 +29,8 @@ const TOKEN = {
   sub: "00000000-0000-0000-0000-000000000000",
 }
 
-// Build an unsigned access_token whose payload decodes to `claims`.
+// Build an unsigned access_token-shaped string to prove the DB package does
+// not decode or trust raw JWTs.
 function makeAccessToken(claims: Record<string, unknown>): string {
   const encode = (value: object) =>
     Buffer.from(JSON.stringify(value)).toString("base64url")
@@ -66,8 +70,8 @@ describe("getDrizzleSupabaseAdminClient", () => {
 })
 
 describe("getDrizzleSupabaseClient", () => {
-  it("switches the role to the token's role inside runTransaction", async () => {
-    const { runTransaction } = getDrizzleSupabaseClient(makeAccessToken(TOKEN))
+  it("switches the role to the verified claims' role inside runTransaction", async () => {
+    const { runTransaction } = getDrizzleSupabaseClient(TOKEN)
     const result = await runTransaction((tx) =>
       tx.execute(sql`select current_user as role`)
     )
@@ -75,7 +79,7 @@ describe("getDrizzleSupabaseClient", () => {
   })
 
   it("sets request.jwt.claims (JSON) so auth.uid() resolves the sub", async () => {
-    const { runTransaction } = getDrizzleSupabaseClient(makeAccessToken(TOKEN))
+    const { runTransaction } = getDrizzleSupabaseClient(TOKEN)
     const result = await runTransaction((tx) =>
       tx.execute(
         sql`select current_setting('request.jwt.claims', true) as claims, auth.uid() as uid`
@@ -87,8 +91,27 @@ describe("getDrizzleSupabaseClient", () => {
   })
 
   it("falls back to the anon role for an unknown/forged role claim", async () => {
+    const { runTransaction } = getDrizzleSupabaseClient({ role: "postgres" })
+    const result = await runTransaction((tx) =>
+      tx.execute(sql`select current_user as role`)
+    )
+    expect(result[0]).toEqual({ role: "anon" })
+  })
+
+  it("does not allow the request-scoped client to switch into service_role", async () => {
+    const { runTransaction } = getDrizzleSupabaseClient({
+      role: "service_role",
+      sub: TOKEN.sub,
+    })
+    const result = await runTransaction((tx) =>
+      tx.execute(sql`select current_user as role`)
+    )
+    expect(result[0]).toEqual({ role: "anon" })
+  })
+
+  it("does not decode or trust raw access token strings", async () => {
     const { runTransaction } = getDrizzleSupabaseClient(
-      makeAccessToken({ role: "postgres" })
+      makeAccessToken(TOKEN) as unknown as SupabaseTokenClaims
     )
     const result = await runTransaction((tx) =>
       tx.execute(sql`select current_user as role`)
@@ -97,7 +120,7 @@ describe("getDrizzleSupabaseClient", () => {
   })
 
   it("scopes role and claims to the transaction (does not leak)", async () => {
-    const { runTransaction } = getDrizzleSupabaseClient(makeAccessToken(TOKEN))
+    const { runTransaction } = getDrizzleSupabaseClient(TOKEN)
     await runTransaction((tx) => tx.execute(sql`select 1`))
     // The admin pool is a separate connection — never role-switched, and the
     // claim was never set on it (null, not "").
@@ -108,7 +131,7 @@ describe("getDrizzleSupabaseClient", () => {
   })
 
   it("applies RLS policies — non-matching sub returns 0 rows", async () => {
-    const { runTransaction } = getDrizzleSupabaseClient(makeAccessToken(TOKEN))
+    const { runTransaction } = getDrizzleSupabaseClient(TOKEN)
     const rows = await runTransaction((tx) => tx.select().from(posts))
     expect(rows).toEqual([])
   })

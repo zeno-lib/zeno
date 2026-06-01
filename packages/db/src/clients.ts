@@ -3,16 +3,17 @@ import { type DrizzleConfig, sql } from "drizzle-orm"
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js"
 import postgres from "postgres"
 
-// Claims we read off the decoded Supabase JWT to drive RLS.
-type SupabaseTokenClaims = {
+// Verified Supabase JWT claims used to drive Postgres RLS.
+export type SupabaseTokenClaims = {
   sub?: string
   role?: string
+  [claim: string]: unknown
 }
 
 // `set local role <ident>` can't be parameterized, so the role is interpolated
 // via sql.raw. Restrict it to the Supabase-managed roles so a forged `role`
-// claim can't inject SQL.
-const ALLOWED_ROLES = new Set(["anon", "authenticated", "service_role"])
+// claim can't inject SQL or switch into the service role.
+const ALLOWED_RLS_ROLES = new Set(["anon", "authenticated"])
 
 type CreateDrizzleClientsOptions<TSchema extends Record<string, unknown>> = {
   schema: TSchema
@@ -36,12 +37,14 @@ export function createDrizzleClients<TSchema extends Record<string, unknown>>(
   // prepare:false → required for the Supabase transaction pooler (port 6543).
   // Two separate pools: admin runs as the connection role (bypasses RLS),
   // rls switches role + sets JWT claims per transaction.
+  const adminPool = postgres(url, { prepare: false })
+  const rlsPool = postgres(url, { prepare: false })
   const adminClient = drizzle({
-    client: postgres(url, { prepare: false }),
+    client: adminPool,
     ...config,
   })
   const rlsClient = drizzle({
-    client: postgres(url, { prepare: false }),
+    client: rlsPool,
     ...config,
   })
 
@@ -50,52 +53,53 @@ export function createDrizzleClients<TSchema extends Record<string, unknown>>(
     return adminClient
   }
 
-  // RLS-aware. Pass the request's Supabase `access_token`; every query MUST run
-  // inside `runTransaction` for the JWT context (and thus RLS) to apply.
-  function getDrizzleSupabaseClient(accessToken: string) {
-    const token = decodeJwt(accessToken)
+  // RLS-aware. Pass verified Supabase JWT claims; every query MUST run inside
+  // `runTransaction` for the JWT context (and thus RLS) to apply.
+  function getDrizzleSupabaseClient(
+    verifiedClaims?: SupabaseTokenClaims | null
+  ) {
+    const token = normalizeTokenClaims(verifiedClaims)
     const claims = JSON.stringify(token)
     const sub = token.sub ?? ""
     const role =
-      token.role && ALLOWED_ROLES.has(token.role) ? token.role : "anon"
+      token.role && ALLOWED_RLS_ROLES.has(token.role) ? token.role : "anon"
 
     const runTransaction = (async (transaction, txConfig) =>
       await rlsClient.transaction(async (tx) => {
-        try {
-          // auth.jwt()/auth.uid() read these; is_local scopes them to the tx,
-          // so they auto-reset when it commits or rolls back.
-          await tx.execute(
-            sql`select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true)`
-          )
-          await tx.execute(sql`set local role ${sql.raw(role)}`)
-          return await transaction(tx)
-        } finally {
-          // Defensive reset (transaction-local settings already auto-reset).
-          await tx.execute(
-            sql`select set_config('request.jwt.claims', NULL, true), set_config('request.jwt.claim.sub', NULL, true)`
-          )
-          await tx.execute(sql`reset role`)
-        }
+        // auth.jwt()/auth.uid() read these; is_local scopes them to the tx, so
+        // they auto-reset when it commits or rolls back.
+        await tx.execute(
+          sql`select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true)`
+        )
+        await tx.execute(sql`set local role ${sql.raw(role)}`)
+        return await transaction(tx)
       }, txConfig)) as typeof rlsClient.transaction
 
     return { runTransaction }
   }
 
-  return { getDrizzleSupabaseAdminClient, getDrizzleSupabaseClient }
+  async function closeDrizzleSupabaseClients(
+    options?: Parameters<typeof adminPool.end>[0]
+  ): Promise<void> {
+    await Promise.all([adminPool.end(options), rlsPool.end(options)])
+  }
+
+  return {
+    closeDrizzleSupabaseClients,
+    getDrizzleSupabaseAdminClient,
+    getDrizzleSupabaseClient,
+  }
 }
 
-// Supabase already verified the token; we only need to read its claims.
-// Hand-rolled to avoid a jwt-decode dependency (server-only; Buffer is fine).
-function decodeJwt(accessToken: string): SupabaseTokenClaims {
-  try {
-    const payload = accessToken.split(".")[1]
-    if (!payload) {
-      return {}
-    }
-    return JSON.parse(
-      Buffer.from(payload, "base64url").toString("utf8")
-    ) as SupabaseTokenClaims
-  } catch {
+function normalizeTokenClaims(
+  verifiedClaims?: SupabaseTokenClaims | null
+): SupabaseTokenClaims {
+  if (
+    !verifiedClaims ||
+    typeof verifiedClaims !== "object" ||
+    Array.isArray(verifiedClaims)
+  ) {
     return {}
   }
+  return verifiedClaims
 }
