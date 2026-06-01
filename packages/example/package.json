@@ -10,7 +10,8 @@
     "db:push": "drizzle-kit push",
     "db:seed": "node src/seed.ts",
     "db:studio": "drizzle-kit studio",
-    "test": "vitest --run",
+    "test": "vitest --run src/example.test.ts",
+    "test:integration": "vitest --run src/example.integration.test.ts",
     "test:watch": "vitest watch",
     "types:check": "tsc --noEmit"
   },
