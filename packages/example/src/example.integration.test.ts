@@ -5,8 +5,9 @@ import {
   type SupabaseTokenClaims,
 } from "@zeno-lib/db"
 import { eq, isNull, sql } from "drizzle-orm"
-import { beforeAll, describe, expect, it, vi } from "vitest"
-import { db } from "./clients"
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
+// biome-ignore lint/performance/noNamespaceImport: drizzle schema needs every table
+import * as schema from "./schema"
 import {
   customers,
   details,
@@ -27,6 +28,11 @@ const TOKEN = {
   role: "authenticated",
   sub: "00000000-0000-0000-0000-000000000000",
 }
+const db = createSupabaseDrizzle({ schema })
+
+afterAll(async () => {
+  await db.close({ timeout: 0 })
+})
 
 // Build an unsigned access_token-shaped string to prove the DB package does
 // not decode or trust raw JWTs.
@@ -74,41 +80,37 @@ describe("db.admin", () => {
 describe("db.rls", () => {
   it("uses the Supabase client passed at creation time", async () => {
     const supabase = createSupabase(TOKEN)
-    const dbWithSupabase = createSupabaseDrizzle({
+    const db = createSupabaseDrizzle({
       connectionString: LOCAL_DB_URL,
-      schema: {},
+      schema,
       supabase,
     })
 
-    const result = await dbWithSupabase.rls((tx) =>
+    const result = await db.rls((tx) =>
       tx.execute(sql`select current_user as role`)
     )
 
     expect(supabase.auth.getClaims).toHaveBeenCalledOnce()
     expect(result[0]).toEqual({ role: "authenticated" })
-
-    await dbWithSupabase.close({ timeout: 0 })
   })
 
   it("switches the role to the verified claims' role inside rls", async () => {
-    const dbWithSupabase = createSupabaseDrizzle({
-      schema: {},
+    const db = createSupabaseDrizzle({
+      schema,
       supabase: createSupabase(TOKEN),
     })
-    const result = await dbWithSupabase.rls((tx) =>
+    const result = await db.rls((tx) =>
       tx.execute(sql`select current_user as role`)
     )
     expect(result[0]).toEqual({ role: "authenticated" })
-
-    await dbWithSupabase.close({ timeout: 0 })
   })
 
   it("sets request.jwt.claims (JSON) so auth.uid() resolves the sub", async () => {
-    const dbWithSupabase = createSupabaseDrizzle({
-      schema: {},
+    const db = createSupabaseDrizzle({
+      schema,
       supabase: createSupabase(TOKEN),
     })
-    const result = await dbWithSupabase.rls((tx) =>
+    const result = await db.rls((tx) =>
       tx.execute(
         sql`select current_setting('request.jwt.claims', true) as claims, auth.uid() as uid`
       )
@@ -116,77 +118,65 @@ describe("db.rls", () => {
     const row = result[0] as { claims: string; uid: string }
     expect(JSON.parse(row.claims)).toMatchObject(TOKEN)
     expect(row.uid).toBe(TOKEN.sub)
-
-    await dbWithSupabase.close({ timeout: 0 })
   })
 
   it("falls back to the anon role for an unknown/forged role claim", async () => {
-    const dbWithSupabase = createSupabaseDrizzle({
-      schema: {},
+    const db = createSupabaseDrizzle({
+      schema,
       supabase: createSupabase({ role: "postgres" }),
     })
-    const result = await dbWithSupabase.rls((tx) =>
+    const result = await db.rls((tx) =>
       tx.execute(sql`select current_user as role`)
     )
     expect(result[0]).toEqual({ role: "anon" })
-
-    await dbWithSupabase.close({ timeout: 0 })
   })
 
   it("does not allow the request-scoped client to switch into service_role", async () => {
-    const dbWithSupabase = createSupabaseDrizzle({
-      schema: {},
+    const db = createSupabaseDrizzle({
+      schema,
       supabase: createSupabase({
         role: "service_role",
         sub: TOKEN.sub,
       }),
     })
-    const result = await dbWithSupabase.rls((tx) =>
+    const result = await db.rls((tx) =>
       tx.execute(sql`select current_user as role`)
     )
     expect(result[0]).toEqual({ role: "anon" })
-
-    await dbWithSupabase.close({ timeout: 0 })
   })
 
   it("does not decode or trust raw access token strings", async () => {
-    const dbWithSupabase = createSupabaseDrizzle({
-      schema: {},
+    const db = createSupabaseDrizzle({
+      schema,
       supabase: makeAccessToken(TOKEN) as unknown as SupabaseTokenClaims,
     })
-    const result = await dbWithSupabase.rls((tx) =>
+    const result = await db.rls((tx) =>
       tx.execute(sql`select current_user as role`)
     )
     expect(result[0]).toEqual({ role: "anon" })
-
-    await dbWithSupabase.close({ timeout: 0 })
   })
 
   it("scopes role and claims to the transaction (does not leak)", async () => {
-    const dbWithSupabase = createSupabaseDrizzle({
-      schema: {},
+    const db = createSupabaseDrizzle({
+      schema,
       supabase: createSupabase(TOKEN),
     })
-    await dbWithSupabase.rls((tx) => tx.execute(sql`select 1`))
+    await db.rls((tx) => tx.execute(sql`select 1`))
     // The admin pool is a separate connection — never role-switched, and the
     // claim was never set on it (null, not "").
     const result = await db.admin.execute(
       sql`select current_user as role, current_setting('request.jwt.claims', true) as claims`
     )
     expect(result[0]).toEqual({ claims: null, role: "postgres" })
-
-    await dbWithSupabase.close({ timeout: 0 })
   })
 
   it("applies RLS policies — non-matching sub returns 0 rows", async () => {
-    const dbWithSupabase = createSupabaseDrizzle({
-      schema: {},
+    const db = createSupabaseDrizzle({
+      schema,
       supabase: createSupabase(TOKEN),
     })
-    const rows = await dbWithSupabase.rls((tx) => tx.select().from(posts))
+    const rows = await db.rls((tx) => tx.select().from(posts))
     expect(rows).toEqual([])
-
-    await dbWithSupabase.close({ timeout: 0 })
   })
 })
 

@@ -1,9 +1,11 @@
 // https://orm.drizzle.team/docs/seed-overview#complex-example
 import "dotenv/config"
 import { fileURLToPath } from "node:url"
+import { createSupabaseDrizzle } from "@zeno-lib/db"
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js"
 import { reset, seed } from "drizzle-seed"
-import { db } from "./clients.ts"
+// biome-ignore lint/performance/noNamespaceImport: drizzle schema needs every table
+import * as appSchema from "./schema.ts"
 import {
   customers,
   details,
@@ -140,6 +142,7 @@ export async function seedDatabase<TSchema extends Record<string, unknown>>(
 
 async function main(): Promise<void> {
   // Seeding bypasses RLS, so use the admin client.
+  const db = createSupabaseDrizzle({ schema: appSchema })
   await seedDatabase(db.admin)
   console.log("Seeded Northwind dataset")
 }
