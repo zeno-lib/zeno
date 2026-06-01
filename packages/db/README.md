@@ -44,14 +44,14 @@ export const posts = pgTable(
 ).enableRLS()
 ```
 
-## 2. Create the database helper
+## 2. Query with RLS
 
 ```ts
 // route.ts
 import { createSupabaseDrizzle } from "@zeno-lib/db"
+import { createClient } from "@zeno-lib/supabase/server"
 import * as schema from "./schema"
 import { posts } from "./schema"
-import { createClient } from "@zeno-lib/supabase/server"
 
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ schema, supabase })
@@ -62,6 +62,12 @@ const mine = await db.rls((tx) => tx.select().from(posts))
 `createSupabaseDrizzle(...)` reuses the underlying Postgres pools for the same
 imported `schema`, `DATABASE_URL`, and `casing`, so it is safe to call in a
 request after creating the request-scoped Supabase client.
+
+`db.rls(...)` calls `supabase.auth.getClaims()` before the transaction. Those
+claims are the verified JWT payload Supabase returns after validating the
+current access token. The package installs them into transaction-local Postgres
+settings so Supabase helpers like `auth.uid()` and `auth.jwt()` work inside RLS
+policies.
 
 ## Admin queries
 
@@ -81,12 +87,6 @@ await db.admin.select().from(posts)
 Calling `db.rls(...)` without passing `supabase` to `createSupabaseDrizzle(...)`
 throws immediately, so missing auth context does not silently become an anon
 query.
-
-`db.rls(...)` calls `supabase.auth.getClaims()` before the transaction. Those
-claims are the verified JWT payload Supabase returns after validating the
-current access token. The package installs them into transaction-local Postgres
-settings so Supabase helpers like `auth.uid()` and `auth.jwt()` work inside RLS
-policies.
 
 `db.admin` bypasses RLS. Use it only for trusted server work: webhooks, cron,
 admin jobs, and seed scripts.
