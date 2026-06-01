@@ -1,7 +1,9 @@
 // https://orm.drizzle.team/docs/seed-overview#complex-example
 import "dotenv/config"
-import { createDb, type PostgresJsDatabase } from "@zeno-lib/db/client"
+import { fileURLToPath } from "node:url"
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js"
 import { reset, seed } from "drizzle-seed"
+import { getDrizzleSupabaseAdminClient } from "./clients.ts"
 import {
   customers,
   details,
@@ -35,8 +37,10 @@ export const SEED_COUNTS = {
   suppliers: 15,
 } as const
 
-export async function seedDatabase(
-  db: PostgresJsDatabase<typeof schema>
+// Accepts any Drizzle client (e.g. the admin client); only the Northwind
+// `schema` subset is reset/seeded, so the RLS `posts` table is left alone.
+export async function seedDatabase<TSchema extends Record<string, unknown>>(
+  db: PostgresJsDatabase<TSchema>
 ): Promise<void> {
   await reset(db, schema)
   await seed(db, schema).refine((funcs) => ({
@@ -135,9 +139,18 @@ export async function seedDatabase(
 }
 
 async function main(): Promise<void> {
-  const db = createDb({ schema })
-  await seedDatabase(db)
+  // Seeding bypasses RLS, so use the admin client.
+  await seedDatabase(getDrizzleSupabaseAdminClient())
   console.log("Seeded Northwind dataset")
 }
 
-main()
+// Only run when invoked directly (`node src/seed.ts`), not when imported by tests.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().then(
+    () => process.exit(0),
+    (error) => {
+      console.error(error)
+      process.exit(1)
+    }
+  )
+}

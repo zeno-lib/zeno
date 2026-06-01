@@ -1,7 +1,10 @@
-import { createDb } from "@zeno-lib/db/client"
-import { createDbForRequest } from "@zeno-lib/db/rls"
+import { createDrizzleClients } from "@zeno-lib/db/clients"
 import { eq, isNull, sql } from "drizzle-orm"
 import { beforeAll, describe, expect, it, vi } from "vitest"
+import {
+  getDrizzleSupabaseAdminClient,
+  getDrizzleSupabaseClient,
+} from "./clients"
 import {
   customers,
   details,
@@ -17,83 +20,102 @@ import { SEED_COUNTS, seedDatabase } from "./seed"
 // Start it with `pnpm dev` before running these tests.
 
 const PHONE_TEMPLATE = /^\(\d{3}\) \d{3}-\d{4}$/
+const LOCAL_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+const TOKEN = {
+  role: "authenticated",
+  sub: "00000000-0000-0000-0000-000000000000",
+}
 
-describe("createDb", () => {
+// Build an unsigned access_token whose payload decodes to `claims`.
+function makeAccessToken(claims: Record<string, unknown>): string {
+  const encode = (value: object) =>
+    Buffer.from(JSON.stringify(value)).toString("base64url")
+  return `${encode({ alg: "HS256", typ: "JWT" })}.${encode(claims)}.signature`
+}
+
+// Package-level factory contract (the reusable engine in @zeno-lib/db).
+describe("createDrizzleClients", () => {
   it("throws when DATABASE_URL is unset and no override is provided", () => {
     vi.stubEnv("DATABASE_URL", "")
-    expect(() => createDb()).toThrow(
+    expect(() => createDrizzleClients({ schema: {} })).toThrow(
       "Missing DATABASE_URL environment variable"
     )
     vi.unstubAllEnvs()
   })
 
   it("accepts an explicit connectionString override", async () => {
-    const db = createDb({
-      connectionString:
-        "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+    const clients = createDrizzleClients({
+      connectionString: LOCAL_DB_URL,
+      schema: {},
     })
-    const result = await db.execute(sql`select 1 as ok`)
+    const result = await clients
+      .getDrizzleSupabaseAdminClient()
+      .execute(sql`select 1 as ok`)
     expect(result[0]).toEqual({ ok: 1 })
   })
+})
 
-  it("runs a query against the service-role connection (bypasses RLS)", async () => {
-    const db = createDb()
-    const result = await db.execute(sql`select current_user as role`)
-    // Default connection role is `postgres` (service-equivalent) — not
-    // `authenticated`, so RLS does not apply.
+// App-level getters (this package's own clients.ts, bound to its schema).
+describe("getDrizzleSupabaseAdminClient", () => {
+  it("bypasses RLS (runs as postgres)", async () => {
+    const result = await getDrizzleSupabaseAdminClient().execute(
+      sql`select current_user as role`
+    )
     expect(result[0]).toEqual({ role: "postgres" })
   })
 })
 
-describe("createDbForRequest", () => {
-  const fakeJwt = JSON.stringify({
-    role: "authenticated",
-    sub: "00000000-0000-0000-0000-000000000000",
-  })
-
-  it("switches the role to 'authenticated' inside rls()", async () => {
-    const db = createDb()
-    const userDb = createDbForRequest(db, fakeJwt)
-    const result = await userDb.rls((tx) =>
+describe("getDrizzleSupabaseClient", () => {
+  it("switches the role to the token's role inside runTransaction", async () => {
+    const { runTransaction } = getDrizzleSupabaseClient(makeAccessToken(TOKEN))
+    const result = await runTransaction((tx) =>
       tx.execute(sql`select current_user as role`)
     )
     expect(result[0]).toEqual({ role: "authenticated" })
   })
 
-  it("sets request.jwt.claims to the provided JWT inside rls()", async () => {
-    const db = createDb()
-    const userDb = createDbForRequest(db, fakeJwt)
-    const result = await userDb.rls((tx) =>
+  it("sets request.jwt.claims (JSON) so auth.uid() resolves the sub", async () => {
+    const { runTransaction } = getDrizzleSupabaseClient(makeAccessToken(TOKEN))
+    const result = await runTransaction((tx) =>
       tx.execute(
-        sql`select current_setting('request.jwt.claims', true) as claims`
+        sql`select current_setting('request.jwt.claims', true) as claims, auth.uid() as uid`
       )
     )
-    expect(result[0]).toEqual({ claims: fakeJwt })
+    const row = result[0] as { claims: string; uid: string }
+    expect(JSON.parse(row.claims)).toMatchObject(TOKEN)
+    expect(row.uid).toBe(TOKEN.sub)
+  })
+
+  it("falls back to the anon role for an unknown/forged role claim", async () => {
+    const { runTransaction } = getDrizzleSupabaseClient(
+      makeAccessToken({ role: "postgres" })
+    )
+    const result = await runTransaction((tx) =>
+      tx.execute(sql`select current_user as role`)
+    )
+    expect(result[0]).toEqual({ role: "anon" })
   })
 
   it("scopes role and claims to the transaction (does not leak)", async () => {
-    const db = createDb()
-    const userDb = createDbForRequest(db, fakeJwt)
-    await userDb.rls((tx) => tx.execute(sql`select 1`))
-    // Outside the rls() transaction, the parent db should still be `postgres`
-    // with no jwt claims set on this connection's session.
-    const result = await db.execute(
+    const { runTransaction } = getDrizzleSupabaseClient(makeAccessToken(TOKEN))
+    await runTransaction((tx) => tx.execute(sql`select 1`))
+    // The admin pool is a separate connection — never role-switched, and the
+    // claim was never set on it (null, not "").
+    const result = await getDrizzleSupabaseAdminClient().execute(
       sql`select current_user as role, current_setting('request.jwt.claims', true) as claims`
     )
-    expect(result[0]).toEqual({ claims: "", role: "postgres" })
+    expect(result[0]).toEqual({ claims: null, role: "postgres" })
   })
 
   it("applies RLS policies — non-matching sub returns 0 rows", async () => {
-    const db = createDb({ schema: { posts } })
-    const userDb = createDbForRequest(db, fakeJwt)
-    const rows = await userDb.rls((tx) => tx.select().from(posts))
+    const { runTransaction } = getDrizzleSupabaseClient(makeAccessToken(TOKEN))
+    const rows = await runTransaction((tx) => tx.select().from(posts))
     expect(rows).toEqual([])
   })
 })
 
 describe("northwind seed", () => {
-  const schema = { customers, details, employees, orders, products, suppliers }
-  const db = createDb({ schema })
+  const db = getDrizzleSupabaseAdminClient()
 
   beforeAll(async () => {
     await seedDatabase(db)
