@@ -3,7 +3,7 @@ import "dotenv/config"
 import { fileURLToPath } from "node:url"
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js"
 import { reset, seed } from "drizzle-seed"
-import { getDrizzleSupabaseAdminClient } from "./clients.ts"
+import { db } from "./clients.ts"
 import {
   customers,
   details,
@@ -140,7 +140,7 @@ export async function seedDatabase<TSchema extends Record<string, unknown>>(
 
 async function main(): Promise<void> {
   // Seeding bypasses RLS, so use the admin client.
-  await seedDatabase(getDrizzleSupabaseAdminClient())
+  await seedDatabase(db.admin)
   console.log("Seeded Northwind dataset")
 }
 

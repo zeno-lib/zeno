@@ -5,6 +5,7 @@
     "types:check": "tsc --noEmit"
   },
   "exports": {
+    ".": "./src/index.ts",
     "./*": "./src/*.ts"
   },
   "files": [

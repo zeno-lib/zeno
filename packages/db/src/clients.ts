@@ -10,15 +10,38 @@ export type SupabaseTokenClaims = {
   [claim: string]: unknown
 }
 
+export type SupabaseAuthClientLike = {
+  auth: {
+    getClaims: () => Promise<{
+      data: { claims: SupabaseTokenClaims } | null
+      error: unknown | null
+    }>
+  }
+}
+
+export type SupabaseAuthContext =
+  | SupabaseAuthClientLike
+  | SupabaseTokenClaims
+  | null
+  | undefined
+
 // `set local role <ident>` can't be parameterized, so the role is interpolated
 // via sql.raw. Restrict it to the Supabase-managed roles so a forged `role`
 // claim can't inject SQL or switch into the service role.
 const ALLOWED_RLS_ROLES = new Set(["anon", "authenticated"])
 
-type CreateDrizzleClientsOptions<TSchema extends Record<string, unknown>> = {
+export type CreateDrizzleClientsOptions<
+  TSchema extends Record<string, unknown>,
+> = {
   schema: TSchema
   connectionString?: string
   casing?: DrizzleConfig<TSchema>["casing"]
+}
+
+export type CreateSupabaseDrizzleOptions<
+  TSchema extends Record<string, unknown>,
+> = CreateDrizzleClientsOptions<TSchema> & {
+  supabase?: SupabaseAuthContext
 }
 
 export function createDrizzleClients<TSchema extends Record<string, unknown>>(
@@ -53,19 +76,18 @@ export function createDrizzleClients<TSchema extends Record<string, unknown>>(
     return adminClient
   }
 
-  // RLS-aware. Pass verified Supabase JWT claims; every query MUST run inside
-  // `runTransaction` for the JWT context (and thus RLS) to apply.
-  function getDrizzleSupabaseClient(
-    verifiedClaims?: SupabaseTokenClaims | null
-  ) {
-    const token = normalizeTokenClaims(verifiedClaims)
-    const claims = JSON.stringify(token)
-    const sub = token.sub ?? ""
-    const role =
-      token.role && ALLOWED_RLS_ROLES.has(token.role) ? token.role : "anon"
-
+  // RLS-aware. Pass either a Supabase client (preferred) or verified JWT
+  // claims; every query MUST run inside `runTransaction` for the JWT context
+  // (and thus RLS) to apply.
+  function getDrizzleSupabaseClient(authContext?: SupabaseAuthContext) {
     const runTransaction = (async (transaction, txConfig) =>
       await rlsClient.transaction(async (tx) => {
+        const token = await resolveTokenClaims(authContext)
+        const claims = JSON.stringify(token)
+        const sub = token.sub ?? ""
+        const role =
+          token.role && ALLOWED_RLS_ROLES.has(token.role) ? token.role : "anon"
+
         // auth.jwt()/auth.uid() read these; is_local scopes them to the tx, so
         // they auto-reset when it commits or rolls back.
         await tx.execute(
@@ -91,13 +113,62 @@ export function createDrizzleClients<TSchema extends Record<string, unknown>>(
   }
 }
 
+export function createSupabaseDrizzle<TSchema extends Record<string, unknown>>(
+  options: CreateSupabaseDrizzleOptions<TSchema>
+) {
+  const {
+    closeDrizzleSupabaseClients,
+    getDrizzleSupabaseAdminClient,
+    getDrizzleSupabaseClient,
+  } = createDrizzleClients(options)
+  const createRlsClient = (authContext?: SupabaseAuthContext) =>
+    getDrizzleSupabaseClient(authContext)
+
+  return {
+    admin: getDrizzleSupabaseAdminClient(),
+    close: closeDrizzleSupabaseClients,
+    rls: createRlsClient(options.supabase).runTransaction,
+    withAuth: (authContext: SupabaseAuthContext) => ({
+      rls: createRlsClient(authContext).runTransaction,
+    }),
+  }
+}
+
+async function resolveTokenClaims(
+  authContext?: SupabaseAuthContext
+): Promise<SupabaseTokenClaims> {
+  if (isSupabaseClientLike(authContext)) {
+    const { data, error } = await authContext.auth.getClaims()
+    if (error) {
+      throw error
+    }
+    return normalizeTokenClaims(data?.claims)
+  }
+  return normalizeTokenClaims(authContext)
+}
+
+function isSupabaseClientLike(
+  authContext?: SupabaseAuthContext
+): authContext is SupabaseAuthClientLike {
+  return (
+    !!authContext &&
+    typeof authContext === "object" &&
+    "auth" in authContext &&
+    typeof authContext.auth === "object" &&
+    !!authContext.auth &&
+    "getClaims" in authContext.auth &&
+    typeof authContext.auth.getClaims === "function"
+  )
+}
+
 function normalizeTokenClaims(
-  verifiedClaims?: SupabaseTokenClaims | null
+  verifiedClaims?: SupabaseAuthContext
 ): SupabaseTokenClaims {
   if (
     !verifiedClaims ||
     typeof verifiedClaims !== "object" ||
-    Array.isArray(verifiedClaims)
+    Array.isArray(verifiedClaims) ||
+    isSupabaseClientLike(verifiedClaims)
   ) {
     return {}
   }

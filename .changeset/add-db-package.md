@@ -6,7 +6,8 @@ Add `@zeno-lib/db`: Drizzle ORM wrapper for Supabase Postgres. Owns schema, migr
 
 Public surface:
 
-- `@zeno-lib/db/clients` — `createDrizzleClients({ schema, connectionString?, casing? })` returns `{ getDrizzleSupabaseAdminClient, getDrizzleSupabaseClient, closeDrizzleSupabaseClients }`. Opens two `postgres-js` pools. `getDrizzleSupabaseAdminClient()` bypasses RLS. `getDrizzleSupabaseClient(verifiedClaims?)` accepts already-verified Supabase JWT claims and returns `{ runTransaction }` — queries run inside `runTransaction` get `request.jwt.claims` (JSON) + `request.jwt.claim.sub` set and `set local role` (validated against `anon | authenticated`) so RLS policies apply. `closeDrizzleSupabaseClients()` closes both pools for tests/scripts/shutdown.
+- `@zeno-lib/db` — `createSupabaseDrizzle({ schema, supabase?, connectionString?, casing? })` returns `{ admin, rls, withAuth, close }`. `admin` bypasses RLS. `rls(...)` runs a transaction after resolving verified claims from the bound Supabase client. `withAuth(supabaseOrClaims).rls(...)` binds request auth at the call site.
+- `@zeno-lib/db/clients` — lower-level `createDrizzleClients({ schema, connectionString?, casing? })` returns `{ getDrizzleSupabaseAdminClient, getDrizzleSupabaseClient, closeDrizzleSupabaseClients }`. `getDrizzleSupabaseClient(supabaseOrClaims?)` accepts a Supabase client or already-verified Supabase JWT claims and returns `{ runTransaction }`.
 - `@zeno-lib/db/config` — `defineDrizzleConfig({ schema, ...overrides })` preset for `drizzle.config.ts`. Defaults `out: "./supabase/migrations"`, dialect `postgresql`, reads `DATABASE_URL`, and sets `entities.roles.provider: "supabase"` so Supabase built-in roles aren't touched.
 - `@zeno-lib/db/schema` — re-exports of `anonRole`, `authenticatedRole`, `serviceRole`, `postgresRole`, `supabaseAuthAdminRole`, `authUsers`, `authUid`, `realtimeMessages`, `realtimeTopic` from `drizzle-orm/supabase`, plus a `timestamps` mixin.
 
