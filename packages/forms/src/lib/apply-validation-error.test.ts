@@ -1,8 +1,8 @@
-import type { AnyFormApi } from "@tanstack/react-form"
-import { describe, expect, test, vi } from "@zeno-lib/vitest"
+import { describe, expect, test, vi } from "@zeno-lib/test"
 
-import { applyValidationError } from "./apply-validation-error"
+import type { AnyFormApi } from "@tanstack/react-form"
 import { ValidationError } from "./validation-error"
+import { applyValidationError } from "./apply-validation-error"
 
 type FieldMetaUpdater = (prev: {
   errorMap?: Record<string, unknown>

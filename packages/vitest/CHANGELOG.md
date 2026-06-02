@@ -1,4 +1,4 @@
-# @zeno-lib/vitest
+# @zeno-lib/test
 
 ## 0.0.1
 

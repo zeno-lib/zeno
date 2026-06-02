@@ -1,3 +1,3 @@
-import { defineReactConfig } from "@zeno-lib/vitest/configs/react"
+import { defineReactConfig } from "@zeno-lib/test/configs/react"
 
 export default defineReactConfig()

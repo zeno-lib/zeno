@@ -1,3 +1,5 @@
+import { Form, FormProvider } from "./form"
+import { act, cleanup, render, screen } from "@zeno-lib/test/testing-library"
 import {
   afterEach,
   beforeEach,
@@ -5,13 +7,11 @@ import {
   expect,
   test,
   vi,
-} from "@zeno-lib/vitest"
-import { act, cleanup, render, screen } from "@zeno-lib/vitest/testing-library"
-import userEvent from "@zeno-lib/vitest/user-event"
-import { z } from "zod"
+} from "@zeno-lib/test"
 
-import { Form, FormProvider } from "./form"
 import { useForm } from "./use-form"
+import userEvent from "@zeno-lib/test/user-event"
+import { z } from "zod"
 
 const NAME_LABEL = /Name/
 

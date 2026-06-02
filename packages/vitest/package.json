@@ -1,5 +1,5 @@
 {
-  "name": "@zeno-lib/vitest",
+  "name": "@zeno-lib/test",
   "version": "0.0.1",
   "bin": {
     "vitest": "./bin/vitest.mjs"
@@ -20,9 +20,9 @@
   },
   "repository": {
     "url": "https://github.com/zeno-lib/zeno.git",
-    "directory": "packages/vitest"
+    "directory": "packages/test"
   },
-  "dependencies": {
+  "devDependencies": {
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
     "@vitejs/plugin-react": "6.0.1",

@@ -1,6 +1,3 @@
-import type { AnyFormApi } from "@tanstack/react-form"
-import { describe, expect, test } from "@zeno-lib/vitest"
-
 import {
   DEFAULT_VALIDATION_MODE,
   getFormHideFieldErrors,
@@ -8,6 +5,9 @@ import {
   isFieldRequired,
   setFormZenoState,
 } from "./validation-modes"
+import { describe, expect, test } from "@zeno-lib/test"
+
+import type { AnyFormApi } from "@tanstack/react-form"
 
 function makeFormStub() {
   return { store: {} } as unknown as AnyFormApi

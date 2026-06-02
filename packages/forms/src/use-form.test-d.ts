@@ -1,7 +1,7 @@
-import { expectTypeOf, test } from "@zeno-lib/vitest"
-import { z } from "zod"
+import { expectTypeOf, test } from "@zeno-lib/test"
 
 import { useForm } from "./use-form"
+import { z } from "zod"
 
 const stringSchema = z.object({
   age: z.number(),
