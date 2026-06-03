@@ -28,6 +28,26 @@ For React packages, use `reactConfig` instead:
 export { reactConfig as default } from "@zeno-lib/test/configs"
 ```
 
+### Extending the config
+
+To override shared defaults, merge a shared config with package-specific options:
+
+```ts
+// vitest.config.ts
+import { defineConfig, mergeConfig, reactConfig } from "@zeno-lib/test/configs"
+
+export default mergeConfig(
+  reactConfig,
+  defineConfig({
+    test: {
+      // package-specific overrides
+    },
+  }),
+)
+```
+
+Use `defaultConfig` instead of `reactConfig` for non-React packages.
+
 - Create tests in `*.test.ts` (or `*.test.tsx` for React) files.
 
 Example test:
