@@ -55,17 +55,11 @@ export const env = {
 
 ## Vitest Environment
 
-Tests use `.env.test` and `NODE_ENV=test`:
+Tests use `.env.test` and `NODE_ENV=test`. The shared config from `@zeno-lib/test` loads env vars automatically:
 
 ```typescript
 // vitest.config.ts
-import { loadEnv } from "vite"
-
-export default defineConfig({
-  test: {
-    env: loadEnv("test", process.cwd(), ""),
-  },
-})
+export { default } from "@zeno-lib/test/configs/default"
 ```
 
 ## Turborepo

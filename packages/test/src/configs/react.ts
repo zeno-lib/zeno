@@ -1,7 +1,6 @@
 import react from "@vitejs/plugin-react"
-import { loadEnv } from "vite"
+import { loadEnv, type UserConfig } from "vite"
 import tsconfigPaths from "vite-tsconfig-paths"
-import type { UserConfig } from "vitest/config"
 import { defineConfig, mergeConfig } from "vitest/config"
 
 const base = defineConfig({

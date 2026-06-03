@@ -9,26 +9,26 @@ Zeno uses [Vitest](https://vitest.dev) for fast, modern unit testing with native
 
 ## Setup
 
-Tests use the shared config from `@zeno-lib/vitest`:
+Add `@zeno-lib/test` to your package and use the shared config:
 
 ```typescript
 // vitest.config.ts
-import { loadEnv } from "vite"
-import tsconfigPaths from "vite-tsconfig-paths"
-import { defineConfig } from "vitest/config"
+export { default } from "@zeno-lib/test/configs/default"
+```
 
-export default defineConfig({
-  plugins: [tsconfigPaths()],
-  test: {
-    env: loadEnv("test", process.cwd(), ""),
-  },
-})
+For React packages, use `@zeno-lib/test/configs/react`:
+
+```typescript
+// vitest.config.ts
+import { defineReactConfig } from "@zeno-lib/test/configs/react"
+
+export default defineReactConfig()
 ```
 
 ## Writing Tests
 
 ```typescript
-import { describe, expect, test } from "vitest"
+import { describe, expect, test } from "@zeno-lib/test"
 
 describe("Calculator", () => {
   test("adds two numbers", () => {
@@ -57,11 +57,11 @@ pnpm turbo run test --filter @zeno-lib/example
 
 ## Testing React Components
 
-Use `@testing-library/react` (included in `@zeno-lib/vitest`):
+Use `@zeno-lib/test/testing-library` and `@zeno-lib/test/user-event` (included in `@zeno-lib/test`):
 
 ```typescript
-import { render, screen } from "@testing-library/react"
-import { describe, expect, test } from "vitest"
+import { describe, expect, test } from "@zeno-lib/test"
+import { render, screen } from "@zeno-lib/test/testing-library"
 import { Button } from "@zeno-lib/ui/button"
 
 describe("Button", () => {
@@ -75,7 +75,7 @@ describe("Button", () => {
 ## Mocking
 
 ```typescript
-import { vi, describe, expect, test } from "vitest"
+import { vi, describe, expect, test } from "@zeno-lib/test"
 
 const mockFetch = vi.fn()
 
@@ -90,15 +90,7 @@ describe("API", () => {
 
 ## Environment Variables
 
-Tests run with `NODE_ENV=test`. Load env vars in your config:
-
-```typescript
-test: {
-  env: loadEnv("test", process.cwd(), ""),
-}
-```
-
-Create a `.env.test` file for test-specific variables.
+Tests run with `NODE_ENV=test`. The shared config loads `.env.test` automatically — create a `.env.test` file for test-specific variables.
 
 ## Best Practices
 
