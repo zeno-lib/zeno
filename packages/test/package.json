@@ -1,13 +1,13 @@
 {
   "name": "@zeno-lib/test",
   "version": "0.0.1",
+  "type": "module",
   "bin": {
     "vitest": "./bin/vitest.mjs"
   },
   "exports": {
     ".": "./src/vitest.ts",
-    "./configs/react": "./src/configs/react.ts",
-    "./configs/default": "./src/configs/default.ts",
+    "./configs": "./src/configs/index.ts",
     "./testing-library": "./src/testing-library.ts",
     "./user-event": "./src/user-event.ts"
   },

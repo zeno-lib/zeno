@@ -9,20 +9,16 @@ Zeno uses [Vitest](https://vitest.dev) for fast, modern unit testing with native
 
 ## Setup
 
-Add `@zeno-lib/test` to your package and use the shared config:
+Add `@zeno-lib/test` to your package and use the default config:
 
-```typescript
-// vitest.config.ts
-export { default } from "@zeno-lib/test/configs/default"
+```typescript title="vitest.config.ts"
+export { defaultConfig as default} from "@zeno-lib/test/configs"
 ```
 
-For React packages, use `@zeno-lib/test/configs/react`:
+For React packages, use `reactConfig` from `@zeno-lib/test/configs`:
 
-```typescript
-// vitest.config.ts
-import { defineReactConfig } from "@zeno-lib/test/configs/react"
-
-export default defineReactConfig()
+```typescript title="vitest.config.ts"
+export { reactConfig as default } from "@zeno-lib/test/configs"
 ```
 
 ## Writing Tests

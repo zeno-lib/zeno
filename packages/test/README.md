@@ -14,20 +14,18 @@ In the package you want to do testing, do the following:
 }
 ```
 
-- Create a `vitest.config.ts` using the shared config:
+- Create a `vitest.config.ts` using the default config:
 
 ```ts
 // vitest.config.ts
-export { default } from "@zeno-lib/test/configs/default"
+export { defaultConfig as default } from "@zeno-lib/test/configs"
 ```
 
-For React packages, use `@zeno-lib/test/configs/react` instead:
+For React packages, use `reactConfig` instead:
 
 ```ts
 // vitest.config.ts
-import { defineReactConfig } from "@zeno-lib/test/configs/react"
-
-export default defineReactConfig()
+export { reactConfig as default } from "@zeno-lib/test/configs"
 ```
 
 - Create tests in `*.test.ts` (or `*.test.tsx` for React) files.

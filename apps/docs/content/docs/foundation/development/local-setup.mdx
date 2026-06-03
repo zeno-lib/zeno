@@ -44,8 +44,7 @@ NEXT_PUBLIC_APP_NAME=My App
 
 Create a typed env file for autocomplete:
 
-```typescript
-// env.ts
+```typescript title="env.ts"
 export const env = {
   DATABASE_URL: process.env.DATABASE_URL!,
   API_SECRET: process.env.API_SECRET!,
@@ -57,17 +56,15 @@ export const env = {
 
 Tests use `.env.test` and `NODE_ENV=test`. The shared config from `@zeno-lib/test` loads env vars automatically:
 
-```typescript
-// vitest.config.ts
-export { default } from "@zeno-lib/test/configs/default"
+```typescript title="vitest.config.ts"
+export { defaultConfig as default } from "@zeno-lib/test/configs"
 ```
 
 ## Turborepo
 
 Pass environment variables to Turborepo tasks:
 
-```json
-// turbo.json
+```json title="turbo.json"
 {
   "globalEnv": ["NODE_ENV"],
   "tasks": {
