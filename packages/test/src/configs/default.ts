@@ -6,5 +6,12 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     env: loadEnv("test", process.cwd(), ""),
+    globals: false,
+    include: ["src/**/*.test.ts"],
+    typecheck: {
+      enabled: true,
+      include: ["src/**/*.test-d.ts"],
+      tsconfig: "./tsconfig.json",
+    },
   },
 })
