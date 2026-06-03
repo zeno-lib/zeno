@@ -1,7 +1,6 @@
-import { deepMergeDefaults, extractZodDefaults } from "./schema-defaults"
 import { describe, expect, test } from "@zeno-lib/test"
-
 import { z } from "zod"
+import { deepMergeDefaults, extractZodDefaults } from "./schema-defaults"
 
 describe("extractZodDefaults — primitives", () => {
   test("z.string() → ''", () => {
