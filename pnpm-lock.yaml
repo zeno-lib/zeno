@@ -152,7 +152,7 @@ importers:
 
   packages/example:
     devDependencies:
-      '@zeno-lib/vitest':
+      '@zeno-lib/test':
         specifier: workspace:*
         version: link:../vitest
       typescript:
@@ -195,12 +195,12 @@ importers:
       '@types/react-dom':
         specifier: 19.2.3
         version: 19.2.3(@types/react@19.2.14)
+      '@zeno-lib/test':
+        specifier: workspace:^
+        version: link:../vitest
       '@zeno-lib/typescript':
         specifier: workspace:^
         version: link:../typescript
-      '@zeno-lib/vitest':
-        specifier: workspace:^
-        version: link:../vitest
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -327,7 +327,7 @@ importers:
         version: 6.0.3
 
   packages/vitest:
-    dependencies:
+    devDependencies:
       '@testing-library/react':
         specifier: 16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
