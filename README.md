@@ -13,6 +13,7 @@ This Turborepo includes the following packages/apps:
 - `@zeno-lib/ui`: a stub React component library shared by both `web` and `docs` applications
 - `@zeno-lib/typescript`: `tsconfig.json`s used throughout the monorepo
 - `@zeno-lib/supabase`: a library for working with Supabase in Next.js
+- `@zeno-lib/test`: shared [Vitest](https://vitest.dev/) setup that wraps the test runner with opinionated configs and re-exports testing utilities
 
 Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
 
