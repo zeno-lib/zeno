@@ -1,6 +1,5 @@
-import { expectTypeOf, test } from "@zeno-lib/vitest"
+import { expectTypeOf, test } from "@zeno-lib/test"
 import { z } from "zod"
-
 import { useForm } from "./use-form"
 
 const stringSchema = z.object({

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest"
+import { describe, expect, test } from "@zeno-lib/test"
 
 describe("Example", () => {
   test("Example", () => {
