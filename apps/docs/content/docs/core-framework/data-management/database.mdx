@@ -23,15 +23,31 @@ Every Supabase project includes a Postgres database. You can query it directly
 from trusted server code, and Supabase can also expose it through APIs such as
 PostgREST and Supabase client libraries.
 
-The important security rule is: browser-facing tables need
+The important security rule is: user-scoped tables need
 [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security).
 RLS is a Postgres feature that attaches policies to tables. You can think of a
 policy as database-level authorization logic that Postgres applies whenever a
 role tries to read, insert, update, or delete rows.
 
-Supabase maps requests to Postgres roles such as `anon` and `authenticated`.
-Policies can use helpers like `auth.uid()` to compare the current user with a
-row's `user_id`.
+Supabase requests run as database roles. The two roles you use most often are:
+
+- `anon` — an unauthenticated request. Use this for data that can be read or
+  written without a signed-in user, if your app allows that.
+- `authenticated` — a request with a valid signed-in Supabase user. Use this
+  for data that depends on who the user is.
+
+RLS policies decide what each role may do. Inside those policies, Supabase
+helpers expose information about the current request:
+
+- [`auth.uid()`](https://supabase.com/docs/guides/database/postgres/row-level-security#authuid)
+  returns the current user's id.
+- [`auth.jwt()`](https://supabase.com/docs/guides/database/postgres/row-level-security#authjwt)
+  returns the current user's JWT claims. Use trusted app metadata for
+  authorization data, not user-editable metadata.
+
+Use those helpers to compare the request with your own application rules: for
+example, whether the user owns the record, belongs to the same organization, has
+a required membership, or is allowed to perform that action.
 
 ### Drizzle
 
@@ -60,8 +76,9 @@ roles and helpers.
 
 <Callout type="warn">
 `@zeno-lib/db` is server-only. It uses `postgres-js`, which opens TCP
-connections to Postgres. Browser code should use Supabase client APIs, Server
-Actions, or Route Handlers instead.
+connections to Postgres. Browser code should call backend entry points that use
+this package for application data. Use browser Supabase clients only for
+specialized Supabase features, such as realtime, when that guide calls for it.
 </Callout>
 
 ## Installation
@@ -159,10 +176,8 @@ export type SelectPost = typeof posts.$inferSelect
 ```
 
 The TypeScript column names stay camelCase while database columns default to
-snake_case. This is Drizzle's
-[casing option](https://orm.drizzle.team/docs/sql-schema-declaration#camel-and-snake-casing),
-and `@zeno-lib/db` applies `snake_case` by default for both runtime queries and
-migration generation.
+snake_case. Check Drizzle's
+[casing option](https://orm.drizzle.team/docs/sql-schema-declaration#camel-and-snake-casing) for more details.
 
 `@zeno-lib/db/schema` re-exports Supabase's built-in roles and helpers from
 `drizzle-orm/supabase`, including `anonRole`, `authenticatedRole`,
@@ -240,7 +255,7 @@ import { posts } from "./schema"
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ schema, supabase })
 
-const mine = await db.rls((tx) => tx.select().from(posts))
+const mine = await db.rls((rlsDb) => rlsDb.select().from(posts))
 ```
 
 `db.rls(...)` calls `supabase.auth.getClaims()` before the transaction. Supabase
@@ -274,14 +289,9 @@ Calling `db.rls(...)` without passing `supabase` to `createSupabaseDrizzle(...)`
 throws immediately, so missing auth context does not silently become an anon
 query.
 
-## Reuse schema objects
+## Import the schema module
 
-`createSupabaseDrizzle(...)` caches the underlying Postgres pools for the same
-imported `schema` object, resolved `DATABASE_URL`, and `casing`. This makes it
-safe to call from request-scoped server code after creating the request's
-Supabase client.
-
-Prefer importing the schema module object:
+When creating the DB client, pass the imported schema module:
 
 ```typescript
 import * as schema from "./schema"
@@ -289,12 +299,10 @@ import * as schema from "./schema"
 const db = createSupabaseDrizzle({ schema, supabase })
 ```
 
-Avoid creating fresh schema object literals per request, because each new object
-misses the shared pool cache.
+Do not build a new schema object inline for each request. Reusing the module
+import lets `@zeno-lib/db` reuse its underlying Postgres pools safely.
 
 ## Package API
-
-Most application code should use `createSupabaseDrizzle(...)`:
 
 | Import | Use it for |
 |---|---|
@@ -317,7 +325,9 @@ const rls = clients.getDrizzleSupabaseClient({
   sub: "00000000-0000-0000-0000-000000000000",
 })
 
-const rows = await rls.runTransaction((tx) => tx.select().from(schema.posts))
+const rows = await rls.runTransaction((rlsDb) =>
+  rlsDb.select().from(schema.posts)
+)
 
 await clients.closeDrizzleSupabaseClients()
 ```

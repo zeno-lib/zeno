@@ -8,7 +8,7 @@ Provides a Drizzle-based interface for everything DB-related against Supabase Po
 
 **Owns:** schema (TS source of truth), migrations (`drizzle-kit generate`/`migrate`), RLS roles & policies (authored via `pgPolicy(...)` in schema files), typed runtime queries, the `postgres-js` connections.
 
-**Does NOT own:** Supabase Auth, Storage, Edge Functions, the SSR cookie wiring (all in `@zeno-lib/supabase`). Browser-side data access — `postgres-js` is server-only; the browser still talks to Supabase via `postgrest` / `supabase-js`.
+**Does NOT own:** Supabase Auth, Storage, Edge Functions, the SSR cookie wiring (all in `@zeno-lib/supabase`). Browser-side Supabase features such as realtime — `postgres-js` is server-only, and normal application reads/writes should go through backend entry points that use this package rather than direct browser table queries.
 
 ## Entry Points & Contracts
 
@@ -38,10 +38,10 @@ import * as schema from "./schema"
 
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ schema, supabase })
-const mine = await db.rls((tx) => tx.select().from(posts)) // RLS enforced
+const mine = await db.rls((rlsDb) => rlsDb.select().from(posts)) // RLS enforced
 ```
 
-`createSupabaseDrizzle(...)` reuses pools for the same imported `schema`, resolved `DATABASE_URL`, and `casing`; do not create fresh schema object literals per request.
+Pass the imported schema module object to `createSupabaseDrizzle(...)`; do not create fresh schema object literals per request, or the pool cache cannot be reused.
 
 Admin (bypasses RLS — webhooks, admin tasks, background jobs, seeding):
 
@@ -91,7 +91,7 @@ export default defineDrizzleConfig({ schema: "./src/schema.ts" })
 
 ## Anti-patterns
 
-- **Do not import `@zeno-lib/db/clients` from a Client Component.** `postgres-js` opens a TCP socket — server-only. Browser code talks to Supabase via REST (`@supabase/supabase-js`) or via your own Server Actions/Route Handlers.
+- **Do not import `@zeno-lib/db/clients` from a Client Component.** `postgres-js` opens a TCP socket — server-only. Browser code should call your Server Actions/Route Handlers for application data; direct browser Supabase clients are reserved for specialized Supabase features such as realtime.
 - **Do not tell consumers to install/import `drizzle-orm`, `drizzle-kit`, or `postgres` directly for normal DB package usage.** `@zeno-lib/db` owns those dependencies and exposes the expected re-export paths plus a `drizzle-kit` binary shim, matching the convenience pattern from `@zeno-lib/test`.
 - **Do not run queries outside `db.rls(...)` when you intend RLS to apply.** A query on `db.admin` executes as the connection role, bypassing the policies you authored. The JWT claims + role are only set inside that transaction.
 - **Do not pass raw JWT strings or unverified session payloads into RLS helpers.** Pass a Supabase client, or verify first with Supabase Auth (`auth.getClaims()` / equivalent) and pass the resulting claims object. The DB package deliberately does not decode raw tokens.
