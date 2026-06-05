@@ -1,5 +1,11 @@
 # @zeno-lib/test
 
+## 1.0.2
+
+### Patch Changes
+
+- f39cb9e: Move runtime packages from devDependencies to dependencies
+
 ## 1.0.1
 
 ### Patch Changes
