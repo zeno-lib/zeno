@@ -27,7 +27,7 @@
     "drizzle-orm": "0.44.6",
     "drizzle-seed": "0.3.1",
     "postgres": "3.4.7",
-    "supabase": "2.31.8",
+    "supabase": "2.84.1",
     "typescript": "5.9.3"
   }
 }

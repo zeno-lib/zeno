@@ -38,6 +38,13 @@ jobs:
       run: pnpm install
     - name: Install Playwright Browsers
       run: pnpm --filter @zeno-lib/e2e exec playwright install --with-deps chromium
+    - name: Setup Supabase CLI
+      uses: supabase/setup-cli@v1
+      with:
+        version: 2.84.1
+    - name: Start Example Supabase
+      working-directory: packages/example
+      run: supabase start -x=postgres-meta,studio,logflare,supavisor
     - name: Run turbo ci command
       run: pnpm run ci
     - name: Upload Playwright report
