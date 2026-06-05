@@ -1,7 +1,12 @@
 {
   "name": "@zeno-lib/db",
   "version": "0.0.1",
+  "bin": {
+    "drizzle-kit": "./bin/drizzle-kit.mjs"
+  },
   "scripts": {
+    "test": "vitest --run",
+    "test:watch": "vitest watch",
     "types:check": "tsc --noEmit"
   },
   "exports": {
@@ -9,6 +14,7 @@
     "./*": "./src/*.ts"
   },
   "files": [
+    "bin",
     "src"
   ],
   "publishConfig": {
@@ -18,13 +24,14 @@
     "url": "https://github.com/zeno-lib/zeno.git",
     "directory": "packages/db"
   },
-  "peerDependencies": {
-    "drizzle-kit": ">=0.31",
-    "drizzle-orm": ">=0.44",
-    "postgres": ">=3.4"
+  "dependencies": {
+    "drizzle-kit": "0.31.5",
+    "drizzle-orm": "0.44.6",
+    "postgres": "3.4.7"
   },
   "devDependencies": {
     "@types/node": "24.10.0",
+    "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^"
   }
 }

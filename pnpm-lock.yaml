@@ -134,18 +134,21 @@ importers:
   packages/db:
     dependencies:
       drizzle-kit:
-        specifier: '>=0.31'
+        specifier: 0.31.5
         version: 0.31.5
       drizzle-orm:
-        specifier: '>=0.44'
+        specifier: 0.44.6
         version: 0.44.6(postgres@3.4.7)
       postgres:
-        specifier: '>=3.4'
+        specifier: 3.4.7
         version: 3.4.7
     devDependencies:
       '@types/node':
         specifier: 24.10.0
         version: 24.10.0
+      '@zeno-lib/test':
+        specifier: workspace:*
+        version: link:../test
       '@zeno-lib/typescript':
         specifier: workspace:^
         version: link:../typescript
