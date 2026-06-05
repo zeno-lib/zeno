@@ -8,6 +8,6 @@ export default mergeConfig(defaultConfig, {
   plugins: [tsconfigPaths(), react({ jsxRuntime: "automatic" })],
   test: {
     environment: "jsdom",
-    include: ["src/**/*.test.{ts,tsx}"],
+    include: ["{src,test,tests}/**/*.test.{ts,tsx}"],
   },
 })
