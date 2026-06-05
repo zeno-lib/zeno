@@ -1,5 +1,11 @@
 # @zeno-lib/test
 
+## 1.0.1
+
+### Patch Changes
+
+- a88dad5: Expand Vitest test discovery to test/ and tests/
+
 ## 1.0.0
 
 ### Major Changes
