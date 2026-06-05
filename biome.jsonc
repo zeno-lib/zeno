@@ -10,6 +10,16 @@
   },
   "overrides": [
     {
+      "includes": ["**/vitest.config.*"],
+      "linter": {
+        "rules": {
+          "performance": {
+            "noBarrelFile": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["**/tests/**"],
       "linter": {
         "rules": {

@@ -1,13 +1,13 @@
 {
-  "name": "@zeno-lib/vitest",
-  "version": "0.0.1",
+  "name": "@zeno-lib/test",
+  "version": "1.0.1",
+  "type": "module",
   "bin": {
     "vitest": "./bin/vitest.mjs"
   },
   "exports": {
     ".": "./src/vitest.ts",
-    "./configs/react": "./src/configs/react.ts",
-    "./configs/default": "./src/configs/default.ts",
+    "./configs": "./src/configs/index.ts",
     "./testing-library": "./src/testing-library.ts",
     "./user-event": "./src/user-event.ts"
   },
@@ -20,15 +20,21 @@
   },
   "repository": {
     "url": "https://github.com/zeno-lib/zeno.git",
-    "directory": "packages/vitest"
+    "directory": "packages/test"
   },
-  "dependencies": {
+  "scripts": {
+    "types:check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "25.6.0",
+    "@zeno-lib/typescript": "workspace:^",
+    "typescript": "6.0.3",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
     "@vitejs/plugin-react": "6.0.1",
     "jsdom": "29.1.1",
     "vite": "8.0.11",
     "vite-tsconfig-paths": "6.1.1",
-    "vitest": "4.0.18"
+    "vitest": "4.1.0"
   }
 }

@@ -1,6 +1,5 @@
-import { test } from "@zeno-lib/vitest"
+import { test } from "@zeno-lib/test"
 import { z } from "zod"
-
 import { useForm } from "./use-form"
 
 const schema = z.object({

@@ -21,14 +21,13 @@
   "devDependencies": {
     "@types/node": "24.10.0",
     "@zeno-lib/typescript": "workspace:^",
-    "@zeno-lib/vitest": "workspace:*",
+    "@zeno-lib/test": "workspace:*",
     "dotenv": "16.4.7",
     "drizzle-kit": "0.31.5",
     "drizzle-orm": "0.44.6",
     "drizzle-seed": "0.3.1",
     "postgres": "3.4.7",
     "supabase": "2.31.8",
-    "typescript": "5.9.3",
-    "vitest": "4.0.18"
+    "typescript": "5.9.3"
   }
 }

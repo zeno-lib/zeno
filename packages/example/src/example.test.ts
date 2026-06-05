@@ -1,5 +1,5 @@
 import { createDrizzleClients, createSupabaseDrizzle } from "@zeno-lib/db"
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it, vi } from "@zeno-lib/test"
 
 const LOCAL_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 

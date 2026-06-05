@@ -4,8 +4,8 @@ import {
   type SupabaseAuthClientLike,
   type SupabaseTokenClaims,
 } from "@zeno-lib/db"
+import { afterAll, beforeAll, describe, expect, it, vi } from "@zeno-lib/test"
 import { eq, isNull, sql } from "drizzle-orm"
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 // biome-ignore lint/performance/noNamespaceImport: drizzle schema needs every table
 import * as schema from "./schema"
 import {
