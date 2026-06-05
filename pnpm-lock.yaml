@@ -244,9 +244,6 @@ importers:
       '@vitejs/plugin-react':
         specifier: 6.0.1
         version: 6.0.1(vite@8.0.11(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(yaml@2.9.0))
-      '@zeno-lib/typescript':
-        specifier: workspace:^
-        version: link:../typescript
       jsdom:
         specifier: 29.1.1
         version: 29.1.1(@noble/hashes@1.8.0)
@@ -259,6 +256,16 @@ importers:
       vitest:
         specifier: 4.1.0
         version: 4.1.0(@types/node@25.6.0)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.14.3(@types/node@25.6.0)(typescript@6.0.3))(vite@8.0.11(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.6.1)(yaml@2.9.0))
+    devDependencies:
+      '@types/node':
+        specifier: 25.6.0
+        version: 25.6.0
+      '@zeno-lib/typescript':
+        specifier: workspace:^
+        version: link:../typescript
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
 
   packages/typescript: {}
 
