@@ -1,8 +1,277 @@
 ---
 title: Database
-description: Database setup with Supabase and Drizzle
+description: Database setup with Supabase Postgres and Drizzle
 icon: Database
-status: todo
+status: in progress
 ---
 
-Database guide coming soon.
+Zeno uses Supabase Postgres for the database and Drizzle for type-safe schema
+definition, migrations, and server-side queries. The `@zeno-lib/db` package is
+the shared integration layer: it creates Drizzle clients for Supabase, keeps RLS
+queries request-scoped, and gives Drizzle Kit a Supabase-aware config preset.
+
+## What you get
+
+The package has four public entry points:
+
+| Import | Use it for |
+|---|---|
+| `@zeno-lib/db` | The ergonomic `createSupabaseDrizzle({ schema, supabase?, connectionString?, casing? })` factory. It returns `{ admin, rls, close }`. |
+| `@zeno-lib/db/clients` | Lower-level client factories when you need to manage admin/RLS clients yourself. |
+| `@zeno-lib/db/config` | `defineDrizzleConfig(...)`, a Drizzle Kit preset configured for Supabase. |
+| `@zeno-lib/db/schema` | Supabase role/table/helper re-exports plus the shared `timestamps` column mixin. |
+
+Use `db.rls(...)` for request-scoped user queries and `db.admin` for trusted
+server work that intentionally bypasses RLS.
+
+<Callout type="warn">
+`@zeno-lib/db` is server-only. It uses `postgres-js`, which opens TCP
+connections to Postgres. Client Components and browser code should call
+Supabase through `@supabase/supabase-js`, PostgREST, Server Actions, or Route
+Handlers instead.
+</Callout>
+
+## Installation
+
+Install the database package and its peer dependencies in the package or app
+that owns your schema:
+
+```bash
+pnpm add @zeno-lib/db drizzle-orm postgres
+pnpm add -D drizzle-kit
+```
+
+## Environment
+
+Both runtime clients and the Drizzle Kit preset read `DATABASE_URL` from the
+environment unless you pass an explicit `connectionString` override.
+
+For local Supabase:
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+```
+
+For deployed Supabase projects, prefer the transaction pooler URL, typically on
+port `6543`. The package sets `prepare: false` on the underlying `postgres-js`
+pools so transaction-mode pooling works.
+
+## Define your schema
+
+Write your tables and RLS policies in TypeScript. The schema is the source of
+truth; Drizzle Kit will generate the SQL migration files from it.
+
+```typescript title="src/schema.ts"
+import {
+  authenticatedRole,
+  authUid,
+  authUsers,
+  timestamps,
+} from "@zeno-lib/db/schema"
+import { sql } from "drizzle-orm"
+import { pgPolicy, pgTable, text, uuid } from "drizzle-orm/pg-core"
+
+export const posts = pgTable(
+  "posts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    title: text("title").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => authUsers.id),
+    ...timestamps,
+  },
+  (t) => [
+    pgPolicy("posts_owner_select", {
+      for: "select",
+      to: authenticatedRole,
+      using: sql`${t.userId} = ${authUid}`,
+    }),
+    pgPolicy("posts_owner_insert", {
+      for: "insert",
+      to: authenticatedRole,
+      withCheck: sql`${t.userId} = ${authUid}`,
+    }),
+  ]
+).enableRLS()
+
+export type InsertPost = typeof posts.$inferInsert
+export type SelectPost = typeof posts.$inferSelect
+```
+
+`@zeno-lib/db/schema` re-exports Supabase's built-in roles and helpers from
+`drizzle-orm/supabase`, including `anonRole`, `authenticatedRole`,
+`serviceRole`, `postgresRole`, `supabaseAuthAdminRole`, `authUsers`, `authUid`,
+`realtimeMessages`, and `realtimeTopic`.
+
+## Configure Drizzle Kit
+
+Create a `drizzle.config.ts` next to the package or app that owns the schema:
+
+```typescript title="drizzle.config.ts"
+import "dotenv/config"
+import { defineDrizzleConfig } from "@zeno-lib/db/config"
+
+export default defineDrizzleConfig()
+```
+
+The preset defaults to:
+
+| Option | Default |
+|---|---|
+| `schema` | `./src/schema.ts` |
+| `out` | `./supabase/migrations` |
+| `dialect` | `postgresql` |
+| `dbCredentials.url` | `process.env.DATABASE_URL` |
+| `entities.roles.provider` | `supabase` |
+
+You can pass Drizzle Kit overrides when needed:
+
+```typescript title="drizzle.config.ts"
+import "dotenv/config"
+import { defineDrizzleConfig } from "@zeno-lib/db/config"
+
+export default defineDrizzleConfig({
+  casing: "snake_case",
+  schema: "./src/db/schema.ts",
+})
+```
+
+<Callout type="info">
+Keep `casing` consistent between `defineDrizzleConfig(...)` and
+`createSupabaseDrizzle(...)`. If migrations are generated with one casing and
+runtime queries use another, column names can drift.
+</Callout>
+
+## Generate migrations
+
+Recommended package scripts:
+
+```json title="package.json"
+{
+  "scripts": {
+    "dev": "pnpm exec supabase start",
+    "stop": "pnpm exec supabase stop",
+    "reset": "pnpm exec supabase db reset && pnpm db:seed",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "node src/seed.ts"
+  }
+}
+```
+
+Use one migration source of truth: author tables and RLS policies in your
+Drizzle schema, run `drizzle-kit generate`, and commit the generated SQL under
+`supabase/migrations`.
+
+<Callout type="warn">
+Avoid mixing hand-written RLS migrations with Drizzle-authored policies unless
+you are intentionally taking ownership of that desync risk. `drizzle-kit
+migrate` tracks generated migrations in `__drizzle_migrations`, while
+`supabase db reset` applies every SQL file in the migrations directory.
+</Callout>
+
+## Query with RLS
+
+Create the request-scoped Supabase client first, then bind it to
+`createSupabaseDrizzle(...)`. Every RLS query runs inside `db.rls(...)`.
+
+```typescript title="route.ts"
+import { createSupabaseDrizzle } from "@zeno-lib/db"
+import { createClient } from "@zeno-lib/supabase/server"
+import * as schema from "./schema"
+import { posts } from "./schema"
+
+const supabase = await createClient()
+const db = createSupabaseDrizzle({ schema, supabase })
+
+const mine = await db.rls((tx) => tx.select().from(posts))
+```
+
+`db.rls(...)` calls `supabase.auth.getClaims()` before the transaction. Supabase
+returns a verified JWT payload, and the package installs those claims into
+transaction-local Postgres settings so helpers like `auth.uid()` and
+`auth.jwt()` work inside RLS policies.
+
+The RLS role is intentionally limited to `anon` or `authenticated`. Unknown or
+forged role claims fall back to `anon`, and `service_role` never runs through
+the request-scoped RLS path.
+
+## Use admin queries carefully
+
+For trusted server work that should bypass user RLS, omit the `supabase` option
+and use `db.admin`:
+
+```typescript title="seed.ts"
+import { createSupabaseDrizzle } from "@zeno-lib/db"
+import * as schema from "./schema"
+import { posts } from "./schema"
+
+const db = createSupabaseDrizzle({ schema })
+
+await db.admin.select().from(posts)
+```
+
+`db.admin` is appropriate for seed scripts, webhooks, cron jobs, admin tools,
+and background jobs. It should not be used for user-scoped reads or writes.
+
+Calling `db.rls(...)` without passing `supabase` to `createSupabaseDrizzle(...)`
+throws immediately, so missing auth context does not silently become an anon
+query.
+
+## Reuse schema objects
+
+`createSupabaseDrizzle(...)` caches the underlying Postgres pools for the same
+imported `schema` object, resolved `DATABASE_URL`, and `casing`. This makes it
+safe to call from request-scoped server code after creating the request's
+Supabase client.
+
+Prefer importing the schema module object:
+
+```typescript
+import * as schema from "./schema"
+
+const db = createSupabaseDrizzle({ schema, supabase })
+```
+
+Avoid creating fresh schema object literals per request, because each new object
+misses the shared pool cache.
+
+## Lower-level clients
+
+Most application code should use `createSupabaseDrizzle(...)`. If a shared
+library needs explicit control over clients, use `createDrizzleClients(...)`:
+
+```typescript
+import { createDrizzleClients } from "@zeno-lib/db/clients"
+import * as schema from "./schema"
+
+const clients = createDrizzleClients({ schema })
+const admin = clients.getDrizzleSupabaseAdminClient()
+const rls = clients.getDrizzleSupabaseClient({
+  role: "authenticated",
+  sub: "00000000-0000-0000-0000-000000000000",
+})
+
+const rows = await rls.runTransaction((tx) => tx.select().from(schema.posts))
+
+await clients.closeDrizzleSupabaseClients()
+```
+
+When using the lower-level RLS client, pass a Supabase client whenever possible.
+If you pass claims directly, they must already be verified. The DB package does
+not decode or trust raw JWT strings.
+
+## Common pitfalls
+
+- Do not import `@zeno-lib/db` from Client Components or browser code.
+- Do not use `db.admin` for user-scoped reads and writes.
+- Do not pass raw access token strings or unverified session payloads to RLS
+  helpers.
+- Do not manually declare Supabase's built-in roles; import the existing role
+  exports from `@zeno-lib/db/schema`.
+- Do not remove `entities.roles.provider: "supabase"` from Drizzle Kit config,
+  or generated migrations may try to create or drop Supabase-managed roles.
+- Do not create fresh schema object literals per request.
+- Do not run queries outside `db.rls(...)` when you expect RLS policies to
+  apply.
