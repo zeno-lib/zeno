@@ -29,6 +29,9 @@ export type SupabaseAuthContext =
 // via sql.raw. Restrict it to the Supabase-managed roles so a forged `role`
 // claim can't inject SQL or switch into the service role.
 const ALLOWED_RLS_ROLES = new Set(["anon", "authenticated"])
+const DEFAULT_CASING = "snake_case" satisfies DrizzleConfig<
+  Record<string, unknown>
+>["casing"]
 
 export type CreateDrizzleClientsOptions<
   TSchema extends Record<string, unknown>,
@@ -62,7 +65,7 @@ export function createDrizzleClients<TSchema extends Record<string, unknown>>(
   }
 
   const config = {
-    casing: options.casing,
+    casing: options.casing ?? DEFAULT_CASING,
     schema: options.schema,
   } satisfies DrizzleConfig<TSchema>
 
@@ -188,7 +191,7 @@ function createCacheKey<TSchema extends Record<string, unknown>>(
   if (!url) {
     throw new Error("Missing DATABASE_URL environment variable")
   }
-  return JSON.stringify({ casing: options.casing ?? null, url })
+  return JSON.stringify({ casing: options.casing ?? DEFAULT_CASING, url })
 }
 
 async function resolveTokenClaims(
