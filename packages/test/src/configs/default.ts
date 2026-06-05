@@ -7,10 +7,10 @@ export default defineConfig({
   test: {
     env: loadEnv("test", process.cwd(), ""),
     globals: false,
-    include: ["src/**/*.test.ts"],
+    include: ["{src,test,tests}/**/*.test.ts"],
     typecheck: {
       enabled: true,
-      include: ["src/**/*.test-d.ts"],
+      include: ["{src,test,tests}/**/*.test-d.ts"],
       tsconfig: "./tsconfig.json",
     },
   },

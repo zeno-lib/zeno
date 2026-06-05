@@ -63,7 +63,7 @@ export { reactConfig as default } from "@zeno-lib/test/configs"
 
 ### 4. Write your first test
 
-Create a `*.test.ts` file (or `*.test.tsx` for React) anywhere inside `src/`:
+Create a `*.test.ts` file (or `*.test.tsx` for React) under `src/`, `test/`, or `tests/`:
 
 ```typescript title="src/example.test.ts"
 import { describe, expect, test } from "@zeno-lib/test"
@@ -91,8 +91,8 @@ For plain TypeScript packages (no DOM). It:
 
 - Resolves your `tsconfig` path aliases (`vite-tsconfig-paths`).
 - Loads environment variables from `.env.test` automatically.
-- Discovers tests matching `src/**/*.test.ts`.
-- Enables [type testing](#type-testing) for `src/**/*.test-d.ts` files.
+- Discovers tests matching `{src,test,tests}/**/*.test.ts`.
+- Enables [type testing](#type-testing) for `{src,test,tests}/**/*.test-d.ts` files.
 
 ### `reactConfig`
 
@@ -100,7 +100,7 @@ Extends `defaultConfig` with what React component tests need:
 
 - Runs tests in a `jsdom` environment so the DOM is available.
 - Enables the React plugin with the automatic JSX runtime — no `import React` needed.
-- Widens test discovery to `src/**/*.test.{ts,tsx}` so `.tsx` tests are included.
+- Widens test discovery to `{src,test,tests}/**/*.test.{ts,tsx}` so `.tsx` tests are included.
 
 <Callout type="info">
 Both configs set `globals: false`. This means Vitest helpers are **not** injected into the global scope — you must import `describe`, `test`, `expect`, etc. from `@zeno-lib/test` in every test file. This keeps test files explicit and type-safe.
