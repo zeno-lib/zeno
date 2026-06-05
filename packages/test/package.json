@@ -1,6 +1,6 @@
 {
   "name": "@zeno-lib/test",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "bin": {
     "vitest": "./bin/vitest.mjs"
@@ -25,10 +25,7 @@
   "scripts": {
     "types:check": "tsc --noEmit"
   },
-  "devDependencies": {
-    "@types/node": "25.6.0",
-    "@zeno-lib/typescript": "workspace:^",
-    "typescript": "6.0.3",
+  "dependencies": {
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
     "@vitejs/plugin-react": "6.0.1",
@@ -36,5 +33,10 @@
     "vite": "8.0.11",
     "vite-tsconfig-paths": "6.1.1",
     "vitest": "4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "25.6.0",
+    "@zeno-lib/typescript": "workspace:^",
+    "typescript": "6.0.3"
   }
 }
