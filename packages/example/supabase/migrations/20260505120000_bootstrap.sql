@@ -1,1 +1,0 @@
--- Retail Supabase bootstrap (schema evolves in later migrations)

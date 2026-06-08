@@ -1,6 +1,7 @@
 {
   "name": "@zeno-lib/db",
   "version": "0.0.1",
+  "type": "module",
   "bin": {
     "drizzle-kit": "./bin/drizzle-kit.mjs"
   },

@@ -1,6 +1,7 @@
 {
   "name": "@zeno-lib/example",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "pnpm exec supabase start",
     "stop": "pnpm exec supabase stop",
