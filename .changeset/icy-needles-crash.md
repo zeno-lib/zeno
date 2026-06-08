@@ -2,4 +2,4 @@
 "@zeno-lib/test": patch
 ---
 
-Change re-exporting vitest
+Stop re-exporting vitest
