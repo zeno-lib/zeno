@@ -2,9 +2,6 @@
   "name": "@zeno-lib/test",
   "version": "1.0.2",
   "type": "module",
-  "bin": {
-    "vitest": "./bin/vitest.mjs"
-  },
   "exports": {
     ".": "./src/vitest.ts",
     "./configs": "./src/configs/index.ts",
@@ -12,7 +9,6 @@
     "./user-event": "./src/user-event.ts"
   },
   "files": [
-    "bin",
     "src"
   ],
   "publishConfig": {
@@ -30,13 +26,17 @@
     "@testing-library/user-event": "14.6.1",
     "@vitejs/plugin-react": "6.0.1",
     "jsdom": "29.1.1",
-    "vite": "8.0.11",
-    "vite-tsconfig-paths": "6.1.1",
-    "vitest": "4.1.0"
+    "vite-tsconfig-paths": "6.1.1"
+  },
+  "peerDependencies": {
+    "vite": "^6.0.0 || ^7.0.0 || ^8.0.0",
+    "vitest": "^4.1.0"
   },
   "devDependencies": {
     "@types/node": "25.6.0",
     "@zeno-lib/typescript": "workspace:^",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vite": "8.0.11",
+    "vitest": "4.1.0"
   }
 }
