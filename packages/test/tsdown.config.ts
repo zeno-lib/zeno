@@ -9,10 +9,4 @@ export default defineConfig({
     "user-event": "src/user-event.ts",
     vitest: "src/vitest.ts",
   },
-  fixedExtension: false,
-  format: "esm",
-  outExtensions: () => ({
-    dts: ".d.ts",
-    js: ".js",
-  }),
 })

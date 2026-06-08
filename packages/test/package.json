@@ -4,24 +4,24 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/vitest.d.ts",
-      "import": "./dist/vitest.js",
-      "default": "./dist/vitest.js"
+      "types": "./dist/vitest.d.mts",
+      "import": "./dist/vitest.mjs",
+      "default": "./dist/vitest.mjs"
     },
     "./configs": {
-      "types": "./dist/configs/index.d.ts",
-      "import": "./dist/configs/index.js",
-      "default": "./dist/configs/index.js"
+      "types": "./dist/configs/index.d.mts",
+      "import": "./dist/configs/index.mjs",
+      "default": "./dist/configs/index.mjs"
     },
     "./testing-library": {
-      "types": "./dist/testing-library.d.ts",
-      "import": "./dist/testing-library.js",
-      "default": "./dist/testing-library.js"
+      "types": "./dist/testing-library.d.mts",
+      "import": "./dist/testing-library.mjs",
+      "default": "./dist/testing-library.mjs"
     },
     "./user-event": {
-      "types": "./dist/user-event.d.ts",
-      "import": "./dist/user-event.js",
-      "default": "./dist/user-event.js"
+      "types": "./dist/user-event.d.mts",
+      "import": "./dist/user-event.mjs",
+      "default": "./dist/user-event.mjs"
     }
   },
   "files": [
