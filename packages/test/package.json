@@ -3,12 +3,29 @@
   "version": "1.0.2",
   "type": "module",
   "exports": {
-    ".": "./src/vitest.ts",
-    "./configs": "./src/configs/index.ts",
-    "./testing-library": "./src/testing-library.ts",
-    "./user-event": "./src/user-event.ts"
+    ".": {
+      "types": "./dist/vitest.d.ts",
+      "import": "./dist/vitest.js",
+      "default": "./dist/vitest.js"
+    },
+    "./configs": {
+      "types": "./dist/configs/index.d.ts",
+      "import": "./dist/configs/index.js",
+      "default": "./dist/configs/index.js"
+    },
+    "./testing-library": {
+      "types": "./dist/testing-library.d.ts",
+      "import": "./dist/testing-library.js",
+      "default": "./dist/testing-library.js"
+    },
+    "./user-event": {
+      "types": "./dist/user-event.d.ts",
+      "import": "./dist/user-event.js",
+      "default": "./dist/user-event.js"
+    }
   },
   "files": [
+    "dist",
     "src"
   ],
   "publishConfig": {
@@ -19,6 +36,7 @@
     "directory": "packages/test"
   },
   "scripts": {
+    "build": "tsdown",
     "types:check": "tsc --noEmit"
   },
   "dependencies": {
@@ -35,6 +53,7 @@
   "devDependencies": {
     "@types/node": "25.6.0",
     "@zeno-lib/typescript": "workspace:^",
+    "tsdown": "^0.22.2",
     "typescript": "6.0.3",
     "vite": "8.0.11",
     "vitest": "4.1.0"

@@ -45,3 +45,7 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+
+# Committed bundle for @zeno-lib/test
+!packages/test/dist/
+!packages/test/dist/**
