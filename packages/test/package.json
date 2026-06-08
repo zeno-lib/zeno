@@ -3,11 +3,6 @@
   "version": "0.0.2",
   "type": "module",
   "exports": {
-    ".": {
-      "types": "./dist/vitest.d.mts",
-      "import": "./dist/vitest.mjs",
-      "default": "./dist/vitest.mjs"
-    },
     "./configs": {
       "types": "./dist/configs/index.d.mts",
       "import": "./dist/configs/index.mjs",

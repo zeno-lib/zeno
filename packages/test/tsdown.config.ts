@@ -7,6 +7,5 @@ export default defineConfig({
     "configs/index": "src/configs/index.ts",
     "testing-library": "src/testing-library.ts",
     "user-event": "src/user-event.ts",
-    vitest: "src/vitest.ts",
   },
 })
