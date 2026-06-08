@@ -1,5 +1,11 @@
 # @zeno-lib/test
 
+## 0.0.3
+
+### Patch Changes
+
+- 448249c: Stop re-exporting vitest
+
 ## 0.0.2
 
 ### Patch Changes
