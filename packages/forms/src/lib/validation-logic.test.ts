@@ -1,5 +1,5 @@
 import type { AnyFormApi, ValidationLogicFn } from "@tanstack/react-form"
-import { describe, expect, test, vi } from "@zeno-lib/test"
+import { describe, expect, test, vi } from "vitest"
 
 import { blurThenChangeLogic } from "./validation-logic"
 
