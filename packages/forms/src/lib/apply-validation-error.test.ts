@@ -1,5 +1,5 @@
 import type { AnyFormApi } from "@tanstack/react-form"
-import { describe, expect, test, vi } from "@zeno-lib/test"
+import { describe, expect, test, vi } from "vitest"
 import { applyValidationError } from "./apply-validation-error"
 import { ValidationError } from "./validation-error"
 

@@ -6,10 +6,10 @@
     "build": {
       "dependsOn": ["types:check", "^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "types:check": {
-      "dependsOn": ["^types:check"]
+      "dependsOn": ["^types:check", "^build"]
     },
     "e2e": {
       "dependsOn": ["^build", "@zeno-lib/e2e#verify-deps"],

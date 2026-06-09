@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, test, vi } from "@zeno-lib/test"
 import { cleanup, render, screen } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
+import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
 import { Form, FormProvider } from "./form"
 import type { ValidationMode } from "./lib/validation-modes"

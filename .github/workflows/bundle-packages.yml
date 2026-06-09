@@ -1,0 +1,64 @@
+name: Bundle packages
+
+on:
+  pull_request:
+    # Add the package path here when a new package needs bundling.
+    paths:
+      - "packages/test/**"
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    strategy:
+      # Serialize matrix jobs so concurrent pushes to the PR branch don't race.
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        # Add an entry here for each package that needs bundling.
+        package:
+          - name: test
+            filter: "@zeno-lib/test"
+            dist: packages/test/dist
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          # persist-credentials defaults to true, enabling the push below
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build ${{ matrix.package.name }} package
+        run: pnpm --filter ${{ matrix.package.filter }} build
+
+      - name: Commit bundled dist
+        run: |
+          # Attribute the commit to GitHub's Actions bot. 41898282 is the
+          # github-actions[bot] account's user ID, and the address follows
+          # GitHub's ID+username@users.noreply.github.com noreply convention.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ${{ matrix.package.dist }}
+          if git diff --staged --quiet; then
+            echo "No dist changes to commit."
+          else
+            git commit -m "chore(${{ matrix.package.name }}): bundle dist [skip ci]"
+            git push origin HEAD:${{ github.head_ref }}
+          fi

@@ -5,36 +5,33 @@ icon: ListChecks
 status: in progress
 ---
 
-Zeno uses [Vitest](https://vitest.dev) for fast, modern unit testing with native TypeScript support. The `@zeno-lib/test` package wraps Vitest with shared, opinionated configs so every package tests the same way — you don't install or configure Vitest yourself.
+Zeno uses [Vitest](https://vitest.dev) for fast, modern unit testing with native TypeScript support. The `@zeno-lib/test` package provides shared, opinionated configs and Testing Library re-exports so every package tests the same way — install it alongside `vitest` and `vite`.
 
 ## What you get
 
-Adding `@zeno-lib/test` gives you a single dependency that provides everything needed to write and run tests:
+Adding `@zeno-lib/test` (with `vitest` and `vite`) gives you shared configs and re-exports for writing and running tests. Import Vitest runtime helpers (`describe`, `test`, `expect`, `vi`, …) directly from `vitest`:
 
 | Import | What it provides |
 |---|---|
-| `@zeno-lib/test` | Re-exports all of Vitest's runtime (`describe`, `test`, `expect`, `vi`, `beforeEach`, …) |
 | `@zeno-lib/test/configs` | The `defaultConfig` and `reactConfig` presets, plus `defineConfig` / `mergeConfig` |
 | `@zeno-lib/test/testing-library` | Re-exports [`@testing-library/react`](https://testing-library.com/docs/react-testing-library/intro) (`render`, `screen`, …) |
 | `@zeno-lib/test/user-event` | Re-exports [`@testing-library/user-event`](https://testing-library.com/docs/user-event/intro) for simulating real user interactions |
-
-The `vitest` CLI binary is also shipped by the package, so there's no need to add `vitest` to your own `devDependencies`.
 
 ## Installation
 
 In the package you want to test, follow these steps.
 
-### 1. Install the package
+### 1. Install the packages
 
-Install `@zeno-lib/test` as a dev dependency:
+Install `@zeno-lib/test` together with its peer dependencies `vitest` and `vite`:
 
 ```npm
-npm install --save-dev @zeno-lib/test
+npm install --save-dev @zeno-lib/test vitest vite
 ```
 
 ### 2. Add the test scripts
 
-The `vitest` CLI is provided by the package, so you can wire up scripts directly:
+The `vitest` CLI comes from the `vitest` package you installed:
 
 ```json title="package.json"
 {
@@ -66,7 +63,7 @@ export { reactConfig as default } from "@zeno-lib/test/configs"
 Create a `*.test.ts` file (or `*.test.tsx` for React) under `src/`, `test/`, or `tests/`:
 
 ```typescript title="src/example.test.ts"
-import { describe, expect, test } from "@zeno-lib/test"
+import { describe, expect, test } from "vitest"
 
 describe("Example", () => {
   test("works", () => {
@@ -103,7 +100,7 @@ Extends `defaultConfig` with what React component tests need:
 - Widens test discovery to `{src,test,tests}/**/*.test.{ts,tsx}` so `.tsx` tests are included.
 
 <Callout type="info">
-Both configs set `globals: false`. This means Vitest helpers are **not** injected into the global scope — you must import `describe`, `test`, `expect`, etc. from `@zeno-lib/test` in every test file. This keeps test files explicit and type-safe.
+Both configs set `globals: false`. This means Vitest helpers are **not** injected into the global scope — you must import `describe`, `test`, `expect`, etc. from `vitest` in every test file. This keeps test files explicit and type-safe.
 </Callout>
 
 ### Extending the config
@@ -125,10 +122,10 @@ export default mergeConfig(
 
 ## Writing tests
 
-Import the helpers you need from `@zeno-lib/test` (remember: there are no globals):
+Import the helpers you need from `vitest` (remember: there are no globals):
 
 ```typescript
-import { describe, expect, test } from "@zeno-lib/test"
+import { describe, expect, test } from "vitest"
 
 describe("Calculator", () => {
   test("adds two numbers", () => {
@@ -166,7 +163,7 @@ These libraries let you test components the way a user actually experiences them
 - **User Event** dispatches realistic interaction sequences (a click fires `pointerdown`, `mousedown`, `focus`, `click`, …), so tests exercise the same event flow a real user triggers, catching bugs that a single synthetic event would miss.
 
 ```tsx
-import { describe, expect, test, vi } from "@zeno-lib/test"
+import { describe, expect, test, vi } from "vitest"
 import { render, screen } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
 import { Button } from "@zeno-lib/ui/button"
@@ -191,10 +188,10 @@ describe("Button", () => {
 
 ## Mocking
 
-Vitest's [`vi`](https://vitest.dev/api/vi) helper is re-exported from `@zeno-lib/test`. See the [Mocking guide](https://vitest.dev/guide/mocking) for the full range of techniques (functions, modules, timers, globals, …):
+Import [`vi`](https://vitest.dev/api/vi) and other helpers from `vitest`. Vitest's mock hoister only recognizes `vi` from the `"vitest"` specifier, so always import mocking utilities from `vitest` — `vi.fn()`, `vi.mock()`, `vi.hoisted()`, and the rest. See the [Mocking guide](https://vitest.dev/guide/mocking) for the full range of techniques.
 
 ```typescript
-import { describe, expect, test, vi } from "@zeno-lib/test"
+import { describe, expect, test, vi } from "vitest"
 
 const mockFetch = vi.fn()
 
@@ -207,12 +204,30 @@ describe("API", () => {
 })
 ```
 
+```typescript
+import { describe, expect, test, vi } from "vitest"
+
+vi.mock("./api", () => ({
+  fetchData: vi.fn(),
+}))
+
+import { fetchData } from "./api"
+
+describe("API client", () => {
+  test("calls fetchData", async () => {
+    vi.mocked(fetchData).mockResolvedValue({ data: "test" })
+    const result = await fetchData()
+    expect(result.data).toBe("test")
+  })
+})
+```
+
 ## Type testing
 
 Both presets also type-check files ending in `.test-d.ts`. Use [`expectTypeOf`](https://vitest.dev/api/expect-typeof) to assert on types without running any runtime code. See Vitest's [Testing Types guide](https://vitest.dev/guide/testing-types) for the full API:
 
 ```typescript title="src/types.test-d.ts"
-import { expectTypeOf, test } from "@zeno-lib/test"
+import { expectTypeOf, test } from "vitest"
 
 test("greet returns a string", () => {
   expectTypeOf(greet("world")).toBeString()

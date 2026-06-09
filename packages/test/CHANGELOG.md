@@ -1,22 +1,16 @@
 # @zeno-lib/test
 
-## 1.0.2
+## 0.0.3
 
 ### Patch Changes
 
-- f39cb9e: Move runtime packages from devDependencies to dependencies
+- 448249c: Stop re-exporting vitest
 
-## 1.0.1
+## 0.0.2
 
 ### Patch Changes
 
-- a88dad5: Expand Vitest test discovery to test/ and tests/
-
-## 1.0.0
-
-### Major Changes
-
-- d4df70f: First release including configs and documentation
+- 478dd8f: Put vitest and vite in peerDependencies. Use tsdown to bundle package.
 
 ## 0.0.1
 

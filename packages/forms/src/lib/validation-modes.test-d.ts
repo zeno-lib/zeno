@@ -1,4 +1,4 @@
-import { expectTypeOf, test } from "@zeno-lib/test"
+import { expectTypeOf, test } from "vitest"
 
 import type { ValidationMode } from "./validation-modes"
 
