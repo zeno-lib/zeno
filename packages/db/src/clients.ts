@@ -83,10 +83,14 @@ export function createDrizzleClients<TSchema extends Record<string, unknown>>(
   function getDrizzleSupabaseClient(authContext?: SupabaseAuthContext) {
     const runTransaction = (async (transaction, txConfig) => {
       const token = await resolveTokenClaims(authContext)
-      const claims = JSON.stringify(token)
       const sub = token.sub ?? ""
       const role =
         token.role && ALLOWED_RLS_ROLES.has(token.role) ? token.role : "anon"
+      // Force the serialized claims' role to match the role we actually `set
+      // local role` to, so a policy reading auth.jwt()->>'role' can never see a
+      // value that disagrees with the live Postgres role (e.g. a service_role
+      // claim that was downgraded to anon).
+      const claims = JSON.stringify({ ...token, role })
 
       return await rlsClient.transaction(async (tx) => {
         // auth.jwt()/auth.uid() read these; is_local scopes them to the tx, so

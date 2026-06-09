@@ -145,6 +145,23 @@ describe("db.rls", () => {
     expect(result[0]).toEqual({ role: "anon" })
   })
 
+  it("normalizes request.jwt.claims role to the enforced session role", async () => {
+    const db = createSupabaseDrizzle({
+      schema,
+      supabase: createSupabase({ role: "service_role", sub: TOKEN.sub }),
+    })
+    const result = await db.rls((tx) =>
+      tx.execute(
+        sql`select current_user as role, current_setting('request.jwt.claims', true) as claims`
+      )
+    )
+    const row = result[0] as { role: string; claims: string }
+    // Connection role was downgraded to anon, and the claims a policy would read
+    // via auth.jwt() agree with it instead of leaking the rejected service_role.
+    expect(row.role).toBe("anon")
+    expect((JSON.parse(row.claims) as { role: string }).role).toBe("anon")
+  })
+
   it("does not decode or trust raw access token strings", async () => {
     const db = createSupabaseDrizzle({
       schema,
