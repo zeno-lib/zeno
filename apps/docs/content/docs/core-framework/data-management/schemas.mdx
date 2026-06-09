@@ -2,7 +2,235 @@
 title: Schemas
 description: Data schemas and validation
 icon: Blocks
-status: todo
 ---
 
-Schemas guide coming soon.
+Zeno treats your Drizzle table as the database source of truth, then derives
+Zod schemas from it for validation. The goal is one schema lineage: database
+shape, server validation, and forms all start from the same table definition.
+
+`@zeno-lib/schema` is the pure helper package for that layer. It has no database
+clients and no `postgres-js` dependency, so schemas can live in shared modules
+that are safe to import from Server Actions, Route Handlers, and Client
+Components.
+
+<Callout type="info">
+Keep the module that exports your Zod schemas pure. It can import table builders
+and `defineTableSchema`, but it should not create database clients or read
+server-only request state.
+</Callout>
+
+## Installation
+
+Install the schema package wherever you define Drizzle tables:
+
+```bash
+pnpm add @zeno-lib/schema drizzle-orm@1.0.0-rc.3 zod
+```
+
+Most projects use it with the database and forms packages:
+
+```bash
+pnpm add @zeno-lib/db @zeno-lib/schema @zeno-lib/forms drizzle-orm@1.0.0-rc.3 postgres zod
+pnpm add -D drizzle-kit@1.0.0-rc.3
+```
+
+`@zeno-lib/schema` peers on Drizzle's Zod bridge. Import Drizzle table builders
+from Drizzle, and import Zod itself directly from `zod` when you compose
+product-specific schemas.
+
+## Define a table
+
+Start with a Drizzle table. In Zeno apps, keep the Drizzle dependency visible by
+importing Postgres builders directly from Drizzle.
+
+```ts title="src/posts.schema.ts"
+import { timestamps } from "@zeno-lib/db/schema"
+import { snakeCase } from "drizzle-orm/pg-core/casing"
+import { text, uuid } from "drizzle-orm/pg-core"
+
+const pgTable = snakeCase.table
+
+export const posts = pgTable("posts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  slug: text("slug").notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  ...timestamps,
+})
+```
+
+The table describes database columns and generated/defaulted fields. Drizzle
+also exposes TypeScript model types:
+
+```ts
+export type InsertPost = typeof posts.$inferInsert
+export type SelectPost = typeof posts.$inferSelect
+```
+
+## Derive Zod schemas
+
+Use `defineTableSchema(table)` to create the three database variants Zeno
+standardizes on:
+
+```ts title="src/posts.schema.ts"
+import { defineTableSchema } from "@zeno-lib/schema"
+
+export const postSchema = defineTableSchema(posts)
+```
+
+`postSchema` contains:
+
+| Schema | Use it for |
+|---|---|
+| `postSchema.select` | Data read from the database. Generated columns are present. Nullable columns accept `null`. |
+| `postSchema.insert` | Data accepted before an insert. Generated/defaulted columns are omitted or optional according to Drizzle metadata. |
+| `postSchema.update` | Data accepted before an update. Updatable fields are optional; generated columns are omitted. |
+
+These are plain Zod schemas. You can parse payloads in a Server Action or Route
+Handler before calling `db.rls(...)` or `db.admin`:
+
+```ts title="src/posts.actions.ts"
+import { createSupabaseDrizzle } from "@zeno-lib/db"
+import { postSchema, posts } from "./posts.schema"
+import * as schema from "./posts.schema"
+
+export async function createPost(input: unknown) {
+  const value = postSchema.insert.parse(input)
+  const db = createSupabaseDrizzle({ schema })
+
+  await db.admin.insert(posts).values(value)
+}
+```
+
+## Refine each variant
+
+Pass refinement maps when the database shape needs richer validation. The maps
+match Drizzle's first-party
+[Zod schema helpers](https://orm.drizzle.team/docs/zod).
+
+```ts title="src/posts.schema.ts"
+export const postSchema = defineTableSchema(posts, {
+  insert: {
+    body: (schema) => schema.min(1),
+    slug: (schema) => schema.regex(/^[a-z0-9-]+$/),
+    title: (schema) => schema.min(3).max(120),
+  },
+  update: {
+    body: (schema) => schema.min(1),
+    slug: (schema) => schema.regex(/^[a-z0-9-]+$/),
+    title: (schema) => schema.min(3).max(120),
+  },
+})
+```
+
+Refinements are per variant. A rule under `insert` does not affect `update` or
+`select`, so repeat rules intentionally when the same constraint belongs in more
+than one workflow.
+
+For advanced cases such as coercion, pass a Drizzle schema factory option:
+
+```ts
+export const postSchema = defineTableSchema(posts, {
+  factory: {
+    coerce: {
+      date: true,
+    },
+  },
+})
+```
+
+## Derive form and action schemas
+
+Zeno does not generate form-specific schemas automatically. Forms are product
+workflows: they may omit server-owned fields, add UI-only values, or require
+cross-field validation that the database table should not know about.
+
+Derive those schemas explicitly with Zod:
+
+```ts title="src/posts.forms.ts"
+import { z } from "zod"
+import { postSchema } from "./posts.schema"
+
+export const createPostFormSchema = postSchema.insert
+  .omit({
+    createdAt: true,
+    id: true,
+    slug: true,
+    updatedAt: true,
+  })
+  .extend({
+    publishNow: z.boolean().default(false),
+  })
+  .refine((value) => value.title.trim() !== value.body.trim(), {
+    message: "Title and body should not be identical.",
+    path: ["body"],
+  })
+
+export type CreatePostForm = z.infer<typeof createPostFormSchema>
+```
+
+Then pass the derived schema to `@zeno-lib/forms`:
+
+```tsx title="src/create-post-form.tsx"
+"use client"
+
+import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { createPostFormSchema } from "./posts.forms"
+
+export function CreatePostForm() {
+  const form = useForm({
+    defaultValues: {
+      body: "",
+      publishNow: false,
+      title: "",
+    },
+    onSubmit: async ({ value }) => {
+      // Call a Server Action with validated form data.
+      console.log(value)
+    },
+    schema: createPostFormSchema,
+  })
+
+  return (
+    <FormProvider form={form}>
+      <Form>
+        <form.InputField label="Title" name="title" />
+        <form.TextAreaField label="Body" name="body" />
+        <form.CheckboxField label="Publish now" name="publishNow" />
+        <form.SubmitButton>Save</form.SubmitButton>
+      </Form>
+    </FormProvider>
+  )
+}
+```
+
+## Shared module boundary
+
+Use this split for most features:
+
+| File | Should contain |
+|---|---|
+| `*.schema.ts` | Drizzle tables, table-derived Zod schemas, and pure exported types. |
+| `*.forms.ts` | Zod schemas derived for UI workflows. Safe to import from Client Components when it stays pure. |
+| `*.actions.ts` | Server Actions or Route Handlers that parse schemas and call `@zeno-lib/db`. |
+
+Avoid importing `createSupabaseDrizzle(...)` or other server-only code from a
+module that a Client Component imports for validation. Keep database clients at
+the action/route boundary and keep Zod schemas pure.
+
+## Direct Drizzle helpers
+
+`@zeno-lib/schema` also re-exports Drizzle's first-party helpers for cases where
+you do not want the `{ select, insert, update }` bundle:
+
+```ts
+import {
+  createInsertSchema,
+  createSchemaFactory,
+  createSelectSchema,
+  createUpdateSchema,
+} from "@zeno-lib/schema"
+```
+
+Prefer `defineTableSchema(...)` for application tables so teams use the same
+variant names across forms, actions, and tests.

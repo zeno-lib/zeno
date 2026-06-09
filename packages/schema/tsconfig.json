@@ -1,0 +1,3 @@
+{
+  "extends": "@zeno-lib/typescript/strictest.json"
+}

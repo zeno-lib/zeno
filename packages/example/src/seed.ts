@@ -41,9 +41,7 @@ export const SEED_COUNTS = {
 
 // Accepts any Drizzle client (e.g. the admin client); only the Northwind
 // `schema` subset is reset/seeded, so the RLS `posts` table is left alone.
-export async function seedDatabase<TSchema extends Record<string, unknown>>(
-  db: PostgresJsDatabase<TSchema>
-): Promise<void> {
+export async function seedDatabase(db: PostgresJsDatabase): Promise<void> {
   await reset(db, schema)
   await seed(db, schema).refine((funcs) => ({
     customers: {

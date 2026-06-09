@@ -10,12 +10,14 @@ import {
   integer,
   numeric,
   pgPolicy,
-  pgTable,
   text,
   timestamp,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core"
+import { snakeCase } from "drizzle-orm/pg-core/casing"
+
+const pgTable = snakeCase.table
 
 export const posts = pgTable(
   "posts",
@@ -39,7 +41,7 @@ export const posts = pgTable(
       withCheck: sql`${t.userId} = ${authUid}`,
     }),
   ]
-).enableRLS()
+)
 
 export type InsertPost = typeof posts.$inferInsert
 export type SelectPost = typeof posts.$inferSelect

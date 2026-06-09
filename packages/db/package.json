@@ -2,9 +2,6 @@
   "name": "@zeno-lib/db",
   "version": "0.0.1",
   "type": "module",
-  "bin": {
-    "drizzle-kit": "./bin/drizzle-kit.mjs"
-  },
   "scripts": {
     "test": "vitest --run",
     "test:watch": "vitest watch",
@@ -12,10 +9,11 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./*": "./src/*.ts"
+    "./clients": "./src/clients.ts",
+    "./config": "./src/config.ts",
+    "./schema": "./src/schema.ts"
   },
   "files": [
-    "bin",
     "src"
   ],
   "publishConfig": {
@@ -25,14 +23,17 @@
     "url": "https://github.com/zeno-lib/zeno.git",
     "directory": "packages/db"
   },
-  "dependencies": {
-    "drizzle-kit": "0.31.5",
-    "drizzle-orm": "0.44.6",
-    "postgres": "3.4.7"
+  "peerDependencies": {
+    "drizzle-kit": "1.0.0-rc.3",
+    "drizzle-orm": "1.0.0-rc.3",
+    "postgres": ">=3.4"
   },
   "devDependencies": {
     "@types/node": "24.10.0",
     "@zeno-lib/test": "workspace:*",
-    "@zeno-lib/typescript": "workspace:^"
+    "@zeno-lib/typescript": "workspace:^",
+    "drizzle-kit": "1.0.0-rc.3",
+    "drizzle-orm": "1.0.0-rc.3",
+    "postgres": "3.4.7"
   }
 }

@@ -1,19 +1,18 @@
-import { pgTable, text, uuid } from "@zeno-lib/db/pg-core"
 import { describe, expect, it } from "@zeno-lib/test"
+import { text, uuid } from "drizzle-orm/pg-core"
+import { camelCase, snakeCase } from "drizzle-orm/pg-core/casing"
 import { createSupabaseDrizzle } from "./clients.ts"
 import { defineDrizzleConfig } from "./config.ts"
 
 const LOCAL_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
 describe("default casing", () => {
-  it("uses snake_case in the Drizzle Kit config by default", () => {
-    expect(defineDrizzleConfig()).toMatchObject({
-      casing: "snake_case",
-    })
+  it("leaves casing to Drizzle table constructors", () => {
+    expect(defineDrizzleConfig()).not.toHaveProperty("casing")
   })
 
-  it("uses snake_case in runtime queries by default", async () => {
-    const posts = pgTable("posts", {
+  it("works with Drizzle's snake_case table builders", async () => {
+    const posts = snakeCase.table("posts", {
       displayName: text(),
       ownerId: uuid(),
     })
@@ -30,12 +29,11 @@ describe("default casing", () => {
     await db.close({ timeout: 0 })
   })
 
-  it("allows callers to override runtime casing", async () => {
-    const posts = pgTable("posts", {
+  it("allows callers to opt into camelCase table builders", async () => {
+    const posts = camelCase.table("posts", {
       displayName: text(),
     })
     const db = createSupabaseDrizzle({
-      casing: "camelCase",
       connectionString: LOCAL_DB_URL,
       schema: { posts },
     })

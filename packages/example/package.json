@@ -24,9 +24,9 @@
     "@zeno-lib/typescript": "workspace:^",
     "@zeno-lib/test": "workspace:*",
     "dotenv": "16.4.7",
-    "drizzle-kit": "0.31.5",
-    "drizzle-orm": "0.44.6",
-    "drizzle-seed": "0.3.1",
+    "drizzle-kit": "1.0.0-rc.3",
+    "drizzle-orm": "1.0.0-rc.3",
+    "drizzle-seed": "1.0.0-rc.3",
     "postgres": "3.4.7",
     "supabase": "2.84.1",
     "typescript": "5.9.3"

@@ -12,53 +12,68 @@ const packageJson = JSON.parse(
 ) as {
   bin?: Record<string, string>
   dependencies?: Record<string, string>
+  devDependencies?: Record<string, string>
+  exports?: Record<string, string>
   peerDependencies?: Record<string, string>
 }
-const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..")
 
 describe("@zeno-lib/db package surface", () => {
-  it("owns the Drizzle and postgres dependencies consumers need", () => {
-    expect(packageJson.dependencies).toMatchObject({
-      "drizzle-kit": expect.any(String),
-      "drizzle-orm": expect.any(String),
+  it("expects consumers to provide the Drizzle and postgres dependencies", () => {
+    expect(packageJson.peerDependencies).toEqual({
+      "drizzle-kit": "1.0.0-rc.3",
+      "drizzle-orm": "1.0.0-rc.3",
       postgres: expect.any(String),
     })
-    expect(packageJson.peerDependencies).toBeUndefined()
+
+    expect(packageJson.dependencies ?? {}).not.toHaveProperty("drizzle-kit")
+    expect(packageJson.dependencies ?? {}).not.toHaveProperty("drizzle-orm")
+    expect(packageJson.dependencies ?? {}).not.toHaveProperty("postgres")
+    expect(packageJson.devDependencies).toEqual(
+      expect.objectContaining({
+        "drizzle-kit": "1.0.0-rc.3",
+        "drizzle-orm": "1.0.0-rc.3",
+        postgres: expect.any(String),
+      })
+    )
   })
 
-  it("ships a drizzle-kit binary shim", () => {
-    expect(packageJson.bin).toEqual({
-      "drizzle-kit": "./bin/drizzle-kit.mjs",
+  it("keeps Drizzle Kit CLI ownership in the consumer package", () => {
+    expect(packageJson.bin).toBeUndefined()
+  })
+
+  it("exports only Zeno-owned DB entrypoints", () => {
+    expect(packageJson.exports).toEqual({
+      ".": "./src/index.ts",
+      "./clients": "./src/clients.ts",
+      "./config": "./src/config.ts",
+      "./schema": "./src/schema.ts",
     })
   })
 
-  it("runs the drizzle-kit binary shim", () => {
-    const result = spawnSync(
-      process.execPath,
-      [join(packageRoot, "bin/drizzle-kit.mjs"), "--version"],
-      {
-        encoding: "utf8",
-      }
-    )
+  it("relies on the peer drizzle-kit binary", () => {
+    const result = spawnSync("drizzle-kit", ["--version"], {
+      encoding: "utf8",
+    })
 
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain("drizzle-kit: v0.31.5")
+    expect(result.stdout).toContain("drizzle-kit: v1.0.0-rc.3")
   })
 
-  it("re-exports the Drizzle APIs used in schema files", async () => {
-    const ormImportPath = "@zeno-lib/db/drizzle-orm"
-    const pgCoreImportPath = "@zeno-lib/db/pg-core"
-    const postgresImportPath = "@zeno-lib/db/postgres"
+  it("keeps peer package surfaces outside the DB helper exports", async () => {
+    const importPeerSurface = (importPath: string) =>
+      import(/* @vite-ignore */ importPath)
 
-    const [orm, pgCore, postgres] = await Promise.all([
-      import(ormImportPath),
-      import(pgCoreImportPath),
-      import(postgresImportPath),
-    ])
-
-    expect(orm.sql).toEqual(expect.any(Function))
-    expect(pgCore.pgTable).toEqual(expect.any(Function))
-    expect(pgCore.pgPolicy).toEqual(expect.any(Function))
-    expect(postgres.default).toEqual(expect.any(Function))
+    await expect(importPeerSurface("@zeno-lib/db/drizzle-orm")).rejects.toThrow(
+      '"./drizzle-orm" is not exported'
+    )
+    await expect(importPeerSurface("@zeno-lib/db/pg-core")).rejects.toThrow(
+      '"./pg-core" is not exported'
+    )
+    await expect(importPeerSurface("@zeno-lib/db/drizzle-kit")).rejects.toThrow(
+      '"./drizzle-kit" is not exported'
+    )
+    await expect(importPeerSurface("@zeno-lib/db/postgres")).rejects.toThrow(
+      '"./postgres" is not exported'
+    )
   })
 })

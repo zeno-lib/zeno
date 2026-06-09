@@ -1,5 +1,5 @@
 // https://orm.drizzle.team/docs/rls#using-with-supabase
-import { type DrizzleConfig, sql } from "drizzle-orm"
+import { sql } from "drizzle-orm"
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js"
 import postgres from "postgres"
 
@@ -29,16 +29,12 @@ export type SupabaseAuthContext =
 // via sql.raw. Restrict it to the Supabase-managed roles so a forged `role`
 // claim can't inject SQL or switch into the service role.
 const ALLOWED_RLS_ROLES = new Set(["anon", "authenticated"])
-const DEFAULT_CASING = "snake_case" satisfies DrizzleConfig<
-  Record<string, unknown>
->["casing"]
 
 export type CreateDrizzleClientsOptions<
   TSchema extends Record<string, unknown>,
 > = {
   schema: TSchema
   connectionString?: string
-  casing?: DrizzleConfig<TSchema>["casing"]
 }
 
 export type CreateSupabaseDrizzleOptions<
@@ -64,11 +60,6 @@ export function createDrizzleClients<TSchema extends Record<string, unknown>>(
     throw new Error("Missing DATABASE_URL environment variable")
   }
 
-  const config = {
-    casing: options.casing ?? DEFAULT_CASING,
-    schema: options.schema,
-  } satisfies DrizzleConfig<TSchema>
-
   // prepare:false → required for the Supabase transaction pooler (port 6543).
   // Two separate pools: admin runs as the connection role (bypasses RLS),
   // rls switches role + sets JWT claims per transaction.
@@ -76,15 +67,13 @@ export function createDrizzleClients<TSchema extends Record<string, unknown>>(
   const rlsPool = postgres(url, { prepare: false })
   const adminClient = drizzle({
     client: adminPool,
-    ...config,
   })
   const rlsClient = drizzle({
     client: rlsPool,
-    ...config,
   })
 
   // Bypasses RLS. Use for webhooks, admin tasks, background jobs, seeding.
-  function getDrizzleSupabaseAdminClient(): PostgresJsDatabase<TSchema> {
+  function getDrizzleSupabaseAdminClient(): PostgresJsDatabase {
     return adminClient
   }
 
@@ -191,7 +180,7 @@ function createCacheKey<TSchema extends Record<string, unknown>>(
   if (!url) {
     throw new Error("Missing DATABASE_URL environment variable")
   }
-  return JSON.stringify({ casing: options.casing ?? DEFAULT_CASING, url })
+  return JSON.stringify({ url })
 }
 
 async function resolveTokenClaims(

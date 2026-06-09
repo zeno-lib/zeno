@@ -70,9 +70,11 @@ roles and helpers.
 
 - A Drizzle Kit config preset for Supabase projects.
 - A runtime factory that returns an admin client and an RLS-aware query path.
-- Re-exports for Drizzle schema/query APIs, so consumers do not install Drizzle
-  packages directly.
-- Supabase role and helper exports for writing policies in schema files.
+- Curated Supabase role/helper exports for writing policies in schema files.
+
+Drizzle, Drizzle Kit, and `postgres-js` stay visible peer dependencies. Import
+Drizzle's schema and query APIs directly from Drizzle so your app owns the exact
+Drizzle surface it writes against.
 
 <Callout type="warn">
 `@zeno-lib/db` is server-only. It uses `postgres-js`, which opens TCP
@@ -86,22 +88,13 @@ specialized Supabase features, such as realtime, when that guide calls for it.
 Install the database package in the package or app that owns your schema:
 
 ```bash
-pnpm add @zeno-lib/db
+pnpm add @zeno-lib/db drizzle-orm@1.0.0-rc.3 postgres
+pnpm add -D drizzle-kit@1.0.0-rc.3
 ```
 
-`@zeno-lib/db` owns `drizzle-orm`, `drizzle-kit`, and `postgres`. Import Drizzle
-APIs from the package re-exports:
-
-| Import | Use it for |
-|---|---|
-| `@zeno-lib/db/drizzle-orm` | Query helpers such as `sql`, `eq`, `and`, `or`, `isNull`. |
-| `@zeno-lib/db/pg-core` | Postgres schema builders such as `pgTable`, `uuid`, `text`, `pgPolicy`. |
-| `@zeno-lib/db/drizzle-kit` | Drizzle Kit config helpers if you need them directly. |
-| `@zeno-lib/db/postgres` | The underlying `postgres-js` package for advanced server-only cases. |
-
-The package also exposes a `drizzle-kit` binary, so package scripts can call
-`drizzle-kit generate`, `drizzle-kit migrate`, and `drizzle-kit studio` without
-installing Drizzle Kit separately.
+Use Drizzle's own imports for table builders and query helpers. Use Zeno imports
+only for Zeno-owned helpers such as `createSupabaseDrizzle`,
+`defineDrizzleConfig`, and the Supabase schema primitives.
 
 ## Environment
 
@@ -144,8 +137,11 @@ import {
   authUsers,
   timestamps,
 } from "@zeno-lib/db/schema"
-import { sql } from "@zeno-lib/db/drizzle-orm"
-import { pgPolicy, pgTable, text, uuid } from "@zeno-lib/db/pg-core"
+import { sql } from "drizzle-orm"
+import { snakeCase } from "drizzle-orm/pg-core/casing"
+import { pgPolicy, text, uuid } from "drizzle-orm/pg-core"
+
+const pgTable = snakeCase.table
 
 export const posts = pgTable(
   "posts",
@@ -169,15 +165,16 @@ export const posts = pgTable(
       withCheck: sql`${t.userId} = ${authUid}`,
     }),
   ]
-).enableRLS()
+)
 
 export type InsertPost = typeof posts.$inferInsert
 export type SelectPost = typeof posts.$inferSelect
 ```
 
 The TypeScript column names stay camelCase while database columns default to
-snake_case. Check Drizzle's
-[casing option](https://orm.drizzle.team/docs/sql-schema-declaration#camel-and-snake-casing) for more details.
+snake_case because the example uses Drizzle's `snakeCase.table(...)` Postgres
+constructor. Use `camelCase.table(...)` from `drizzle-orm/pg-core/casing` only
+when a table intentionally preserves camelCase database identifiers.
 
 `@zeno-lib/db/schema` re-exports Supabase's built-in roles and helpers from
 `drizzle-orm/supabase`, including `anonRole`, `authenticatedRole`,
@@ -202,7 +199,6 @@ The preset:
 - Uses the `postgresql` dialect.
 - Reads `DATABASE_URL`.
 - Keeps Supabase's built-in roles marked as existing.
-- Uses `snake_case` database naming.
 
 You can still pass Drizzle Kit overrides for package-specific paths or
 credentials:
@@ -349,6 +345,8 @@ not decode or trust raw JWT strings.
   exports from `@zeno-lib/db/schema`.
 - Do not remove `entities.roles.provider: "supabase"` from Drizzle Kit config,
   or generated migrations may try to create or drop Supabase-managed roles.
+- Do not append `.enableRLS()` to tables that already declare `pgPolicy(...)`.
+  Drizzle v1 enables RLS automatically when policies are present.
 - Do not create fresh schema object literals per request.
 - Do not run queries outside `db.rls(...)` when you expect RLS policies to
   apply.

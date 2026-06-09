@@ -1,10 +1,8 @@
 // https://orm.drizzle.team/docs/rls#using-with-supabase  (re-exported roles, authUsers, authUid, realtimeMessages)
 import { timestamp } from "drizzle-orm/pg-core"
 
-// Re-export Supabase primitives from drizzle-orm/supabase so consumers can
-// import roles, the auth.users table, and helpers from one place. Keeps the
-// dep ownership in this package (same pattern @zeno-lib/supabase uses to
-// re-export supabase-js types).
+// Curated Supabase primitives from drizzle-orm/supabase so consumers can import
+// roles, the auth.users table, and helpers from one Zeno-owned schema entrypoint.
 // biome-ignore lint/performance/noBarrelFile: intentional public re-export surface
 export {
   anonRole,

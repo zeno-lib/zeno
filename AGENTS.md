@@ -14,6 +14,7 @@ Linked entries below have a leaf node — open it before working in that area. E
   - [`docs/`](apps/docs/AGENTS.md) — Documentation site (Next.js + Fumadocs) on port 5002
 - `packages/`
   - [`ui/`](packages/ui/AGENTS.md) — `@zeno-lib/ui` component primitives (Base UI + Tailwind)
+  - [`schema/`](packages/schema/AGENTS.md) — `@zeno-lib/schema` pure Drizzle table → Zod schema helpers
   - [`authentication/`](packages/authentication/AGENTS.md) — `@zeno-lib/authentication` Supabase auth flows (read before touching `verify/` or `email-sent/`)
   - [`supabase/`](packages/supabase/AGENTS.md) — `@zeno-lib/supabase` SSR client + middleware
   - [`db/`](packages/db/AGENTS.md) — `@zeno-lib/db` Drizzle ORM client + schema + migrations + RLS

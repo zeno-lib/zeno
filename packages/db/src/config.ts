@@ -5,12 +5,11 @@ import { type Config, defineConfig } from "drizzle-kit"
 export function defineDrizzleConfig(
   overrides: Partial<Config> = {}
 ): ReturnType<typeof defineConfig> {
-  const { casing = "snake_case", entities, ...configOverrides } = overrides
+  const { entities, ...configOverrides } = overrides
   const roleOverrides =
     typeof entities?.roles === "object" ? entities.roles : {}
 
   return defineConfig({
-    casing,
     dbCredentials: { url: process.env.DATABASE_URL ?? "" },
     dialect: "postgresql",
     // Tells drizzle-kit that Supabase's built-in roles (anon, authenticated,
