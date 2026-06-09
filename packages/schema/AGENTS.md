@@ -86,7 +86,7 @@ export const createPostFormSchema = postSchema.insert
 ## Dependencies & Edges
 
 Peer deps: `drizzle-orm 1.0.0-rc.3`, `zod >=4`. Dev deps:
-`@zeno-lib/test`, `@zeno-lib/typescript`, `drizzle-orm`, `typescript`, `zod`.
+`@zeno-lib/typescript`, `drizzle-orm`, `typescript`, `vitest`, `zod`.
 
 Used by: apps and packages that want a single Zod schema lineage from Drizzle
 tables to server validation and `@zeno-lib/forms`.

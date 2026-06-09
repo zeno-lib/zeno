@@ -30,10 +30,10 @@
   },
   "devDependencies": {
     "@types/node": "24.10.0",
-    "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
     "drizzle-kit": "1.0.0-rc.3",
     "drizzle-orm": "1.0.0-rc.3",
-    "postgres": "3.4.7"
+    "postgres": "3.4.7",
+    "vitest": "4.1.0"
   }
 }

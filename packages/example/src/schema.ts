@@ -17,7 +17,7 @@ import {
 } from "drizzle-orm/pg-core"
 import { snakeCase } from "drizzle-orm/pg-core/casing"
 
-const pgTable = snakeCase.table
+const pgTable = snakeCase.table.withRLS
 
 export const posts = pgTable(
   "posts",

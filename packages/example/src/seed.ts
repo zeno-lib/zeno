@@ -140,7 +140,10 @@ export async function seedDatabase(db: PostgresJsDatabase): Promise<void> {
 
 async function main(): Promise<void> {
   // Seeding bypasses RLS, so use the admin client.
-  const db = createSupabaseDrizzle({ schema: appSchema })
+  const db = createSupabaseDrizzle({
+    connectionString: "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+    schema: appSchema,
+  })
   await seedDatabase(db.admin)
   console.log("Seeded Northwind dataset")
 }

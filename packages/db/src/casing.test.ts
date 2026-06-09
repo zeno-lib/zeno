@@ -1,6 +1,6 @@
-import { describe, expect, it } from "@zeno-lib/test"
 import { text, uuid } from "drizzle-orm/pg-core"
 import { camelCase, snakeCase } from "drizzle-orm/pg-core/casing"
+import { describe, expect, it } from "vitest"
 import { createSupabaseDrizzle } from "./clients.ts"
 import { defineDrizzleConfig } from "./config.ts"
 

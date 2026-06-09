@@ -1,5 +1,5 @@
-import { expectTypeOf, test } from "@zeno-lib/test"
 import { integer, pgTable, text } from "drizzle-orm/pg-core"
+import { expectTypeOf, test } from "vitest"
 import type { z } from "zod"
 
 import { defineTableSchema } from "./index"

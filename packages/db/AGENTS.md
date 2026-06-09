@@ -146,9 +146,9 @@ export default defineDrizzleConfig({ schema: "./src/schema.ts" })
 ## Dependencies & Edges
 
 Peer deps: `drizzle-orm 1.0.0-rc.3`, `drizzle-kit 1.0.0-rc.3`,
-`postgres >=3.4`. Dev deps: `@zeno-lib/test`, `@zeno-lib/typescript`,
-`@types/node`, plus local copies of the peer deps for tests and type-checking.
-No workspace runtime deps.
+`postgres >=3.4`. Dev deps: `@zeno-lib/typescript`, `@types/node`, `vitest`,
+plus local copies of the peer deps for tests and type-checking. No workspace
+runtime deps.
 
 JWT verification belongs to Supabase Auth; `clients.ts` calls
 `supabase.auth.getClaims()` when given a Supabase client, or accepts

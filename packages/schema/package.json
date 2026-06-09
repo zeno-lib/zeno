@@ -25,10 +25,10 @@
     "zod": ">=4"
   },
   "devDependencies": {
-    "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
     "drizzle-orm": "1.0.0-rc.3",
     "typescript": "6.0.3",
+    "vitest": "4.1.0",
     "zod": "^4.4.3"
   }
 }

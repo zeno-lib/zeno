@@ -1,5 +1,5 @@
-import { describe, expect, it } from "@zeno-lib/test"
 import { integer, pgTable, text, timestamp } from "drizzle-orm/pg-core"
+import { describe, expect, it } from "vitest"
 
 import { defineTableSchema } from "./index"
 
