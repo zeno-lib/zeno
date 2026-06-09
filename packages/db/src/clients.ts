@@ -47,9 +47,16 @@ type DrizzleClients<TSchema extends Record<string, unknown>> = ReturnType<
   typeof createDrizzleClients<TSchema>
 >
 
+// Cached pools are reference-counted so a request-scoped `close()` only ends the
+// underlying pools once the last handle sharing them is closed.
+type SharedDrizzleEntry = {
+  clients: DrizzleClients<Record<string, unknown>>
+  refCount: number
+}
+
 const sharedClients = new WeakMap<
   Record<string, unknown>,
-  Map<string, DrizzleClients<Record<string, unknown>>>
+  Map<string, SharedDrizzleEntry>
 >()
 
 export function createDrizzleClients<TSchema extends Record<string, unknown>>(
@@ -122,17 +129,20 @@ export function createDrizzleClients<TSchema extends Record<string, unknown>>(
 export function createSupabaseDrizzle<TSchema extends Record<string, unknown>>(
   options: CreateSupabaseDrizzleOptions<TSchema>
 ) {
+  const cacheKey = createCacheKey(options)
+  const entry = acquireSharedDrizzleClients(options, cacheKey)
   const {
     closeDrizzleSupabaseClients,
     getDrizzleSupabaseAdminClient,
     getDrizzleSupabaseClient,
-  } = getSharedDrizzleClients(options)
-  const cacheKey = createCacheKey(options)
+  } = entry.clients
   type RlsTransaction = ReturnType<
     typeof getDrizzleSupabaseClient
   >["runTransaction"]
+  // `null` is treated like `undefined`: with no auth context we must reject
+  // loudly rather than silently fall back to an anon query.
   const rls =
-    options.supabase === undefined
+    options.supabase == null
       ? ((() =>
           Promise.reject(
             new Error(
@@ -141,11 +151,23 @@ export function createSupabaseDrizzle<TSchema extends Record<string, unknown>>(
           )) as RlsTransaction)
       : getDrizzleSupabaseClient(options.supabase).runTransaction
 
+  // Guard against double-close: each handle releases its reference at most once.
+  let released = false
+
   return {
     admin: getDrizzleSupabaseAdminClient(),
     close: async (
       closeOptions?: Parameters<typeof closeDrizzleSupabaseClients>[0]
     ) => {
+      if (released) {
+        return
+      }
+      released = true
+      entry.refCount -= 1
+      // Other handles still share these pools — leave them open.
+      if (entry.refCount > 0) {
+        return
+      }
       sharedClients.get(options.schema)?.delete(cacheKey)
       await closeDrizzleSupabaseClients(closeOptions)
     },
@@ -153,29 +175,36 @@ export function createSupabaseDrizzle<TSchema extends Record<string, unknown>>(
   }
 }
 
-function getSharedDrizzleClients<TSchema extends Record<string, unknown>>(
-  options: CreateDrizzleClientsOptions<TSchema>
-): DrizzleClients<TSchema> {
-  const cacheKey = createCacheKey(options)
+function acquireSharedDrizzleClients<TSchema extends Record<string, unknown>>(
+  options: CreateDrizzleClientsOptions<TSchema>,
+  cacheKey: string
+): { clients: DrizzleClients<TSchema>; refCount: number } {
   let schemaClients = sharedClients.get(options.schema)
   if (!schemaClients) {
     schemaClients = new Map()
     sharedClients.set(options.schema, schemaClients)
   }
 
-  const existingClients = schemaClients.get(cacheKey) as
-    | DrizzleClients<TSchema>
-    | undefined
-  if (existingClients) {
-    return existingClients
+  const existingEntry = schemaClients.get(cacheKey)
+  if (existingEntry) {
+    existingEntry.refCount += 1
+    return existingEntry as unknown as {
+      clients: DrizzleClients<TSchema>
+      refCount: number
+    }
   }
 
-  const clients = createDrizzleClients(options)
-  schemaClients.set(
-    cacheKey,
-    clients as DrizzleClients<Record<string, unknown>>
-  )
-  return clients
+  const entry: SharedDrizzleEntry = {
+    clients: createDrizzleClients(options) as DrizzleClients<
+      Record<string, unknown>
+    >,
+    refCount: 1,
+  }
+  schemaClients.set(cacheKey, entry)
+  return entry as unknown as {
+    clients: DrizzleClients<TSchema>
+    refCount: number
+  }
 }
 
 function createCacheKey<TSchema extends Record<string, unknown>>(

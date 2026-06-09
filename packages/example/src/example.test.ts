@@ -39,4 +39,18 @@ describe("createSupabaseDrizzle", () => {
 
     await db.close({ timeout: 0 })
   })
+
+  it("fails loudly when rls is given a null Supabase client", async () => {
+    const db = createSupabaseDrizzle({
+      connectionString: LOCAL_DB_URL,
+      schema: {},
+      supabase: null,
+    })
+
+    await expect(db.rls(async () => [])).rejects.toThrow(
+      "Missing Supabase client for RLS"
+    )
+
+    await db.close({ timeout: 0 })
+  })
 })
