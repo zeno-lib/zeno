@@ -1,6 +1,6 @@
 import { integer, pgTable, text } from "drizzle-orm/pg-core"
 import { expectTypeOf, test } from "vitest"
-import type { z } from "zod"
+import { z } from "zod"
 
 import { defineTableSchema } from "./index"
 
@@ -37,5 +37,18 @@ test("insert and update schemas infer form-compatible Standard Schema data", () 
   expectTypeOf<z.infer<typeof schemas.update>>().toEqualTypeOf<{
     slug?: string | undefined
     title?: string | undefined
+  }>()
+})
+
+test("refined schemas preserve refinement-specific output types", () => {
+  const schemas = defineTableSchema(posts, {
+    insert: {
+      title: z.literal("fixed"),
+    },
+  })
+
+  expectTypeOf<z.infer<typeof schemas.insert>>().toEqualTypeOf<{
+    slug: string
+    title: "fixed"
   }>()
 })

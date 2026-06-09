@@ -94,52 +94,40 @@ function defineTableSchema<TTable extends Table>(
 function defineTableSchema<
   TTable extends Table,
   TCoerce extends CoerceOptions = undefined,
+  TOptions extends DefineTableSchemaOptions<
+    TTable,
+    TCoerce
+  > = DefineTableSchemaOptions<TTable, TCoerce>,
 >(
   table: TTable,
-  options: DefineTableSchemaOptions<TTable, TCoerce>
-): DefineTableSchemaResult<
-  TTable,
-  TCoerce,
-  DefineTableSchemaOptions<TTable, TCoerce>
->
+  options: TOptions
+): DefineTableSchemaResult<TTable, TCoerce, TOptions>
 function defineTableSchema<
   TTable extends Table,
   TCoerce extends CoerceOptions = undefined,
+  TOptions extends DefineTableSchemaOptions<
+    TTable,
+    TCoerce
+  > = DefineTableSchemaOptions<TTable, TCoerce>,
 >(
   table: TTable,
-  options?: DefineTableSchemaOptions<TTable, TCoerce>
-): DefineTableSchemaResult<
-  TTable,
-  TCoerce,
-  DefineTableSchemaOptions<TTable, TCoerce>
-> {
+  options?: TOptions
+): DefineTableSchemaResult<TTable, TCoerce, TOptions> {
   const schemaFactory = createDrizzleSchemaFactory(options?.factory)
 
   return {
     insert: schemaFactory.createInsertSchema(
       table,
       options?.insert
-    ) as DefineTableSchemaResult<
-      TTable,
-      TCoerce,
-      DefineTableSchemaOptions<TTable, TCoerce>
-    >["insert"],
+    ) as DefineTableSchemaResult<TTable, TCoerce, TOptions>["insert"],
     select: schemaFactory.createSelectSchema(
       table,
       options?.select
-    ) as DefineTableSchemaResult<
-      TTable,
-      TCoerce,
-      DefineTableSchemaOptions<TTable, TCoerce>
-    >["select"],
+    ) as DefineTableSchemaResult<TTable, TCoerce, TOptions>["select"],
     update: schemaFactory.createUpdateSchema(
       table,
       options?.update
-    ) as DefineTableSchemaResult<
-      TTable,
-      TCoerce,
-      DefineTableSchemaOptions<TTable, TCoerce>
-    >["update"],
+    ) as DefineTableSchemaResult<TTable, TCoerce, TOptions>["update"],
   }
 }
 
