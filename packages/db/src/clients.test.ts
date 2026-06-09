@@ -1,0 +1,76 @@
+import { afterEach, describe, expect, it, vi } from "vitest"
+
+type MockTransaction = (tx: {
+  execute: (query: unknown) => unknown
+}) => Promise<unknown>
+
+afterEach(() => {
+  vi.resetModules()
+  vi.doUnmock("drizzle-orm/postgres-js")
+  vi.doUnmock("postgres")
+})
+
+describe("getDrizzleSupabaseClient", () => {
+  it("resolves Supabase claims before opening the RLS transaction", async () => {
+    const events: string[] = []
+    const tx = {
+      execute: vi.fn((_query: unknown) => {
+        events.push("execute")
+      }),
+    }
+    const adminClient = {}
+    const rlsClient = {
+      transaction: vi.fn(async (transaction: MockTransaction) => {
+        events.push("transaction-start")
+        return await transaction(tx)
+      }),
+    }
+
+    vi.doMock("postgres", () => ({
+      default: vi.fn(() => ({
+        end: vi.fn(async () => undefined),
+      })),
+    }))
+    vi.doMock("drizzle-orm/postgres-js", () => ({
+      drizzle: vi
+        .fn()
+        .mockReturnValueOnce(adminClient)
+        .mockReturnValueOnce(rlsClient),
+    }))
+
+    const { createDrizzleClients } = await import("./clients.ts")
+    const clients = createDrizzleClients({
+      connectionString: "postgresql://postgres:postgres@localhost/postgres",
+      schema: {},
+    })
+    const supabase = {
+      auth: {
+        getClaims: vi.fn(() => {
+          events.push("claims")
+          return Promise.resolve({
+            data: {
+              claims: {
+                role: "authenticated",
+                sub: "00000000-0000-0000-0000-000000000000",
+              },
+            },
+            error: null,
+          })
+        }),
+      },
+    }
+
+    await clients.getDrizzleSupabaseClient(supabase).runTransaction(() => {
+      events.push("callback")
+      return Promise.resolve()
+    })
+
+    expect(events).toEqual([
+      "claims",
+      "transaction-start",
+      "execute",
+      "execute",
+      "callback",
+    ])
+  })
+})

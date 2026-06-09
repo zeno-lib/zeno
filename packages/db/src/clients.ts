@@ -81,14 +81,14 @@ export function createDrizzleClients<TSchema extends Record<string, unknown>>(
   // claims; every query MUST run inside `runTransaction` for the JWT context
   // (and thus RLS) to apply.
   function getDrizzleSupabaseClient(authContext?: SupabaseAuthContext) {
-    const runTransaction = (async (transaction, txConfig) =>
-      await rlsClient.transaction(async (tx) => {
-        const token = await resolveTokenClaims(authContext)
-        const claims = JSON.stringify(token)
-        const sub = token.sub ?? ""
-        const role =
-          token.role && ALLOWED_RLS_ROLES.has(token.role) ? token.role : "anon"
+    const runTransaction = (async (transaction, txConfig) => {
+      const token = await resolveTokenClaims(authContext)
+      const claims = JSON.stringify(token)
+      const sub = token.sub ?? ""
+      const role =
+        token.role && ALLOWED_RLS_ROLES.has(token.role) ? token.role : "anon"
 
+      return await rlsClient.transaction(async (tx) => {
         // auth.jwt()/auth.uid() read these; is_local scopes them to the tx, so
         // they auto-reset when it commits or rolls back.
         await tx.execute(
@@ -96,7 +96,8 @@ export function createDrizzleClients<TSchema extends Record<string, unknown>>(
         )
         await tx.execute(sql`set local role ${sql.raw(role)}`)
         return await transaction(tx)
-      }, txConfig)) as typeof rlsClient.transaction
+      }, txConfig)
+    }) as typeof rlsClient.transaction
 
     return { runTransaction }
   }
