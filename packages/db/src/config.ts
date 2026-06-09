@@ -6,6 +6,9 @@ export function defineDrizzleConfig(
   overrides: Partial<Config> = {}
 ): ReturnType<typeof defineConfig> {
   const { entities, ...configOverrides } = overrides
+  // `entities.roles` may be a boolean (`true`) in drizzle-kit config; in that
+  // form there are no role options to preserve, so we only merge the object
+  // form. The `provider: "supabase"` flag below is always enforced regardless.
   const roleOverrides =
     typeof entities?.roles === "object" ? entities.roles : {}
 
