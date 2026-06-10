@@ -31,7 +31,7 @@ Most projects use it with the database and forms packages:
 
 ```npm
 pnpm add @zeno-lib/db @zeno-lib/schema @zeno-lib/forms drizzle-orm@1.0.0-rc.3 postgres zod
-pnpm add -D drizzle-kit@1.0.0-rc.3
+pnpm add -D drizzle-kit@1.0.0-rc.3 dotenv
 ```
 
 `@zeno-lib/schema` peers on Drizzle's Zod bridge. Import Drizzle table builders
@@ -40,17 +40,16 @@ product-specific schemas.
 
 ## Define a table
 
-Start with a Drizzle table. In Zeno apps, keep the Drizzle dependency visible by
-importing Postgres builders directly from Drizzle.
+Start with a
+[Drizzle table](https://orm.drizzle.team/docs/sql-schema-declaration). In Zeno
+apps, use Zeno's table helper for the table itself and keep Drizzle's column
+builders visible by importing them directly from Drizzle.
 
 ```ts title="src/posts.schema.ts"
-import { timestamps } from "@zeno-lib/db/schema"
-import { snakeCase } from "drizzle-orm/pg-core/casing"
+import { dbTable, timestamps } from "@zeno-lib/db/schema"
 import { text, uuid } from "drizzle-orm/pg-core"
 
-const pgTable = snakeCase.table
-
-export const posts = pgTable("posts", {
+export const posts = dbTable("posts", {
   id: uuid("id").primaryKey().defaultRandom(),
   slug: text("slug").notNull(),
   title: text("title").notNull(),
@@ -66,6 +65,10 @@ also exposes TypeScript model types:
 export type InsertPost = typeof posts.$inferInsert
 export type SelectPost = typeof posts.$inferSelect
 ```
+
+`dbTable` maps TypeScript keys to snake_case database identifiers and enables
+RLS by default. If the table is intentionally not protected by RLS, use
+`unsecureDbTable` from `@zeno-lib/db/schema` instead.
 
 ## Derive Zod schemas
 
