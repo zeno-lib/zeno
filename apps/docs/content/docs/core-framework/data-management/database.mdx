@@ -97,7 +97,7 @@ Start with a TypeScript schema. Drizzle Kit reads exported tables from this file
 when it generates migrations, and Drizzle uses the same exported table objects
 when you write queries.
 
-```typescript title="src/schema.ts"
+```typescript lineNumbers title="src/schema.ts"
 import {
   authenticatedRole,
   authUid,
@@ -325,7 +325,7 @@ and background jobs. It should not be used for user-scoped reads or writes.
 Most apps should use `createSupabaseDrizzle(...)`. If a shared library needs
 explicit control over clients, use `createDrizzleClients(...)`:
 
-```typescript
+```typescript lineNumbers
 import { createDrizzleClients } from "@zeno-lib/db/clients"
 import * as schema from "./schema"
 

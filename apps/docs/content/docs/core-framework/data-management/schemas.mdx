@@ -111,7 +111,7 @@ Pass refinement maps when the database shape needs richer validation. The maps
 match Drizzle's first-party
 [Zod schema helpers](https://orm.drizzle.team/docs/zod).
 
-```ts title="src/posts.schema.ts"
+```ts lineNumbers title="src/posts.schema.ts"
 export const postSchema = defineTableSchema(posts, {
   insert: {
     body: (schema) => schema.min(1),
@@ -150,7 +150,7 @@ cross-field validation that the database table should not know about.
 
 Derive those schemas explicitly with Zod:
 
-```ts title="src/posts.forms.ts"
+```ts lineNumbers title="src/posts.forms.ts"
 import { z } from "zod"
 import { postSchema } from "./posts.schema"
 
@@ -174,7 +174,7 @@ export type CreatePostForm = z.infer<typeof createPostFormSchema>
 
 Then pass the derived schema to `@zeno-lib/forms`:
 
-```tsx title="src/create-post-form.tsx"
+```tsx lineNumbers title="src/create-post-form.tsx"
 "use client"
 
 import { Form, FormProvider, useForm } from "@zeno-lib/forms"

@@ -124,7 +124,7 @@ export default mergeConfig(
 
 Import the helpers you need from `vitest` (remember: there are no globals):
 
-```typescript
+```typescript lineNumbers
 import { describe, expect, test } from "vitest"
 
 describe("Calculator", () => {
@@ -162,7 +162,7 @@ These libraries let you test components the way a user actually experiences them
 - **React Testing Library** mounts a component into the `jsdom` DOM and exposes queries (`getByRole`, `getByText`, …) that find elements by their accessible role and visible text. Asserting on what's on screen — instead of on internal state or props — keeps tests resilient to refactors.
 - **User Event** dispatches realistic interaction sequences (a click fires `pointerdown`, `mousedown`, `focus`, `click`, …), so tests exercise the same event flow a real user triggers, catching bugs that a single synthetic event would miss.
 
-```tsx
+```tsx lineNumbers
 import { describe, expect, test, vi } from "vitest"
 import { render, screen } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
@@ -190,7 +190,7 @@ describe("Button", () => {
 
 Import [`vi`](https://vitest.dev/api/vi) and other helpers from `vitest`. Vitest's mock hoister only recognizes `vi` from the `"vitest"` specifier, so always import mocking utilities from `vitest` — `vi.fn()`, `vi.mock()`, `vi.hoisted()`, and the rest. See the [Mocking guide](https://vitest.dev/guide/mocking) for the full range of techniques.
 
-```typescript
+```typescript lineNumbers
 import { describe, expect, test, vi } from "vitest"
 
 const mockFetch = vi.fn()
@@ -204,7 +204,7 @@ describe("API", () => {
 })
 ```
 
-```typescript
+```typescript lineNumbers
 import { describe, expect, test, vi } from "vitest"
 
 vi.mock("./api", () => ({

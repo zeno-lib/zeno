@@ -22,7 +22,7 @@ packages/e2e/
 
 ## Configuration
 
-```typescript
+```typescript lineNumbers
 // playwright.config.ts
 import { defineConfig, devices } from "@playwright/test"
 
@@ -51,7 +51,7 @@ export default defineConfig({
 
 ## Writing Tests
 
-```typescript
+```typescript lineNumbers
 import { expect, test } from "@playwright/test"
 
 test("homepage loads successfully", async ({ page }) => {
@@ -93,7 +93,7 @@ In CI, tests run with:
 
 For larger test suites, use page objects:
 
-```typescript
+```typescript lineNumbers
 // pages/home.ts
 import { Page } from "@playwright/test"
 

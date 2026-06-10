@@ -33,7 +33,7 @@ accessibility wiring. Destructure from the `form` returned by `useForm`,
 drop it inside `<Form>`, and the `name` prop autocompletes against your
 schema (or `defaultValues` when no schema is passed).
 
-```tsx
+```tsx lineNumbers
 const form = useForm({ schema })
 const { InputField, SubmitButton } = form
 
@@ -186,7 +186,7 @@ counters.
 <Preview>
   <AddonBlockToolbarPreview />
 
-```tsx
+```tsx lineNumbers
 import { InputGroupAddon, InputGroupButton } from "@zeno-lib/ui/input-group"
 import { BoldIcon, ItalicIcon } from "lucide-react"
 
@@ -215,7 +215,7 @@ for a full setup.
 <Preview>
   <AddonValidationSpinnerPreview />
 
-```tsx
+```tsx lineNumbers
 import { ValidationSpinner } from "@zeno-lib/forms"
 
 <EmailField
