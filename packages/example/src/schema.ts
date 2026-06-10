@@ -2,23 +2,23 @@ import {
   authenticatedRole,
   authUid,
   authUsers,
-  dbTable,
+  policy,
+  table,
   timestamps,
-  unsecureDbTable,
+  unsecureTable,
 } from "@zeno-lib/db/schema"
 import { sql } from "drizzle-orm"
 import type { AnyPgColumn } from "drizzle-orm/pg-core"
 import {
   integer,
   numeric,
-  pgPolicy,
   text,
   timestamp,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core"
 
-export const posts = dbTable(
+export const posts = table(
   "posts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -29,12 +29,12 @@ export const posts = dbTable(
     ...timestamps,
   },
   (t) => [
-    pgPolicy("posts_owner_select", {
+    policy("posts_owner_select", {
       for: "select",
       to: authenticatedRole,
       using: sql`${t.userId} = ${authUid}`,
     }),
-    pgPolicy("posts_owner_insert", {
+    policy("posts_owner_insert", {
       for: "insert",
       to: authenticatedRole,
       withCheck: sql`${t.userId} = ${authUid}`,
@@ -47,7 +47,7 @@ export type SelectPost = typeof posts.$inferSelect
 
 // Northwind-style schema from the drizzle-seed complex example.
 // https://orm.drizzle.team/docs/seed-overview#complex-example
-export const customers = unsecureDbTable("customer", {
+export const customers = unsecureTable("customer", {
   address: text().notNull(),
   city: text().notNull(),
   companyName: text().notNull(),
@@ -61,7 +61,7 @@ export const customers = unsecureDbTable("customer", {
   region: text(),
 })
 
-export const employees = unsecureDbTable("employee", {
+export const employees = unsecureTable("employee", {
   address: text().notNull(),
   birthDate: timestamp().notNull(),
   city: text().notNull(),
@@ -80,7 +80,7 @@ export const employees = unsecureDbTable("employee", {
   titleOfCourtesy: text().notNull(),
 })
 
-export const suppliers = unsecureDbTable("supplier", {
+export const suppliers = unsecureTable("supplier", {
   address: text().notNull(),
   city: text().notNull(),
   companyName: text().notNull(),
@@ -93,7 +93,7 @@ export const suppliers = unsecureDbTable("supplier", {
   region: text(),
 })
 
-export const products = unsecureDbTable("product", {
+export const products = unsecureTable("product", {
   discontinued: integer().notNull(),
   id: integer().primaryKey(),
   name: text().notNull(),
@@ -107,7 +107,7 @@ export const products = unsecureDbTable("product", {
   unitsOnOrder: integer().notNull(),
 })
 
-export const orders = unsecureDbTable("order", {
+export const orders = unsecureTable("order", {
   customerId: varchar({ length: 256 })
     .notNull()
     .references(() => customers.id, { onDelete: "cascade" }),
@@ -127,7 +127,7 @@ export const orders = unsecureDbTable("order", {
   shipVia: integer().notNull(),
 })
 
-export const details = unsecureDbTable("order_detail", {
+export const details = unsecureTable("order_detail", {
   discount: numeric().notNull(),
   orderId: integer()
     .notNull()

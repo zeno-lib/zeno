@@ -14,8 +14,8 @@ Supabase role/helper exports, RLS-by-default table helpers, and typed runtime
 queries.
 
 **Owns:** RLS-aware runtime factories, the Supabase Drizzle config preset,
-selected Supabase role/helper conveniences, `dbTable` / `unsecureDbTable`, and
-the `timestamps` mixin.
+selected Supabase role/helper conveniences, curated `pg-core` aliases,
+`table` / `unsecureTable`, and the `timestamps` mixin.
 
 **Does NOT own:** Supabase Auth, Storage, Edge Functions, the SSR cookie wiring
 (all in `@zeno-lib/supabase`) or consumer-owned Drizzle, Drizzle Kit, and
@@ -28,7 +28,7 @@ the `timestamps` mixin.
 | `@zeno-lib/db` | Server code (Server Components, Route Handlers, Server Actions, cron, scripts) | `createSupabaseDrizzle({ schema, supabase?, connectionString? })` -> `{ admin, rls, close }`. `admin` bypasses RLS. `rls(...)` runs a transaction after resolving verified claims from the bound Supabase client. Underlying Postgres pools are cached by imported schema object + connection config, so this ergonomic factory can be called with a request-scoped Supabase client. `close()` is reference-counted: it releases this handle's share of the cached pools and only ends them once the last handle closes (so a per-request `close()` won't tear down pools other in-flight requests are using). |
 | `@zeno-lib/db/clients` | Lower-level server code | `createDrizzleClients({ schema, connectionString? })` -> `{ getDrizzleSupabaseAdminClient, getDrizzleSupabaseClient, closeDrizzleSupabaseClients }`. Opens two `postgres-js` pools. `getDrizzleSupabaseAdminClient()` returns a Drizzle db that **bypasses RLS**. `getDrizzleSupabaseClient(supabaseOrClaims?)` accepts a Supabase client (preferred) or already-verified Supabase JWT claims and returns `{ runTransaction }`. |
 | `@zeno-lib/db/config` | `drizzle.config.ts` in each consuming package/app | `defineDrizzleConfig({ schema, ...overrides })` — preset that defaults `out` to `./supabase/migrations`, dialect to `postgresql`, reads `DATABASE_URL` from env, and sets `entities.roles.provider: "supabase"`. |
-| `@zeno-lib/db/schema` | Application schema files | `dbTable` (`snakeCase.table.withRLS`) for RLS-by-default tables, `unsecureDbTable` (`snakeCase.table`) for intentional non-RLS tables, curated Supabase role/helper exports from `drizzle-orm/supabase`, plus a local `timestamps` mixin (`createdAt`, `updatedAt`). |
+| `@zeno-lib/db/schema` | Application schema files | `table` (`snakeCase.table.withRLS`) for RLS-by-default tables, `unsecureTable` (`snakeCase.table`) for intentional non-RLS tables, curated Supabase role/helper exports from `drizzle-orm/supabase`, curated `pg-core` aliases such as `policy`, `role`, `schema`, `sequence`, `view`, `materializedView`, `tableCreator`, and `enum` (import with a local alias because `enum` is reserved), plus a local `timestamps` mixin (`createdAt`, `updatedAt`). |
 
 Keep this entrypoint list focused on Zeno-owned DB helpers. Consumers import
 Drizzle APIs and run Drizzle Kit directly from their peer dependencies.
@@ -77,11 +77,11 @@ Schema with an RLS policy:
 
 ```ts
 // schema.ts
-import { authenticatedRole, authUid, authUsers, dbTable, timestamps } from "@zeno-lib/db/schema"
+import { authenticatedRole, authUid, authUsers, policy, table, timestamps } from "@zeno-lib/db/schema"
 import { sql } from "drizzle-orm"
-import { pgPolicy, text, uuid } from "drizzle-orm/pg-core"
+import { text, uuid } from "drizzle-orm/pg-core"
 
-export const posts = dbTable(
+export const posts = table(
   "posts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -90,7 +90,7 @@ export const posts = dbTable(
     ...timestamps,
   },
   (t) => [
-    pgPolicy("posts_owner_select", {
+    policy("posts_owner_select", {
       for: "select",
       to: authenticatedRole,
       using: sql`${t.userId} = ${authUid}`,
@@ -112,9 +112,10 @@ export default defineDrizzleConfig({ schema: "./src/schema.ts" })
   `postgres-js` opens a TCP socket — server-only. Browser code should call your
   Server Actions/Route Handlers for application data; direct browser Supabase
   clients are reserved for specialized Supabase features such as realtime.
-- **Keep Drizzle package APIs peer-owned.** Consumer schema/query files import
-  `drizzle-orm`, `drizzle-orm/pg-core`, and `postgres` APIs directly, except
-  for Zeno-owned schema helpers exported from `@zeno-lib/db/schema`.
+- **Keep broad Drizzle package APIs peer-owned.** Consumer schema/query files
+  import `drizzle-orm`, general `drizzle-orm/pg-core` column builders, and
+  `postgres` APIs directly, except for Zeno-owned schema helpers and curated
+  `pg-core` aliases exported from `@zeno-lib/db/schema`.
 - **Keep Drizzle Kit CLI ownership in the consuming package.** Consumers install
   `drizzle-kit` and run its CLI from their own package scripts.
 - **Do not run queries outside `db.rls(...)` when you intend RLS to apply.** A
@@ -125,7 +126,7 @@ export default defineDrizzleConfig({ schema: "./src/schema.ts" })
   (`auth.getClaims()` / equivalent) and pass the resulting claims object. The DB
   package deliberately does not decode raw tokens.
 - **Do not write RLS policies as raw SQL in `supabase/migrations/` by hand.**
-  `pgPolicy(...)` in the schema is the source of truth — drizzle-kit emits
+  `policy(...)` in the schema is the source of truth — drizzle-kit emits
   `CREATE POLICY` SQL during `generate`. A hand-written policy file will desync
   from the schema and won't survive the next `drizzle-kit generate`.
 - **Do not declare the Supabase-built-in roles (`anon`, `authenticated`,
@@ -166,7 +167,7 @@ from `@zeno-lib/supabase/server` for auth and import `createSupabaseDrizzle`
 from this package for data.
 
 Coexists with `@zeno-lib/schema`: consumers define Drizzle tables with
-`dbTable` / `unsecureDbTable` plus direct Drizzle column imports, call
+`table` / `unsecureTable` plus direct Drizzle column imports, call
 `defineTableSchema(...)` from `@zeno-lib/schema`, and keep DB clients out of
 modules that need to be imported by Client Components for validation.
 
@@ -183,7 +184,7 @@ modules that need to be imported by Client Components for validation.
   `postgresql://postgres:postgres@127.0.0.1:54322/postgres`. `prepare: false` is
   already set so the pooler works.
 - **Drizzle v1 casing lives on entity constructors, not DB config.** Use
-  `dbTable(...)` for app-owned RLS tables and `unsecureDbTable(...)` for the
+  `table(...)` for app-owned RLS tables and `unsecureTable(...)` for the
   rare table that intentionally has no RLS; both map TypeScript camelCase to
   snake_case database identifiers. Use direct Drizzle casing helpers only when
   the database intentionally preserves camelCase identifiers or needs a custom
@@ -192,7 +193,7 @@ modules that need to be imported by Client Components for validation.
   try to drop Supabase's built-in roles in the next migration. The shared
   `defineDrizzleConfig` sets this by default — don't override `entities` without
   re-merging this flag.
-- **Do not append `.enableRLS()` manually.** Use `dbTable(...)` for RLS-enabled
+- **Do not append `.enableRLS()` manually.** Use `table(...)` for RLS-enabled
   tables. Drizzle v1 also enables RLS automatically when policies are present,
   and `.enableRLS()` is deprecated for that common case.
 - **The "claims object" is Supabase's verified JWT payload.** Prefer passing the

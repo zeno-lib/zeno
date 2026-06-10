@@ -23,7 +23,7 @@ Adding `@zeno-lib/db` gives you a small Supabase-ready layer around Drizzle:
 |---|---|
 | `@zeno-lib/db` | `createSupabaseDrizzle(...)`, the client factory for admin queries and RLS-aware queries. |
 | `@zeno-lib/db/config` | `defineDrizzleConfig(...)`, the Drizzle Kit preset for Supabase projects. |
-| `@zeno-lib/db/schema` | `dbTable`, `unsecureDbTable`, Supabase roles/helpers, and `timestamps` for schema files. |
+| `@zeno-lib/db/schema` | `table`, `unsecureTable`, Supabase roles/helpers, pg-core aliases, and utils for schema files. |
 | `@zeno-lib/db/clients` | Lower-level admin/RLS client factories for shared libraries that need explicit client control. |
 
 <Callout type="warn">
@@ -46,12 +46,15 @@ RLS is a Postgres feature that attaches policies to tables. You can think of a
 policy as database-level authorization logic that Postgres applies whenever a
 role tries to read, insert, update, or delete rows.
 
-Supabase requests run as database roles. The two roles you use most often are:
+Supabase requests run as database roles. The roles you use most often are:
 
 - `anon`: an unauthenticated request. Use this for data that can be read or
   written without a signed-in user, if your app allows that.
 - `authenticated`: a request with a valid signed-in Supabase user. Use this for
   data that depends on who the user is.
+- `service_role`: a trusted server request that bypasses RLS. Use it only for
+  admin tasks, seed scripts, webhooks, cron jobs, and other code paths where you
+  intentionally do not want user-scoped policies to apply.
 
 Inside RLS policies, Supabase helpers expose information about the current
 request:
@@ -102,13 +105,14 @@ import {
   authenticatedRole,
   authUid,
   authUsers,
-  dbTable,
+  policy,
+  table,
   timestamps,
 } from "@zeno-lib/db/schema"
 import { sql } from "drizzle-orm"
-import { pgPolicy, text, uuid } from "drizzle-orm/pg-core"
+import { text, uuid } from "drizzle-orm/pg-core"
 
-export const posts = dbTable(
+export const posts = table(
   "posts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -121,12 +125,12 @@ export const posts = dbTable(
     ...timestamps,
   },
   (t) => [
-    pgPolicy("posts_owner_select", {
+    policy("posts_owner_select", {
       for: "select",
       to: authenticatedRole,
       using: sql`${t.userId} = ${authUid}`,
     }),
-    pgPolicy("posts_owner_insert", {
+    policy("posts_owner_insert", {
       for: "insert",
       to: authenticatedRole,
       withCheck: sql`${t.userId} = ${authUid}`,
@@ -138,14 +142,15 @@ export type InsertPost = typeof posts.$inferInsert
 export type SelectPost = typeof posts.$inferSelect
 ```
 
-`dbTable` is Zeno's default table helper. It uses Drizzle's snake_case table
+`table` is Zeno's default table helper. It uses Drizzle's snake_case table
 builder, so TypeScript properties like `userId` become database identifiers like
-`user_id`, and it enables RLS by default. Use `unsecureDbTable` only for tables
+`user_id`, and it enables RLS by default. Use `unsecureTable` only for tables
 that intentionally should not have RLS, such as seed-only reference data.
 
 The imports from `@zeno-lib/db/schema` are Zeno's Supabase schema conveniences:
 
-- `dbTable` - RLS-ready, snake_case Postgres table builder.
+- `table` - RLS-ready, snake_case Postgres table builder.
+- `policy` - Drizzle's Postgres RLS policy helper.
 - `authUsers` - Drizzle's model of Supabase's existing `auth.users` table.
 - `authenticatedRole` - Supabase's existing `authenticated` database role.
 - `authUid` - SQL helper for `auth.uid()`.
@@ -351,14 +356,14 @@ not decode or trust raw JWT strings.
 
 - Do not import `@zeno-lib/db` runtime clients from Client Components or browser
   code.
-- Use `dbTable` for user-scoped application tables so RLS is enabled by default.
-- Use `unsecureDbTable` only when the table is intentionally not protected by
+- Use `table` for user-scoped application tables so RLS is enabled by default.
+- Use `unsecureTable` only when the table is intentionally not protected by
   RLS.
 - Do not use `db.admin` for user-scoped reads and writes.
 - Do not pass raw access token strings or unverified session payloads to RLS
   helpers.
 - Do not hand-write RLS policies in migration files when the table is otherwise
-  managed by Drizzle. Put `pgPolicy(...)` in the schema and generate the
+  managed by Drizzle. Put `policy(...)` in the schema and generate the
   migration.
 - Do not manually declare Supabase's built-in roles; import the existing role
   exports from `@zeno-lib/db/schema`.

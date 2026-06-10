@@ -1,9 +1,42 @@
-import { getTableConfig, text, uuid } from "drizzle-orm/pg-core"
+import {
+  getTableConfig,
+  isPgEnum,
+  isPgMaterializedView,
+  isPgSchema,
+  isPgSequence,
+  isPgView,
+  pgEnum,
+  pgMaterializedView,
+  pgPolicy,
+  pgRole,
+  pgSchema,
+  pgSequence,
+  pgTableCreator,
+  pgView,
+  text,
+  uuid,
+} from "drizzle-orm/pg-core"
 import { camelCase, snakeCase } from "drizzle-orm/pg-core/casing"
 import { describe, expect, it } from "vitest"
 import { createSupabaseDrizzle } from "./clients.ts"
 import { defineDrizzleConfig } from "./config.ts"
-import { dbTable, unsecureDbTable } from "./schema.ts"
+import {
+  enum as enum_,
+  isEnum,
+  isMaterializedView,
+  isSchema,
+  isSequence,
+  isView,
+  materializedView,
+  policy,
+  role,
+  schema,
+  sequence,
+  table,
+  tableCreator,
+  unsecureTable,
+  view,
+} from "./schema.ts"
 
 const LOCAL_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
@@ -45,7 +78,7 @@ describe("default casing", () => {
   })
 
   it("exports an RLS-enabled snake_case table helper", async () => {
-    const posts = dbTable("posts", {
+    const posts = table("posts", {
       displayName: text(),
       ownerId: uuid(),
     })
@@ -64,7 +97,7 @@ describe("default casing", () => {
   })
 
   it("exports an explicit non-RLS snake_case table helper", async () => {
-    const auditEvents = unsecureDbTable("audit_events", {
+    const auditEvents = unsecureTable("audit_events", {
       displayName: text(),
       ownerId: uuid(),
     })
@@ -82,5 +115,21 @@ describe("default casing", () => {
     expect(getTableConfig(auditEvents).enableRLS).toBe(false)
 
     await db.close({ timeout: 0 })
+  })
+
+  it("re-exports likely pg-prefixed schema builders without the pg prefix", () => {
+    expect(enum_).toBe(pgEnum)
+    expect(isEnum).toBe(isPgEnum)
+    expect(isMaterializedView).toBe(isPgMaterializedView)
+    expect(isSchema).toBe(isPgSchema)
+    expect(isSequence).toBe(isPgSequence)
+    expect(isView).toBe(isPgView)
+    expect(materializedView).toBe(pgMaterializedView)
+    expect(policy).toBe(pgPolicy)
+    expect(role).toBe(pgRole)
+    expect(schema).toBe(pgSchema)
+    expect(sequence).toBe(pgSequence)
+    expect(tableCreator).toBe(pgTableCreator)
+    expect(view).toBe(pgView)
   })
 })
