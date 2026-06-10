@@ -2,7 +2,9 @@ import {
   authenticatedRole,
   authUid,
   authUsers,
+  dbTable,
   timestamps,
+  unsecureDbTable,
 } from "@zeno-lib/db/schema"
 import { sql } from "drizzle-orm"
 import type { AnyPgColumn } from "drizzle-orm/pg-core"
@@ -15,11 +17,8 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core"
-import { snakeCase } from "drizzle-orm/pg-core/casing"
 
-const pgTable = snakeCase.table.withRLS
-
-export const posts = pgTable(
+export const posts = dbTable(
   "posts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -48,7 +47,7 @@ export type SelectPost = typeof posts.$inferSelect
 
 // Northwind-style schema from the drizzle-seed complex example.
 // https://orm.drizzle.team/docs/seed-overview#complex-example
-export const customers = pgTable("customer", {
+export const customers = unsecureDbTable("customer", {
   address: text().notNull(),
   city: text().notNull(),
   companyName: text().notNull(),
@@ -62,7 +61,7 @@ export const customers = pgTable("customer", {
   region: text(),
 })
 
-export const employees = pgTable("employee", {
+export const employees = unsecureDbTable("employee", {
   address: text().notNull(),
   birthDate: timestamp().notNull(),
   city: text().notNull(),
@@ -81,7 +80,7 @@ export const employees = pgTable("employee", {
   titleOfCourtesy: text().notNull(),
 })
 
-export const suppliers = pgTable("supplier", {
+export const suppliers = unsecureDbTable("supplier", {
   address: text().notNull(),
   city: text().notNull(),
   companyName: text().notNull(),
@@ -94,7 +93,7 @@ export const suppliers = pgTable("supplier", {
   region: text(),
 })
 
-export const products = pgTable("product", {
+export const products = unsecureDbTable("product", {
   discontinued: integer().notNull(),
   id: integer().primaryKey(),
   name: text().notNull(),
@@ -108,7 +107,7 @@ export const products = pgTable("product", {
   unitsOnOrder: integer().notNull(),
 })
 
-export const orders = pgTable("order", {
+export const orders = unsecureDbTable("order", {
   customerId: varchar({ length: 256 })
     .notNull()
     .references(() => customers.id, { onDelete: "cascade" }),
@@ -128,7 +127,7 @@ export const orders = pgTable("order", {
   shipVia: integer().notNull(),
 })
 
-export const details = pgTable("order_detail", {
+export const details = unsecureDbTable("order_detail", {
   discount: numeric().notNull(),
   orderId: integer()
     .notNull()

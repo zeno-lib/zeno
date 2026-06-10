@@ -1,13 +1,21 @@
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 type MockTransaction = (tx: {
   execute: (query: unknown) => unknown
 }) => Promise<unknown>
 
-afterEach(() => {
+function resetClientModuleMocks() {
   vi.resetModules()
   vi.doUnmock("drizzle-orm/postgres-js")
   vi.doUnmock("postgres")
+}
+
+beforeEach(() => {
+  resetClientModuleMocks()
+})
+
+afterEach(() => {
+  resetClientModuleMocks()
 })
 
 describe("getDrizzleSupabaseClient", () => {
