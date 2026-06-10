@@ -15,7 +15,8 @@ queries.
 
 **Owns:** RLS-aware runtime factories, the Supabase Drizzle config preset,
 selected Supabase role/helper conveniences, curated `pg-core` aliases,
-`table` / `unsecureTable`, and the `timestamps` mixin.
+`table` / `unsecureTable`, common ID/audit column helpers and mixins, and
+policy helpers.
 
 **Does NOT own:** Supabase Auth, Storage, Edge Functions, the SSR cookie wiring
 (all in `@zeno-lib/supabase`) or consumer-owned Drizzle, Drizzle Kit, and
@@ -28,7 +29,7 @@ selected Supabase role/helper conveniences, curated `pg-core` aliases,
 | `@zeno-lib/db` | Server code (Server Components, Route Handlers, Server Actions, cron, scripts) | `createSupabaseDrizzle({ schema, supabase?, connectionString? })` -> `{ admin, rls, close }`. `admin` bypasses RLS. `rls(...)` runs a transaction after resolving verified claims from the bound Supabase client. Underlying Postgres pools are cached by imported schema object + connection config, so this ergonomic factory can be called with a request-scoped Supabase client. `close()` is reference-counted: it releases this handle's share of the cached pools and only ends them once the last handle closes (so a per-request `close()` won't tear down pools other in-flight requests are using). |
 | `@zeno-lib/db/clients` | Lower-level server code | `createDrizzleClients({ schema, connectionString? })` -> `{ getDrizzleSupabaseAdminClient, getDrizzleSupabaseClient, closeDrizzleSupabaseClients }`. Opens two `postgres-js` pools. `getDrizzleSupabaseAdminClient()` returns a Drizzle db that **bypasses RLS**. `getDrizzleSupabaseClient(supabaseOrClaims?)` accepts a Supabase client (preferred) or already-verified Supabase JWT claims and returns `{ runTransaction }`. |
 | `@zeno-lib/db/config` | `drizzle.config.ts` in each consuming package/app | `defineDrizzleConfig({ schema, ...overrides })` — preset that defaults `out` to `./supabase/migrations`, dialect to `postgresql`, reads `DATABASE_URL` from env, and sets `entities.roles.provider: "supabase"`. |
-| `@zeno-lib/db/schema` | Application schema files | `table` (`snakeCase.table.withRLS`) for RLS-by-default tables, `unsecureTable` (`snakeCase.table`) for intentional non-RLS tables, curated Supabase role/helper exports from `drizzle-orm/supabase`, curated `pg-core` aliases such as `policy`, `role`, `schema`, `sequence`, `view`, `materializedView`, `tableCreator`, and `enum` (import with a local alias because `enum` is reserved), plus a local `timestamps` mixin (`createdAt`, `updatedAt`). |
+| `@zeno-lib/db/schema` | Application schema files | `table` (`snakeCase.table.withRLS`) for RLS-by-default tables, `unsecureTable` (`snakeCase.table`) for intentional non-RLS tables, common column helpers (`primaryId`, `authUserId`, `createdBy`, `updatedBy`), audit mixins (`timestamps` for xAt, `authorship` for xBy, `auditColumns` for all four), generic policy helpers (`selectPolicy`, `insertPolicy`, `updatePolicy`, `deletePolicy`, `allPolicy`), authenticated-owner policy helpers, curated Supabase role/helper exports from `drizzle-orm/supabase`, and curated `pg-core` aliases such as `policy`, `role`, `schema`, `sequence`, `view`, `materializedView`, `tableCreator`, and `enum` (import with a local alias because `enum` is reserved). |
 
 Keep this entrypoint list focused on Zeno-owned DB helpers. Consumers import
 Drizzle APIs and run Drizzle Kit directly from their peer dependencies.
@@ -77,24 +78,27 @@ Schema with an RLS policy:
 
 ```ts
 // schema.ts
-import { authenticatedRole, authUid, authUsers, policy, table, timestamps } from "@zeno-lib/db/schema"
-import { sql } from "drizzle-orm"
-import { text, uuid } from "drizzle-orm/pg-core"
+import {
+  authenticatedOwnerInsertPolicy,
+  authenticatedOwnerSelectPolicy,
+  authUserId,
+  primaryId,
+  table,
+  timestamps,
+} from "@zeno-lib/db/schema"
+import { text } from "drizzle-orm/pg-core"
 
 export const posts = table(
   "posts",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid().notNull().references(() => authUsers.id),
+    id: primaryId("uuid"),
+    userId: authUserId(),
     title: text().notNull(),
     ...timestamps,
   },
   (t) => [
-    policy("posts_owner_select", {
-      for: "select",
-      to: authenticatedRole,
-      using: sql`${t.userId} = ${authUid}`,
-    }),
+    authenticatedOwnerSelectPolicy("posts_owner_select", t.userId),
+    authenticatedOwnerInsertPolicy("posts_owner_insert", t.userId),
   ]
 )
 ```
@@ -126,7 +130,8 @@ export default defineDrizzleConfig({ schema: "./src/schema.ts" })
   (`auth.getClaims()` / equivalent) and pass the resulting claims object. The DB
   package deliberately does not decode raw tokens.
 - **Do not write RLS policies as raw SQL in `supabase/migrations/` by hand.**
-  `policy(...)` in the schema is the source of truth — drizzle-kit emits
+  `policy(...)` / `selectPolicy(...)` / owner policy helpers in the schema are
+  the source of truth — drizzle-kit emits
   `CREATE POLICY` SQL during `generate`. A hand-written policy file will desync
   from the schema and won't survive the next `drizzle-kit generate`.
 - **Do not declare the Supabase-built-in roles (`anon`, `authenticated`,
@@ -167,9 +172,11 @@ from `@zeno-lib/supabase/server` for auth and import `createSupabaseDrizzle`
 from this package for data.
 
 Coexists with `@zeno-lib/schema`: consumers define Drizzle tables with
-`table` / `unsecureTable` plus direct Drizzle column imports, call
-`defineTableSchema(...)` from `@zeno-lib/schema`, and keep DB clients out of
-modules that need to be imported by Client Components for validation.
+`table` / `unsecureTable`, Zeno schema conveniences such as `primaryId`,
+`authUserId`, and policy helpers, plus direct Drizzle column imports for
+domain-specific columns. They call `defineTableSchema(...)` from
+`@zeno-lib/schema`, and keep DB clients out of modules that need to be imported
+by Client Components for validation.
 
 ## Pitfalls
 

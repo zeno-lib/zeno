@@ -46,13 +46,14 @@ apps, use Zeno's table helper for the table itself and keep Drizzle's column
 builders visible by importing them directly from Drizzle.
 
 ```ts title="src/posts.schema.ts"
-import { table, timestamps } from "@zeno-lib/db/schema"
-import { text, uuid } from "drizzle-orm/pg-core"
+import { authUserId, primaryId, table, timestamps } from "@zeno-lib/db/schema"
+import { text } from "drizzle-orm/pg-core"
 
 export const posts = table("posts", {
-  id: uuid("id").primaryKey().defaultRandom(),
+  id: primaryId("uuid"),
   slug: text("slug").notNull(),
   title: text("title").notNull(),
+  userId: authUserId(),
   body: text("body").notNull(),
   ...timestamps,
 })
@@ -69,6 +70,12 @@ export type SelectPost = typeof posts.$inferSelect
 `table` maps TypeScript keys to snake_case database identifiers and enables
 RLS by default. If the table is intentionally not protected by RLS, use
 `unsecureTable` from `@zeno-lib/db/schema` instead.
+
+Use `primaryId("uuid")` for the usual random UUID primary key or
+`primaryId("sequential")` for an integer identity primary key. Use
+`authUserId()` for a Supabase `auth.users` reference. Add `...timestamps` for
+`createdAt` / `updatedAt`, `...authorship` for `createdBy` / `updatedBy`, or
+`...auditColumns` when the table should include all four audit columns.
 
 ## Derive Zod schemas
 

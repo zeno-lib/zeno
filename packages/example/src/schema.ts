@@ -1,44 +1,26 @@
 import {
-  authenticatedRole,
-  authUid,
-  authUsers,
-  policy,
+  authenticatedOwnerInsertPolicy,
+  authenticatedOwnerSelectPolicy,
+  authUserId,
+  primaryId,
   table,
   timestamps,
   unsecureTable,
 } from "@zeno-lib/db/schema"
-import { sql } from "drizzle-orm"
 import type { AnyPgColumn } from "drizzle-orm/pg-core"
-import {
-  integer,
-  numeric,
-  text,
-  timestamp,
-  uuid,
-  varchar,
-} from "drizzle-orm/pg-core"
+import { integer, numeric, text, timestamp, varchar } from "drizzle-orm/pg-core"
 
 export const posts = table(
   "posts",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: primaryId("uuid"),
     title: text("title").notNull(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => authUsers.id),
+    userId: authUserId(),
     ...timestamps,
   },
   (t) => [
-    policy("posts_owner_select", {
-      for: "select",
-      to: authenticatedRole,
-      using: sql`${t.userId} = ${authUid}`,
-    }),
-    policy("posts_owner_insert", {
-      for: "insert",
-      to: authenticatedRole,
-      withCheck: sql`${t.userId} = ${authUid}`,
-    }),
+    authenticatedOwnerSelectPolicy("posts_owner_select", t.userId),
+    authenticatedOwnerInsertPolicy("posts_owner_insert", t.userId),
   ]
 )
 

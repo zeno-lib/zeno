@@ -102,39 +102,28 @@ when you write queries.
 
 ```typescript lineNumbers title="src/schema.ts"
 import {
-  authenticatedRole,
-  authUid,
-  authUsers,
-  policy,
+  authenticatedOwnerInsertPolicy,
+  authenticatedOwnerSelectPolicy,
+  authUserId,
+  primaryId,
   table,
   timestamps,
 } from "@zeno-lib/db/schema"
-import { sql } from "drizzle-orm"
-import { text, uuid } from "drizzle-orm/pg-core"
+import { text } from "drizzle-orm/pg-core"
 
 export const posts = table(
   "posts",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: primaryId("uuid"),
     title: text().notNull(),
-    userId: uuid()
-      .notNull()
-      // Supabase owns auth.users; this reference links your table to the signed-in user.
-      .references(() => authUsers.id),
+    // Supabase owns auth.users; this reference links your table to the signed-in user.
+    userId: authUserId(),
     // Reusable created_at and updated_at columns from @zeno-lib/db/schema.
     ...timestamps,
   },
   (t) => [
-    policy("posts_owner_select", {
-      for: "select",
-      to: authenticatedRole,
-      using: sql`${t.userId} = ${authUid}`,
-    }),
-    policy("posts_owner_insert", {
-      for: "insert",
-      to: authenticatedRole,
-      withCheck: sql`${t.userId} = ${authUid}`,
-    }),
+    authenticatedOwnerSelectPolicy("posts_owner_select", t.userId),
+    authenticatedOwnerInsertPolicy("posts_owner_insert", t.userId),
   ]
 )
 
@@ -151,10 +140,15 @@ The imports from `@zeno-lib/db/schema` are Zeno's Supabase schema conveniences:
 
 - `table` - RLS-ready, snake_case Postgres table builder.
 - `policy` - Drizzle's Postgres RLS policy helper.
-- `authUsers` - Drizzle's model of Supabase's existing `auth.users` table.
-- `authenticatedRole` - Supabase's existing `authenticated` database role.
-- `authUid` - SQL helper for `auth.uid()`.
+- `primaryId("uuid")` - random UUID primary key helper.
+- `authUserId()` - UUID reference to Supabase's existing `auth.users` table.
+- `authenticatedOwnerSelectPolicy(...)` - common owner read policy using
+  `auth.uid()`.
+- `authenticatedOwnerInsertPolicy(...)` - common owner insert policy using
+  `auth.uid()`.
 - `timestamps` - reusable `created_at` and `updated_at` columns.
+- `authorship` - reusable `created_by` and `updated_by` auth-user columns.
+- `auditColumns` - `timestamps` plus `authorship` for tables that use all four.
 
 Keeping this shape in TypeScript has a few practical benefits: the table is the
 source of truth for migrations, query types are inferred from the same object,
@@ -363,8 +357,8 @@ not decode or trust raw JWT strings.
 - Do not pass raw access token strings or unverified session payloads to RLS
   helpers.
 - Do not hand-write RLS policies in migration files when the table is otherwise
-  managed by Drizzle. Put `policy(...)` in the schema and generate the
-  migration.
+  managed by Drizzle. Put `policy(...)`, `selectPolicy(...)`, or owner policy
+  helpers in the schema and generate the migration.
 - Do not manually declare Supabase's built-in roles; import the existing role
   exports from `@zeno-lib/db/schema`.
 - Do not remove `entities.roles.provider: "supabase"` from Drizzle Kit config,
