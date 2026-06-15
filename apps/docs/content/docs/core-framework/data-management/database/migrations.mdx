@@ -11,7 +11,7 @@ Create a
 [`drizzle.config.ts`](https://orm.drizzle.team/docs/drizzle-config-file) next to
 the package or app that owns the schema:
 
-```typescript title="drizzle.config.ts"
+```typescript title="{project}-db/drizzle.config.ts"
 import "dotenv/config"
 import { defineDrizzleConfig } from "@zeno-lib/db/config"
 
@@ -32,10 +32,10 @@ The preset:
 - Reads `DATABASE_URL`.
 - Keeps Supabase's built-in roles marked as existing.
 
-You can still pass Drizzle Kit overrides for package-specific paths or
-credentials:
+You can still pass Drizzle Kit overrides for package-specific credentials or
+paths — for example, a separate migrations connection string:
 
-```typescript title="drizzle.config.ts"
+```typescript title="{project}-db/drizzle.config.ts"
 import "dotenv/config"
 import { defineDrizzleConfig } from "@zeno-lib/db/config"
 
@@ -43,7 +43,6 @@ export default defineDrizzleConfig({
   dbCredentials: {
     url: process.env.MIGRATIONS_DATABASE_URL ?? "",
   },
-  schema: "./src/db/schema.ts",
 })
 ```
 
@@ -51,7 +50,7 @@ export default defineDrizzleConfig({
 
 Recommended package scripts:
 
-```json title="package.json"
+```json title="{project}-db/package.json"
 {
   "scripts": {
     "dev": "pnpm exec supabase start",

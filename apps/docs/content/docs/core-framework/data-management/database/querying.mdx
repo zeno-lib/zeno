@@ -20,16 +20,15 @@ the underlying `postgres-js` pools so Supabase's transaction-mode pooler works.
 Create the request-scoped Supabase client first, then bind it to
 `createSupabaseDrizzle(...)`:
 
-```typescript title="route.ts"
+```typescript title="app/posts/route.ts"
 import { createSupabaseDrizzle } from "@zeno-lib/db"
 import { createClient } from "@zeno-lib/supabase/server"
-import * as schema from "./schema"
-import { posts } from "./schema"
+import * as schema from "{project}-db"
 
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ schema, supabase })
 
-const mine = await db.rls((rlsDb) => rlsDb.select().from(posts))
+const mine = await db.rls((rlsDb) => rlsDb.select().from(schema.posts))
 ```
 
 Pass the imported schema module object to `createSupabaseDrizzle(...)`. Do not
@@ -44,16 +43,15 @@ intentionally connects to a different database URL.
 
 Every user-scoped query should run inside `db.rls(...)`.
 
-```typescript title="route.ts"
+```typescript title="app/posts/route.ts"
 import { createSupabaseDrizzle } from "@zeno-lib/db"
 import { createClient } from "@zeno-lib/supabase/server"
-import * as schema from "./schema"
-import { posts } from "./schema"
+import * as schema from "{project}-db"
 
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ schema, supabase })
 
-const mine = await db.rls((rlsDb) => rlsDb.select().from(posts))
+const mine = await db.rls((rlsDb) => rlsDb.select().from(schema.posts))
 ```
 
 `db.rls(...)` calls `supabase.auth.getClaims()` before the transaction. Supabase
@@ -74,14 +72,13 @@ not silently become an anon query.
 For trusted server work that should bypass user RLS, omit the `supabase` option
 and use `db.admin`:
 
-```typescript title="seed.ts"
+```typescript title="{project}-db/src/seed.ts"
 import { createSupabaseDrizzle } from "@zeno-lib/db"
 import * as schema from "./schema"
-import { posts } from "./schema"
 
 const db = createSupabaseDrizzle({ schema })
 
-await db.admin.select().from(posts)
+await db.admin.select().from(schema.posts)
 ```
 
 `db.admin` is appropriate for seed scripts, webhooks, cron jobs, admin tools,

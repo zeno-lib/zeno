@@ -45,7 +45,7 @@ Start with a
 apps, use Zeno's table helper for the table itself and keep Drizzle's column
 builders visible by importing them directly from Drizzle.
 
-```ts title="src/posts.schema.ts"
+```ts title="{project}-db/src/schemas/posts.ts"
 import { auditColumns, authUserId, primaryId, table } from "@zeno-lib/db/schema"
 import { text } from "drizzle-orm/pg-core"
 
@@ -77,13 +77,20 @@ Use `primaryId("uuid")` for the usual random UUID primary key or
 `createdAt` / `updatedAt`, `...authorship` for `createdBy` / `updatedBy`, or
 `...auditColumns` when the table should include all four audit columns.
 
+This table is the database source of truth, so it lives in your database package
+under `{project}-db/src/schemas/`, where `{project}` is your workspace name (see
+[Tables](/docs/core-framework/data-management/database/tables)). The Zod schemas
+below are derived from it and live next to your forms in `{project}-forms`, so
+they stay free of database clients and are safe to import from Client Components.
+
 ## Derive Zod schemas
 
 Use `defineTableSchema(table)` to create the three database variants Zeno
-standardizes on:
+standardizes on. Import the table from your database package:
 
-```ts title="src/posts.schema.ts"
+```ts title="{project}-forms/src/posts/schemas.ts"
 import { defineTableSchema } from "@zeno-lib/schema"
+import { posts } from "{project}-db"
 
 export const postSchema = defineTableSchema(posts)
 ```
@@ -99,16 +106,16 @@ export const postSchema = defineTableSchema(posts)
 These are plain Zod schemas. You can parse payloads in a Server Action or Route
 Handler before calling `db.rls(...)` or `db.admin`:
 
-```ts title="src/posts.actions.ts"
+```ts title="app/posts/actions.ts"
 import { createSupabaseDrizzle } from "@zeno-lib/db"
-import { postSchema, posts } from "./posts.schema"
-import * as schema from "./posts.schema"
+import * as schema from "{project}-db"
+import { postSchema } from "{project}-forms/posts/schemas"
 
 export async function createPost(input: unknown) {
   const value = postSchema.insert.parse(input)
   const db = createSupabaseDrizzle({ schema })
 
-  await db.admin.insert(posts).values(value)
+  await db.admin.insert(schema.posts).values(value)
 }
 ```
 
@@ -118,7 +125,7 @@ Pass refinement maps when the database shape needs richer validation. The maps
 match Drizzle's first-party
 [Zod schema helpers](https://orm.drizzle.team/docs/zod).
 
-```ts lineNumbers title="src/posts.schema.ts"
+```ts lineNumbers title="{project}-forms/src/posts/schemas.ts"
 export const postSchema = defineTableSchema(posts, {
   insert: {
     body: (schema) => schema.min(1),
@@ -155,11 +162,11 @@ Zeno does not generate form-specific schemas automatically. Forms are product
 workflows: they may omit server-owned fields, add UI-only values, or require
 cross-field validation that the database table should not know about.
 
-Derive those schemas explicitly with Zod:
+Derive those schemas explicitly with Zod, in the same `schemas.ts` alongside the
+table-derived `postSchema`:
 
-```ts lineNumbers title="src/posts.forms.ts"
+```ts lineNumbers title="{project}-forms/src/posts/schemas.ts"
 import { z } from "zod"
-import { postSchema } from "./posts.schema"
 
 export const createPostFormSchema = postSchema.insert
   .omit({
@@ -181,11 +188,11 @@ export type CreatePostForm = z.infer<typeof createPostFormSchema>
 
 Then pass the derived schema to `@zeno-lib/forms`:
 
-```tsx lineNumbers title="src/create-post-form.tsx"
+```tsx lineNumbers title="{project}-forms/src/posts/forms.tsx"
 "use client"
 
 import { Form, FormProvider, useForm } from "@zeno-lib/forms"
-import { createPostFormSchema } from "./posts.forms"
+import { createPostFormSchema } from "./schemas"
 
 export function CreatePostForm() {
   const form = useForm({
@@ -214,15 +221,22 @@ export function CreatePostForm() {
 }
 ```
 
-## Shared module boundary
+## Where each file lives
 
-Use this split for most features:
+Zeno splits a feature across two packages plus your app, so server-only database
+code never leaks into modules a Client Component imports. `{project}` is your
+workspace name and `{table}` is the entity (here, `posts`).
 
-| File | Should contain |
+| Path | Should contain |
 |---|---|
-| `*.schema.ts` | Drizzle tables, table-derived Zod schemas, and pure exported types. |
-| `*.forms.ts` | Zod schemas derived for UI workflows. Safe to import from Client Components when it stays pure. |
-| `*.actions.ts` | Server Actions or Route Handlers that parse schemas and call `@zeno-lib/db`. |
+| `{project}-db/src/schemas/{table}.ts` | The Drizzle table — the database source of truth and the input to migrations. |
+| `{project}-db/src/schema.ts` | Barrel re-exporting every table, passed to `createSupabaseDrizzle({ schema })`. |
+| `{project}-forms/src/{table}/schemas.ts` | Table-derived Zod variants (`defineTableSchema`) and the UI/form schemas built from them. Pure — safe to import from Client Components. |
+| `{project}-forms/src/{table}/forms.tsx` | `@zeno-lib/forms` components for the table. |
+
+Server Actions and Route Handlers that parse a schema and call `@zeno-lib/db`
+live in your app at the server boundary. They import tables from `{project}-db`
+and schemas from `{project}-forms`.
 
 Avoid importing `createSupabaseDrizzle(...)` or other server-only code from a
 module that a Client Component imports for validation. Keep database clients at

@@ -5,11 +5,12 @@ icon: Table
 status: in progress
 ---
 
-Start with a TypeScript schema. Drizzle Kit reads exported tables from this file
-when it generates migrations, and Drizzle uses the same exported table objects
-when you write queries.
+Each table lives in its own file under `{project}-db/src/schemas/`, where
+`{project}` is your workspace name. Drizzle Kit reads the exported tables when it
+generates migrations, and Drizzle uses the same exported table objects when you
+write queries.
 
-```typescript lineNumbers title="src/schema.ts"
+```typescript lineNumbers title="{project}-db/src/schemas/posts.ts"
 import {
   auditColumns,
   authenticatedOwnerInsertPolicy,
@@ -44,6 +45,16 @@ export type SelectPost = typeof posts.$inferSelect
 builder, so TypeScript properties like `userId` become database identifiers like
 `user_id`, and it enables RLS by default. Use `unsecureTable` only for tables
 that intentionally should not have RLS, such as seed-only reference data.
+
+Re-export every table from a single `{project}-db/src/schema.ts` barrel. That
+barrel is what the [Drizzle Kit config](/docs/core-framework/data-management/database/migrations)
+reads and what you pass to `createSupabaseDrizzle({ schema })` when
+[querying](/docs/core-framework/data-management/database/querying):
+
+```typescript title="{project}-db/src/schema.ts"
+export * from "./schemas/posts"
+// export * from "./schemas/comments"
+```
 
 Keeping this shape in TypeScript has a few practical benefits: the table is the
 source of truth for migrations, query types are inferred from the same object,
