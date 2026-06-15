@@ -1,4 +1,5 @@
 // https://orm.drizzle.team/docs/rls#using-with-supabase
+import type { AnyRelations, EmptyRelations } from "drizzle-orm"
 import { sql } from "drizzle-orm"
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js"
 import postgres from "postgres"
@@ -32,25 +33,33 @@ const ALLOWED_RLS_ROLES = new Set(["anon", "authenticated"])
 
 export type CreateDrizzleClientsOptions<
   TSchema extends Record<string, unknown>,
+  TRelations extends AnyRelations = EmptyRelations,
 > = {
   schema: TSchema
+  // Relations object from drizzle's `defineRelations`. Required for the
+  // relational query API (`db.query.<table>.findMany()`); drizzle v1 ignores
+  // `schema` for relations. Pair a stable `relations` object with the stable
+  // `schema` object so the pool cache can be reused.
+  relations?: TRelations
   connectionString?: string
 }
 
 export type CreateSupabaseDrizzleOptions<
   TSchema extends Record<string, unknown>,
-> = CreateDrizzleClientsOptions<TSchema> & {
+  TRelations extends AnyRelations = EmptyRelations,
+> = CreateDrizzleClientsOptions<TSchema, TRelations> & {
   supabase?: SupabaseAuthContext
 }
 
-type DrizzleClients<TSchema extends Record<string, unknown>> = ReturnType<
-  typeof createDrizzleClients<TSchema>
->
+type DrizzleClients<
+  TSchema extends Record<string, unknown>,
+  TRelations extends AnyRelations = EmptyRelations,
+> = ReturnType<typeof createDrizzleClients<TSchema, TRelations>>
 
 // Cached pools are reference-counted so a request-scoped `close()` only ends the
 // underlying pools once the last handle sharing them is closed.
 type SharedDrizzleEntry = {
-  clients: DrizzleClients<Record<string, unknown>>
+  clients: DrizzleClients<Record<string, unknown>, AnyRelations>
   refCount: number
 }
 
@@ -59,9 +68,10 @@ const sharedClients = new WeakMap<
   Map<string, SharedDrizzleEntry>
 >()
 
-export function createDrizzleClients<TSchema extends Record<string, unknown>>(
-  options: CreateDrizzleClientsOptions<TSchema>
-) {
+export function createDrizzleClients<
+  TSchema extends Record<string, unknown>,
+  TRelations extends AnyRelations = EmptyRelations,
+>(options: CreateDrizzleClientsOptions<TSchema, TRelations>) {
   const url = options.connectionString ?? process.env.DATABASE_URL
   if (!url) {
     throw new Error("Missing DATABASE_URL environment variable")
@@ -70,17 +80,21 @@ export function createDrizzleClients<TSchema extends Record<string, unknown>>(
   // prepare:false → required for the Supabase transaction pooler (port 6543).
   // Two separate pools: admin runs as the connection role (bypasses RLS),
   // rls switches role + sets JWT claims per transaction.
+  // `relations` enables the relational query API on both clients (and inside
+  // the rls transaction's `tx`).
   const adminPool = postgres(url, { prepare: false })
   const rlsPool = postgres(url, { prepare: false })
-  const adminClient = drizzle({
+  const adminClient = drizzle<TRelations>({
     client: adminPool,
+    relations: options.relations,
   })
-  const rlsClient = drizzle({
+  const rlsClient = drizzle<TRelations>({
     client: rlsPool,
+    relations: options.relations,
   })
 
   // Bypasses RLS. Use for webhooks, admin tasks, background jobs, seeding.
-  function getDrizzleSupabaseAdminClient(): PostgresJsDatabase {
+  function getDrizzleSupabaseAdminClient(): PostgresJsDatabase<TRelations> {
     return adminClient
   }
 
@@ -126,9 +140,10 @@ export function createDrizzleClients<TSchema extends Record<string, unknown>>(
   }
 }
 
-export function createSupabaseDrizzle<TSchema extends Record<string, unknown>>(
-  options: CreateSupabaseDrizzleOptions<TSchema>
-) {
+export function createSupabaseDrizzle<
+  TSchema extends Record<string, unknown>,
+  TRelations extends AnyRelations = EmptyRelations,
+>(options: CreateSupabaseDrizzleOptions<TSchema, TRelations>) {
   const cacheKey = createCacheKey(options)
   const entry = acquireSharedDrizzleClients(options, cacheKey)
   const {
@@ -141,7 +156,7 @@ export function createSupabaseDrizzle<TSchema extends Record<string, unknown>>(
   >["runTransaction"]
   // `null` is treated like `undefined`: with no auth context we must reject
   // loudly rather than silently fall back to an anon query.
-  const rls =
+  const rlsTransaction =
     options.supabase == null
       ? ((() =>
           Promise.reject(
@@ -150,6 +165,16 @@ export function createSupabaseDrizzle<TSchema extends Record<string, unknown>>(
             )
           )) as RlsTransaction)
       : getDrizzleSupabaseClient(options.supabase).runTransaction
+
+  // Chainable single-statement RLS: `db.rls.select().from(table)` /
+  // `db.rls.query.table.findMany()`. Records the call chain and replays it
+  // inside one `rlsTransaction`, so RLS context is established in exactly one
+  // place. Reach for `rlsTransaction(cb)` to run multiple statements atomically.
+  const rls = createRlsProxy(
+    rlsTransaction as (
+      transaction: (tx: unknown) => unknown
+    ) => Promise<unknown>
+  ) as PostgresJsDatabase<TRelations>
 
   // Guard against double-close: each handle releases its reference at most once.
   let released = false
@@ -172,13 +197,17 @@ export function createSupabaseDrizzle<TSchema extends Record<string, unknown>>(
       await closeDrizzleSupabaseClients(closeOptions)
     },
     rls,
+    rlsTransaction,
   }
 }
 
-function acquireSharedDrizzleClients<TSchema extends Record<string, unknown>>(
-  options: CreateDrizzleClientsOptions<TSchema>,
+function acquireSharedDrizzleClients<
+  TSchema extends Record<string, unknown>,
+  TRelations extends AnyRelations = EmptyRelations,
+>(
+  options: CreateDrizzleClientsOptions<TSchema, TRelations>,
   cacheKey: string
-): { clients: DrizzleClients<TSchema>; refCount: number } {
+): { clients: DrizzleClients<TSchema, TRelations>; refCount: number } {
   let schemaClients = sharedClients.get(options.schema)
   if (!schemaClients) {
     schemaClients = new Map()
@@ -189,32 +218,106 @@ function acquireSharedDrizzleClients<TSchema extends Record<string, unknown>>(
   if (existingEntry) {
     existingEntry.refCount += 1
     return existingEntry as unknown as {
-      clients: DrizzleClients<TSchema>
+      clients: DrizzleClients<TSchema, TRelations>
       refCount: number
     }
   }
 
   const entry: SharedDrizzleEntry = {
     clients: createDrizzleClients(options) as DrizzleClients<
-      Record<string, unknown>
+      Record<string, unknown>,
+      AnyRelations
     >,
     refCount: 1,
   }
   schemaClients.set(cacheKey, entry)
   return entry as unknown as {
-    clients: DrizzleClients<TSchema>
+    clients: DrizzleClients<TSchema, TRelations>
     refCount: number
   }
 }
 
-function createCacheKey<TSchema extends Record<string, unknown>>(
-  options: CreateDrizzleClientsOptions<TSchema>
-): string {
+function createCacheKey<
+  TSchema extends Record<string, unknown>,
+  TRelations extends AnyRelations = EmptyRelations,
+>(options: CreateDrizzleClientsOptions<TSchema, TRelations>): string {
   const url = options.connectionString ?? process.env.DATABASE_URL
   if (!url) {
     throw new Error("Missing DATABASE_URL environment variable")
   }
   return JSON.stringify({ url })
+}
+
+// One recorded step of a chained call: `db.rls.select` is a get, the following
+// `()` is an apply.
+type RlsChainStep =
+  | { kind: "get"; prop: PropertyKey }
+  | { kind: "apply"; args: unknown[] }
+
+// Walk the recorded chain against the live transaction `tx`, tracking the
+// receiver so methods are invoked with the right `this`. Returns whatever the
+// chain produces — a thenable drizzle builder, or a relational query promise.
+function replayRlsChain(tx: unknown, path: RlsChainStep[]): unknown {
+  let receiver: unknown = tx
+  let current: unknown = tx
+  for (const step of path) {
+    if (step.kind === "get") {
+      receiver = current
+      current = (current as Record<PropertyKey, unknown>)[step.prop]
+    } else {
+      current = (current as (...args: unknown[]) => unknown).apply(
+        receiver,
+        step.args
+      )
+    }
+  }
+  return current
+}
+
+// Builds the chainable `db.rls` proxy. It records the get/apply chain lazily;
+// only when the chain is awaited (`.then`/`.catch`/`.finally`) does it open an
+// RLS transaction and replay the chain against that transaction's `tx`. Each
+// awaited chain is its own transaction.
+function createRlsProxy(
+  runTransaction: (transaction: (tx: unknown) => unknown) => Promise<unknown>
+): unknown {
+  const build = (path: RlsChainStep[], isRoot: boolean): unknown => {
+    // The proxy target must be callable so the `apply` trap fires for `()`.
+    const target = () => undefined
+    return new Proxy(target, {
+      apply(_target, _thisArg, args: unknown[]) {
+        if (isRoot) {
+          throw new Error(
+            "db.rls is chainable (e.g. db.rls.select().from(table)). Use db.rlsTransaction(cb) to run multiple statements in one RLS transaction."
+          )
+        }
+        return build([...path, { args, kind: "apply" }], false)
+      },
+      get(_target, prop) {
+        // Awaiting the chain triggers the transaction + replay. The transaction
+        // is opened lazily when the promise method is *called* (not merely
+        // accessed), so probing `.then` for thenable-detection never starts a
+        // stray transaction. The call returns a real promise, so any further
+        // `.then`/`.catch`/`.finally` chaining runs on it, not on the proxy.
+        if (prop === "then" || prop === "catch" || prop === "finally") {
+          return (...promiseArgs: unknown[]) => {
+            const promise = runTransaction((tx) => replayRlsChain(tx, path))
+            return (promise[prop] as (...args: unknown[]) => unknown).apply(
+              promise,
+              promiseArgs
+            )
+          }
+        }
+        // Ignore symbol probes (inspection, `Symbol.toPrimitive`, etc.) so they
+        // are not recorded as part of the query chain.
+        if (typeof prop === "symbol") {
+          return
+        }
+        return build([...path, { kind: "get", prop }], false)
+      },
+    })
+  }
+  return build([], true)
 }
 
 async function resolveTokenClaims(

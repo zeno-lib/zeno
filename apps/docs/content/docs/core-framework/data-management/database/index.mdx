@@ -106,7 +106,8 @@ reasoning.
 - **Real transactions.** PostgREST runs each request as its own transaction, so
   you cannot compose several client calls into one atomic unit. Over the direct
   connection Drizzle gives you true multi-statement transactions — Zeno's
-  `db.rls(...)` is itself one — so related writes commit or roll back together.
+  `db.rlsTransaction(...)` is itself one — so related writes commit or roll back
+  together.
 - **One TypeScript schema, migrations handled for you.** Tables are defined once
   in TypeScript; Drizzle Kit diffs that schema and generates SQL migrations,
   versioned in git. You are not changing schema in the dashboard and then

@@ -28,7 +28,7 @@ import * as schema from "{project}-db"
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ schema, supabase })
 
-const mine = await db.rls((rlsDb) => rlsDb.select().from(schema.posts))
+const mine = await db.rls.select().from(schema.posts)
 ```
 
 Pass the imported schema module object to `createSupabaseDrizzle(...)`. Do not
@@ -41,7 +41,9 @@ intentionally connects to a different database URL.
 
 ## Query with RLS
 
-Every user-scoped query should run inside `db.rls(...)`.
+Every user-scoped query should run through `db.rls`. For a single statement,
+chain off `db.rls` exactly like a Drizzle client — the query runs inside an
+RLS-scoped transaction automatically:
 
 ```typescript title="app/posts/route.ts"
 import { createSupabaseDrizzle } from "@zeno-lib/db"
@@ -51,21 +53,60 @@ import * as schema from "{project}-db"
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ schema, supabase })
 
-const mine = await db.rls((rlsDb) => rlsDb.select().from(schema.posts))
+const mine = await db.rls.select().from(schema.posts)
 ```
 
-`db.rls(...)` calls `supabase.auth.getClaims()` before the transaction. Supabase
-returns a verified JWT payload, and the package installs those claims into
-transaction-local Postgres settings so helpers like `auth.uid()` and
-`auth.jwt()` work inside RLS policies.
+Awaiting a `db.rls` chain calls `supabase.auth.getClaims()`, opens a
+transaction, installs the verified JWT claims into transaction-local Postgres
+settings (so `auth.uid()` and `auth.jwt()` work inside RLS policies), and runs
+the query as the claims' role. Each awaited chain is its own transaction.
 
 The RLS role is limited to `anon` or `authenticated`. Unknown role claims fall
 back to `anon`, and `service_role` never runs through the request-scoped RLS
 path.
 
-Calling `db.rls(...)` without passing `supabase` to
-`createSupabaseDrizzle(...)` throws immediately, so missing auth context does
+Awaiting a `db.rls` query without passing `supabase` to
+`createSupabaseDrizzle(...)` rejects immediately, so missing auth context does
 not silently become an anon query.
+
+### Relational queries
+
+The relational query API works the same way once you pass a `relations` object
+(from Drizzle's `defineRelations`) to `createSupabaseDrizzle(...)`:
+
+```typescript title="app/posts/route.ts"
+import { createSupabaseDrizzle } from "@zeno-lib/db"
+import { createClient } from "@zeno-lib/supabase/server"
+import { defineRelations } from "drizzle-orm"
+import * as schema from "{project}-db"
+
+const relations = defineRelations(schema)
+const supabase = await createClient()
+const db = createSupabaseDrizzle({ relations, schema, supabase })
+
+const mine = await db.rls.query.posts.findMany()
+```
+
+### Multiple statements in one transaction
+
+When you need several statements to share one atomic RLS transaction (for
+example a read followed by a dependent write), use the callback form
+`db.rlsTransaction(...)`. Every statement on the `tx` argument runs under the
+same claims and role:
+
+```typescript title="app/posts/route.ts"
+const created = await db.rlsTransaction(async (tx) => {
+  const [post] = await tx
+    .insert(schema.posts)
+    .values({ title: "Hello" })
+    .returning()
+  await tx.insert(schema.auditLog).values({ postId: post.id })
+  return post
+})
+```
+
+Reach for `db.rlsTransaction` only when a single chained `db.rls` query is not
+enough — one chained statement is the common case.
 
 ## Use admin queries carefully
 
@@ -119,5 +160,8 @@ not decode or trust raw JWT strings.
 - Do not pass raw access token strings or unverified session payloads to RLS
   helpers.
 - Do not create fresh schema object literals per request.
-- Do not run queries outside `db.rls(...)` when you expect RLS policies to
-  apply.
+- Do not run queries outside `db.rls` / `db.rlsTransaction(...)` when you expect
+  RLS policies to apply. `db.admin` bypasses them.
+- Do not call `db.rls` like the old callback (`db.rls((tx) => ...)`); it now
+  throws. Chain off it (`db.rls.select()...`) or use `db.rlsTransaction(...)`
+  for multi-statement work.

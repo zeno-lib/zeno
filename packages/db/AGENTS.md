@@ -26,7 +26,7 @@ policy helpers.
 
 | Import | Use from | Returns / does |
 |---|---|---|
-| `@zeno-lib/db` | Server code (Server Components, Route Handlers, Server Actions, cron, scripts) | `createSupabaseDrizzle({ schema, supabase?, connectionString? })` -> `{ admin, rls, close }`. `admin` bypasses RLS. `rls(...)` runs a transaction after resolving verified claims from the bound Supabase client. Underlying Postgres pools are cached by imported schema object + connection config, so this ergonomic factory can be called with a request-scoped Supabase client. `close()` is reference-counted: it releases this handle's share of the cached pools and only ends them once the last handle closes (so a per-request `close()` won't tear down pools other in-flight requests are using). |
+| `@zeno-lib/db` | Server code (Server Components, Route Handlers, Server Actions, cron, scripts) | `createSupabaseDrizzle({ schema, relations?, supabase?, connectionString? })` -> `{ admin, rls, rlsTransaction, close }`. `admin` bypasses RLS. `rls` is a **chainable** single-statement RLS client (`db.rls.select().from(t)`, `db.rls.query.t.findMany()`): it records the chain and replays it inside one RLS transaction (claims resolved from the bound Supabase client, role switched), one transaction per awaited chain. `rlsTransaction(cb)` is the **callback** form for multiple statements under one atomic RLS transaction (`db.rlsTransaction(async (tx) => { ... })`). `rls` is built on `rlsTransaction`, so RLS context is established in exactly one place. `relations` (from drizzle's `defineRelations`) enables the relational query API on `admin`, `rls`, and `tx`. Underlying Postgres pools are cached by imported schema object + connection config. `close()` is reference-counted: it releases this handle's share of the cached pools and only ends them once the last handle closes (so a per-request `close()` won't tear down pools other in-flight requests are using). |
 | `@zeno-lib/db/clients` | Lower-level server code | `createDrizzleClients({ schema, connectionString? })` -> `{ getDrizzleSupabaseAdminClient, getDrizzleSupabaseClient, closeDrizzleSupabaseClients }`. Opens two `postgres-js` pools. `getDrizzleSupabaseAdminClient()` returns a Drizzle db that **bypasses RLS**. `getDrizzleSupabaseClient(supabaseOrClaims?)` accepts a Supabase client (preferred) or already-verified Supabase JWT claims and returns `{ runTransaction }`. |
 | `@zeno-lib/db/config` | `drizzle.config.ts` in each consuming package/app | `defineDrizzleConfig({ schema, ...overrides })` — preset that defaults `out` to `./supabase/migrations`, dialect to `postgresql`, reads `DATABASE_URL` from env, and sets `entities.roles.provider: "supabase"`. |
 | `@zeno-lib/db/schema` | Application schema files | `table` (`snakeCase.table.withRLS`) for RLS-by-default tables, `unsecureTable` (`snakeCase.table`) for intentional non-RLS tables, common column helpers (`primaryId`, `authUserId`, `createdBy`, `updatedBy`), audit mixins (`timestamps` for xAt, `authorship` for xBy, `auditColumns` for all four), generic policy helpers (`selectPolicy`, `insertPolicy`, `updatePolicy`, `deletePolicy`, `allPolicy`), authenticated-owner policy helpers, curated Supabase role/helper exports from `drizzle-orm/supabase`, and curated `pg-core` aliases such as `policy`, `role`, `schema`, `sequence`, `view`, `materializedView`, `tableCreator`, and `enum` (import with a local alias because `enum` is reserved). |
@@ -45,7 +45,8 @@ use the admin client for service-role work.
 
 ## Usage Patterns
 
-RLS-aware per request — pass the request-scoped Supabase client at creation time:
+RLS-aware per request — pass the request-scoped Supabase client at creation
+time, then chain off `db.rls` for a single statement:
 
 ```ts
 // route.ts
@@ -56,12 +57,32 @@ import * as schema from "./schema"
 
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ schema, supabase })
-const mine = await db.rls((rlsDb) => rlsDb.select().from(posts)) // RLS enforced
+const mine = await db.rls.select().from(posts) // RLS enforced (chainable)
 ```
 
-Pass the imported schema module object to `createSupabaseDrizzle(...)`; do not
-create fresh schema object literals per request, or the pool cache cannot be
-reused.
+Multiple statements under one atomic RLS transaction — use the callback form
+`db.rlsTransaction(...)`:
+
+```ts
+const created = await db.rlsTransaction(async (tx) => {
+  const [post] = await tx.insert(posts).values({ title }).returning()
+  await tx.insert(auditLog).values({ postId: post.id })
+  return post
+})
+```
+
+Relational query API — pass `relations` (from `defineRelations`) at creation:
+
+```ts
+import { defineRelations } from "drizzle-orm"
+const relations = defineRelations(schema)
+const db = createSupabaseDrizzle({ relations, schema, supabase })
+const mine = await db.rls.query.posts.findMany() // RLS enforced
+```
+
+Pass the imported schema module object (and a stable `relations` object) to
+`createSupabaseDrizzle(...)`; do not create fresh schema/relations object
+literals per request, or the pool cache cannot be reused.
 
 Admin (bypasses RLS — webhooks, admin tasks, background jobs, seeding):
 
@@ -122,9 +143,14 @@ export default defineDrizzleConfig({ schema: "./src/schema.ts" })
   `pg-core` aliases exported from `@zeno-lib/db/schema`.
 - **Keep Drizzle Kit CLI ownership in the consuming package.** Consumers install
   `drizzle-kit` and run its CLI from their own package scripts.
-- **Do not run queries outside `db.rls(...)` when you intend RLS to apply.** A
-  query on `db.admin` executes as the connection role, bypassing the policies
-  you authored. The JWT claims + role are only set inside that transaction.
+- **Do not run queries outside `db.rls` / `db.rlsTransaction(...)` when you
+  intend RLS to apply.** A query on `db.admin` executes as the connection role,
+  bypassing the policies you authored. The JWT claims + role are only set inside
+  the RLS transaction.
+- **Do not call `db.rls` like the old callback form** (`db.rls((tx) => ...)`).
+  `db.rls` is now chainable and throws on a direct call. Chain off it
+  (`db.rls.select()...`) for one statement, or use `db.rlsTransaction(cb)` for
+  multiple statements in one transaction.
 - **Do not pass raw JWT strings or unverified session payloads into RLS
   helpers.** Pass a Supabase client, or verify first with Supabase Auth
   (`auth.getClaims()` / equivalent) and pass the resulting claims object. The DB
@@ -210,6 +236,15 @@ by Client Components for validation.
   (transaction-local), so it auto-resets at commit/rollback. Run each request's
   queries inside its own `rls(...)` transaction so the context never leaks across
   requests.
+- **The relational query API (`db.query.*` / `db.rls.query.*`) needs a
+  `relations` object.** Drizzle v1 ignores `schema` for relations and reads
+  `relations` (from `defineRelations`). Without it, `query.*` is unavailable.
+  Because pools are cached by schema object + connection config, pass the same
+  stable `relations` object on every `createSupabaseDrizzle(...)` call sharing
+  that schema + URL, or a cached client built without relations will be reused.
+- **Each awaited `db.rls` chain is its own transaction.** It cannot span
+  multiple statements; reach for `db.rlsTransaction(...)` when several statements
+  must be atomic.
 - **`test` covers public package behavior without connecting eagerly** — peer
   dependency expectations, focused package exports, and the RLS/client
   contracts.
