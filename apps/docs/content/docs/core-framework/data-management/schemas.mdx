@@ -46,7 +46,7 @@ apps, use Zeno's table helper for the table itself and keep Drizzle's column
 builders visible by importing them directly from Drizzle.
 
 ```ts title="src/posts.schema.ts"
-import { authUserId, primaryId, table, timestamps } from "@zeno-lib/db/schema"
+import { auditColumns, authUserId, primaryId, table } from "@zeno-lib/db/schema"
 import { text } from "drizzle-orm/pg-core"
 
 export const posts = table("posts", {
@@ -55,7 +55,7 @@ export const posts = table("posts", {
   title: text("title").notNull(),
   userId: authUserId(),
   body: text("body").notNull(),
-  ...timestamps,
+  ...auditColumns,
 })
 ```
 

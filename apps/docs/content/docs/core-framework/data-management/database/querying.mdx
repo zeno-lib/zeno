@@ -1,0 +1,126 @@
+---
+title: Querying
+description: Create clients and run RLS-scoped, admin, and lower-level queries
+icon: Search
+status: in progress
+---
+
+## Clients
+
+Both runtime clients and the Drizzle Kit preset read `DATABASE_URL` from the
+environment unless you pass an explicit `connectionString` override. For local
+and deployed connection strings, see
+[Environment](/docs/core-framework/data-management/database#environment).
+
+For deployed Supabase projects, prefer the
+[Supabase connection pooler](https://supabase.com/docs/guides/database/connecting-to-postgres#server-side-poolers)
+for serverless or autoscaling environments. The package sets `prepare: false` on
+the underlying `postgres-js` pools so Supabase's transaction-mode pooler works.
+
+Create the request-scoped Supabase client first, then bind it to
+`createSupabaseDrizzle(...)`:
+
+```typescript title="route.ts"
+import { createSupabaseDrizzle } from "@zeno-lib/db"
+import { createClient } from "@zeno-lib/supabase/server"
+import * as schema from "./schema"
+import { posts } from "./schema"
+
+const supabase = await createClient()
+const db = createSupabaseDrizzle({ schema, supabase })
+
+const mine = await db.rls((rlsDb) => rlsDb.select().from(posts))
+```
+
+Pass the imported schema module object to `createSupabaseDrizzle(...)`. Do not
+build a new schema object inline for each request; reusing the module import
+lets `@zeno-lib/db` reuse its underlying Postgres pools safely.
+
+`createSupabaseDrizzle(...)` reads `DATABASE_URL` from the server environment in
+this example. You only need `connectionString` when a script or service
+intentionally connects to a different database URL.
+
+## Query with RLS
+
+Every user-scoped query should run inside `db.rls(...)`.
+
+```typescript title="route.ts"
+import { createSupabaseDrizzle } from "@zeno-lib/db"
+import { createClient } from "@zeno-lib/supabase/server"
+import * as schema from "./schema"
+import { posts } from "./schema"
+
+const supabase = await createClient()
+const db = createSupabaseDrizzle({ schema, supabase })
+
+const mine = await db.rls((rlsDb) => rlsDb.select().from(posts))
+```
+
+`db.rls(...)` calls `supabase.auth.getClaims()` before the transaction. Supabase
+returns a verified JWT payload, and the package installs those claims into
+transaction-local Postgres settings so helpers like `auth.uid()` and
+`auth.jwt()` work inside RLS policies.
+
+The RLS role is limited to `anon` or `authenticated`. Unknown role claims fall
+back to `anon`, and `service_role` never runs through the request-scoped RLS
+path.
+
+Calling `db.rls(...)` without passing `supabase` to
+`createSupabaseDrizzle(...)` throws immediately, so missing auth context does
+not silently become an anon query.
+
+## Use admin queries carefully
+
+For trusted server work that should bypass user RLS, omit the `supabase` option
+and use `db.admin`:
+
+```typescript title="seed.ts"
+import { createSupabaseDrizzle } from "@zeno-lib/db"
+import * as schema from "./schema"
+import { posts } from "./schema"
+
+const db = createSupabaseDrizzle({ schema })
+
+await db.admin.select().from(posts)
+```
+
+`db.admin` is appropriate for seed scripts, webhooks, cron jobs, admin tools,
+and background jobs. It should not be used for user-scoped reads or writes.
+
+## Lower-level clients
+
+Most apps should use `createSupabaseDrizzle(...)`. If a shared library needs
+explicit control over clients, use `createDrizzleClients(...)`:
+
+```typescript lineNumbers
+import { createDrizzleClients } from "@zeno-lib/db/clients"
+import * as schema from "./schema"
+
+const clients = createDrizzleClients({ schema })
+const admin = clients.getDrizzleSupabaseAdminClient()
+const rls = clients.getDrizzleSupabaseClient({
+  role: "authenticated",
+  sub: "00000000-0000-0000-0000-000000000000",
+})
+
+const rows = await rls.runTransaction((rlsDb) =>
+  rlsDb.select().from(schema.posts)
+)
+
+await clients.closeDrizzleSupabaseClients()
+```
+
+When using the lower-level RLS client, pass a Supabase client whenever possible.
+If you pass claims directly, they must already be verified. The DB package does
+not decode or trust raw JWT strings.
+
+## Pitfalls
+
+- Do not import `@zeno-lib/db` runtime clients from Client Components or browser
+  code.
+- Do not use `db.admin` for user-scoped reads and writes.
+- Do not pass raw access token strings or unverified session payloads to RLS
+  helpers.
+- Do not create fresh schema object literals per request.
+- Do not run queries outside `db.rls(...)` when you expect RLS policies to
+  apply.

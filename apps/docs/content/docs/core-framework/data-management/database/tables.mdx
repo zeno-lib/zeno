@@ -1,0 +1,173 @@
+---
+title: Tables
+description: Define Postgres tables and RLS policies in TypeScript with Zeno's Drizzle helpers
+icon: Table
+status: in progress
+---
+
+Start with a TypeScript schema. Drizzle Kit reads exported tables from this file
+when it generates migrations, and Drizzle uses the same exported table objects
+when you write queries.
+
+```typescript lineNumbers title="src/schema.ts"
+import {
+  auditColumns,
+  authenticatedOwnerInsertPolicy,
+  authenticatedOwnerSelectPolicy,
+  authUserId,
+  primaryId,
+  table,
+} from "@zeno-lib/db/schema"
+import { text } from "drizzle-orm/pg-core"
+
+export const posts = table(
+  "posts",
+  {
+    id: primaryId("uuid"),
+    title: text().notNull(),
+    // Supabase owns auth.users; this reference links your table to the signed-in user.
+    userId: authUserId(),
+    // created_at, updated_at, created_by, and updated_by, from @zeno-lib/db/schema.
+    ...auditColumns,
+  },
+  (t) => [
+    authenticatedOwnerSelectPolicy("posts_owner_select", t.userId),
+    authenticatedOwnerInsertPolicy("posts_owner_insert", t.userId),
+  ]
+)
+
+export type InsertPost = typeof posts.$inferInsert
+export type SelectPost = typeof posts.$inferSelect
+```
+
+`table` is Zeno's default table helper. It uses Drizzle's snake_case table
+builder, so TypeScript properties like `userId` become database identifiers like
+`user_id`, and it enables RLS by default. Use `unsecureTable` only for tables
+that intentionally should not have RLS, such as seed-only reference data.
+
+Keeping this shape in TypeScript has a few practical benefits: the table is the
+source of truth for migrations, query types are inferred from the same object,
+common columns can be reused as code, and validation schemas can be derived from
+the table later. For that next layer, see
+[Schemas](/docs/core-framework/data-management/schemas).
+
+## Schema helpers
+
+Everything below is exported from `@zeno-lib/db/schema`. The module is the single
+entrypoint for building Supabase-ready Drizzle schemas: table builders, reusable
+columns, RLS policy helpers, and curated re-exports of the Drizzle and Supabase
+primitives you would otherwise import from several packages.
+
+### Table builders
+
+| Export | Signature | What it does |
+|---|---|---|
+| `table` | `table(name, columns, extra?)` | snake_case Postgres table builder with **RLS enabled**. Use it for application-owned tables. |
+| `unsecureTable` | `unsecureTable(name, columns, extra?)` | Same builder **without RLS**. Use only for intentionally unprotected tables such as seed or reference data. |
+
+Both map camelCase TypeScript keys to snake_case database identifiers. The
+optional `extra` callback receives the built columns and returns indexes,
+constraints, and RLS policies (see the example above).
+
+### Primary keys
+
+| Export | Result |
+|---|---|
+| `primaryId("uuid")` | Random UUID primary key — `uuid("id").primaryKey().defaultRandom()`. This is the default when called with no argument. |
+| `primaryId("sequential")` | Integer identity primary key — `integer("id").primaryKey().generatedAlwaysAsIdentity()`. |
+
+### Columns
+
+Spread the column groups into your column map; use the single-column helpers when
+a table needs only part of a group.
+
+| Export | Columns | Notes |
+|---|---|---|
+| `timestamps` | `createdAt`, `updatedAt` | Both `timestamptz NOT NULL DEFAULT now()`. `updatedAt` also refreshes on every update. |
+| `authorship` | `createdBy`, `updatedBy` | UUID references to `auth.users`, defaulting to `auth.uid()`. `updatedBy` refreshes to the current user on update. |
+| `auditColumns` | `createdAt`, `updatedAt`, `createdBy`, `updatedBy` | `timestamps` plus `authorship` — the full audit set. |
+| `createdBy` | `created_by` | The individual column from `authorship`, for tables that want only creation tracking. |
+| `updatedBy` | `updated_by` | The individual column from `authorship`. |
+| `authUserId(name?)` | one UUID column | `NOT NULL` UUID referencing `auth.users.id`. Pass `name` to override the column name (defaults to the property's snake_case key). |
+
+### RLS policy helpers
+
+Operation-scoped wrappers over Drizzle's `pgPolicy`. Each takes
+`(name, config?)` and presets the policy's `for` operation, so you don't repeat
+`{ for: "select" }` at every call site. `config` accepts the usual Drizzle
+policy options (`to`, `using`, `withCheck`, `as`).
+
+| Helper | Operation |
+|---|---|
+| `selectPolicy(name, config?)` | `select` |
+| `insertPolicy(name, config?)` | `insert` |
+| `updatePolicy(name, config?)` | `update` |
+| `deletePolicy(name, config?)` | `delete` |
+| `allPolicy(name, config?)` | `all` |
+| `policy(name, config)` | Raw `pgPolicy` alias when you need full control over `for`. |
+| `authUserOwns(ownerColumn)` | SQL fragment `ownerColumn = auth.uid()`, for composing your own policy conditions. |
+
+### Owner policy helpers
+
+Convenience policies scoped to the `authenticated` role that restrict rows to the
+signed-in owner. Each takes `(name, ownerColumn, config?)` and defaults the owner
+check — `using` for reads/deletes, `withCheck` for inserts, both for updates and
+`all` — to `authUserOwns(ownerColumn)`. Pass `using` or `withCheck` in `config`
+to override the default condition.
+
+| Helper | Operation it covers |
+|---|---|
+| `authenticatedOwnerSelectPolicy` | `select` |
+| `authenticatedOwnerInsertPolicy` | `insert` |
+| `authenticatedOwnerUpdatePolicy` | `update` |
+| `authenticatedOwnerDeletePolicy` | `delete` |
+| `authenticatedOwnerAllPolicy` | `all` |
+
+### Supabase primitives
+
+Re-exported from `drizzle-orm/supabase` so roles, the `auth.users` table, and
+helpers all come from one Zeno-owned entrypoint. Reference these — do not
+redeclare Supabase's built-in roles in your schema.
+
+| Export | What it is |
+|---|---|
+| `anonRole` | The `anon` (unauthenticated) role. |
+| `authenticatedRole` | The `authenticated` (signed-in user) role. |
+| `serviceRole` | The `service_role` (RLS-bypassing) role. |
+| `postgresRole` | The `postgres` superuser role. |
+| `supabaseAuthAdminRole` | The `supabase_auth_admin` role that owns the auth schema. |
+| `authUsers` | The Supabase `auth.users` table. |
+| `authUid` | The `auth.uid()` SQL helper for the current user id. |
+| `realtimeMessages` | The Supabase Realtime `messages` table. |
+| `realtimeTopic` | The `realtime.topic()` SQL helper. |
+
+### pg-core aliases
+
+Curated aliases over `drizzle-orm/pg-core` so schema files don't repeat the `pg`
+prefix at every call site. They behave exactly like their Drizzle counterparts.
+
+| Alias | Drizzle export |
+|---|---|
+| `enum` | `pgEnum` |
+| `schema` | `pgSchema` |
+| `view` | `pgView` |
+| `materializedView` | `pgMaterializedView` |
+| `sequence` | `pgSequence` |
+| `role` | `pgRole` |
+| `tableCreator` | `pgTableCreator` |
+| `isEnum` | `isPgEnum` |
+| `isView` | `isPgView` |
+| `isMaterializedView` | `isPgMaterializedView` |
+| `isSchema` | `isPgSchema` |
+| `isSequence` | `isPgSequence` |
+
+## Pitfalls
+
+- Use `table` for user-scoped application tables so RLS is enabled by default.
+- Use `unsecureTable` only when the table is intentionally not protected by
+  RLS.
+- Do not hand-write RLS policies in migration files when the table is otherwise
+  managed by Drizzle. Put `policy(...)`, `selectPolicy(...)`, or owner policy
+  helpers in the schema and generate the migration.
+- Do not manually declare Supabase's built-in roles; import the existing role
+  exports from `@zeno-lib/db/schema`.
