@@ -64,75 +64,223 @@ the table later. For that next layer, see
 
 ## Schema helpers
 
-Everything below is exported from `@zeno-lib/db/schema`. The module is the single
-entrypoint for building Supabase-ready Drizzle schemas: table builders, reusable
-columns, RLS policy helpers, and curated re-exports of the Drizzle and Supabase
-primitives you would otherwise import from several packages.
+Everything below is exported from `@zeno-lib/db/schema`, and all of it is just
+convenience utilities — none of it is required. You can always define tables,
+columns, and RLS policies with Drizzle's own primitives directly whenever you
+need something these utils don't cover. The module simply gathers the common
+cases — table builders, reusable columns, RLS policies, and curated re-exports of
+the Drizzle and Supabase primitives — behind one Zeno-owned entrypoint so you
+don't import them from several packages.
+
+### Anatomy of a table
+
+Every helper slots into one of three places in a table definition. Keep this
+shape in mind — each helper below is tagged with the slot it belongs to.
+
+```typescript
+export const posts = table(   // ① table builder — wraps the table, toggles RLS
+  "posts",
+  {                           // ② columns map — primary key, columns, column builders
+    id: primaryId("uuid"),
+    userId: authUserId(),
+    ...auditColumns,
+  },
+  (t) => [                    // ③ extra callback — indexes, constraints, RLS policies
+    authenticatedOwnerSelectPolicy("posts_owner_select", t.userId),
+  ]
+)
+```
+
+- **① table builder** — wraps the columns and the extra callback.
+- **② columns map** — spread a group (`...auditColumns`) or assign to a key
+  (`userId: authUserId()`).
+- **③ extra callback** — receives the built columns `t` and returns indexes,
+  constraints, and RLS policies.
+
+Each entry below shows the Drizzle it expands to and the SQL that Drizzle Kit
+generates from it.
 
 ### Table builders
 
-| Export | Signature | What it does |
-|---|---|---|
-| `table` | `table(name, columns, extra?)` | snake_case Postgres table builder with **RLS enabled**. Use it for application-owned tables. |
-| `unsecureTable` | `unsecureTable(name, columns, extra?)` | Same builder **without RLS**. Use only for intentionally unprotected tables such as seed or reference data. |
+_Slot ① — wraps the whole table._ Both map camelCase TypeScript keys to
+snake_case database identifiers.
 
-Both map camelCase TypeScript keys to snake_case database identifiers. The
-optional `extra` callback receives the built columns and returns indexes,
-constraints, and RLS policies (see the example above).
+`table(name, columns, extra?)` builds a Postgres table with **RLS enabled** — use
+it for application-owned tables:
+
+```typescript
+table("posts", { /* columns */ }, (t) => [ /* policies */ ])
+```
+
+```sql
+CREATE TABLE "posts" ( /* columns */ );
+ALTER TABLE "posts" ENABLE ROW LEVEL SECURITY;
+```
+
+`unsecureTable(name, columns, extra?)` is the same builder **without** the
+`ENABLE ROW LEVEL SECURITY` line. Use it only for intentionally unprotected
+tables such as seed or reference data.
 
 ### Primary keys
 
-| Export | Result |
-|---|---|
-| `primaryId("uuid")` | Random UUID primary key — `uuid("id").primaryKey().defaultRandom()`. This is the default when called with no argument. |
-| `primaryId("sequential")` | Integer identity primary key — `integer("id").primaryKey().generatedAlwaysAsIdentity()`. |
+_Slot ② — assign to a key in the columns map._
+
+`primaryId("uuid")` is a random UUID key (the default when called with no
+argument):
+
+```typescript
+id: primaryId("uuid") // uuid("id").primaryKey().defaultRandom()
+```
+
+```sql
+"id" uuid PRIMARY KEY DEFAULT gen_random_uuid()
+```
+
+`primaryId("sequential")` is an integer identity key:
+
+```typescript
+id: primaryId("sequential") // integer("id").primaryKey().generatedAlwaysAsIdentity()
+```
+
+```sql
+"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY -- (+ default sequence options)
+```
 
 ### Columns
 
-Spread the column groups into your column map; use the single-column helpers when
-a table needs only part of a group.
+_Slot ② — in the columns map._ Utils that create commonly-used columns so you
+don't redeclare them on every table. They come in two shapes.
 
-| Export | Columns | Notes |
+**Ready-made columns** have fixed database names. Spread a group into your column
+map (`...auditColumns`), or assign a single column to a key.
+
+`timestamps` adds `createdAt` and `updatedAt`:
+
+```typescript
+...timestamps
+// createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+// updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+//   .$onUpdate(() => new Date())
+```
+
+```sql
+"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+```
+
+`updatedAt`'s refresh-on-write comes from Drizzle's `$onUpdate`, which runs in
+your app when you write through Drizzle — it is **not** a SQL trigger, so the
+generated DDL is just the `DEFAULT now()` above.
+
+`authorship` adds `createdBy` and `updatedBy`, UUID references to `auth.users`
+defaulting to the current user:
+
+```typescript
+...authorship
+// createdBy: authUserId("created_by").default(authUid)
+// updatedBy: authUserId("updated_by").default(authUid).$onUpdate(() => authUid)
+```
+
+```sql
+"created_by" uuid DEFAULT (select auth.uid()) NOT NULL,
+"updated_by" uuid DEFAULT (select auth.uid()) NOT NULL
+-- foreign keys are emitted as separate statements:
+ALTER TABLE "<table>" ADD CONSTRAINT "<table>_created_by_users_id_fkey"
+  FOREIGN KEY ("created_by") REFERENCES "auth"."users"("id");
+ALTER TABLE "<table>" ADD CONSTRAINT "<table>_updated_by_users_id_fkey"
+  FOREIGN KEY ("updated_by") REFERENCES "auth"."users"("id");
+```
+
+As with `updatedAt`, `updatedBy`'s refresh to the current user happens in Drizzle
+on write, not in SQL.
+
+`auditColumns` is `timestamps` plus `authorship` — the full four-column audit
+set. `createdBy` and `updatedBy` are also exported individually, for tables that
+want only one of them.
+
+**Column builders** are functions you assign to a key; the column takes its name
+from that key, or from an explicit argument.
+
+`authUserId(name?)` is a `NOT NULL` UUID column referencing `auth.users.id`:
+
+```typescript
+userId: authUserId()           // column name from the key → "user_id"
+ownerId: authUserId("owner_id") // explicit column name
+// uuid(name).notNull().references(() => authUsers.id)
+```
+
+```sql
+"user_id" uuid NOT NULL
+-- foreign key emitted as a separate statement:
+ALTER TABLE "<table>" ADD CONSTRAINT "<table>_user_id_users_id_fkey"
+  FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id");
+```
+
+### RLS policies
+
+_Slot ③ — return them from the extra callback._ Wrappers over Drizzle's
+`pgPolicy` so you don't hand-write the `for` operation or the owner check at
+every call site. Like the rest of this module they are optional — reach for
+`policy(...)` or Drizzle's `pgPolicy` directly when you need full control.
+
+**Operation-scoped policies** preset the policy's `for` operation. Each takes
+`(name, config?)`, and `config` accepts the usual Drizzle policy options (`to`,
+`using`, `withCheck`, `as`). With no `to`, Postgres applies the policy to
+`public`:
+
+```typescript
+selectPolicy("posts_read", { using: authUserOwns(t.userId) })
+// pgPolicy("posts_read", { for: "select", using: ... })
+```
+
+```sql
+CREATE POLICY "posts_read" ON "posts" AS PERMISSIVE FOR SELECT TO public
+  USING ("posts"."user_id" = (select auth.uid()));
+```
+
+These helpers only preset `for` — you still supply the condition. Postgres
+accepts it in a different clause per operation:
+
+| Export | `for` | Condition goes in |
 |---|---|---|
-| `timestamps` | `createdAt`, `updatedAt` | Both `timestamptz NOT NULL DEFAULT now()`. `updatedAt` also refreshes on every update. |
-| `authorship` | `createdBy`, `updatedBy` | UUID references to `auth.users`, defaulting to `auth.uid()`. `updatedBy` refreshes to the current user on update. |
-| `auditColumns` | `createdAt`, `updatedAt`, `createdBy`, `updatedBy` | `timestamps` plus `authorship` — the full audit set. |
-| `createdBy` | `created_by` | The individual column from `authorship`, for tables that want only creation tracking. |
-| `updatedBy` | `updated_by` | The individual column from `authorship`. |
-| `authUserId(name?)` | one UUID column | `NOT NULL` UUID referencing `auth.users.id`. Pass `name` to override the column name (defaults to the property's snake_case key). |
+| `selectPolicy(name, config?)` | `SELECT` | `using` |
+| `insertPolicy(name, config?)` | `INSERT` | `withCheck` |
+| `updatePolicy(name, config?)` | `UPDATE` | `using` + `withCheck` |
+| `deletePolicy(name, config?)` | `DELETE` | `using` |
+| `allPolicy(name, config?)` | `ALL` | `using` + `withCheck` |
+| `policy(name, config)` | raw `pgPolicy` — you set `for` yourself | — |
 
-### RLS policy helpers
+`authUserOwns(ownerColumn)` is not a policy but the condition most of them use —
+the SQL fragment for composing `using` / `withCheck`:
 
-Operation-scoped wrappers over Drizzle's `pgPolicy`. Each takes
-`(name, config?)` and presets the policy's `for` operation, so you don't repeat
-`{ for: "select" }` at every call site. `config` accepts the usual Drizzle
-policy options (`to`, `using`, `withCheck`, `as`).
+```typescript
+authUserOwns(t.userId) // sql`${t.userId} = ${authUid}`
+```
 
-| Helper | Operation |
-|---|---|
-| `selectPolicy(name, config?)` | `select` |
-| `insertPolicy(name, config?)` | `insert` |
-| `updatePolicy(name, config?)` | `update` |
-| `deletePolicy(name, config?)` | `delete` |
-| `allPolicy(name, config?)` | `all` |
-| `policy(name, config)` | Raw `pgPolicy` alias when you need full control over `for`. |
-| `authUserOwns(ownerColumn)` | SQL fragment `ownerColumn = auth.uid()`, for composing your own policy conditions. |
+```sql
+"posts"."user_id" = (select auth.uid())
+```
 
-### Owner policy helpers
+**Owner policies** build on those: they force `TO authenticated` and default the
+owner check to `authUserOwns(ownerColumn)`. Each takes `(name, ownerColumn,
+config?)`; pass `using` or `withCheck` to override.
 
-Convenience policies scoped to the `authenticated` role that restrict rows to the
-signed-in owner. Each takes `(name, ownerColumn, config?)` and defaults the owner
-check — `using` for reads/deletes, `withCheck` for inserts, both for updates and
-`all` — to `authUserOwns(ownerColumn)`. Pass `using` or `withCheck` in `config`
-to override the default condition.
+```typescript
+authenticatedOwnerSelectPolicy("posts_owner_select", t.userId)
+```
 
-| Helper | Operation it covers |
-|---|---|
-| `authenticatedOwnerSelectPolicy` | `select` |
-| `authenticatedOwnerInsertPolicy` | `insert` |
-| `authenticatedOwnerUpdatePolicy` | `update` |
-| `authenticatedOwnerDeletePolicy` | `delete` |
-| `authenticatedOwnerAllPolicy` | `all` |
+```sql
+CREATE POLICY "posts_owner_select" ON "posts" AS PERMISSIVE FOR SELECT
+  TO "authenticated" USING ("posts"."user_id" = (select auth.uid()));
+```
+
+| Export | `for` | Owner check applied to |
+|---|---|---|
+| `authenticatedOwnerSelectPolicy` | `SELECT` | `using` |
+| `authenticatedOwnerInsertPolicy` | `INSERT` | `withCheck` |
+| `authenticatedOwnerUpdatePolicy` | `UPDATE` | `using` + `withCheck` |
+| `authenticatedOwnerDeletePolicy` | `DELETE` | `using` |
+| `authenticatedOwnerAllPolicy` | `ALL` | `using` + `withCheck` |
 
 ### Supabase primitives
 

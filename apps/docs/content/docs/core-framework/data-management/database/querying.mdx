@@ -122,6 +122,11 @@ const db = createSupabaseDrizzle({ schema })
 await db.admin.select().from(schema.posts)
 ```
 
+Under the hood `db.admin` does not switch roles. It runs as the role your
+`DATABASE_URL` connection authenticates as — the `postgres` role by default —
+which is not subject to RLS. That direct connection role, not `service_role`, is
+what makes admin queries bypass policies.
+
 `db.admin` is appropriate for seed scripts, webhooks, cron jobs, admin tools,
 and background jobs. It should not be used for user-scoped reads or writes.
 

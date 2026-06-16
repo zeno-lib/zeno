@@ -20,7 +20,7 @@ Provides Next.js–aware factories for Supabase clients (browser, server, middle
 | `@zeno-lib/supabase/supabase-middleware` | Custom middleware compositions | `updateSession(request)` — the actual cookie-refresh + auth-gate logic |
 | `@zeno-lib/supabase/image-loader` | `next.config.mjs` `images.loaderFile` | Supabase Storage transformation URL builder |
 
-Both `createClient` factories accept optional `(supabaseUrl, supabaseKey)` and fall back to `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`. They throw `"Missing Supabase ... environment variables"` if neither side provides values — this is the only error path the factories own.
+Both `createClient` factories accept optional `(supabaseUrl, supabaseKey)` and fall back to `NEXT_PUBLIC_SUPABASE_URL` for the URL and, for the key, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (the new publishable key) before `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the legacy anon key, deprecated by Supabase end of 2026). `supabase-middleware.ts` resolves the key with the same publishable-then-anon fallback. They throw `"Missing Supabase ... environment variables"` if neither side provides values — this is the only error path the factories own.
 
 The image loader resolves the project ID from `NEXT_PUBLIC_SUPABASE_STORAGE_PROJECT_ID` (preferred) or `NEXT_PUBLIC_SUPABASE_PROJECT_ID`. URLs starting with `http` pass through unchanged; relative paths are rewritten to `https://<projectId>.supabase.co/storage/v1/object/public/<src>?width=<w>&quality=<q|75>`.
 
