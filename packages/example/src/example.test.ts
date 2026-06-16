@@ -23,49 +23,49 @@ describe("createSupabaseDrizzle", () => {
 
     expect(db.admin).toBeDefined()
     // Chainable single-statement query surface.
-    expect(db.rls).toBeDefined()
+    expect(db.asUser).toBeDefined()
     // Callback form for multi-statement RLS transactions.
-    expect(db.rlsTransaction).toEqual(expect.any(Function))
+    expect(db.asUserTransaction).toEqual(expect.any(Function))
     expect(db.close).toEqual(expect.any(Function))
 
     await db.close({ timeout: 0 })
   })
 
-  it("fails loudly when rlsTransaction is used without a Supabase client", async () => {
+  it("fails loudly when asUserTransaction is used without a Supabase client", async () => {
     const db = createSupabaseDrizzle({
       connectionString: LOCAL_DB_URL,
       schema: {},
     })
 
-    await expect(db.rlsTransaction(async () => [])).rejects.toThrow(
-      "Missing Supabase client for RLS"
+    await expect(db.asUserTransaction(async () => [])).rejects.toThrow(
+      "Missing Supabase client"
     )
 
     await db.close({ timeout: 0 })
   })
 
-  it("fails loudly when the chainable rls is used without a Supabase client", async () => {
+  it("fails loudly when the chainable asUser is used without a Supabase client", async () => {
     const db = createSupabaseDrizzle({
       connectionString: LOCAL_DB_URL,
       schema: {},
     })
 
-    await expect(db.rls.execute(sql`select 1`)).rejects.toThrow(
-      "Missing Supabase client for RLS"
+    await expect(db.asUser.execute(sql`select 1`)).rejects.toThrow(
+      "Missing Supabase client"
     )
 
     await db.close({ timeout: 0 })
   })
 
-  it("fails loudly when rlsTransaction is given a null Supabase client", async () => {
+  it("fails loudly when asUserTransaction is given a null Supabase client", async () => {
     const db = createSupabaseDrizzle({
       connectionString: LOCAL_DB_URL,
       schema: {},
       supabase: null,
     })
 
-    await expect(db.rlsTransaction(async () => [])).rejects.toThrow(
-      "Missing Supabase client for RLS"
+    await expect(db.asUserTransaction(async () => [])).rejects.toThrow(
+      "Missing Supabase client"
     )
 
     await db.close({ timeout: 0 })

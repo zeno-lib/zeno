@@ -117,7 +117,7 @@ describe("getDrizzleSupabaseClient", () => {
   })
 })
 
-describe("createSupabaseDrizzle chainable rls", () => {
+describe("createSupabaseDrizzle chainable asUser", () => {
   it("records and replays a select() chain inside one RLS transaction", async () => {
     const { events, selectResult } = mockClients()
     const db = createSupabaseDrizzle({
@@ -126,7 +126,7 @@ describe("createSupabaseDrizzle chainable rls", () => {
       supabase: mockSupabase(),
     })
 
-    const rows = await db.rls.select().from({} as never)
+    const rows = await db.asUser.select().from({} as never)
 
     expect(rows).toBe(selectResult)
     // The transaction sets RLS context (2 execute calls) before the recorded
@@ -140,7 +140,7 @@ describe("createSupabaseDrizzle chainable rls", () => {
     ])
   })
 
-  it("replays the relational query API (db.rls.query.table.findMany)", async () => {
+  it("replays the relational query API (db.asUser.query.table.findMany)", async () => {
     const { events, findManyResult } = mockClients()
     const db = createSupabaseDrizzle({
       connectionString: CONNECTION,
@@ -149,7 +149,7 @@ describe("createSupabaseDrizzle chainable rls", () => {
     })
 
     const rows = await (
-      db.rls as unknown as {
+      db.asUser as unknown as {
         query: { posts: { findMany: () => Promise<unknown> } }
       }
     ).query.posts.findMany()
@@ -167,12 +167,12 @@ describe("createSupabaseDrizzle chainable rls", () => {
       schema: {},
     })
 
-    await expect(db.rls.select().from({} as never)).rejects.toThrow(
-      "Missing Supabase client for RLS"
+    await expect(db.asUser.select().from({} as never)).rejects.toThrow(
+      "Missing Supabase client"
     )
   })
 
-  it("throws a helpful error if db.rls is called like the old callback form", () => {
+  it("throws a helpful error if db.asUser is called like the old callback form", () => {
     mockClients()
     const db = createSupabaseDrizzle({
       connectionString: CONNECTION,
@@ -180,8 +180,8 @@ describe("createSupabaseDrizzle chainable rls", () => {
       supabase: mockSupabase(),
     })
 
-    expect(() => (db.rls as unknown as () => void)()).toThrow(
-      "db.rls is chainable"
+    expect(() => (db.asUser as unknown as () => void)()).toThrow(
+      "db.asUser is chainable"
     )
   })
 

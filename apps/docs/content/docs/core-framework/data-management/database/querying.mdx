@@ -39,9 +39,11 @@ intentionally connects to a different database URL.
 
 ## Query with RLS
 
-Every user-scoped query should run through `db.rls`. For a single statement,
-chain off `db.rls` exactly like a Drizzle client, and the query runs inside an
-RLS-scoped transaction automatically:
+Run user-scoped queries through `db.asUser`. It runs each query **as the
+signed-in Supabase user**, so `auth.uid()` resolves to that user and their RLS
+policies apply. For a single statement, chain off `db.asUser` exactly like a
+Drizzle client, and the query runs inside an RLS-scoped transaction
+automatically:
 
 ```typescript title="app/posts/route.ts"
 import { createSupabaseDrizzle } from "@zeno-lib/db"
@@ -51,10 +53,10 @@ import * as schema from "{project}-db"
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ schema, supabase })
 
-const myPosts = await db.rls.select().from(schema.posts)
+const myPosts = await db.asUser.select().from(schema.posts)
 ```
 
-Awaiting a `db.rls` chain calls `supabase.auth.getClaims()`, opens a
+Awaiting a `db.asUser` chain calls `supabase.auth.getClaims()`, opens a
 transaction, installs the verified JWT claims into transaction-local Postgres
 settings (so `auth.uid()` and `auth.jwt()` work inside RLS policies), and runs
 the query as the claims' role. Each awaited chain is its own transaction.
@@ -63,7 +65,7 @@ The RLS role is limited to `anon` or `authenticated`. Unknown role claims fall
 back to `anon`, and `service_role` never runs through the request-scoped RLS
 path.
 
-Awaiting a `db.rls` query without passing `supabase` to
+Awaiting a `db.asUser` query without passing `supabase` to
 `createSupabaseDrizzle(...)` rejects immediately, so missing auth context does
 not silently become an anon query.
 
@@ -83,18 +85,18 @@ const relations = defineRelations(schema)
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ relations, schema, supabase })
 
-const myPosts = await db.rls.query.posts.findMany()
+const myPosts = await db.asUser.query.posts.findMany()
 ```
 
 ### Multiple statements in one transaction
 
 When you need several statements to share one atomic RLS transaction (for
 example a read followed by a dependent write), use the callback form
-`db.rlsTransaction(...)`. Every statement on the `tx` argument runs under the
+`db.asUserTransaction(...)`. Every statement on the `tx` argument runs under the
 same claims and role:
 
 ```typescript title="app/posts/route.ts"
-const created = await db.rlsTransaction(async (tx) => {
+const created = await db.asUserTransaction(async (tx) => {
   const [post] = await tx
     .insert(schema.posts)
     .values({ title: "Hello" })
@@ -104,7 +106,7 @@ const created = await db.rlsTransaction(async (tx) => {
 })
 ```
 
-Reach for `db.rlsTransaction` only when a single chained `db.rls` query is not
+Reach for `db.asUserTransaction` only when a single chained `db.asUser` query is not
 enough; one chained statement is the common case.
 
 ## Use admin queries carefully
@@ -163,8 +165,8 @@ not decode or trust raw JWT strings.
 - Do not pass raw access token strings or unverified session payloads to RLS
   helpers.
 - Do not create fresh schema object literals per request.
-- Do not run queries outside `db.rls` / `db.rlsTransaction(...)` when you expect
+- Do not run queries outside `db.asUser` / `db.asUserTransaction(...)` when you expect
   RLS policies to apply. `db.admin` bypasses them.
-- Do not call `db.rls` like the old callback (`db.rls((tx) => ...)`); it now
-  throws. Chain off it (`db.rls.select()...`) or use `db.rlsTransaction(...)`
+- Do not call `db.asUser` like the old callback (`db.asUser((tx) => ...)`); it now
+  throws. Chain off it (`db.asUser.select()...`) or use `db.asUserTransaction(...)`
   for multi-statement work.

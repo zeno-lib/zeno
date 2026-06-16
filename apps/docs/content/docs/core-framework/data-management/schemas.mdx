@@ -104,7 +104,7 @@ export const postSchema = defineTableSchema(posts)
 | `postSchema.update` | Data accepted before an update. Updatable fields are optional; generated columns are omitted. |
 
 These are plain Zod schemas. You can parse payloads in a Server Action or Route
-Handler before querying through `db.rls` / `db.rlsTransaction(...)` or
+Handler before querying through `db.asUser` / `db.asUserTransaction(...)` or
 `db.admin`:
 
 ```ts title="app/posts/actions.ts"

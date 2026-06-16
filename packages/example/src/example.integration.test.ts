@@ -81,7 +81,7 @@ describe("db.admin", () => {
   })
 })
 
-describe("db.rls (chainable)", () => {
+describe("db.asUser (chainable)", () => {
   it("uses the Supabase client passed at creation time", async () => {
     const supabase = createSupabase(TOKEN)
     const db = createSupabaseDrizzle({
@@ -91,19 +91,19 @@ describe("db.rls (chainable)", () => {
       supabase,
     })
 
-    const result = await db.rls.execute(sql`select current_user as role`)
+    const result = await db.asUser.execute(sql`select current_user as role`)
 
     expect(supabase.auth.getClaims).toHaveBeenCalledOnce()
     expect(result[0]).toEqual({ role: "authenticated" })
   })
 
-  it("switches the role to the verified claims' role inside rls", async () => {
+  it("switches the role to the verified claims' role inside asUser", async () => {
     const db = createSupabaseDrizzle({
       relations,
       schema,
       supabase: createSupabase(TOKEN),
     })
-    const result = await db.rls.execute(sql`select current_user as role`)
+    const result = await db.asUser.execute(sql`select current_user as role`)
     expect(result[0]).toEqual({ role: "authenticated" })
   })
 
@@ -113,7 +113,7 @@ describe("db.rls (chainable)", () => {
       schema,
       supabase: createSupabase(TOKEN),
     })
-    const result = await db.rls.execute(
+    const result = await db.asUser.execute(
       sql`select current_setting('request.jwt.claims', true) as claims, auth.uid() as uid`
     )
     const row = result[0] as { claims: string; uid: string }
@@ -127,7 +127,7 @@ describe("db.rls (chainable)", () => {
       schema,
       supabase: createSupabase({ role: "postgres" }),
     })
-    const result = await db.rls.execute(sql`select current_user as role`)
+    const result = await db.asUser.execute(sql`select current_user as role`)
     expect(result[0]).toEqual({ role: "anon" })
   })
 
@@ -140,7 +140,7 @@ describe("db.rls (chainable)", () => {
         sub: TOKEN.sub,
       }),
     })
-    const result = await db.rls.execute(sql`select current_user as role`)
+    const result = await db.asUser.execute(sql`select current_user as role`)
     expect(result[0]).toEqual({ role: "anon" })
   })
 
@@ -150,7 +150,7 @@ describe("db.rls (chainable)", () => {
       schema,
       supabase: createSupabase({ role: "service_role", sub: TOKEN.sub }),
     })
-    const result = await db.rls.execute(
+    const result = await db.asUser.execute(
       sql`select current_user as role, current_setting('request.jwt.claims', true) as claims`
     )
     const row = result[0] as { role: string; claims: string }
@@ -166,7 +166,7 @@ describe("db.rls (chainable)", () => {
       schema,
       supabase: makeAccessToken(TOKEN) as unknown as SupabaseTokenClaims,
     })
-    const result = await db.rls.execute(sql`select current_user as role`)
+    const result = await db.asUser.execute(sql`select current_user as role`)
     expect(result[0]).toEqual({ role: "anon" })
   })
 
@@ -176,7 +176,7 @@ describe("db.rls (chainable)", () => {
       schema,
       supabase: createSupabase(TOKEN),
     })
-    await db.rls.execute(sql`select 1`)
+    await db.asUser.execute(sql`select 1`)
     // The admin pool is a separate connection — never role-switched, and the
     // claim was never set on it (null, not "").
     const result = await db.admin.execute(
@@ -191,7 +191,7 @@ describe("db.rls (chainable)", () => {
       schema,
       supabase: createSupabase(TOKEN),
     })
-    const rows = await db.rls.select().from(posts)
+    const rows = await db.asUser.select().from(posts)
     expect(rows).toEqual([])
   })
 
@@ -201,12 +201,12 @@ describe("db.rls (chainable)", () => {
       schema,
       supabase: createSupabase(TOKEN),
     })
-    const rows = await db.rls.query.posts.findMany()
+    const rows = await db.asUser.query.posts.findMany()
     expect(rows).toEqual([])
   })
 })
 
-describe("db.rlsTransaction (multi-statement)", () => {
+describe("db.asUserTransaction (multi-statement)", () => {
   it("runs several statements under one role-switched transaction", async () => {
     const db = createSupabaseDrizzle({
       relations,
@@ -214,7 +214,7 @@ describe("db.rlsTransaction (multi-statement)", () => {
       supabase: createSupabase(TOKEN),
     })
 
-    const result = await db.rlsTransaction(async (tx) => {
+    const result = await db.asUserTransaction(async (tx) => {
       const role = await tx.execute(sql`select current_user as role`)
       const uid = await tx.execute(sql`select auth.uid() as uid`)
       return { role: role[0], uid: uid[0] }
