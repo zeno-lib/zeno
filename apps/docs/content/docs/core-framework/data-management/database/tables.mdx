@@ -10,6 +10,11 @@ Each table lives in its own file under `{project}-db/src/schemas/`, where
 generates migrations, and Drizzle uses the same exported table objects when you
 write queries.
 
+The example below is a complete table definition. It is here to show how the
+pieces fit together; every helper it uses (`table`, `primaryId`, `authUserId`,
+`auditColumns`, and the owner policies) is documented in detail under
+[Schema helpers](#schema-helpers) further down.
+
 ```typescript lineNumbers title="{project}-db/src/schemas/posts.ts"
 import {
   auditColumns,
@@ -41,11 +46,6 @@ export type InsertPost = typeof posts.$inferInsert
 export type SelectPost = typeof posts.$inferSelect
 ```
 
-`table` is Zeno's default table helper. It uses Drizzle's snake_case table
-builder, so TypeScript properties like `userId` become database identifiers like
-`user_id`, and it enables RLS by default. Use `unsecureTable` only for tables
-that intentionally should not have RLS, such as seed-only reference data.
-
 Re-export every table from a single `{project}-db/src/schema.ts` barrel. That
 barrel is what the [Drizzle Kit config](/docs/core-framework/data-management/database/migrations)
 reads and what you pass to `createSupabaseDrizzle({ schema })` when
@@ -65,36 +65,36 @@ the table later. For that next layer, see
 ## Schema helpers
 
 Everything below is exported from `@zeno-lib/db/schema`, and all of it is just
-convenience utilities — none of it is required. You can always define tables,
+convenience utilities, none of it is required. You can always define tables,
 columns, and RLS policies with Drizzle's own primitives directly whenever you
 need something these utils don't cover. The module simply gathers the common
-cases — table builders, reusable columns, RLS policies, and curated re-exports of
-the Drizzle and Supabase primitives — behind one Zeno-owned entrypoint so you
+cases (table builders, reusable columns, RLS policies, and curated re-exports of
+the Drizzle and Supabase primitives) behind one Zeno-owned entrypoint so you
 don't import them from several packages.
 
 ### Anatomy of a table
 
 Every helper slots into one of three places in a table definition. Keep this
-shape in mind — each helper below is tagged with the slot it belongs to.
+shape in mind. Each helper below is tagged with the slot it belongs to.
 
 ```typescript
-export const posts = table(   // ① table builder — wraps the table, toggles RLS
+export const posts = table(   // ① table builder: wraps the table, toggles RLS
   "posts",
-  {                           // ② columns map — primary key, columns, column builders
+  {                           // ② columns map: primary key, columns, column builders
     id: primaryId("uuid"),
     userId: authUserId(),
     ...auditColumns,
   },
-  (t) => [                    // ③ extra callback — indexes, constraints, RLS policies
+  (t) => [                    // ③ extra callback: indexes, constraints, RLS policies
     authenticatedOwnerSelectPolicy("posts_owner_select", t.userId),
   ]
 )
 ```
 
-- **① table builder** — wraps the columns and the extra callback.
-- **② columns map** — spread a group (`...auditColumns`) or assign to a key
+- **① table builder**: wraps the columns and the extra callback.
+- **② columns map**: spread a group (`...auditColumns`) or assign to a key
   (`userId: authUserId()`).
-- **③ extra callback** — receives the built columns `t` and returns indexes,
+- **③ extra callback**: receives the built columns `t` and returns indexes,
   constraints, and RLS policies.
 
 Each entry below shows the Drizzle it expands to and the SQL that Drizzle Kit
@@ -102,10 +102,10 @@ generates from it.
 
 ### Table builders
 
-_Slot ① — wraps the whole table._ Both map camelCase TypeScript keys to
-snake_case database identifiers.
+_Slot ①: wraps the whole table._ Both map camelCase TypeScript keys to
+snake_case database identifiers, so `userId` becomes `user_id`.
 
-`table(name, columns, extra?)` builds a Postgres table with **RLS enabled** — use
+`table(name, columns, extra?)` builds a Postgres table with **RLS enabled**. Use
 it for application-owned tables:
 
 ```typescript
@@ -123,7 +123,7 @@ tables such as seed or reference data.
 
 ### Primary keys
 
-_Slot ② — assign to a key in the columns map._
+_Slot ②: assign to a key in the columns map._
 
 `primaryId("uuid")` is a random UUID key (the default when called with no
 argument):
@@ -148,7 +148,7 @@ id: primaryId("sequential") // integer("id").primaryKey().generatedAlwaysAsIdent
 
 ### Columns
 
-_Slot ② — in the columns map._ Utils that create commonly-used columns so you
+_Slot ②: in the columns map._ Utils that create commonly-used columns so you
 don't redeclare them on every table. They come in two shapes.
 
 **Ready-made columns** have fixed database names. Spread a group into your column
@@ -169,7 +169,7 @@ map (`...auditColumns`), or assign a single column to a key.
 ```
 
 `updatedAt`'s refresh-on-write comes from Drizzle's `$onUpdate`, which runs in
-your app when you write through Drizzle — it is **not** a SQL trigger, so the
+your app when you write through Drizzle. It is **not** a SQL trigger, so the
 generated DDL is just the `DEFAULT now()` above.
 
 `authorship` adds `createdBy` and `updatedBy`, UUID references to `auth.users`
@@ -194,7 +194,7 @@ ALTER TABLE "<table>" ADD CONSTRAINT "<table>_updated_by_users_id_fkey"
 As with `updatedAt`, `updatedBy`'s refresh to the current user happens in Drizzle
 on write, not in SQL.
 
-`auditColumns` is `timestamps` plus `authorship` — the full four-column audit
+`auditColumns` is `timestamps` plus `authorship`, the full four-column audit
 set. `createdBy` and `updatedBy` are also exported individually, for tables that
 want only one of them.
 
@@ -218,9 +218,9 @@ ALTER TABLE "<table>" ADD CONSTRAINT "<table>_user_id_users_id_fkey"
 
 ### RLS policies
 
-_Slot ③ — return them from the extra callback._ Wrappers over Drizzle's
+_Slot ③: return them from the extra callback._ Wrappers over Drizzle's
 `pgPolicy` so you don't hand-write the `for` operation or the owner check at
-every call site. Like the rest of this module they are optional — reach for
+every call site. Like the rest of this module they are optional: reach for
 `policy(...)` or Drizzle's `pgPolicy` directly when you need full control.
 
 **Operation-scoped policies** preset the policy's `for` operation. Each takes
@@ -238,7 +238,7 @@ CREATE POLICY "posts_read" ON "posts" AS PERMISSIVE FOR SELECT TO public
   USING ("posts"."user_id" = (select auth.uid()));
 ```
 
-These helpers only preset `for` — you still supply the condition. Postgres
+These helpers only preset `for`; you still supply the condition. Postgres
 accepts it in a different clause per operation:
 
 | Export | `for` | Condition goes in |
@@ -248,9 +248,9 @@ accepts it in a different clause per operation:
 | `updatePolicy(name, config?)` | `UPDATE` | `using` + `withCheck` |
 | `deletePolicy(name, config?)` | `DELETE` | `using` |
 | `allPolicy(name, config?)` | `ALL` | `using` + `withCheck` |
-| `policy(name, config)` | raw `pgPolicy` — you set `for` yourself | — |
+| `policy(name, config)` | raw `pgPolicy`, you set `for` yourself | n/a |
 
-`authUserOwns(ownerColumn)` is not a policy but the condition most of them use —
+`authUserOwns(ownerColumn)` is not a policy but the condition most of them use,
 the SQL fragment for composing `using` / `withCheck`:
 
 ```typescript
@@ -285,7 +285,7 @@ CREATE POLICY "posts_owner_select" ON "posts" AS PERMISSIVE FOR SELECT
 ### Supabase primitives
 
 Re-exported from `drizzle-orm/supabase` so roles, the `auth.users` table, and
-helpers all come from one Zeno-owned entrypoint. Reference these — do not
+helpers all come from one Zeno-owned entrypoint. Reference these; do not
 redeclare Supabase's built-in roles in your schema.
 
 | Export | What it is |

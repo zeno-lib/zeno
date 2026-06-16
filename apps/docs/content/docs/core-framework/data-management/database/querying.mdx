@@ -27,8 +27,6 @@ import * as schema from "{project}-db"
 
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ schema, supabase })
-
-const mine = await db.rls.select().from(schema.posts)
 ```
 
 Pass the imported schema module object to `createSupabaseDrizzle(...)`. Do not
@@ -42,7 +40,7 @@ intentionally connects to a different database URL.
 ## Query with RLS
 
 Every user-scoped query should run through `db.rls`. For a single statement,
-chain off `db.rls` exactly like a Drizzle client — the query runs inside an
+chain off `db.rls` exactly like a Drizzle client, and the query runs inside an
 RLS-scoped transaction automatically:
 
 ```typescript title="app/posts/route.ts"
@@ -53,7 +51,7 @@ import * as schema from "{project}-db"
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ schema, supabase })
 
-const mine = await db.rls.select().from(schema.posts)
+const myPosts = await db.rls.select().from(schema.posts)
 ```
 
 Awaiting a `db.rls` chain calls `supabase.auth.getClaims()`, opens a
@@ -71,8 +69,9 @@ not silently become an anon query.
 
 ### Relational queries
 
-The relational query API works the same way once you pass a `relations` object
-(from Drizzle's `defineRelations`) to `createSupabaseDrizzle(...)`:
+The [relational query API](https://orm.drizzle.team/docs/relations-v2) works the
+same way once you pass a `relations` object (from Drizzle's `defineRelations`) to
+`createSupabaseDrizzle(...)`:
 
 ```typescript title="app/posts/route.ts"
 import { createSupabaseDrizzle } from "@zeno-lib/db"
@@ -84,7 +83,7 @@ const relations = defineRelations(schema)
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ relations, schema, supabase })
 
-const mine = await db.rls.query.posts.findMany()
+const myPosts = await db.rls.query.posts.findMany()
 ```
 
 ### Multiple statements in one transaction
@@ -106,7 +105,7 @@ const created = await db.rlsTransaction(async (tx) => {
 ```
 
 Reach for `db.rlsTransaction` only when a single chained `db.rls` query is not
-enough — one chained statement is the common case.
+enough; one chained statement is the common case.
 
 ## Use admin queries carefully
 
@@ -122,10 +121,9 @@ const db = createSupabaseDrizzle({ schema })
 await db.admin.select().from(schema.posts)
 ```
 
-Under the hood `db.admin` does not switch roles. It runs as the role your
-`DATABASE_URL` connection authenticates as — the `postgres` role by default —
-which is not subject to RLS. That direct connection role, not `service_role`, is
-what makes admin queries bypass policies.
+Under the hood `db.admin` does not switch roles. It runs as the role the client
+connects as (the `postgres` role by default), which is not subject to RLS. That
+connection role, not `service_role`, is what makes admin queries bypass policies.
 
 `db.admin` is appropriate for seed scripts, webhooks, cron jobs, admin tools,
 and background jobs. It should not be used for user-scoped reads or writes.

@@ -33,7 +33,7 @@ The preset:
 - Keeps Supabase's built-in roles marked as existing.
 
 You can still pass Drizzle Kit overrides for package-specific credentials or
-paths — for example, a separate migrations connection string:
+paths, for example a separate migrations connection string:
 
 ```typescript title="{project}-db/drizzle.config.ts"
 import "dotenv/config"
@@ -48,37 +48,15 @@ export default defineDrizzleConfig({
 
 ## Generate migrations
 
-Recommended package scripts:
+With the [package scripts](/docs/core-framework/data-management/database#package-scripts)
+from installation in place, `db:generate` reads your TypeScript schema and writes
+a SQL migration under `supabase/migrations`, and `db:migrate` applies generated
+migrations to a database and records them in Drizzle Kit's migration table.
 
-```json title="{project}-db/package.json"
-{
-  "scripts": {
-    "dev": "pnpm exec supabase start",
-    "stop": "pnpm exec supabase stop",
-    "reset": "pnpm exec supabase db reset && pnpm db:seed",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:seed": "node src/seed.ts"
-  }
-}
-```
-
-What each script does:
-
-- `dev` starts your local Supabase stack, including local Postgres.
-- `stop` stops the local Supabase stack.
-- `reset` rebuilds the local database from migration files, then runs your seed
-  script.
-- `db:generate` reads your TypeScript schema and writes a SQL migration under
-  `supabase/migrations`.
-- `db:migrate` applies generated migrations to a database and records them in
-  Drizzle Kit's migration table.
-- `db:seed` runs your project-owned seed script.
-
-Author tables and RLS policies in your Drizzle schema, run
-`drizzle-kit generate`, review the generated SQL, and commit the generated SQL
-under `supabase/migrations`. Apply generated migrations with
-`drizzle-kit migrate` in environments where the database is not reset from
+Author tables and RLS policies in your Drizzle schema, run `db:generate`
+(`drizzle-kit generate`), review the generated SQL, and commit it under
+`supabase/migrations`. Apply generated migrations with `db:migrate`
+(`drizzle-kit migrate`) in environments where the database is not reset from
 scratch.
 
 ## Pitfalls

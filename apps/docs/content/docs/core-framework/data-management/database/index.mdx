@@ -12,7 +12,7 @@ type-safe schema definitions, migrations, and server-side queries. The
 TypeScript, generate SQL migrations, and run queries with Supabase Row Level
 Security (RLS) applied correctly.
 
-This guide starts from the first table. You do not need to have used Drizzle,
+To read this guide, you do not need to have used Drizzle,
 RLS, or `@zeno-lib/db` before.
 
 ## Concepts
@@ -37,25 +37,14 @@ Postgres requests run as database roles. The roles you meet most often are:
   data that depends on who the user is.
 - `service_role`: a trusted role that bypasses RLS, for code paths where you
   intentionally do not want user-scoped policies to apply.
-- `postgres`: the role your `DATABASE_URL` connection authenticates as
-  (`postgres` by default). It also bypasses RLS.
+- `postgres`: the role the database client connects as by default. It also
+  bypasses RLS.
 
 Zeno connects to Postgres directly rather than through Supabase's API, so it maps
 onto these roles itself: RLS-scoped queries run as `anon` or `authenticated`, and
 trusted admin queries run as the `postgres` connection role. Zeno's clients never
-switch into `service_role` — it is exported only so you can target it from your
+switch into `service_role`. It is exported only so you can target it from your
 own RLS policies if you need to.
-
-<Callout type="info">
-These are Postgres **roles**, not Supabase **API keys**. Supabase is replacing
-its legacy `anon` and `service_role` API keys with publishable (`sb_publishable_…`)
-and secret (`sb_secret_…`) keys, but
-[that change](https://supabase.com/docs/guides/getting-started/api-keys) is about
-API keys passed to the Supabase client — it does not touch these database roles.
-Zeno's data layer connects to Postgres with a connection string and uses no API
-key at all; the keys only matter for the Supabase client used in
-[authentication](/docs/core-framework/user-management/authentication).
-</Callout>
 
 Inside RLS policies, Supabase helpers expose information about the current
 request:
@@ -91,15 +80,19 @@ application data Zeno queries Postgres directly with Drizzle. Here is the
 reasoning.
 
 - **SQL, not a query meta-language.** The Supabase data API builds queries
-  through PostgREST's filter and resource-embedding syntax — a meta-language
+  through PostgREST's filter and resource-embedding syntax, a meta-language
   layered over SQL. It reads nicely for simple lookups, but you soon meet its
-  edges: joins beyond embedded resources, CTEs, window functions, set
-  operations, richer aggregations, and conditional logic. Drizzle expresses all
-  of these because it *is* SQL with TypeScript types.
+  edges: joins beyond embedded resources, richer aggregations, conditional
+  logic, and other advanced SQL features. Drizzle expresses all of these because
+  it *is* SQL with TypeScript types.
 - **No forced workarounds.** When the meta-language cannot express a query you
   either split it into several round-trips or push it into an RPC function. Both
   tend to produce slower queries than the single statement you would have
   written in SQL, so the limitation quietly costs performance.
+- **Relational writes, not just reads.** PostgREST can embed related rows when
+  reading, but it has no relational insert or update, so nested writes turn into
+  several calls you sequence yourself. Drizzle gives you the full range of writes,
+  and real transactions to group them.
 - **Fewer layers between app and database.** The JavaScript client sends HTTP to
   PostgREST, which parses the request, plans it, and serializes rows to JSON.
   Drizzle uses a direct `postgres-js` connection to Postgres and skips the
@@ -114,15 +107,21 @@ reasoning.
   regenerating client types to match.
 - **End-to-end types from the source of truth.** Query result types are inferred
   from the same table objects that drive migrations, so a schema change surfaces
-  as a type error at every call site — there is no separate generated-types file
-  to regenerate and keep in sync.
+  as a type error at every call site, with no separate generated-types file to
+  regenerate and keep in sync.
+- **No runaway type inference.** The Supabase client derives result types from a
+  generated types file, and on larger schemas or nested embeds TypeScript can
+  give up with `Type instantiation is excessively deep and possibly infinite`
+  ([supabase-js #808](https://github.com/supabase/supabase-js/issues/808)).
+  Drizzle infers types straight from your table objects, so it does not hit that
+  wall.
 - **Seeding in TypeScript too.** Seed scripts run through the same Drizzle schema
   and client as the rest of the app, so you write seed data in TypeScript with
   full types instead of maintaining separate SQL or dashboard steps. That is more
   flexible and stays in sync with the schema as it changes.
 - **Less locked in to Supabase.** Zeno relies on Supabase for authentication,
   Realtime, and Storage, but keeping data access in Drizzle and standard Postgres
-  means the data layer itself is not tied to Supabase. That keeps Resolve's
+  means the data layer itself is not tied to Supabase. That keeps
   dependency on any single vendor smaller and leaves room to move or change the
   database without rewriting every query.
 - **No drift from Postgres.** Drizzle stays close to standard SQL, so your
@@ -131,7 +130,7 @@ reasoning.
 
 <Callout type="info">
 This is about *data access*, not about replacing the Supabase client. The
-Supabase client remains the right tool for what it is built for —
+Supabase client remains the right tool for what it is built for:
 authentication, Realtime, and Storage. Zeno uses it for
 [authentication](/docs/core-framework/user-management/authentication) and binds
 the verified session into Drizzle's RLS queries.
@@ -139,17 +138,43 @@ the verified session into Drizzle's RLS queries.
 
 ## Installation
 
-Install the database package in the package or app that owns your schema:
+Install the database and Supabase packages in the package or app that owns your
+schema:
 
 ```npm
-pnpm add @zeno-lib/db drizzle-orm@1.0.0-rc.3 postgres
+pnpm add @zeno-lib/db @zeno-lib/supabase drizzle-orm@1.0.0-rc.3 postgres
 pnpm add -D drizzle-kit@1.0.0-rc.3 dotenv
 ```
 
-`dotenv` is only needed by scripts and config files that run outside your
-framework runtime, such as `drizzle.config.ts`. Next.js and Vercel expose
-environment variables to server runtime code, but a standalone Drizzle Kit CLI
-process needs you to load local `.env` files yourself.
+### Package scripts
+
+Add these scripts to the same `package.json`. They drive local Supabase,
+migrations, and seeding:
+
+```json title="{project}-db/package.json"
+{
+  "scripts": {
+    "dev": "pnpm exec supabase start",
+    "stop": "pnpm exec supabase stop",
+    "reset": "pnpm exec supabase db reset && pnpm db:seed",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "node src/seed.ts"
+  }
+}
+```
+
+What each script does:
+
+- `dev` starts your local Supabase stack, including local Postgres.
+- `stop` stops the local Supabase stack.
+- `reset` rebuilds the local database from migration files, then runs your seed
+  script.
+- `db:generate` reads your TypeScript schema and writes a SQL migration under
+  `supabase/migrations`.
+- `db:migrate` applies generated migrations to a database and records them in
+  Drizzle Kit's migration table.
+- `db:seed` runs your project-owned seed script.
 
 ## Environment
 
@@ -172,9 +197,9 @@ details.
 
 Work through the package in the order you would build with it:
 
-- [Tables](/docs/core-framework/data-management/database/tables) — declare
+- [Tables](/docs/core-framework/data-management/database/tables): declare
   RLS-ready Postgres tables in TypeScript with Zeno's Drizzle helpers.
-- [Migrations](/docs/core-framework/data-management/database/migrations) —
+- [Migrations](/docs/core-framework/data-management/database/migrations):
   configure Drizzle Kit, then generate, apply, and seed SQL migrations.
-- [Querying](/docs/core-framework/data-management/database/querying) — create
+- [Querying](/docs/core-framework/data-management/database/querying): create
   clients and run RLS-scoped, admin, and lower-level queries.
