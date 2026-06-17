@@ -2,12 +2,30 @@
 import { createServerClient } from "@supabase/ssr"
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function updateSession(request: NextRequest) {
+export type UpdateSessionOptions = {
+  /** Supabase project URL. Defaults to `NEXT_PUBLIC_SUPABASE_URL`. */
+  supabaseUrl?: string
+  /** Supabase anon key. Defaults to `NEXT_PUBLIC_SUPABASE_ANON_KEY`. */
+  supabaseKey?: string
+  /** Where to redirect unauthenticated requests. Defaults to `/sign-in`. */
+  signInPath?: string
+  /** Path prefixes that skip the auth check. Defaults to `["/sign-in", "/auth"]`. */
+  publicPaths?: string[]
+}
+
+export async function updateSession(
+  request: NextRequest,
+  options?: UpdateSessionOptions
+) {
   let supabaseResponse = NextResponse.next({
     request,
   })
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl =
+    options?.supabaseUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey =
+    options?.supabaseKey ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const signInPath = options?.signInPath ?? "/sign-in"
+  const publicPaths = options?.publicPaths ?? ["/sign-in", "/auth"]
 
   if (!(supabaseUrl && supabaseKey)) {
     throw new Error("Missing Supabase update session environment variables")
@@ -24,8 +42,8 @@ export async function updateSession(request: NextRequest) {
         supabaseResponse = NextResponse.next({
           request,
         })
-        for (const { name, options, value } of cookiesToSet) {
-          supabaseResponse.cookies.set(name, value, options)
+        for (const { name, options: cookieOptions, value } of cookiesToSet) {
+          supabaseResponse.cookies.set(name, value, cookieOptions)
         }
       },
     },
@@ -37,16 +55,13 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (
-    !(
-      user ||
-      request.nextUrl.pathname.startsWith("/login") ||
-      request.nextUrl.pathname.startsWith("/auth")
-    )
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
+  const isPublicPath = publicPaths.some((path) =>
+    request.nextUrl.pathname.startsWith(path)
+  )
+  if (!(user || isPublicPath)) {
+    // no user, potentially respond by redirecting the user to the sign-in page
     const url = request.nextUrl.clone()
-    url.pathname = "/login"
+    url.pathname = signInPath
     return NextResponse.redirect(url)
   }
   // IMPORTANT: You *must* return the supabaseResponse object as it is.

@@ -8,6 +8,7 @@
     "---Data Management---",
     "data-management/schemas",
     "data-management/database",
+    "data-management/supabase",
     "data-management/real-time",
     "---User Management---",
     "user-management/authentication",

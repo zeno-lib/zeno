@@ -5,6 +5,7 @@ on:
     # Add the package path here when a new package needs bundling.
     paths:
       - "packages/test/**"
+      - "packages/supabase/**"
 
 permissions:
   contents: write
@@ -23,6 +24,9 @@ jobs:
           - name: test
             filter: "@zeno-lib/test"
             dist: packages/test/dist
+          - name: supabase
+            filter: "@zeno-lib/supabase"
+            dist: packages/supabase/dist
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
