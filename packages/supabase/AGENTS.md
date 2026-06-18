@@ -4,7 +4,7 @@ Thin wrapper around `@supabase/ssr` for Next.js App Router. Five files, each wit
 
 ## Purpose & Scope
 
-Provides Next.js–aware factories for Supabase clients (browser, server, middleware), a custom `next/image` loader for Supabase Storage, and re-exports the few `@supabase/supabase-js` types consumers actually need.
+Provides Next.js–aware factories for Supabase clients (browser, server, middleware) and a custom `next/image` loader for Supabase Storage.
 
 **Owns:** the cookie wiring required for SSR auth, env-var resolution with explicit overrides, the standard Next.js middleware matcher pattern.
 
@@ -14,7 +14,7 @@ Provides Next.js–aware factories for Supabase clients (browser, server, middle
 
 | Import | Use from | Returns / does |
 |---|---|---|
-| `@zeno-lib/supabase/client` | Client Components, browser code | `createBrowserClient` factory; re-exports `EmailOtpType`, `QueryData`, `SupabaseClient` types |
+| `@zeno-lib/supabase/client` | Client Components, browser code | `createBrowserClient` factory |
 | `@zeno-lib/supabase/server` | Server Components, Route Handlers, Server Actions | `createServerClient` with `next/headers` cookies; **async** — must be `await`ed |
 | `@zeno-lib/supabase/next-middleware` | App `middleware.ts` | Default `middleware` export + static `config.matcher`, plus `createMiddleware(options)` for a configured middleware |
 | `@zeno-lib/supabase/supabase-middleware` | Custom middleware compositions | `updateSession(request, options?)` — the actual cookie-refresh + auth-gate logic; options set `signInPath`, `publicPaths`, `supabaseUrl`, `supabaseKey` |
@@ -66,13 +66,12 @@ export default {
 - **Do not call `client/createClient` from server code or `server/createClient` from a client component.** Cookie state diverges; a misplaced call returns a usable object that silently loses auth state on navigation.
 - **Do not put any code between `createServerClient(...)` and `supabase.auth.getUser()` in middleware** (`supabase-middleware.ts:51-54`). The official Supabase guidance — and the comment in the file — is explicit: any extra logic there has caused production "users randomly logged out" incidents. Same rule for: do not delete the `auth.getUser()` call.
 - **Do not mutate the `supabaseResponse` object's cookies after `updateSession`** — return it as-is, or follow the four-step copy procedure in the file's trailing comment. Skipping this desyncs browser/server cookies.
-- **Do not import `@supabase/supabase-js` types directly** in workspace packages — re-export them through this package so the dep is owned in one place. `EmailOtpType`, `QueryData`, `SupabaseClient` are already re-exported from `./client`.
 
 ## Dependencies & Edges
 
 Peer: `@supabase/ssr >=0`, `@supabase/supabase-js >=2`, `next >=16`. `next` is an **optional** peer — imported only by `server`/`next-middleware`/`supabase-middleware`. The `supabase` CLI is **not** a dependency (nothing imports it; it's a separate dev tool for generating the `Database` types). No workspace runtime deps.
 
-Used by: `@zeno-lib/authentication` (client + server + types). Used directly by every app that needs auth.
+Used by: `@zeno-lib/authentication` (client + server). Used directly by every app that needs auth.
 
 ## Pitfalls
 

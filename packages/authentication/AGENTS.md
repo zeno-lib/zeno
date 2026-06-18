@@ -86,12 +86,11 @@ export const GET = getRoute
 - **Do not auto-redirect from `verify/`.** The button-click is a *security* feature, not a UX placeholder (see Pitfalls). The commented-out `useEffect` in `verify/index.tsx` exists as a cautionary tombstone; do not uncomment it.
 - **Do not perform OTP verification client-side.** `supabase.auth.verifyOtp` is called from the server handler in `src/confirm/index.ts`. Calling it from a client component leaks the token through the browser history and breaks magic-link flows behind email-prefetch scanners.
 - **Do not throw raw errors from submit handlers.** Surface user-facing failures via `toast.error(message)`; only re-throw after notifying so upstream telemetry can capture them — this is the pattern in `AuthProvider`'s `handleSubmit` `try/catch`.
-- **Do not import `@supabase/supabase-js` directly.** Take the `SupabaseClient` type from `@zeno-lib/supabase/client` so the dep edge stays clean.
 - **Sign-up submission is intentionally not wired** in `AuthProvider`'s switch (see commented block at the bottom of `context.tsx`). If you implement it, follow the magic-link router-push pattern (`router.push("/email-sent")`).
 
 ## Dependencies & Edges
 
-Workspace: `@zeno-lib/ui`, `@zeno-lib/supabase`. Peer: `next >=16`, `react >=19`, `react-dom >=19`, `react-hook-form >=7`.
+Workspace: `@zeno-lib/ui`, `@zeno-lib/supabase`. Peer: `@supabase/supabase-js >=2`, `next >=16`, `react >=19`, `react-dom >=19`, `react-hook-form >=7`.
 
 Cross-package contract: the auth package issues `router.push("/email-sent")` after magic-link submit, and `Verify` redirects to `/confirm?token_hash=...&type=...`. The consuming app **must** mount routes at exactly those paths or wire its own equivalents — there is no central route map.
 

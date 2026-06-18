@@ -13,7 +13,7 @@ Each concern is its own entry point, so you only pull in the client that matches
 
 | Import | Use from | Provides |
 |---|---|---|
-| `@zeno-lib/supabase/client` | Client Components, browser code | `createClient` (browser) + `EmailOtpType`, `QueryData`, `SupabaseClient` type re-exports |
+| `@zeno-lib/supabase/client` | Client Components, browser code | `createClient` (browser) |
 | `@zeno-lib/supabase/server` | Server Components, Route Handlers, Server Actions | `createClient` (server, **async**) |
 | `@zeno-lib/supabase/next-middleware` | App `middleware.ts` | Ready-made `middleware` + static `config`, plus the `createMiddleware(options)` factory |
 | `@zeno-lib/supabase/supabase-middleware` | Custom middleware compositions | `updateSession(request, options?)` — configurable cookie-refresh + auth-gate logic |
@@ -148,15 +148,3 @@ export default {
 When the project id isn't available via environment variables at import time, build the loader explicitly with `createSupabaseImageLoader({ projectId })` and default-export the result.
 
 `http(s)` sources pass through untouched; relative paths are rewritten to `https://<projectId>.supabase.co/storage/v1/object/public/<src>?width=<w>&quality=<q|75>`.
-
-## Types
-
-The few `@supabase/supabase-js` types you actually need are re-exported from `@zeno-lib/supabase/client`, so you can import them in one place instead of depending on `@supabase/supabase-js` directly:
-
-```typescript
-import type {
-  EmailOtpType,
-  QueryData,
-  SupabaseClient,
-} from "@zeno-lib/supabase/client"
-```

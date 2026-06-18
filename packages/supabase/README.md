@@ -1,8 +1,7 @@
 # @zeno-lib/supabase
 
 Next.js App Router–aware factories for [Supabase](https://supabase.com) clients
-(browser, server, middleware), a `next/image` loader for Supabase Storage, and
-re-exports of the few `@supabase/supabase-js` types consumers actually need.
+(browser, server, middleware) and a `next/image` loader for Supabase Storage.
 
 Thin wrapper around [`@supabase/ssr`](https://supabase.com/docs/guides/auth/server-side/nextjs) —
 the value is in keeping the client / server / middleware split honest.
@@ -42,7 +41,7 @@ precedence over the env vars. If neither side supplies both values, the call thr
 
 | Import | Use from | Provides |
 | --- | --- | --- |
-| `@zeno-lib/supabase/client` | Client Components, browser code | `createClient` (browser) + `EmailOtpType`, `QueryData`, `SupabaseClient` type re-exports |
+| `@zeno-lib/supabase/client` | Client Components, browser code | `createClient` (browser) |
 | `@zeno-lib/supabase/server` | Server Components, Route Handlers, Server Actions | `createClient` (server, **async**) |
 | `@zeno-lib/supabase/next-middleware` | App `middleware.ts` | Ready-made `middleware` + static `config`, plus the `createMiddleware(options)` factory |
 | `@zeno-lib/supabase/supabase-middleware` | Custom middleware compositions | `updateSession(request, options?)` — configurable cookie-refresh + auth-gate logic |

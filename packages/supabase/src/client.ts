@@ -1,12 +1,6 @@
 // https://supabase.com/docs/guides/auth/server-side/nextjs
 import { createBrowserClient } from "@supabase/ssr"
 
-export type {
-  EmailOtpType,
-  QueryData,
-  SupabaseClient,
-} from "@supabase/supabase-js"
-
 export function createClient<Database>(
   supabaseUrl?: string,
   supabaseKey?: string

@@ -99,6 +99,9 @@ importers:
 
   packages/authentication:
     dependencies:
+      '@supabase/supabase-js':
+        specifier: '>=2'
+        version: 2.52.1
       '@zeno-lib/supabase':
         specifier: workspace:^
         version: link:../supabase

@@ -19,6 +19,7 @@
     "directory": "packages/authentication"
   },
   "peerDependencies": {
+    "@supabase/supabase-js": ">=2",
     "next": ">=16",
     "react": ">=19",
     "react-dom": ">=19",
