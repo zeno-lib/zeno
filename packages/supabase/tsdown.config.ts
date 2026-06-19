@@ -5,10 +5,10 @@ export default defineConfig({
   dts: true,
   entry: {
     client: "src/client.ts",
-    "image-loader": "src/image-loader.ts",
+    "next-client": "src/next-client.ts",
+    "next-image-loader": "src/next-image-loader.ts",
     "next-middleware": "src/next-middleware.ts",
-    server: "src/server.ts",
-    "supabase-middleware": "src/supabase-middleware.ts",
+    "next-server": "src/next-server.ts",
   },
   // Keep peer imports as bare specifiers. `next` ships no exports map, so without
   // this tsdown resolves `next/headers` to a file and emits `next/headers.js`,

@@ -1,7 +1,17 @@
-import { UpdateSessionOptions } from "./supabase-middleware.mjs";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 //#region src/next-middleware.d.ts
+type UpdateSessionOptions = {
+  /** Supabase project URL. Defaults to `NEXT_PUBLIC_SUPABASE_URL`. */supabaseUrl?: string; /** Supabase key. Defaults to `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. */
+  supabaseKey?: string; /** Where to redirect unauthenticated requests. Defaults to `/sign-in`. */
+  signInPath?: string; /** Path prefixes that skip the auth check. Defaults to `["/sign-in"]`. */
+  publicPaths?: string[];
+};
+/**
+ * Refreshes the auth session and gates unauthenticated requests.
+ * Call it from your own `middleware.ts`, or use `createMiddleware`/`middleware` below.
+ */
+declare function updateSession(request: NextRequest, options?: UpdateSessionOptions): Promise<NextResponse<unknown>>;
 /**
  * Build a middleware bound to your auth config. Next requires `config.matcher`
  * to be statically analyzable, so always export a static `config` alongside it —
@@ -15,11 +25,11 @@ import { NextRequest } from "next/server";
  * export { config }
  * ```
  */
-declare function createMiddleware(options?: UpdateSessionOptions): (request: NextRequest) => Promise<import("next/server").NextResponse<unknown>>;
+declare function createMiddleware(options?: UpdateSessionOptions): (request: NextRequest) => Promise<NextResponse<unknown>>;
 /** Zero-config middleware using the default `/sign-in` redirect. */
-declare function middleware(request: NextRequest): Promise<import("next/server").NextResponse<unknown>>;
+declare function middleware(request: NextRequest): Promise<NextResponse<unknown>>;
 declare const config: {
   matcher: string[];
 };
 //#endregion
-export { config, createMiddleware, middleware };
+export { UpdateSessionOptions, config, createMiddleware, middleware, updateSession };

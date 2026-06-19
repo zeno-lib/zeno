@@ -1,5 +1,5 @@
 import type { EmailOtpType } from "@supabase/supabase-js"
-import { createClient } from "@zeno-lib/supabase/server"
+import { createClient } from "@zeno-lib/supabase/next-server"
 import { redirect } from "next/navigation"
 import type { NextRequest } from "next/server"
 
