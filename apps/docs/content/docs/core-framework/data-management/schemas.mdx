@@ -4,20 +4,22 @@ description: Data schemas and validation
 icon: Blocks
 ---
 
-Zeno treats your Drizzle table as the database source of truth, then derives
-Zod schemas from it for validation. The goal is one schema lineage: database
-shape, server validation, and forms all start from the same table definition.
+A **schema** describes the shape and rules your data must satisfy: which fields
+exist, their types, which are required, and what counts as valid. You use it to
+*validate* untrusted input, such as a form submission or a request body, before
+your code trusts it.
 
-`@zeno-lib/schema` is the pure helper package for that layer. It has no database
-clients and no `postgres-js` dependency, so schemas can live in shared modules
-that are safe to import from Server Actions, Route Handlers, and Client
-Components.
+[Zod](https://zod.dev) is the TypeScript-first schema library Zeno uses for that.
+You describe your data once and get two things from the same definition: runtime
+validation (`schema.parse(input)` throws on bad data) and a static TypeScript
+type (`z.infer<typeof schema>`).
 
-<Callout type="info">
-Keep the module that exports your Zod schemas pure. It can import table builders
-and `defineTableSchema`, but it should not create database clients or read
-server-only request state.
-</Callout>
+Your Drizzle table already describes that shape for the database. Redeclaring it
+by hand for validation means two definitions that drift apart the moment you add
+a column. Instead, Zeno **derives** the Zod schema from the table, so a single
+definition keeps everything in lockstep: the database shape, runtime validation
+at your trust boundaries, and the inferred TypeScript types. Add a field to the
+table and your validation and types follow automatically.
 
 ## Installation
 
@@ -38,12 +40,14 @@ pnpm add -D drizzle-kit@1.0.0-rc.3 dotenv
 from Drizzle, and import Zod itself directly from `zod` when you compose
 product-specific schemas.
 
-## Define a table
+## Start from a table
 
-Start with a
-[Drizzle table](https://orm.drizzle.team/docs/sql-schema-declaration). In Zeno
-apps, use Zeno's table helper for the table itself and keep Drizzle's column
-builders visible by importing them directly from Drizzle.
+Zod schemas are derived from a Drizzle table, so everything begins with one. The
+table is the database source of truth and lives in your database package under
+`{project}-db/src/schemas/`. Defining tables and the Zeno helpers it uses
+(`table`, `primaryId`, `authUserId`, `auditColumns`, RLS policies, …) are
+covered in [Tables](/docs/core-framework/data-management/database/tables); the
+example below is just the input the rest of this page builds on.
 
 ```ts title="{project}-db/src/schemas/posts.ts"
 import { auditColumns, authUserId, primaryId, table } from "@zeno-lib/db/schema"
@@ -59,29 +63,9 @@ export const posts = table("posts", {
 })
 ```
 
-The table describes database columns and generated/defaulted fields. Drizzle
-also exposes TypeScript model types:
-
-```ts
-export type InsertPost = typeof posts.$inferInsert
-export type SelectPost = typeof posts.$inferSelect
-```
-
-`table` maps TypeScript keys to snake_case database identifiers and enables
-RLS by default. If the table is intentionally not protected by RLS, use
-`unsecureTable` from `@zeno-lib/db/schema` instead.
-
-Use `primaryId("uuid")` for the usual random UUID primary key or
-`primaryId("sequential")` for an integer identity primary key. Use
-`authUserId()` for a Supabase `auth.users` reference. Add `...timestamps` for
-`createdAt` / `updatedAt`, `...authorship` for `createdBy` / `updatedBy`, or
-`...auditColumns` when the table should include all four audit columns.
-
-This table is the database source of truth, so it lives in your database package
-under `{project}-db/src/schemas/`, where `{project}` is your workspace name (see
-[Tables](/docs/core-framework/data-management/database/tables)). The Zod schemas
-below are derived from it and live next to your forms in `{project}-forms`, so
-they stay free of database clients and are safe to import from Client Components.
+The Zod schemas you derive from it live next to your forms in `{project}-forms`,
+so they stay free of database clients and are safe to import from Client
+Components.
 
 ## Derive Zod schemas
 
@@ -119,6 +103,23 @@ export async function createPost(input: unknown) {
   await db.admin.insert(schema.posts).values(value)
 }
 ```
+
+## Infer types from a schema
+
+Each variant is a plain Zod schema, so its TypeScript type comes from `z.infer`:
+
+```ts
+export type InsertPost = z.infer<typeof postSchema.insert>
+export type SelectPost = z.infer<typeof postSchema.select>
+```
+
+Drizzle also exposes raw row types on the table object itself,
+`posts.$inferInsert` and `posts.$inferSelect` (covered in
+[Tables](/docs/core-framework/data-management/database/tables)). Those mirror the
+table exactly. Prefer the Zod-inferred types once a schema diverges from the
+table: the moment you refine, omit, extend, or coerce a variant (as in the
+sections below), the `$infer` types can no longer describe it, but `z.infer` of
+the actual schema always can.
 
 ## Refine each variant
 
@@ -230,18 +231,14 @@ workspace name and `{table}` is the entity (here, `posts`).
 
 | Path | Should contain |
 |---|---|
-| `{project}-db/src/schemas/{table}.ts` | The Drizzle table — the database source of truth and the input to migrations. |
+| `{project}-db/src/schemas/{table}.ts` | The Drizzle table: the database source of truth and the input to migrations. |
 | `{project}-db/src/schema.ts` | Barrel re-exporting every table, passed to `createSupabaseDrizzle({ schema })`. |
-| `{project}-forms/src/{table}/schemas.ts` | Table-derived Zod variants (`defineTableSchema`) and the UI/form schemas built from them. Pure — safe to import from Client Components. |
+| `{project}-forms/src/{table}/schemas.ts` | Table-derived Zod variants (`defineTableSchema`) and the UI/form schemas built from them. Pure, safe to import from Client Components. |
 | `{project}-forms/src/{table}/forms.tsx` | `@zeno-lib/forms` components for the table. |
 
 Server Actions and Route Handlers that parse a schema and call `@zeno-lib/db`
 live in your app at the server boundary. They import tables from `{project}-db`
 and schemas from `{project}-forms`.
-
-Avoid importing `createSupabaseDrizzle(...)` or other server-only code from a
-module that a Client Component imports for validation. Keep database clients at
-the action/route boundary and keep Zod schemas pure.
 
 ## Direct Drizzle helpers
 
@@ -259,3 +256,17 @@ import {
 
 Prefer `defineTableSchema(...)` for application tables so teams use the same
 variant names across forms, actions, and tests.
+
+## Pitfalls
+
+- Keep the module that exports your Zod schemas pure. It can import table
+  builders and `defineTableSchema`, but it must not create database clients or
+  read server-only request state, because Client Components import this module.
+- Do not import `createSupabaseDrizzle(...)` or other server-only code from a
+  module a Client Component imports for validation. Keep database clients at the
+  action/route boundary.
+- Refinements are per variant: a rule under `insert` does not apply to `update`
+  or `select`. Repeat it in each variant where the constraint belongs.
+- Once you omit, extend, or coerce a schema, infer its type from the Zod schema
+  (`z.infer<typeof schema>`), not the table's `$inferInsert` / `$inferSelect`;
+  the `$infer` types only know the raw table.

@@ -120,16 +120,3 @@ export const details = unsecureTable("order_detail", {
   quantity: integer().notNull(),
   unitPrice: numeric().notNull(),
 })
-
-export type InsertCustomer = typeof customers.$inferInsert
-export type SelectCustomer = typeof customers.$inferSelect
-export type InsertEmployee = typeof employees.$inferInsert
-export type SelectEmployee = typeof employees.$inferSelect
-export type InsertSupplier = typeof suppliers.$inferInsert
-export type SelectSupplier = typeof suppliers.$inferSelect
-export type InsertProduct = typeof products.$inferInsert
-export type SelectProduct = typeof products.$inferSelect
-export type InsertOrder = typeof orders.$inferInsert
-export type SelectOrder = typeof orders.$inferSelect
-export type InsertOrderDetail = typeof details.$inferInsert
-export type SelectOrderDetail = typeof details.$inferSelect
