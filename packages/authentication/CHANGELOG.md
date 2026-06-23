@@ -1,5 +1,13 @@
 # @zeno-lib/authentication
 
+## 0.0.2
+
+### Patch Changes
+
+- 4ed0309: Working release for @zeno-lib/supabase
+- Updated dependencies [4ed0309]
+  - @zeno-lib/supabase@0.0.2
+
 ## 0.0.1
 
 ### Patch Changes
