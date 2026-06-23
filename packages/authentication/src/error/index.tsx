@@ -1,4 +1,4 @@
-import { createClient } from "@zeno-lib/supabase/server"
+import { createClient } from "@zeno-lib/supabase/next-server"
 import { Button } from "@zeno-lib/ui/button"
 import Link from "next/link"
 import { redirect } from "next/navigation"
