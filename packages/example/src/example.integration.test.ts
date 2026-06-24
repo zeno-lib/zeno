@@ -1,8 +1,8 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   createAdminDrizzle,
   createDrizzleClients,
   createSupabaseDrizzle,
-  type SupabaseAuthClientLike,
 } from "@zeno-lib/db"
 import { defineRelations, sql } from "drizzle-orm"
 import { afterAll, describe, expect, it, vi } from "vitest"
@@ -28,9 +28,7 @@ afterAll(async () => {
   await adminDb.close({ timeout: 0 })
 })
 
-function createSupabase(
-  claims: Record<string, unknown>
-): SupabaseAuthClientLike {
+function createSupabase(claims: Record<string, unknown>): SupabaseClient {
   return {
     auth: {
       getClaims: vi.fn(async () => ({
@@ -38,7 +36,7 @@ function createSupabase(
         error: null,
       })),
     },
-  } as unknown as SupabaseAuthClientLike
+  } as unknown as SupabaseClient
 }
 
 // Package-level factory contract (the reusable engine in @zeno-lib/db).

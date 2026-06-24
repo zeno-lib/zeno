@@ -5,17 +5,6 @@ import { sql } from "drizzle-orm"
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js"
 import postgres from "postgres"
 
-// Minimal structural shape of a Supabase client: only the `auth.getClaims`
-// method we call. Derived from the SDK so the signature tracks the real client.
-export type SupabaseAuthClientLike = {
-  auth: Pick<SupabaseClient["auth"], "getClaims">
-}
-
-// Verified Supabase JWT claims used to drive Postgres RLS. `Partial` because
-// `getClaims` may resolve an empty payload (anon). Internal only — callers pass
-// a Supabase client, never raw claims.
-type TokenClaims = Partial<JwtPayload>
-
 // `set local role <ident>` can't be parameterized, so the role is interpolated
 // via sql.raw. Restrict it to the Supabase-managed roles so a forged `role`
 // claim can't inject SQL or switch into the service role.
@@ -47,7 +36,7 @@ export type CreateSupabaseDrizzleOptions<
   // Mandatory: queries resolve verified claims via `supabase.auth.getClaims()`.
   // Raw tokens/claims are intentionally not accepted — JWT verification belongs
   // to Supabase Auth.
-  supabase: SupabaseAuthClientLike
+  supabase: SupabaseClient
 }
 
 type DrizzleClients<
@@ -101,12 +90,12 @@ export function createDrizzleClients<
   // RLS-aware. Resolves verified JWT claims from the Supabase client; every
   // query MUST run inside `runTransaction` for the JWT context (and thus RLS)
   // to apply.
-  function getDrizzleSupabaseClient(supabase: SupabaseAuthClientLike) {
+  function getDrizzleSupabaseClient(supabase: SupabaseClient) {
     const runTransaction = (async (transaction, txConfig) => {
       const token = await resolveClaims(supabase)
-      const sub = token.sub ?? ""
+      const sub = token?.sub ?? ""
       const role =
-        token.role && ALLOWED_RLS_ROLES.has(token.role) ? token.role : "anon"
+        token?.role && ALLOWED_RLS_ROLES.has(token.role) ? token.role : "anon"
       // Force the serialized claims' role to match the role we actually `set
       // local role` to, so a policy reading auth.jwt()->>'role' can never see a
       // value that disagrees with the live Postgres role (e.g. a service_role
@@ -149,12 +138,6 @@ export function createSupabaseDrizzle<
   TSchema extends Record<string, unknown>,
   TRelations extends AnyRelations = EmptyRelations,
 >(options: CreateSupabaseDrizzleOptions<TSchema, TRelations>) {
-  if (!isSupabaseClientLike(options.supabase)) {
-    throw new Error(
-      "createSupabaseDrizzle requires a Supabase client. Pass { supabase } so queries can resolve verified claims via auth.getClaims()."
-    )
-  }
-
   const cacheKey = createCacheKey(options)
   const entry = acquireSharedDrizzleClients(options, cacheKey)
   const close = createCloseHandle(options.schema, cacheKey, entry)
@@ -378,25 +361,11 @@ function createRlsQueryClient(
 }
 
 async function resolveClaims(
-  supabase: SupabaseAuthClientLike
-): Promise<TokenClaims> {
+  supabase: SupabaseClient
+): Promise<JwtPayload | undefined> {
   const { data, error } = await supabase.auth.getClaims()
   if (error) {
     throw error
   }
-  return (data?.claims ?? {}) as TokenClaims
-}
-
-function isSupabaseClientLike(
-  supabase?: SupabaseAuthClientLike | null
-): supabase is SupabaseAuthClientLike {
-  return (
-    !!supabase &&
-    typeof supabase === "object" &&
-    "auth" in supabase &&
-    typeof supabase.auth === "object" &&
-    !!supabase.auth &&
-    "getClaims" in supabase.auth &&
-    typeof supabase.auth.getClaims === "function"
-  )
+  return data?.claims
 }

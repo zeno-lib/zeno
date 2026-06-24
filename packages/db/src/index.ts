@@ -6,5 +6,4 @@ export {
   createAdminDrizzle,
   createDrizzleClients,
   createSupabaseDrizzle,
-  type SupabaseAuthClientLike,
 } from "./clients.ts"

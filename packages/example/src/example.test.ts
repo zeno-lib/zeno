@@ -1,19 +1,19 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   createAdminDrizzle,
   createDrizzleClients,
   createSupabaseDrizzle,
-  type SupabaseAuthClientLike,
 } from "@zeno-lib/db"
 import { describe, expect, it, vi } from "vitest"
 
 const LOCAL_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
-function fakeSupabase(): SupabaseAuthClientLike {
+function fakeSupabase(): SupabaseClient {
   return {
     auth: {
       getClaims: vi.fn(async () => ({ data: { claims: {} }, error: null })),
     },
-  } as unknown as SupabaseAuthClientLike
+  } as unknown as SupabaseClient
 }
 
 describe("createDrizzleClients", () => {
@@ -40,25 +40,6 @@ describe("createSupabaseDrizzle", () => {
     expect(db.close).toEqual(expect.any(Function))
 
     await db.close({ timeout: 0 })
-  })
-
-  it("throws at creation when no Supabase client is provided", () => {
-    expect(() =>
-      createSupabaseDrizzle({
-        connectionString: LOCAL_DB_URL,
-        schema: {},
-      } as never)
-    ).toThrow("requires a Supabase client")
-  })
-
-  it("throws at creation when given a null Supabase client", () => {
-    expect(() =>
-      createSupabaseDrizzle({
-        connectionString: LOCAL_DB_URL,
-        schema: {},
-        supabase: null,
-      } as never)
-    ).toThrow("requires a Supabase client")
   })
 })
 

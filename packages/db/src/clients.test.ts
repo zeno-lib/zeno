@@ -10,12 +10,12 @@ const { drizzleMock, postgresDefault } = vi.hoisted(() => ({
 vi.mock("postgres", () => ({ default: postgresDefault }))
 vi.mock("drizzle-orm/postgres-js", () => ({ drizzle: drizzleMock }))
 
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { sql } from "drizzle-orm"
 import {
   createAdminDrizzle,
   createDrizzleClients,
   createSupabaseDrizzle,
-  type SupabaseAuthClientLike,
 } from "./clients.ts"
 
 const CONNECTION = "postgresql://postgres:postgres@localhost/postgres"
@@ -86,7 +86,7 @@ function mockClients() {
 function mockSupabase(
   role = "authenticated",
   events?: string[]
-): SupabaseAuthClientLike {
+): SupabaseClient {
   return {
     auth: {
       getClaims: vi.fn(() => {
@@ -99,7 +99,7 @@ function mockSupabase(
         })
       }),
     },
-  } as unknown as SupabaseAuthClientLike
+  } as unknown as SupabaseClient
 }
 
 describe("getDrizzleSupabaseClient", () => {
@@ -197,27 +197,6 @@ describe("createSupabaseDrizzle (direct RLS query client)", () => {
     expect(result).toBe("ok")
     // Two execute calls set the RLS context, then the user's statement runs.
     expect(events.filter((event) => event === "execute")).toHaveLength(3)
-  })
-
-  it("throws at creation when no Supabase client is provided", () => {
-    mockClients()
-    expect(() =>
-      createSupabaseDrizzle({
-        connectionString: CONNECTION,
-        schema: {},
-      } as never)
-    ).toThrow("requires a Supabase client")
-  })
-
-  it("throws at creation when given a null Supabase client", () => {
-    mockClients()
-    expect(() =>
-      createSupabaseDrizzle({
-        connectionString: CONNECTION,
-        schema: {},
-        supabase: null,
-      } as never)
-    ).toThrow("requires a Supabase client")
   })
 
   it("forwards the relations object to drizzle", () => {
