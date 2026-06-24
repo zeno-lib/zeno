@@ -1,9 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import {
-  createAdminDrizzle,
-  createDrizzleClients,
-  createSupabaseDrizzle,
-} from "@zeno-lib/db"
+import { createAdminDrizzle, createSupabaseDrizzle } from "@zeno-lib/db"
 import { describe, expect, it, vi } from "vitest"
 
 const LOCAL_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
@@ -15,16 +11,6 @@ function fakeSupabase(): SupabaseClient {
     },
   } as unknown as SupabaseClient
 }
-
-describe("createDrizzleClients", () => {
-  it("throws when DATABASE_URL is unset and no override is provided", () => {
-    vi.stubEnv("DATABASE_URL", "")
-    expect(() => createDrizzleClients({ schema: {} })).toThrow(
-      "Missing DATABASE_URL environment variable"
-    )
-    vi.unstubAllEnvs()
-  })
-})
 
 describe("createSupabaseDrizzle", () => {
   it("exposes a directly-queryable RLS client without connecting eagerly", async () => {
@@ -44,6 +30,14 @@ describe("createSupabaseDrizzle", () => {
 })
 
 describe("createAdminDrizzle", () => {
+  it("throws when DATABASE_URL is unset and no override is provided", () => {
+    vi.stubEnv("DATABASE_URL", "")
+    expect(() => createAdminDrizzle({ schema: {} })).toThrow(
+      "Missing DATABASE_URL environment variable"
+    )
+    vi.unstubAllEnvs()
+  })
+
   it("exposes a directly-queryable admin client without connecting eagerly", async () => {
     const db = createAdminDrizzle({
       connectionString: LOCAL_DB_URL,

@@ -12,17 +12,9 @@ vi.mock("drizzle-orm/postgres-js", () => ({ drizzle: drizzleMock }))
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { sql } from "drizzle-orm"
-import {
-  createAdminDrizzle,
-  createDrizzleClients,
-  createSupabaseDrizzle,
-} from "./clients.ts"
+import { createAdminDrizzle, createSupabaseDrizzle } from "./clients.ts"
 
 const CONNECTION = "postgresql://postgres:postgres@localhost/postgres"
-
-type MockTransaction = (tx: {
-  execute: (query: unknown) => unknown
-}) => Promise<unknown>
 
 beforeEach(() => {
   drizzleMock.mockReset()
@@ -31,9 +23,9 @@ beforeEach(() => {
   postgresDefault.mockReturnValue({ end: vi.fn(async () => undefined) })
 })
 
-// Builds the admin + rls clients returned by the two `drizzle()` calls in
-// `createDrizzleClients`, plus a `tx` that records the query chain into
-// `events`. Wires them onto `drizzleMock` (admin first, rls second).
+// Builds the admin + rls clients returned by the two `drizzle()` calls the
+// factories make, plus a `tx` that records the query chain into `events`. Wires
+// them onto `drizzleMock` (admin first, rls second).
 function mockClients() {
   const events: string[] = []
   const selectResult = [{ id: "select" }]
@@ -102,28 +94,16 @@ function mockSupabase(
   } as unknown as SupabaseClient
 }
 
-describe("getDrizzleSupabaseClient", () => {
+describe("createSupabaseDrizzle (RLS context)", () => {
   it("resolves Supabase claims before opening the RLS transaction", async () => {
-    const events: string[] = []
-    const tx = {
-      execute: vi.fn(() => {
-        events.push("execute")
-      }),
-    }
-    drizzleMock.mockReturnValueOnce({}).mockReturnValueOnce({
-      transaction: vi.fn(async (transaction: MockTransaction) => {
-        events.push("transaction-start")
-        return await transaction(tx)
-      }),
-    })
-
-    const clients = createDrizzleClients({
+    const { events } = mockClients()
+    const db = createSupabaseDrizzle({
       connectionString: CONNECTION,
       schema: {},
+      supabase: mockSupabase("authenticated", events),
     })
-    const supabase = mockSupabase("authenticated", events)
 
-    await clients.getDrizzleSupabaseClient(supabase).runTransaction(() => {
+    await db.transaction(() => {
       events.push("callback")
       return Promise.resolve()
     })

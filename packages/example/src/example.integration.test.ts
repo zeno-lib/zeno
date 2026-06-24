@@ -1,9 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import {
-  createAdminDrizzle,
-  createDrizzleClients,
-  createSupabaseDrizzle,
-} from "@zeno-lib/db"
+import { createAdminDrizzle, createSupabaseDrizzle } from "@zeno-lib/db"
 import { defineRelations, sql } from "drizzle-orm"
 import { afterAll, describe, expect, it, vi } from "vitest"
 // biome-ignore lint/performance/noNamespaceImport: drizzle schema needs every table
@@ -39,27 +35,22 @@ function createSupabase(claims: Record<string, unknown>): SupabaseClient {
   } as unknown as SupabaseClient
 }
 
-// Package-level factory contract (the reusable engine in @zeno-lib/db).
-describe("createDrizzleClients", () => {
-  it("accepts an explicit connectionString override", async () => {
-    const clients = createDrizzleClients({
-      connectionString: LOCAL_DB_URL,
-      schema: {},
-    })
-    const result = await clients
-      .getDrizzleSupabaseAdminClient()
-      .execute(sql`select 1 as ok`)
-
-    expect(result[0]).toEqual({ ok: 1 })
-
-    await clients.closeDrizzleSupabaseClients({ timeout: 0 })
-  })
-})
-
 describe("createAdminDrizzle", () => {
   it("bypasses RLS (runs as postgres)", async () => {
     const result = await adminDb.execute(sql`select current_user as role`)
     expect(result[0]).toEqual({ role: "postgres" })
+  })
+
+  it("accepts an explicit connectionString override", async () => {
+    const db = createAdminDrizzle({
+      connectionString: LOCAL_DB_URL,
+      schema: {},
+    })
+    const result = await db.execute(sql`select 1 as ok`)
+
+    expect(result[0]).toEqual({ ok: 1 })
+
+    await db.close({ timeout: 0 })
   })
 })
 

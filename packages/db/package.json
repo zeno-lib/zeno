@@ -9,7 +9,6 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./clients": "./src/clients.ts",
     "./config": "./src/config.ts",
     "./schema": "./src/schema.ts"
   },
