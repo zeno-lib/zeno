@@ -49,3 +49,7 @@ playwright/.cache/
 # Committed bundle for @zeno-lib/test
 !packages/test/dist/
 !packages/test/dist/**
+
+# Committed bundle for @zeno-lib/supabase
+!packages/supabase/dist/
+!packages/supabase/dist/**

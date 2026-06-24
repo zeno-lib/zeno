@@ -3,7 +3,7 @@
   "tasks": {
     "build": {
       "env": [
-        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
         "NEXT_PUBLIC_SUPABASE_STORAGE_PROJECT_ID",
         "NEXT_PUBLIC_SUPABASE_URL"
       ]
