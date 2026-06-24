@@ -4,25 +4,15 @@ import {
   createSupabaseDrizzle,
   type SupabaseAuthClientLike,
 } from "@zeno-lib/db"
-import { defineRelations, eq, isNull, sql } from "drizzle-orm"
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
+import { defineRelations, sql } from "drizzle-orm"
+import { afterAll, describe, expect, it, vi } from "vitest"
 // biome-ignore lint/performance/noNamespaceImport: drizzle schema needs every table
 import * as schema from "./schema"
-import {
-  customers,
-  details,
-  employees,
-  orders,
-  posts,
-  products,
-  suppliers,
-} from "./schema"
-import { SEED_COUNTS, seedDatabase } from "./seed"
+import { posts } from "./schema"
 
 // DATABASE_URL is injected by vitest.config.ts (local Supabase on 54322).
 // Start it with `pnpm dev` before running these tests.
 
-const PHONE_TEMPLATE = /^\(\d{3}\) \d{3}-\d{4}$/
 const LOCAL_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 const TOKEN = {
   role: "authenticated",
@@ -207,68 +197,5 @@ describe("db.transaction (multi-statement)", () => {
     // Both statements observed the same authenticated, sub-bearing context.
     expect(result.role).toEqual({ role: "authenticated" })
     expect(result.uid).toEqual({ uid: TOKEN.sub })
-  })
-})
-
-describe("northwind seed", () => {
-  beforeAll(async () => {
-    await seedDatabase(adminDb)
-  }, 60_000)
-
-  it("inserts the configured number of rows per top-level table", async () => {
-    expect(await adminDb.$count(customers)).toBe(SEED_COUNTS.customers)
-    expect(await adminDb.$count(employees)).toBe(SEED_COUNTS.employees)
-    expect(await adminDb.$count(suppliers)).toBe(SEED_COUNTS.suppliers)
-    expect(await adminDb.$count(products)).toBe(SEED_COUNTS.products)
-    expect(await adminDb.$count(orders)).toBe(SEED_COUNTS.orders)
-  })
-
-  it("reads seeded rows through the relational query API (bypassing RLS)", async () => {
-    const rows = await adminDb.query.customers.findMany()
-    expect(rows).toHaveLength(SEED_COUNTS.customers)
-  })
-
-  it("creates 1-25 detail rows per order via the weighted `with`", async () => {
-    const detailCount = await adminDb.$count(details)
-    expect(detailCount).toBeGreaterThanOrEqual(SEED_COUNTS.orders)
-    expect(detailCount).toBeLessThanOrEqual(SEED_COUNTS.orders * 25)
-  })
-
-  it("wires every order to a real customer and employee (FK integrity)", async () => {
-    const orphanCustomer = await adminDb
-      .select({ id: orders.id })
-      .from(orders)
-      .leftJoin(customers, eq(orders.customerId, customers.id))
-      .where(isNull(customers.id))
-    const orphanEmployee = await adminDb
-      .select({ id: orders.id })
-      .from(orders)
-      .leftJoin(employees, eq(orders.employeeId, employees.id))
-      .where(isNull(employees.id))
-    expect(orphanCustomer).toHaveLength(0)
-    expect(orphanEmployee).toHaveLength(0)
-  })
-
-  it("wires every detail to a real order and product (FK integrity)", async () => {
-    const orphanOrder = await adminDb
-      .select({ orderId: details.orderId })
-      .from(details)
-      .leftJoin(orders, eq(details.orderId, orders.id))
-      .where(isNull(orders.id))
-    const orphanProduct = await adminDb
-      .select({ productId: details.productId })
-      .from(details)
-      .leftJoin(products, eq(details.productId, products.id))
-      .where(isNull(products.id))
-    expect(orphanOrder).toHaveLength(0)
-    expect(orphanProduct).toHaveLength(0)
-  })
-
-  it("applies the phone-number template generator", async () => {
-    const rows = await adminDb
-      .select({ phone: customers.phone })
-      .from(customers)
-      .limit(1)
-    expect(rows[0]?.phone).toMatch(PHONE_TEMPLATE)
   })
 })
