@@ -41,9 +41,6 @@ export const posts = table(
     authenticatedOwnerInsertPolicy("posts_owner_insert", t.userId),
   ]
 )
-
-export type InsertPost = typeof posts.$inferInsert
-export type SelectPost = typeof posts.$inferSelect
 ```
 
 Re-export every table from a single `{project}-db/src/schema.ts` barrel. That

@@ -24,9 +24,6 @@ export const posts = table(
   ]
 )
 
-export type InsertPost = typeof posts.$inferInsert
-export type SelectPost = typeof posts.$inferSelect
-
 // Northwind-style schema from the drizzle-seed complex example.
 // https://orm.drizzle.team/docs/seed-overview#complex-example
 export const customers = unsecureTable("customer", {
