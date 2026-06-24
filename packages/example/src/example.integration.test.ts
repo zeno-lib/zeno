@@ -1,8 +1,8 @@
 import {
+  createAdminDrizzle,
   createDrizzleClients,
   createSupabaseDrizzle,
   type SupabaseAuthClientLike,
-  type SupabaseTokenClaims,
 } from "@zeno-lib/db"
 import { defineRelations, eq, isNull, sql } from "drizzle-orm"
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
@@ -32,21 +32,15 @@ const TOKEN = {
 // Pass the same stable `relations` object to every db sharing this schema + url
 // so the cached drizzle pools are built with relations enabled.
 const relations = defineRelations(schema)
-const db = createSupabaseDrizzle({ relations, schema })
+const adminDb = createAdminDrizzle({ relations, schema })
 
 afterAll(async () => {
-  await db.close({ timeout: 0 })
+  await adminDb.close({ timeout: 0 })
 })
 
-// Build an unsigned access_token-shaped string to prove the DB package does
-// not decode or trust raw JWTs.
-function makeAccessToken(claims: Record<string, unknown>): string {
-  const encode = (value: object) =>
-    Buffer.from(JSON.stringify(value)).toString("base64url")
-  return `${encode({ alg: "HS256", typ: "JWT" })}.${encode(claims)}.signature`
-}
-
-function createSupabase(claims: SupabaseTokenClaims): SupabaseAuthClientLike {
+function createSupabase(
+  claims: Record<string, unknown>
+): SupabaseAuthClientLike {
   return {
     auth: {
       getClaims: vi.fn(async () => ({
@@ -54,7 +48,7 @@ function createSupabase(claims: SupabaseTokenClaims): SupabaseAuthClientLike {
         error: null,
       })),
     },
-  }
+  } as unknown as SupabaseAuthClientLike
 }
 
 // Package-level factory contract (the reusable engine in @zeno-lib/db).
@@ -74,14 +68,14 @@ describe("createDrizzleClients", () => {
   })
 })
 
-describe("db.admin", () => {
+describe("createAdminDrizzle", () => {
   it("bypasses RLS (runs as postgres)", async () => {
-    const result = await db.admin.execute(sql`select current_user as role`)
+    const result = await adminDb.execute(sql`select current_user as role`)
     expect(result[0]).toEqual({ role: "postgres" })
   })
 })
 
-describe("db.asUser (chainable)", () => {
+describe("createSupabaseDrizzle (direct RLS query client)", () => {
   it("uses the Supabase client passed at creation time", async () => {
     const supabase = createSupabase(TOKEN)
     const db = createSupabaseDrizzle({
@@ -91,19 +85,19 @@ describe("db.asUser (chainable)", () => {
       supabase,
     })
 
-    const result = await db.asUser.execute(sql`select current_user as role`)
+    const result = await db.execute(sql`select current_user as role`)
 
     expect(supabase.auth.getClaims).toHaveBeenCalledOnce()
     expect(result[0]).toEqual({ role: "authenticated" })
   })
 
-  it("switches the role to the verified claims' role inside asUser", async () => {
+  it("switches the role to the verified claims' role", async () => {
     const db = createSupabaseDrizzle({
       relations,
       schema,
       supabase: createSupabase(TOKEN),
     })
-    const result = await db.asUser.execute(sql`select current_user as role`)
+    const result = await db.execute(sql`select current_user as role`)
     expect(result[0]).toEqual({ role: "authenticated" })
   })
 
@@ -113,7 +107,7 @@ describe("db.asUser (chainable)", () => {
       schema,
       supabase: createSupabase(TOKEN),
     })
-    const result = await db.asUser.execute(
+    const result = await db.execute(
       sql`select current_setting('request.jwt.claims', true) as claims, auth.uid() as uid`
     )
     const row = result[0] as { claims: string; uid: string }
@@ -127,7 +121,7 @@ describe("db.asUser (chainable)", () => {
       schema,
       supabase: createSupabase({ role: "postgres" }),
     })
-    const result = await db.asUser.execute(sql`select current_user as role`)
+    const result = await db.execute(sql`select current_user as role`)
     expect(result[0]).toEqual({ role: "anon" })
   })
 
@@ -140,7 +134,7 @@ describe("db.asUser (chainable)", () => {
         sub: TOKEN.sub,
       }),
     })
-    const result = await db.asUser.execute(sql`select current_user as role`)
+    const result = await db.execute(sql`select current_user as role`)
     expect(result[0]).toEqual({ role: "anon" })
   })
 
@@ -150,7 +144,7 @@ describe("db.asUser (chainable)", () => {
       schema,
       supabase: createSupabase({ role: "service_role", sub: TOKEN.sub }),
     })
-    const result = await db.asUser.execute(
+    const result = await db.execute(
       sql`select current_user as role, current_setting('request.jwt.claims', true) as claims`
     )
     const row = result[0] as { role: string; claims: string }
@@ -160,26 +154,16 @@ describe("db.asUser (chainable)", () => {
     expect((JSON.parse(row.claims) as { role: string }).role).toBe("anon")
   })
 
-  it("does not decode or trust raw access token strings", async () => {
-    const db = createSupabaseDrizzle({
-      relations,
-      schema,
-      supabase: makeAccessToken(TOKEN) as unknown as SupabaseTokenClaims,
-    })
-    const result = await db.asUser.execute(sql`select current_user as role`)
-    expect(result[0]).toEqual({ role: "anon" })
-  })
-
   it("scopes role and claims to the transaction (does not leak)", async () => {
     const db = createSupabaseDrizzle({
       relations,
       schema,
       supabase: createSupabase(TOKEN),
     })
-    await db.asUser.execute(sql`select 1`)
+    await db.execute(sql`select 1`)
     // The admin pool is a separate connection — never role-switched, and the
     // claim was never set on it (null, not "").
-    const result = await db.admin.execute(
+    const result = await adminDb.execute(
       sql`select current_user as role, current_setting('request.jwt.claims', true) as claims`
     )
     expect(result[0]).toEqual({ claims: null, role: "postgres" })
@@ -191,7 +175,7 @@ describe("db.asUser (chainable)", () => {
       schema,
       supabase: createSupabase(TOKEN),
     })
-    const rows = await db.asUser.select().from(posts)
+    const rows = await db.select().from(posts)
     expect(rows).toEqual([])
   })
 
@@ -201,12 +185,12 @@ describe("db.asUser (chainable)", () => {
       schema,
       supabase: createSupabase(TOKEN),
     })
-    const rows = await db.asUser.query.posts.findMany()
+    const rows = await db.query.posts.findMany()
     expect(rows).toEqual([])
   })
 })
 
-describe("db.asUserTransaction (multi-statement)", () => {
+describe("db.transaction (multi-statement)", () => {
   it("runs several statements under one role-switched transaction", async () => {
     const db = createSupabaseDrizzle({
       relations,
@@ -214,7 +198,7 @@ describe("db.asUserTransaction (multi-statement)", () => {
       supabase: createSupabase(TOKEN),
     })
 
-    const result = await db.asUserTransaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       const role = await tx.execute(sql`select current_user as role`)
       const uid = await tx.execute(sql`select auth.uid() as uid`)
       return { role: role[0], uid: uid[0] }
@@ -228,35 +212,35 @@ describe("db.asUserTransaction (multi-statement)", () => {
 
 describe("northwind seed", () => {
   beforeAll(async () => {
-    await seedDatabase(db.admin)
+    await seedDatabase(adminDb)
   }, 60_000)
 
   it("inserts the configured number of rows per top-level table", async () => {
-    expect(await db.admin.$count(customers)).toBe(SEED_COUNTS.customers)
-    expect(await db.admin.$count(employees)).toBe(SEED_COUNTS.employees)
-    expect(await db.admin.$count(suppliers)).toBe(SEED_COUNTS.suppliers)
-    expect(await db.admin.$count(products)).toBe(SEED_COUNTS.products)
-    expect(await db.admin.$count(orders)).toBe(SEED_COUNTS.orders)
+    expect(await adminDb.$count(customers)).toBe(SEED_COUNTS.customers)
+    expect(await adminDb.$count(employees)).toBe(SEED_COUNTS.employees)
+    expect(await adminDb.$count(suppliers)).toBe(SEED_COUNTS.suppliers)
+    expect(await adminDb.$count(products)).toBe(SEED_COUNTS.products)
+    expect(await adminDb.$count(orders)).toBe(SEED_COUNTS.orders)
   })
 
   it("reads seeded rows through the relational query API (bypassing RLS)", async () => {
-    const rows = await db.admin.query.customers.findMany()
+    const rows = await adminDb.query.customers.findMany()
     expect(rows).toHaveLength(SEED_COUNTS.customers)
   })
 
   it("creates 1-25 detail rows per order via the weighted `with`", async () => {
-    const detailCount = await db.admin.$count(details)
+    const detailCount = await adminDb.$count(details)
     expect(detailCount).toBeGreaterThanOrEqual(SEED_COUNTS.orders)
     expect(detailCount).toBeLessThanOrEqual(SEED_COUNTS.orders * 25)
   })
 
   it("wires every order to a real customer and employee (FK integrity)", async () => {
-    const orphanCustomer = await db.admin
+    const orphanCustomer = await adminDb
       .select({ id: orders.id })
       .from(orders)
       .leftJoin(customers, eq(orders.customerId, customers.id))
       .where(isNull(customers.id))
-    const orphanEmployee = await db.admin
+    const orphanEmployee = await adminDb
       .select({ id: orders.id })
       .from(orders)
       .leftJoin(employees, eq(orders.employeeId, employees.id))
@@ -266,12 +250,12 @@ describe("northwind seed", () => {
   })
 
   it("wires every detail to a real order and product (FK integrity)", async () => {
-    const orphanOrder = await db.admin
+    const orphanOrder = await adminDb
       .select({ orderId: details.orderId })
       .from(details)
       .leftJoin(orders, eq(details.orderId, orders.id))
       .where(isNull(orders.id))
-    const orphanProduct = await db.admin
+    const orphanProduct = await adminDb
       .select({ productId: details.productId })
       .from(details)
       .leftJoin(products, eq(details.productId, products.id))
@@ -281,7 +265,7 @@ describe("northwind seed", () => {
   })
 
   it("applies the phone-number template generator", async () => {
-    const rows = await db.admin
+    const rows = await adminDb
       .select({ phone: customers.phone })
       .from(customers)
       .limit(1)

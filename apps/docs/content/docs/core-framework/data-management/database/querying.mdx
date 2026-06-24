@@ -39,11 +39,10 @@ intentionally connects to a different database URL.
 
 ## Query with RLS
 
-Run user-scoped queries through `db.asUser`. It runs each query **as the
+`createSupabaseDrizzle(...)` returns a client you query directly **as the
 signed-in Supabase user**, so `auth.uid()` resolves to that user and their RLS
-policies apply. For a single statement, chain off `db.asUser` exactly like a
-Drizzle client, and the query runs inside an RLS-scoped transaction
-automatically:
+policies apply. Query it exactly like a Drizzle client; each statement runs
+inside an RLS-scoped transaction automatically:
 
 ```typescript title="app/posts/route.ts"
 import { createSupabaseDrizzle } from "@zeno-lib/db"
@@ -53,21 +52,21 @@ import * as schema from "{project}-db"
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ schema, supabase })
 
-const myPosts = await db.asUser.select().from(schema.posts)
+const myPosts = await db.select().from(schema.posts)
 ```
 
-Awaiting a `db.asUser` chain calls `supabase.auth.getClaims()`, opens a
-transaction, installs the verified JWT claims into transaction-local Postgres
-settings (so `auth.uid()` and `auth.jwt()` work inside RLS policies), and runs
-the query as the claims' role. Each awaited chain is its own transaction.
+Awaiting a query calls `supabase.auth.getClaims()`, opens a transaction,
+installs the verified JWT claims into transaction-local Postgres settings (so
+`auth.uid()` and `auth.jwt()` work inside RLS policies), and runs the query as
+the claims' role. Each awaited statement is its own transaction.
 
 The RLS role is limited to `anon` or `authenticated`. Unknown role claims fall
 back to `anon`, and `service_role` never runs through the request-scoped RLS
 path.
 
-Awaiting a `db.asUser` query without passing `supabase` to
-`createSupabaseDrizzle(...)` rejects immediately, so missing auth context does
-not silently become an anon query.
+`supabase` is required: `createSupabaseDrizzle(...)` throws at creation time if
+you omit it (or pass `null`), so missing auth context fails loudly instead of
+silently becoming an anon query.
 
 ### Relational queries
 
@@ -85,18 +84,17 @@ const relations = defineRelations(schema)
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ relations, schema, supabase })
 
-const myPosts = await db.asUser.query.posts.findMany()
+const myPosts = await db.query.posts.findMany()
 ```
 
 ### Multiple statements in one transaction
 
 When you need several statements to share one atomic RLS transaction (for
-example a read followed by a dependent write), use the callback form
-`db.asUserTransaction(...)`. Every statement on the `tx` argument runs under the
-same claims and role:
+example a read followed by a dependent write), use `db.transaction(...)`. Every
+statement on the `tx` argument runs under the same claims and role:
 
 ```typescript title="app/posts/route.ts"
-const created = await db.asUserTransaction(async (tx) => {
+const created = await db.transaction(async (tx) => {
   const [post] = await tx
     .insert(schema.posts)
     .values({ title: "Hello" })
@@ -106,29 +104,31 @@ const created = await db.asUserTransaction(async (tx) => {
 })
 ```
 
-Reach for `db.asUserTransaction` only when a single chained `db.asUser` query is not
-enough; one chained statement is the common case.
+Reach for `db.transaction` only when a single statement is not enough; one
+direct statement is the common case.
 
 ## Use admin queries carefully
 
-For trusted server work that should bypass user RLS, omit the `supabase` option
-and use `db.admin`:
+For trusted server work that should bypass user RLS, use `createAdminDrizzle(...)`.
+It needs no Supabase client (it connects via `DATABASE_URL`) and is queried
+directly:
 
 ```typescript title="{project}-db/src/seed.ts"
-import { createSupabaseDrizzle } from "@zeno-lib/db"
+import { createAdminDrizzle } from "@zeno-lib/db"
 import * as schema from "./schema"
 
-const db = createSupabaseDrizzle({ schema })
+const db = createAdminDrizzle({ schema })
 
-await db.admin.select().from(schema.posts)
+await db.select().from(schema.posts)
 ```
 
-Under the hood `db.admin` does not switch roles. It runs as the role the client
-connects as (the `postgres` role by default), which is not subject to RLS. That
+The admin client does not switch roles. It runs as the role the client connects
+as (the `postgres` role by default), which is not subject to RLS. That
 connection role, not `service_role`, is what makes admin queries bypass policies.
 
-`db.admin` is appropriate for seed scripts, webhooks, cron jobs, admin tools,
-and background jobs. It should not be used for user-scoped reads or writes.
+`createAdminDrizzle(...)` is appropriate for seed scripts, webhooks, cron jobs,
+admin tools, and background jobs. It should not be used for user-scoped reads or
+writes.
 
 ## Lower-level clients
 
@@ -139,12 +139,10 @@ explicit control over clients, use `createDrizzleClients(...)`:
 import { createDrizzleClients } from "@zeno-lib/db/clients"
 import * as schema from "./schema"
 
+const supabase = await createClient()
 const clients = createDrizzleClients({ schema })
 const admin = clients.getDrizzleSupabaseAdminClient()
-const rls = clients.getDrizzleSupabaseClient({
-  role: "authenticated",
-  sub: "00000000-0000-0000-0000-000000000000",
-})
+const rls = clients.getDrizzleSupabaseClient(supabase)
 
 const rows = await rls.runTransaction((rlsDb) =>
   rlsDb.select().from(schema.posts)
@@ -153,20 +151,18 @@ const rows = await rls.runTransaction((rlsDb) =>
 await clients.closeDrizzleSupabaseClients()
 ```
 
-When using the lower-level RLS client, pass a Supabase client whenever possible.
-If you pass claims directly, they must already be verified. The DB package does
-not decode or trust raw JWT strings.
+The lower-level RLS client takes a Supabase client and resolves verified claims
+via `supabase.auth.getClaims()`. The DB package does not decode or trust raw JWT
+strings.
 
 ## Pitfalls
 
 - Do not import `@zeno-lib/db` runtime clients from Client Components or browser
   code.
-- Do not use `db.admin` for user-scoped reads and writes.
+- Do not use `createAdminDrizzle(...)` for user-scoped reads and writes.
 - Do not pass raw access token strings or unverified session payloads to RLS
-  helpers.
+  helpers; `createSupabaseDrizzle(...)` accepts a Supabase client only.
 - Do not create fresh schema object literals per request.
-- Do not run queries outside `db.asUser` / `db.asUserTransaction(...)` when you expect
-  RLS policies to apply. `db.admin` bypasses them.
-- Do not call `db.asUser` like the old callback (`db.asUser((tx) => ...)`); it now
-  throws. Chain off it (`db.asUser.select()...`) or use `db.asUserTransaction(...)`
-  for multi-statement work.
+- Do not run reads or writes through `createAdminDrizzle(...)` when you expect
+  RLS policies to apply; it bypasses them. Use `createSupabaseDrizzle(...)` (its
+  direct queries and `db.transaction(...)`) for user-scoped, RLS-enforced work.

@@ -88,19 +88,19 @@ export const postSchema = defineTableSchema(posts)
 | `postSchema.update` | Data accepted before an update. Updatable fields are optional; generated columns are omitted. |
 
 These are plain Zod schemas. You can parse payloads in a Server Action or Route
-Handler before querying through `db.asUser` / `db.asUserTransaction(...)` or
-`db.admin`:
+Handler before querying through `createSupabaseDrizzle(...)` (RLS-scoped) or
+`createAdminDrizzle(...)` (RLS bypass):
 
 ```ts title="app/posts/actions.ts"
-import { createSupabaseDrizzle } from "@zeno-lib/db"
+import { createAdminDrizzle } from "@zeno-lib/db"
 import * as schema from "{project}-db"
 import { postSchema } from "{project}-forms/posts/schemas"
 
 export async function createPost(input: unknown) {
   const value = postSchema.insert.parse(input)
-  const db = createSupabaseDrizzle({ schema })
+  const db = createAdminDrizzle({ schema })
 
-  await db.admin.insert(schema.posts).values(value)
+  await db.insert(schema.posts).values(value)
 }
 ```
 
@@ -232,7 +232,7 @@ workspace name and `{table}` is the entity (here, `posts`).
 | Path | Should contain |
 |---|---|
 | `{project}-db/src/schemas/{table}.ts` | The Drizzle table: the database source of truth and the input to migrations. |
-| `{project}-db/src/schema.ts` | Barrel re-exporting every table, passed to `createSupabaseDrizzle({ schema })`. |
+| `{project}-db/src/schema.ts` | Barrel re-exporting every table, passed as `schema` to `createSupabaseDrizzle(...)` / `createAdminDrizzle(...)`. |
 | `{project}-forms/src/{table}/schemas.ts` | Table-derived Zod variants (`defineTableSchema`) and the UI/form schemas built from them. Pure, safe to import from Client Components. |
 | `{project}-forms/src/{table}/forms.tsx` | `@zeno-lib/forms` components for the table. |
 

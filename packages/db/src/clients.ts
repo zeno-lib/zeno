@@ -1,30 +1,20 @@
 // https://orm.drizzle.team/docs/rls#using-with-supabase
+import type { JwtPayload, SupabaseClient } from "@supabase/supabase-js"
 import type { AnyRelations, EmptyRelations } from "drizzle-orm"
 import { sql } from "drizzle-orm"
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js"
 import postgres from "postgres"
 
-// Verified Supabase JWT claims used to drive Postgres RLS.
-export type SupabaseTokenClaims = {
-  sub?: string
-  role?: string
-  [claim: string]: unknown
-}
-
+// Minimal structural shape of a Supabase client: only the `auth.getClaims`
+// method we call. Derived from the SDK so the signature tracks the real client.
 export type SupabaseAuthClientLike = {
-  auth: {
-    getClaims: () => Promise<{
-      data: { claims: SupabaseTokenClaims } | null
-      error: unknown | null
-    }>
-  }
+  auth: Pick<SupabaseClient["auth"], "getClaims">
 }
 
-export type SupabaseAuthContext =
-  | SupabaseAuthClientLike
-  | SupabaseTokenClaims
-  | null
-  | undefined
+// Verified Supabase JWT claims used to drive Postgres RLS. `Partial` because
+// `getClaims` may resolve an empty payload (anon). Internal only — callers pass
+// a Supabase client, never raw claims.
+type TokenClaims = Partial<JwtPayload>
 
 // `set local role <ident>` can't be parameterized, so the role is interpolated
 // via sql.raw. Restrict it to the Supabase-managed roles so a forged `role`
@@ -44,11 +34,20 @@ export type CreateDrizzleClientsOptions<
   connectionString?: string
 }
 
+// Admin (RLS-bypassing) factory needs no auth context.
+export type CreateAdminDrizzleOptions<
+  TSchema extends Record<string, unknown>,
+  TRelations extends AnyRelations = EmptyRelations,
+> = CreateDrizzleClientsOptions<TSchema, TRelations>
+
 export type CreateSupabaseDrizzleOptions<
   TSchema extends Record<string, unknown>,
   TRelations extends AnyRelations = EmptyRelations,
 > = CreateDrizzleClientsOptions<TSchema, TRelations> & {
-  supabase?: SupabaseAuthContext
+  // Mandatory: queries resolve verified claims via `supabase.auth.getClaims()`.
+  // Raw tokens/claims are intentionally not accepted — JWT verification belongs
+  // to Supabase Auth.
+  supabase: SupabaseAuthClientLike
 }
 
 type DrizzleClients<
@@ -79,7 +78,8 @@ export function createDrizzleClients<
 
   // prepare:false → required for the Supabase transaction pooler (port 6543).
   // Two separate pools: admin runs as the connection role (bypasses RLS),
-  // rls switches role + sets JWT claims per transaction.
+  // rls switches role + sets JWT claims per transaction. Pools connect lazily,
+  // so the one a given factory doesn't use never opens a connection.
   // `relations` enables the relational query API on both clients (and inside
   // the rls transaction's `tx`).
   const adminPool = postgres(url, { prepare: false })
@@ -98,12 +98,12 @@ export function createDrizzleClients<
     return adminClient
   }
 
-  // RLS-aware. Pass either a Supabase client (preferred) or verified JWT
-  // claims; every query MUST run inside `runTransaction` for the JWT context
-  // (and thus RLS) to apply.
-  function getDrizzleSupabaseClient(authContext?: SupabaseAuthContext) {
+  // RLS-aware. Resolves verified JWT claims from the Supabase client; every
+  // query MUST run inside `runTransaction` for the JWT context (and thus RLS)
+  // to apply.
+  function getDrizzleSupabaseClient(supabase: SupabaseAuthClientLike) {
     const runTransaction = (async (transaction, txConfig) => {
-      const token = await resolveTokenClaims(authContext)
+      const token = await resolveClaims(supabase)
       const sub = token.sub ?? ""
       const role =
         token.role && ALLOWED_RLS_ROLES.has(token.role) ? token.role : "anon"
@@ -140,66 +140,98 @@ export function createDrizzleClients<
   }
 }
 
+// RLS-aware client. Query it directly as the signed-in Supabase user:
+// `db.select().from(table)` / `db.query.table.findMany()` run each statement
+// inside its own RLS transaction (claims resolved from the bound Supabase
+// client, role switched). `db.transaction(cb)` runs several statements under
+// one atomic RLS transaction. `supabase` is mandatory.
 export function createSupabaseDrizzle<
   TSchema extends Record<string, unknown>,
   TRelations extends AnyRelations = EmptyRelations,
 >(options: CreateSupabaseDrizzleOptions<TSchema, TRelations>) {
+  if (!isSupabaseClientLike(options.supabase)) {
+    throw new Error(
+      "createSupabaseDrizzle requires a Supabase client. Pass { supabase } so queries can resolve verified claims via auth.getClaims()."
+    )
+  }
+
   const cacheKey = createCacheKey(options)
   const entry = acquireSharedDrizzleClients(options, cacheKey)
-  const {
-    closeDrizzleSupabaseClients,
-    getDrizzleSupabaseAdminClient,
-    getDrizzleSupabaseClient,
-  } = entry.clients
-  type AsUserTransaction = ReturnType<
-    typeof getDrizzleSupabaseClient
-  >["runTransaction"]
-  // `null` is treated like `undefined`: with no auth context we must reject
-  // loudly rather than silently fall back to an anon query.
-  const asUserTransaction =
-    options.supabase == null
-      ? ((() =>
-          Promise.reject(
-            new Error(
-              "Missing Supabase client. Pass { supabase } to createSupabaseDrizzle() to use db.asUser / db.asUserTransaction."
-            )
-          )) as AsUserTransaction)
-      : getDrizzleSupabaseClient(options.supabase).runTransaction
+  const close = createCloseHandle(options.schema, cacheKey, entry)
+  const { runTransaction } = entry.clients.getDrizzleSupabaseClient(
+    options.supabase
+  )
 
-  // Chainable single-statement query run as the signed-in user:
-  // `db.asUser.select().from(table)` / `db.asUser.query.table.findMany()`.
-  // Records the call chain and replays it inside one `asUserTransaction`, so the
-  // RLS context is established in exactly one place. Reach for
-  // `asUserTransaction(cb)` to run multiple statements atomically.
-  const asUser = createAsUserProxy(
-    asUserTransaction as (
+  return createRlsQueryClient(
+    runTransaction as (
       transaction: (tx: unknown) => unknown
-    ) => Promise<unknown>
-  ) as PostgresJsDatabase<TRelations>
+    ) => Promise<unknown>,
+    close
+  ) as PostgresJsDatabase<TRelations> & { close: typeof close }
+}
 
-  // Guard against double-close: each handle releases its reference at most once.
-  let released = false
+// Admin client. Query it directly to bypass RLS (webhooks, admin tasks,
+// background jobs, seeding). Needs no Supabase client — it connects with
+// `DATABASE_URL` (or the `connectionString` override).
+export function createAdminDrizzle<
+  TSchema extends Record<string, unknown>,
+  TRelations extends AnyRelations = EmptyRelations,
+>(options: CreateAdminDrizzleOptions<TSchema, TRelations>) {
+  const cacheKey = createCacheKey(options)
+  const entry = acquireSharedDrizzleClients(options, cacheKey)
+  const close = createCloseHandle(options.schema, cacheKey, entry)
+  const adminClient = entry.clients.getDrizzleSupabaseAdminClient()
 
-  return {
-    admin: getDrizzleSupabaseAdminClient(),
-    asUser,
-    asUserTransaction,
-    close: async (
-      closeOptions?: Parameters<typeof closeDrizzleSupabaseClients>[0]
-    ) => {
-      if (released) {
-        return
-      }
-      released = true
-      entry.refCount -= 1
-      // Other handles still share these pools — leave them open.
-      if (entry.refCount > 0) {
-        return
-      }
-      sharedClients.get(options.schema)?.delete(cacheKey)
-      await closeDrizzleSupabaseClients(closeOptions)
-    },
+  return attachClose(adminClient, close) as PostgresJsDatabase<TRelations> & {
+    close: typeof close
   }
+}
+
+// Reference-counted release of a handle's share of the cached pools. Guards
+// against double-close: each handle releases its reference at most once, and
+// the pools are only ended once the last handle closes.
+function createCloseHandle<
+  TSchema extends Record<string, unknown>,
+  TRelations extends AnyRelations = EmptyRelations,
+>(
+  schema: TSchema,
+  cacheKey: string,
+  entry: { clients: DrizzleClients<TSchema, TRelations>; refCount: number }
+) {
+  let released = false
+  return async (
+    closeOptions?: Parameters<
+      DrizzleClients<TSchema, TRelations>["closeDrizzleSupabaseClients"]
+    >[0]
+  ): Promise<void> => {
+    if (released) {
+      return
+    }
+    released = true
+    entry.refCount -= 1
+    // Other handles still share these pools — leave them open.
+    if (entry.refCount > 0) {
+      return
+    }
+    sharedClients.get(schema)?.delete(cacheKey)
+    await entry.clients.closeDrizzleSupabaseClients(closeOptions)
+  }
+}
+
+// Wraps a drizzle client so `db.close()` releases the cached pools while every
+// other property/method forwards to the real client (bound so drizzle's `this`
+// — including private fields — keeps working). `close` does not collide with
+// any `PostgresJsDatabase` member.
+function attachClose<T extends object, TClose>(client: T, close: TClose): T {
+  return new Proxy(client, {
+    get(target, prop, receiver) {
+      if (prop === "close") {
+        return close
+      }
+      const value = Reflect.get(target, prop, receiver)
+      return typeof value === "function" ? value.bind(target) : value
+    },
+  })
 }
 
 function acquireSharedDrizzleClients<
@@ -249,8 +281,8 @@ function createCacheKey<
   return JSON.stringify({ url })
 }
 
-// One recorded step of a chained call: `db.asUser.select` is a get, the
-// following `()` is an apply.
+// One recorded step of a chained call: `db.select` is a get, the following `()`
+// is an apply.
 type AsUserChainStep =
   | { kind: "get"; prop: PropertyKey }
   | { kind: "apply"; args: unknown[] }
@@ -275,12 +307,36 @@ function replayAsUserChain(tx: unknown, path: AsUserChainStep[]): unknown {
   return current
 }
 
-// Builds the chainable `db.asUser` proxy. It records the get/apply chain lazily;
-// only when the chain is awaited (`.then`/`.catch`/`.finally`) does it open an
-// RLS transaction and replay the chain against that transaction's `tx`. Each
-// awaited chain is its own transaction.
-function createAsUserProxy(
+const PROMISE_METHODS = new Set<PropertyKey>(["then", "catch", "finally"])
+
+// Awaiting a recorded chain triggers the transaction + replay. The transaction
+// is opened lazily when the promise method is *called* (not merely accessed),
+// so probing `.then` for thenable-detection never starts a stray transaction.
+// The call returns a real promise, so any further `.then`/`.catch`/`.finally`
+// chaining runs on it.
+function replayPromiseMethod(
+  prop: PropertyKey,
+  path: AsUserChainStep[],
   runTransaction: (transaction: (tx: unknown) => unknown) => Promise<unknown>
+) {
+  return (...promiseArgs: unknown[]) => {
+    const promise = runTransaction((tx) => replayAsUserChain(tx, path))
+    return (
+      promise[prop as keyof Promise<unknown>] as (...args: unknown[]) => unknown
+    ).apply(promise, promiseArgs)
+  }
+}
+
+// Builds the RLS query client returned by `createSupabaseDrizzle`. Querying it
+// records the get/apply chain lazily; only when the chain is awaited
+// (`.then`/`.catch`/`.finally`) does it open an RLS transaction and replay the
+// chain against that transaction's `tx`. Each awaited chain is its own
+// transaction. `db.transaction(cb)` runs several statements in one transaction,
+// and `db.close()` releases the pools. The root itself is intentionally not
+// thenable and not callable.
+function createRlsQueryClient(
+  runTransaction: (transaction: (tx: unknown) => unknown) => Promise<unknown>,
+  close: (...args: never[]) => Promise<void>
 ): unknown {
   const build = (path: AsUserChainStep[], isRoot: boolean): unknown => {
     // The proxy target must be callable so the `apply` trap fires for `()`.
@@ -289,25 +345,25 @@ function createAsUserProxy(
       apply(_target, _thisArg, args: unknown[]) {
         if (isRoot) {
           throw new Error(
-            "db.asUser is chainable (e.g. db.asUser.select().from(table)). Use db.asUserTransaction(cb) to run multiple statements in one RLS transaction."
+            "The createSupabaseDrizzle() client is queried directly (e.g. db.select().from(table)). Use db.transaction(cb) to run multiple statements in one RLS transaction."
           )
         }
         return build([...path, { args, kind: "apply" }], false)
       },
       get(_target, prop) {
-        // Awaiting the chain triggers the transaction + replay. The transaction
-        // is opened lazily when the promise method is *called* (not merely
-        // accessed), so probing `.then` for thenable-detection never starts a
-        // stray transaction. The call returns a real promise, so any further
-        // `.then`/`.catch`/`.finally` chaining runs on it, not on the proxy.
-        if (prop === "then" || prop === "catch" || prop === "finally") {
-          return (...promiseArgs: unknown[]) => {
-            const promise = runTransaction((tx) => replayAsUserChain(tx, path))
-            return (promise[prop] as (...args: unknown[]) => unknown).apply(
-              promise,
-              promiseArgs
-            )
-          }
+        // Multi-statement RLS transaction and pool release live on the root.
+        if (isRoot && prop === "transaction") {
+          return runTransaction
+        }
+        if (isRoot && prop === "close") {
+          return close
+        }
+        if (PROMISE_METHODS.has(prop)) {
+          // Root stays a plain (non-thenable) object so `await db` / probes
+          // never open a stray transaction; recorded chains are awaitable.
+          return isRoot
+            ? undefined
+            : replayPromiseMethod(prop, path, runTransaction)
         }
         // Ignore symbol probes (inspection, `Symbol.toPrimitive`, etc.) so they
         // are not recorded as part of the query chain.
@@ -321,43 +377,26 @@ function createAsUserProxy(
   return build([], true)
 }
 
-async function resolveTokenClaims(
-  authContext?: SupabaseAuthContext
-): Promise<SupabaseTokenClaims> {
-  if (isSupabaseClientLike(authContext)) {
-    const { data, error } = await authContext.auth.getClaims()
-    if (error) {
-      throw error
-    }
-    return normalizeTokenClaims(data?.claims)
+async function resolveClaims(
+  supabase: SupabaseAuthClientLike
+): Promise<TokenClaims> {
+  const { data, error } = await supabase.auth.getClaims()
+  if (error) {
+    throw error
   }
-  return normalizeTokenClaims(authContext)
+  return (data?.claims ?? {}) as TokenClaims
 }
 
 function isSupabaseClientLike(
-  authContext?: SupabaseAuthContext
-): authContext is SupabaseAuthClientLike {
+  supabase?: SupabaseAuthClientLike | null
+): supabase is SupabaseAuthClientLike {
   return (
-    !!authContext &&
-    typeof authContext === "object" &&
-    "auth" in authContext &&
-    typeof authContext.auth === "object" &&
-    !!authContext.auth &&
-    "getClaims" in authContext.auth &&
-    typeof authContext.auth.getClaims === "function"
+    !!supabase &&
+    typeof supabase === "object" &&
+    "auth" in supabase &&
+    typeof supabase.auth === "object" &&
+    !!supabase.auth &&
+    "getClaims" in supabase.auth &&
+    typeof supabase.auth.getClaims === "function"
   )
-}
-
-function normalizeTokenClaims(
-  verifiedClaims?: SupabaseAuthContext
-): SupabaseTokenClaims {
-  if (
-    !verifiedClaims ||
-    typeof verifiedClaims !== "object" ||
-    Array.isArray(verifiedClaims) ||
-    isSupabaseClientLike(verifiedClaims)
-  ) {
-    return {}
-  }
-  return verifiedClaims
 }

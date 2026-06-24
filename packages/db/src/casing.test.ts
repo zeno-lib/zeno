@@ -19,7 +19,7 @@ import {
 } from "drizzle-orm/pg-core"
 import { camelCase, snakeCase } from "drizzle-orm/pg-core/casing"
 import { describe, expect, it } from "vitest"
-import { createSupabaseDrizzle } from "./clients.ts"
+import { createAdminDrizzle } from "./clients.ts"
 import { defineDrizzleConfig } from "./config.ts"
 import {
   allPolicy,
@@ -70,15 +70,13 @@ describe("default casing", () => {
       displayName: text(),
       ownerId: uuid(),
     })
-    const db = createSupabaseDrizzle({
+    const db = createAdminDrizzle({
       connectionString: LOCAL_DB_URL,
       schema: { posts },
     })
 
-    expect(db.admin.select().from(posts).toSQL().sql).toContain(
-      '"display_name"'
-    )
-    expect(db.admin.select().from(posts).toSQL().sql).toContain('"owner_id"')
+    expect(db.select().from(posts).toSQL().sql).toContain('"display_name"')
+    expect(db.select().from(posts).toSQL().sql).toContain('"owner_id"')
 
     await db.close({ timeout: 0 })
   })
@@ -87,12 +85,12 @@ describe("default casing", () => {
     const posts = camelCase.table("posts", {
       displayName: text(),
     })
-    const db = createSupabaseDrizzle({
+    const db = createAdminDrizzle({
       connectionString: LOCAL_DB_URL,
       schema: { posts },
     })
 
-    expect(db.admin.select().from(posts).toSQL().sql).toContain('"displayName"')
+    expect(db.select().from(posts).toSQL().sql).toContain('"displayName"')
 
     await db.close({ timeout: 0 })
   })
@@ -102,15 +100,13 @@ describe("default casing", () => {
       displayName: text(),
       ownerId: uuid(),
     })
-    const db = createSupabaseDrizzle({
+    const db = createAdminDrizzle({
       connectionString: LOCAL_DB_URL,
       schema: { posts },
     })
 
-    expect(db.admin.select().from(posts).toSQL().sql).toContain(
-      '"display_name"'
-    )
-    expect(db.admin.select().from(posts).toSQL().sql).toContain('"owner_id"')
+    expect(db.select().from(posts).toSQL().sql).toContain('"display_name"')
+    expect(db.select().from(posts).toSQL().sql).toContain('"owner_id"')
     expect(getTableConfig(posts).enableRLS).toBe(true)
 
     await db.close({ timeout: 0 })
@@ -121,17 +117,15 @@ describe("default casing", () => {
       displayName: text(),
       ownerId: uuid(),
     })
-    const db = createSupabaseDrizzle({
+    const db = createAdminDrizzle({
       connectionString: LOCAL_DB_URL,
       schema: { auditEvents },
     })
 
-    expect(db.admin.select().from(auditEvents).toSQL().sql).toContain(
+    expect(db.select().from(auditEvents).toSQL().sql).toContain(
       '"display_name"'
     )
-    expect(db.admin.select().from(auditEvents).toSQL().sql).toContain(
-      '"owner_id"'
-    )
+    expect(db.select().from(auditEvents).toSQL().sql).toContain('"owner_id"')
     expect(getTableConfig(auditEvents).enableRLS).toBe(false)
 
     await db.close({ timeout: 0 })

@@ -133,6 +133,9 @@ importers:
 
   packages/db:
     devDependencies:
+      '@supabase/supabase-js':
+        specifier: 2.106.1
+        version: 2.106.1
       '@types/node':
         specifier: 24.10.0
         version: 24.10.0

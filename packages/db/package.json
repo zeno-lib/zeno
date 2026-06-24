@@ -24,11 +24,13 @@
     "directory": "packages/db"
   },
   "peerDependencies": {
+    "@supabase/supabase-js": ">=2",
     "drizzle-kit": "1.0.0-rc.3",
     "drizzle-orm": "1.0.0-rc.3",
     "postgres": ">=3.4"
   },
   "devDependencies": {
+    "@supabase/supabase-js": "2.106.1",
     "@types/node": "24.10.0",
     "@zeno-lib/typescript": "workspace:^",
     "drizzle-kit": "1.0.0-rc.3",

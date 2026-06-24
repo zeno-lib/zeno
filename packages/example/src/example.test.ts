@@ -1,8 +1,20 @@
-import { createDrizzleClients, createSupabaseDrizzle } from "@zeno-lib/db"
-import { sql } from "drizzle-orm"
+import {
+  createAdminDrizzle,
+  createDrizzleClients,
+  createSupabaseDrizzle,
+  type SupabaseAuthClientLike,
+} from "@zeno-lib/db"
 import { describe, expect, it, vi } from "vitest"
 
 const LOCAL_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+
+function fakeSupabase(): SupabaseAuthClientLike {
+  return {
+    auth: {
+      getClaims: vi.fn(async () => ({ data: { claims: {} }, error: null })),
+    },
+  } as unknown as SupabaseAuthClientLike
+}
 
 describe("createDrizzleClients", () => {
   it("throws when DATABASE_URL is unset and no override is provided", () => {
@@ -15,58 +27,51 @@ describe("createDrizzleClients", () => {
 })
 
 describe("createSupabaseDrizzle", () => {
-  it("exposes the ergonomic db surface without connecting eagerly", async () => {
+  it("exposes a directly-queryable RLS client without connecting eagerly", async () => {
     const db = createSupabaseDrizzle({
       connectionString: LOCAL_DB_URL,
       schema: {},
+      supabase: fakeSupabase(),
     })
 
-    expect(db.admin).toBeDefined()
-    // Chainable single-statement query surface.
-    expect(db.asUser).toBeDefined()
-    // Callback form for multi-statement RLS transactions.
-    expect(db.asUserTransaction).toEqual(expect.any(Function))
+    // Query the signed-in user directly; multi-statement work via transaction.
+    expect(db.select).toEqual(expect.any(Function))
+    expect(db.transaction).toEqual(expect.any(Function))
     expect(db.close).toEqual(expect.any(Function))
 
     await db.close({ timeout: 0 })
   })
 
-  it("fails loudly when asUserTransaction is used without a Supabase client", async () => {
-    const db = createSupabaseDrizzle({
-      connectionString: LOCAL_DB_URL,
-      schema: {},
-    })
-
-    await expect(db.asUserTransaction(async () => [])).rejects.toThrow(
-      "Missing Supabase client"
-    )
-
-    await db.close({ timeout: 0 })
+  it("throws at creation when no Supabase client is provided", () => {
+    expect(() =>
+      createSupabaseDrizzle({
+        connectionString: LOCAL_DB_URL,
+        schema: {},
+      } as never)
+    ).toThrow("requires a Supabase client")
   })
 
-  it("fails loudly when the chainable asUser is used without a Supabase client", async () => {
-    const db = createSupabaseDrizzle({
-      connectionString: LOCAL_DB_URL,
-      schema: {},
-    })
-
-    await expect(db.asUser.execute(sql`select 1`)).rejects.toThrow(
-      "Missing Supabase client"
-    )
-
-    await db.close({ timeout: 0 })
+  it("throws at creation when given a null Supabase client", () => {
+    expect(() =>
+      createSupabaseDrizzle({
+        connectionString: LOCAL_DB_URL,
+        schema: {},
+        supabase: null,
+      } as never)
+    ).toThrow("requires a Supabase client")
   })
+})
 
-  it("fails loudly when asUserTransaction is given a null Supabase client", async () => {
-    const db = createSupabaseDrizzle({
+describe("createAdminDrizzle", () => {
+  it("exposes a directly-queryable admin client without connecting eagerly", async () => {
+    const db = createAdminDrizzle({
       connectionString: LOCAL_DB_URL,
       schema: {},
-      supabase: null,
     })
 
-    await expect(db.asUserTransaction(async () => [])).rejects.toThrow(
-      "Missing Supabase client"
-    )
+    expect(db.select).toEqual(expect.any(Function))
+    expect(db.transaction).toEqual(expect.any(Function))
+    expect(db.close).toEqual(expect.any(Function))
 
     await db.close({ timeout: 0 })
   })

@@ -26,27 +26,27 @@ policy helpers.
 
 | Import | Use from | Returns / does |
 |---|---|---|
-| `@zeno-lib/db` | Server code (Server Components, Route Handlers, Server Actions, cron, scripts) | `createSupabaseDrizzle({ schema, relations?, supabase?, connectionString? })` -> `{ admin, asUser, asUserTransaction, close }`. `admin` bypasses RLS. `asUser` is a **chainable** single-statement client that runs queries as the signed-in Supabase user (`db.asUser.select().from(t)`, `db.asUser.query.t.findMany()`): it records the chain and replays it inside one RLS transaction (claims resolved from the bound Supabase client, role switched), one transaction per awaited chain. `asUserTransaction(cb)` is the **callback** form for multiple statements under one atomic RLS transaction (`db.asUserTransaction(async (tx) => { ... })`). `asUser` is built on `asUserTransaction`, so RLS context is established in exactly one place. `relations` (from drizzle's `defineRelations`) enables the relational query API on `admin`, `asUser`, and `tx`. Underlying Postgres pools are cached by imported schema object + connection config. `close()` is reference-counted: it releases this handle's share of the cached pools and only ends them once the last handle closes (so a per-request `close()` won't tear down pools other in-flight requests are using). |
-| `@zeno-lib/db/clients` | Lower-level server code | `createDrizzleClients({ schema, connectionString? })` -> `{ getDrizzleSupabaseAdminClient, getDrizzleSupabaseClient, closeDrizzleSupabaseClients }`. Opens two `postgres-js` pools. `getDrizzleSupabaseAdminClient()` returns a Drizzle db that **bypasses RLS**. `getDrizzleSupabaseClient(supabaseOrClaims?)` accepts a Supabase client (preferred) or already-verified Supabase JWT claims and returns `{ runTransaction }`. |
+| `@zeno-lib/db` | Server code (Server Components, Route Handlers, Server Actions, cron, scripts) | Two factories. `createSupabaseDrizzle({ schema, relations?, supabase, connectionString? })` -> an RLS-aware client **queried directly** as the signed-in Supabase user. `supabase` is **mandatory** (a Supabase client; raw tokens/claims are not accepted) and creating without one throws immediately. A single statement runs in its own RLS transaction (`db.select().from(t)`, `db.query.t.findMany()`): the chain is recorded and replayed inside one transaction with claims resolved from the bound client and the role switched. `db.transaction(async (tx) => { ... })` runs multiple statements under one atomic RLS transaction. `createAdminDrizzle({ schema, relations?, connectionString? })` -> a client that **bypasses RLS** (webhooks, admin tasks, background jobs, seeding), needs no Supabase client, and is queried directly too (`db.select().from(t)`, `db.transaction(cb)`). `relations` (from drizzle's `defineRelations`) enables the relational query API on both clients (and inside `tx`). Underlying Postgres pools are cached by imported schema object + connection config (the two unused-by-one-factory pools connect lazily, so they cost nothing until queried). `close()` on either client is reference-counted: it releases this handle's share of the cached pools and only ends them once the last handle closes (so a per-request `close()` won't tear down pools other in-flight requests are using). |
+| `@zeno-lib/db/clients` | Lower-level server code | `createDrizzleClients({ schema, connectionString? })` -> `{ getDrizzleSupabaseAdminClient, getDrizzleSupabaseClient, closeDrizzleSupabaseClients }`. Opens two `postgres-js` pools. `getDrizzleSupabaseAdminClient()` returns a Drizzle db that **bypasses RLS**. `getDrizzleSupabaseClient(supabase)` takes a Supabase client and returns `{ runTransaction }`. |
 | `@zeno-lib/db/config` | `drizzle.config.ts` in each consuming package/app | `defineDrizzleConfig({ schema, ...overrides })` — preset that defaults `out` to `./supabase/migrations`, dialect to `postgresql`, reads `DATABASE_URL` from env, and sets `entities.roles.provider: "supabase"`. |
 | `@zeno-lib/db/schema` | Application schema files | `table` (`snakeCase.table.withRLS`) for RLS-by-default tables, `unsecureTable` (`snakeCase.table`) for intentional non-RLS tables, common column helpers (`primaryId`, `authUserId`, `createdBy`, `updatedBy`), audit mixins (`timestamps` for xAt, `authorship` for xBy, `auditColumns` for all four), generic policy helpers (`selectPolicy`, `insertPolicy`, `updatePolicy`, `deletePolicy`, `allPolicy`), authenticated-owner policy helpers, curated Supabase role/helper exports from `drizzle-orm/supabase`, and curated `pg-core` aliases such as `policy`, `role`, `schema`, `sequence`, `view`, `materializedView`, `tableCreator`, and `enum` (import with a local alias because `enum` is reserved). |
 
 Keep this entrypoint list focused on Zeno-owned DB helpers. Consumers import
 Drizzle APIs and run Drizzle Kit directly from their peer dependencies.
 
-Both factories read `DATABASE_URL` from `process.env` with an optional
+All factories read `DATABASE_URL` from `process.env` with an optional
 `{ connectionString }` override; they throw
 `"Missing DATABASE_URL environment variable"` if neither resolves. Both pools
 pass `prepare: false` to `postgres-js` so the Supabase transaction pooler (port
 6543) works. The RLS path resolves verified JWT claims via
-`supabase.auth.getClaims()` when given a Supabase client, validates the `role`
-against `anon | authenticated` (default `anon`), and then uses `set local role`;
-use the admin client for service-role work.
+`supabase.auth.getClaims()`, validates the `role` against `anon | authenticated`
+(default `anon`), and then uses `set local role`; use `createAdminDrizzle` for
+service-role / RLS-bypassing work.
 
 ## Usage Patterns
 
 RLS-aware per request — pass the request-scoped Supabase client at creation
-time, then chain off `db.asUser` for a single statement:
+time (mandatory), then query `db` directly for a single statement:
 
 ```ts
 // route.ts
@@ -57,14 +57,13 @@ import * as schema from "./schema"
 
 const supabase = await createClient()
 const db = createSupabaseDrizzle({ schema, supabase })
-const myPosts = await db.asUser.select().from(posts) // RLS enforced (chainable)
+const myPosts = await db.select().from(posts) // RLS enforced
 ```
 
-Multiple statements under one atomic RLS transaction — use the callback form
-`db.asUserTransaction(...)`:
+Multiple statements under one atomic RLS transaction — use `db.transaction(...)`:
 
 ```ts
-const created = await db.asUserTransaction(async (tx) => {
+const created = await db.transaction(async (tx) => {
   const [post] = await tx.insert(posts).values({ title }).returning()
   await tx.insert(auditLog).values({ postId: post.id })
   return post
@@ -77,22 +76,23 @@ Relational query API — pass `relations` (from `defineRelations`) at creation:
 import { defineRelations } from "drizzle-orm"
 const relations = defineRelations(schema)
 const db = createSupabaseDrizzle({ relations, schema, supabase })
-const myPosts = await db.asUser.query.posts.findMany() // RLS enforced
+const myPosts = await db.query.posts.findMany() // RLS enforced
 ```
 
-Pass the imported schema module object (and a stable `relations` object) to
-`createSupabaseDrizzle(...)`; do not create fresh schema/relations object
-literals per request, or the pool cache cannot be reused.
+Pass the imported schema module object (and a stable `relations` object) to the
+factory; do not create fresh schema/relations object literals per request, or
+the pool cache cannot be reused.
 
-Admin (bypasses RLS — webhooks, admin tasks, background jobs, seeding):
+Admin (bypasses RLS — webhooks, admin tasks, background jobs, seeding). Use the
+separate `createAdminDrizzle` factory; it needs no Supabase client:
 
 ```ts
-import { createSupabaseDrizzle } from "@zeno-lib/db"
+import { createAdminDrizzle } from "@zeno-lib/db"
 import * as schema from "./schema"
 import { posts } from "./schema"
 
-const db = createSupabaseDrizzle({ schema })
-await db.admin.select().from(posts) // RLS bypassed
+const db = createAdminDrizzle({ schema })
+await db.select().from(posts) // RLS bypassed
 ```
 
 Schema with an RLS policy:
@@ -143,18 +143,15 @@ export default defineDrizzleConfig({ schema: "./src/schema.ts" })
   `pg-core` aliases exported from `@zeno-lib/db/schema`.
 - **Keep Drizzle Kit CLI ownership in the consuming package.** Consumers install
   `drizzle-kit` and run its CLI from their own package scripts.
-- **Do not run queries outside `db.asUser` / `db.asUserTransaction(...)` when you
-  intend RLS to apply.** A query on `db.admin` executes as the connection role,
-  bypassing the policies you authored. The JWT claims + role are only set inside
-  the RLS transaction.
-- **Do not call `db.asUser` like the old callback form** (`db.asUser((tx) => ...)`).
-  `db.asUser` is now chainable and throws on a direct call. Chain off it
-  (`db.asUser.select()...`) for one statement, or use `db.asUserTransaction(cb)` for
-  multiple statements in one transaction.
-- **Do not pass raw JWT strings or unverified session payloads into RLS
-  helpers.** Pass a Supabase client, or verify first with Supabase Auth
-  (`auth.getClaims()` / equivalent) and pass the resulting claims object. The DB
-  package deliberately does not decode raw tokens.
+- **Do not use `createAdminDrizzle` for user-scoped reads/writes.** Its client
+  executes as the connection role, bypassing the policies you authored. RLS
+  applies only to a `createSupabaseDrizzle` client, whose JWT claims + role are
+  set inside the per-statement (or `db.transaction`) RLS transaction.
+- **Do not pass raw JWT strings or unverified session payloads as the auth
+  context.** `createSupabaseDrizzle` only accepts a Supabase client (`supabase`
+  is mandatory and client-only); it resolves verified claims via
+  `auth.getClaims()` itself and deliberately does not decode raw tokens. There is
+  no longer a claims-object path to misuse.
 - **Do not write RLS policies as raw SQL in `supabase/migrations/` by hand.**
   `policy(...)` / `selectPolicy(...)` / owner policy helpers in the schema are
   the source of truth — drizzle-kit emits
@@ -183,10 +180,10 @@ plus local copies of the peer deps for tests and type-checking. No workspace
 runtime deps.
 
 JWT verification belongs to Supabase Auth; `clients.ts` calls
-`supabase.auth.getClaims()` when given a Supabase client, or accepts
-already-verified claims for lower-level callers, then installs them into the
-transaction-local Postgres settings used by `auth.uid()` / `auth.jwt()`. Env
-loading (e.g. `dotenv/config`) is the consumer's responsibility —
+`supabase.auth.getClaims()` on the mandatory Supabase client, then installs the
+verified claims into the transaction-local Postgres settings used by
+`auth.uid()` / `auth.jwt()`. Env loading (e.g. `dotenv/config`) is the
+consumer's responsibility.
 `drizzle.config.ts` should `import "dotenv/config"` at the top when run outside
 a framework that auto-loads `.env` (Next.js).
 
@@ -229,22 +226,22 @@ by Client Components for validation.
 - **Do not append `.enableRLS()` manually.** Use `table(...)` for RLS-enabled
   tables. Drizzle v1 also enables RLS automatically when policies are present,
   and `.enableRLS()` is deprecated for that common case.
-- **The "claims object" is Supabase's verified JWT payload.** Prefer passing the
-  Supabase client so `auth.getClaims()` resolves it for you. If passing claims
-  directly, they must already be verified.
+- **Claims come only from the bound Supabase client.** `createSupabaseDrizzle`
+  resolves them via `auth.getClaims()`; there is no path to inject a claims
+  object directly, which keeps "must be verified" a compile-time guarantee.
 - **`request.jwt.claims` is set via `set_config(..., true)`**
   (transaction-local), so it auto-resets at commit/rollback. Run each request's
   queries inside its own `rls(...)` transaction so the context never leaks across
   requests.
-- **The relational query API (`db.query.*` / `db.asUser.query.*`) needs a
-  `relations` object.** Drizzle v1 ignores `schema` for relations and reads
-  `relations` (from `defineRelations`). Without it, `query.*` is unavailable.
-  Because pools are cached by schema object + connection config, pass the same
-  stable `relations` object on every `createSupabaseDrizzle(...)` call sharing
-  that schema + URL, or a cached client built without relations will be reused.
-- **Each awaited `db.asUser` chain is its own transaction.** It cannot span
-  multiple statements; reach for `db.asUserTransaction(...)` when several statements
-  must be atomic.
+- **The relational query API (`db.query.*`) needs a `relations` object.**
+  Drizzle v1 ignores `schema` for relations and reads `relations` (from
+  `defineRelations`). Without it, `query.*` is unavailable. Because pools are
+  cached by schema object + connection config, pass the same stable `relations`
+  object on every factory call sharing that schema + URL, or a cached client
+  built without relations will be reused.
+- **Each awaited single-statement `db` query is its own transaction.** It cannot
+  span multiple statements; reach for `db.transaction(...)` when several
+  statements must be atomic.
 - **`test` covers public package behavior without connecting eagerly** — peer
   dependency expectations, focused package exports, and the RLS/client
   contracts.
