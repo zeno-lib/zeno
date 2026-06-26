@@ -1,5 +1,12 @@
 # @zeno-lib/authentication
 
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies [341f9f7]
+  - @zeno-lib/supabase@0.0.3
+
 ## 0.0.2
 
 ### Patch Changes
