@@ -31,29 +31,13 @@ const anon = createAnonClient<Database>()
 const admin = createAdminClient<Database>()
 ```
 
-`createAnonClient` arguments:
+All three take `(supabaseUrl?, supabaseKey?, options?)`, return a session-less client (`auth.persistSession: false`), and forward `options` to the supabase-js client. The URL resolves from `SUPABASE_URL`, then `NEXT_PUBLIC_SUPABASE_URL` (`createClient` requires it explicitly). They differ in the key:
 
-| Argument | Type | What it does |
-|---|---|---|
-| `supabaseUrl?` | `string` | Supabase project URL. Defaults to `SUPABASE_URL`, then `NEXT_PUBLIC_SUPABASE_URL`. |
-| `supabaseKey?` | `string` | Supabase publishable key. Defaults to `SUPABASE_PUBLISHABLE_KEY`, then `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. |
-| `options?` | `SupabaseClientOptions` | Forwarded to the supabase-js client. `auth.persistSession` defaults to `false`. |
-
-`createAdminClient` arguments:
-
-| Argument | Type | What it does |
-|---|---|---|
-| `supabaseUrl?` | `string` | Supabase project URL. Defaults to `SUPABASE_URL`, then `NEXT_PUBLIC_SUPABASE_URL`. |
-| `supabaseKey?` | `string` | Supabase secret key. Defaults to `SUPABASE_SECRET_KEY`. |
-| `options?` | `SupabaseClientOptions` | Forwarded to the supabase-js client. `auth.persistSession` defaults to `false`. |
-
-`createClient` arguments:
-
-| Argument | Type | What it does |
-|---|---|---|
-| `supabaseUrl` | `string` | Supabase project URL. |
-| `supabaseKey` | `string` | Supabase API key. |
-| `options?` | `SupabaseClientOptions` | Forwarded to the supabase-js client. `auth.persistSession` defaults to `false`. |
+| Factory | Key |
+|---|---|
+| `createAnonClient()` | `SUPABASE_PUBLISHABLE_KEY`, then `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` |
+| `createAdminClient()` | `SUPABASE_SECRET_KEY` |
+| `createClient(url, key)` | passed explicitly |
 
 ### Security
 
