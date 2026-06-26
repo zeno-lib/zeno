@@ -1,6 +1,7 @@
 // https://supabase.com/docs/guides/auth/server-side/nextjs
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
+import { requireSupabaseEnv } from "./env"
 
 /**
  * Server Supabase client backed by the cookie session (`@supabase/ssr`); async — `await` it.
@@ -17,12 +18,10 @@ export async function createClient<Database>(
 ) {
   const cookieStore = await cookies()
 
-  const url = supabaseUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = supabaseKey ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-
-  if (!(url && key)) {
-    throw new Error("Missing Supabase environment variables")
-  }
+  const { url, key } = requireSupabaseEnv(
+    supabaseUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL,
+    supabaseKey ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  )
 
   return createServerClient<Database>(url, key, {
     ...options,

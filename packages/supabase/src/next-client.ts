@@ -1,5 +1,6 @@
 // https://supabase.com/docs/guides/auth/server-side/nextjs
 import { createBrowserClient } from "@supabase/ssr"
+import { requireSupabaseEnv } from "./env"
 
 /**
  * Browser Supabase client backed by the cookie session (`@supabase/ssr`).
@@ -14,12 +15,10 @@ export function createClient<Database>(
   /** Options forwarded to `createBrowserClient`. */
   options?: Parameters<typeof createBrowserClient>[2]
 ) {
-  const url = supabaseUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = supabaseKey ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-
-  if (!(url && key)) {
-    throw new Error("Missing Supabase client environment variables")
-  }
+  const { url, key } = requireSupabaseEnv(
+    supabaseUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL,
+    supabaseKey ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  )
 
   return createBrowserClient<Database>(url, key, options)
 }
