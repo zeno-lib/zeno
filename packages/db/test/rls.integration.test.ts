@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import {
   createAdminClient,
   createAnonClient,
@@ -7,7 +7,7 @@ import {
   createSupabaseClient,
   type SupabaseToken,
 } from "@zeno-lib/db"
-import { defineRelations, inArray, sql } from "drizzle-orm"
+import { defineRelations, eq, inArray, sql } from "drizzle-orm"
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 // biome-ignore lint/performance/noNamespaceImport: drizzle schema needs every table
 import * as schema from "./schema"
@@ -15,21 +15,52 @@ import { posts } from "./schema"
 
 // SUPABASE_DATABASE_URL is loaded from .env.test (local Supabase on 54322).
 // These tests connect for real, so start the stack with `pnpm dev` first.
-
 const LOCAL_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-// Two distinct owners. `posts.user_id` FKs to auth.users, so these must exist as
-// real auth users before any post can reference them (seeded in beforeAll).
-const USER_A = "11111111-1111-1111-1111-111111111111"
-const USER_B = "22222222-2222-2222-2222-222222222222"
+
+// Local Supabase Auth (GoTrue). The keys are the public, universal local-dev
+// demo keys printed by `supabase start` (issuer "supabase-demo") — not secrets.
+const API_URL = "http://127.0.0.1:54321"
+const ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0"
+const SERVICE_ROLE_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU"
+const PASSWORD = "rls-integration-pw"
+
+// Real auth users are created via the GoTrue admin API so `posts.user_id` FKs to
+// genuine auth.users rows. IDs are assigned in beforeAll (random), so anything
+// that embeds them in a test table must read them through a thunk.
+let USER_A: string
+let USER_B: string
 
 // Relations enable the relational query API (`db.query.<table>.findMany()`).
 const relations = defineRelations(schema)
 const adminDb = createAdminClient({ relations })
 
+// service_role client over the Auth admin API (creates/deletes real users).
+const supabaseAdmin = createClient(API_URL, SERVICE_ROLE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false },
+})
+
+async function createAuthUser(email: string): Promise<string> {
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    password: PASSWORD,
+  })
+  if (error) {
+    throw error
+  }
+  return data.user.id
+}
+
 function token(sub: string): SupabaseToken {
   return { role: "authenticated", sub }
 }
 
+// Fakes only the dependency boundary: `getClaims()` is Supabase Auth's job, not
+// this package's. Used to drive the claim-clamping matrix — including forged
+// claims a real signed-in session can never produce. The real getClaims() chain
+// is covered by the "real Supabase session" suite below.
 function createSupabase(claims: Record<string, unknown>): SupabaseClient {
   return {
     auth: {
@@ -53,15 +84,8 @@ function owners(rows: { userId: string }[]) {
 }
 
 beforeAll(async () => {
-  // auth.users rows are the FK targets for posts.user_id. The admin connection
-  // (postgres) is the only one that may write the auth schema.
-  await adminDb.execute(sql`
-    insert into auth.users (instance_id, id, aud, role, email, created_at, updated_at)
-    values
-      ('00000000-0000-0000-0000-000000000000', ${USER_A}, 'authenticated', 'authenticated', 'rls-a@example.test', now(), now()),
-      ('00000000-0000-0000-0000-000000000000', ${USER_B}, 'authenticated', 'authenticated', 'rls-b@example.test', now(), now())
-    on conflict (id) do nothing
-  `)
+  USER_A = await createAuthUser("rls-a@example.test")
+  USER_B = await createAuthUser("rls-b@example.test")
   // Seeded via admin so the rows exist regardless of RLS — one post per owner.
   await adminDb.insert(posts).values([
     { title: "A's post", userId: USER_A },
@@ -71,9 +95,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await adminDb.delete(posts).where(inArray(posts.userId, [USER_A, USER_B]))
-  await adminDb.execute(
-    sql`delete from auth.users where id in (${USER_A}, ${USER_B})`
-  )
+  await supabaseAdmin.auth.admin.deleteUser(USER_A)
+  await supabaseAdmin.auth.admin.deleteUser(USER_B)
   await adminDb.close({ timeout: 0 })
 })
 
@@ -84,22 +107,22 @@ describe("RLS select enforcement", () => {
     {
       makeDb: () => authClient(USER_A),
       name: "authenticated user A sees only their own rows",
-      visible: [USER_A],
+      visible: () => [USER_A],
     },
     {
       makeDb: () => authClient(USER_B),
       name: "authenticated user B sees only their own rows",
-      visible: [USER_B],
+      visible: () => [USER_B],
     },
     {
       makeDb: () => createSupabaseClient(token(USER_A), { relations }),
       name: "createSupabaseClient (decoded token) scopes to the token owner",
-      visible: [USER_A],
+      visible: () => [USER_A],
     },
     {
       makeDb: () => createAnonClient({ relations }),
       name: "anon sees nothing (no policy grants it SELECT)",
-      visible: [],
+      visible: () => [],
     },
     {
       makeDb: () =>
@@ -110,11 +133,11 @@ describe("RLS select enforcement", () => {
           }
         ),
       name: "a forged service_role token is clamped to anon and sees nothing",
-      visible: [],
+      visible: () => [],
     },
   ])("$name", async ({ makeDb, visible }) => {
     const rows = await makeDb().select().from(posts)
-    expect(owners(rows)).toEqual(new Set(visible))
+    expect(owners(rows)).toEqual(new Set(visible()))
   })
 })
 
@@ -176,6 +199,40 @@ describe("createAuthClient (claims hardening)", () => {
       sql`select current_user as role, current_setting('request.jwt.claims', true) as claims`
     )
     expect(result[0]).toEqual({ claims: null, role: "postgres" })
+  })
+})
+
+// End-to-end: a real GoTrue session (sign-in → real getClaims()) must scope RLS
+// to the signed-in user. This is the only path that exercises the actual claims
+// shape getClaims() returns, which the mocked matrix above cannot.
+describe("createAuthClient (real Supabase session)", () => {
+  it("scopes RLS to the signed-in user via real getClaims()", async () => {
+    const email = "rls-e2e@example.test"
+    const userId = await createAuthUser(email)
+    try {
+      await adminDb.insert(posts).values({ title: "e2e post", userId })
+
+      const supabase = createClient(API_URL, ANON_KEY, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      })
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password: PASSWORD,
+      })
+      expect(error).toBeNull()
+
+      const db = createAuthClient(supabase, { relations })
+      // Real getClaims() resolves the live session; RLS scopes to this owner.
+      expect(owners(await db.select().from(posts))).toEqual(new Set([userId]))
+
+      // The owner policy still blocks forging another user's row.
+      await expect(
+        db.insert(posts).values({ title: "forge", userId: USER_A })
+      ).rejects.toThrow()
+    } finally {
+      await adminDb.delete(posts).where(eq(posts.userId, userId))
+      await supabaseAdmin.auth.admin.deleteUser(userId)
+    }
   })
 })
 
