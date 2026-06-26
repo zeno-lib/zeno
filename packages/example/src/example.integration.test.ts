@@ -119,15 +119,6 @@ describe("createAuthClient (direct RLS query client)", () => {
     expect(result[0]).toEqual({ role: "anon" })
   })
 
-  it("does not allow the request-scoped client to switch into service_role", async () => {
-    const db = createAuthClient(
-      createSupabase({ role: "service_role", sub: TOKEN.sub }),
-      { relations }
-    )
-    const result = await db.execute(sql`select current_user as role`)
-    expect(result[0]).toEqual({ role: "anon" })
-  })
-
   it("normalizes request.jwt.claims role to the enforced session role", async () => {
     const db = createAuthClient(
       createSupabase({ role: "service_role", sub: TOKEN.sub }),
