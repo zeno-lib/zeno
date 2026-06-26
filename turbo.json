@@ -37,7 +37,8 @@
       "persistent": true
     },
     "test": {
-      "dependsOn": ["build", "lint"]
+      "dependsOn": ["build", "lint"],
+      "passThroughEnv": ["SUPABASE_DATABASE_URL"]
     },
     "test:watch": {
       "cache": false,
