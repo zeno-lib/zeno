@@ -22,14 +22,14 @@ Keep `import "dotenv/config"` here. Next.js loads `.env*` files for code running
 inside the Next runtime, and Vercel provides environment variables during builds
 and function execution, but Drizzle Kit runs this config as its own CLI process.
 The import makes local `.env` values available before `defineDrizzleConfig()`
-reads `process.env.DATABASE_URL`.
+reads `process.env.SUPABASE_DATABASE_URL`.
 
 The preset:
 
 - Reads schema from `./src/schema.ts`.
 - Writes migrations to `./supabase/migrations`.
 - Uses the `postgresql` dialect.
-- Reads `DATABASE_URL`.
+- Reads `SUPABASE_DATABASE_URL`.
 - Keeps Supabase's built-in roles marked as existing.
 
 You can still pass Drizzle Kit overrides for package-specific credentials or

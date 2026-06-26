@@ -19,7 +19,7 @@ import {
 } from "drizzle-orm/pg-core"
 import { camelCase, snakeCase } from "drizzle-orm/pg-core/casing"
 import { describe, expect, it } from "vitest"
-import { createAdminDrizzle } from "./clients.ts"
+import { createAdminClient } from "./clients.ts"
 import { defineDrizzleConfig } from "./config.ts"
 import {
   allPolicy,
@@ -58,8 +58,6 @@ import {
   view,
 } from "./schema.ts"
 
-const LOCAL_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-
 describe("default casing", () => {
   it("leaves casing to Drizzle table constructors", () => {
     expect(defineDrizzleConfig()).not.toHaveProperty("casing")
@@ -70,10 +68,7 @@ describe("default casing", () => {
       displayName: text(),
       ownerId: uuid(),
     })
-    const db = createAdminDrizzle({
-      connectionString: LOCAL_DB_URL,
-      schema: { posts },
-    })
+    const db = createAdminClient()
 
     expect(db.select().from(posts).toSQL().sql).toContain('"display_name"')
     expect(db.select().from(posts).toSQL().sql).toContain('"owner_id"')
@@ -85,10 +80,7 @@ describe("default casing", () => {
     const posts = camelCase.table("posts", {
       displayName: text(),
     })
-    const db = createAdminDrizzle({
-      connectionString: LOCAL_DB_URL,
-      schema: { posts },
-    })
+    const db = createAdminClient()
 
     expect(db.select().from(posts).toSQL().sql).toContain('"displayName"')
 
@@ -100,10 +92,7 @@ describe("default casing", () => {
       displayName: text(),
       ownerId: uuid(),
     })
-    const db = createAdminDrizzle({
-      connectionString: LOCAL_DB_URL,
-      schema: { posts },
-    })
+    const db = createAdminClient()
 
     expect(db.select().from(posts).toSQL().sql).toContain('"display_name"')
     expect(db.select().from(posts).toSQL().sql).toContain('"owner_id"')
@@ -117,10 +106,7 @@ describe("default casing", () => {
       displayName: text(),
       ownerId: uuid(),
     })
-    const db = createAdminDrizzle({
-      connectionString: LOCAL_DB_URL,
-      schema: { auditEvents },
-    })
+    const db = createAdminClient()
 
     expect(db.select().from(auditEvents).toSQL().sql).toContain(
       '"display_name"'

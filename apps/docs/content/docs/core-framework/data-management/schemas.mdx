@@ -88,17 +88,17 @@ export const postSchema = defineTableSchema(posts)
 | `postSchema.update` | Data accepted before an update. Updatable fields are optional; generated columns are omitted. |
 
 These are plain Zod schemas. You can parse payloads in a Server Action or Route
-Handler before querying through `createSupabaseDrizzle(...)` (RLS-scoped) or
-`createAdminDrizzle(...)` (RLS bypass):
+Handler before querying through `createAuthClient(...)` (RLS-scoped) or
+`createAdminClient(...)` (RLS bypass):
 
 ```ts title="app/posts/actions.ts"
-import { createAdminDrizzle } from "@zeno-lib/db"
+import { createAdminClient } from "@zeno-lib/db"
 import * as schema from "{project}-db"
 import { postSchema } from "{project}-forms/posts/schemas"
 
 export async function createPost(input: unknown) {
   const value = postSchema.insert.parse(input)
-  const db = createAdminDrizzle({ schema })
+  const db = createAdminClient()
 
   await db.insert(schema.posts).values(value)
 }
@@ -232,7 +232,7 @@ workspace name and `{table}` is the entity (here, `posts`).
 | Path | Should contain |
 |---|---|
 | `{project}-db/src/schemas/{table}.ts` | The Drizzle table: the database source of truth and the input to migrations. |
-| `{project}-db/src/schema.ts` | Barrel re-exporting every table, passed as `schema` to `createSupabaseDrizzle(...)` / `createAdminDrizzle(...)`. |
+| `{project}-db/src/schema.ts` | Barrel re-exporting every table, imported by queries to reference tables and passed to `defineRelations(...)` for the relational query API. |
 | `{project}-forms/src/{table}/schemas.ts` | Table-derived Zod variants (`defineTableSchema`) and the UI/form schemas built from them. Pure, safe to import from Client Components. |
 | `{project}-forms/src/{table}/forms.tsx` | `@zeno-lib/forms` components for the table. |
 
@@ -262,7 +262,7 @@ variant names across forms, actions, and tests.
 - Keep the module that exports your Zod schemas pure. It can import table
   builders and `defineTableSchema`, but it must not create database clients or
   read server-only request state, because Client Components import this module.
-- Do not import `createSupabaseDrizzle(...)` or other server-only code from a
+- Do not import `createAuthClient(...)` or other server-only code from a
   module a Client Component imports for validation. Keep database clients at the
   action/route boundary.
 - Refinements are per variant: a rule under `insert` does not apply to `update`

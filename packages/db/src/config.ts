@@ -13,7 +13,7 @@ export function defineDrizzleConfig(
     typeof entities?.roles === "object" ? entities.roles : {}
 
   return defineConfig({
-    dbCredentials: { url: process.env.DATABASE_URL ?? "" },
+    dbCredentials: { url: process.env.SUPABASE_DATABASE_URL ?? "" },
     dialect: "postgresql",
     // Tells drizzle-kit that Supabase's built-in roles (anon, authenticated,
     // service_role, ...) already exist — don't try to CREATE or DROP them.

@@ -45,8 +45,8 @@ export const posts = table(
 
 Re-export every table from a single `{project}-db/src/schema.ts` barrel. That
 barrel is what the [Drizzle Kit config](/docs/core-framework/data-management/database/migrations)
-reads and what you pass as `schema` to `createSupabaseDrizzle(...)` /
-`createAdminDrizzle(...)` when
+reads, what your queries import to reference tables, and what feeds
+`defineRelations(...)` for the relational query API when
 [querying](/docs/core-framework/data-management/database/querying):
 
 ```typescript title="{project}-db/src/schema.ts"

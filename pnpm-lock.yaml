@@ -142,6 +142,9 @@ importers:
       '@types/node':
         specifier: 24.10.0
         version: 24.10.0
+      '@zeno-lib/test':
+        specifier: workspace:*
+        version: link:../test
       '@zeno-lib/typescript':
         specifier: workspace:^
         version: link:../typescript
@@ -154,6 +157,9 @@ importers:
       postgres:
         specifier: 3.4.7
         version: 3.4.7
+      vite:
+        specifier: 8.0.16
+        version: 8.0.16(@types/node@24.10.0)(esbuild@0.28.0)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.9.0)
       vitest:
         specifier: 4.1.0
         version: 4.1.0(@types/node@24.10.0)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.14.3(@types/node@24.10.0)(typescript@6.0.3))(vite@8.0.16(@types/node@24.10.0)(esbuild@0.28.0)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.9.0))

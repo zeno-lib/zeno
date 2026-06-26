@@ -41,10 +41,12 @@ Postgres requests run as database roles. The roles you meet most often are:
   bypasses RLS.
 
 Zeno connects to Postgres directly rather than through Supabase's API, so it maps
-onto these roles itself: RLS-scoped queries run as `anon` or `authenticated`, and
-trusted admin queries run as the `postgres` connection role. Zeno's clients never
-switch into `service_role`. It is exported only so you can target it from your
-own RLS policies if you need to.
+onto these roles itself: RLS-scoped queries run as `anon` or `authenticated`,
+trusted admin queries run as the `postgres` connection role, and a dedicated
+client runs as `service_role` for trusted work that should bypass RLS through
+Supabase's `BYPASSRLS` grant. A user token can only ever resolve to `anon` or
+`authenticated`; `service_role` is reachable only through that explicit
+server-side client, never from a JWT.
 
 Inside RLS policies, Supabase helpers expose information about the current
 request:
@@ -178,14 +180,27 @@ What each script does:
 
 ## Environment
 
-Both runtime clients and the Drizzle Kit preset read `DATABASE_URL` from the
-environment unless you pass an explicit `connectionString` override.
+Both the runtime clients and the Drizzle Kit preset read `SUPABASE_DATABASE_URL`
+from the environment unless you pass an explicit `connectionString` override.
 
 For local Supabase:
 
 ```dotenv
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+SUPABASE_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
 ```
+
+### Anatomy of the connection URL
+
+`SUPABASE_DATABASE_URL` is a standard
+[PostgreSQL connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS):
+
+```
+postgresql://[user[:password]@][host][:port][/dbname][?param=value&...]
+```
+
+Find a deployed project's string in the Supabase dashboard via the **Connect**
+button. The direct connection uses port `5432`; the transaction pooler uses
+`6543`.
 
 For deployed Supabase projects, prefer the
 [Supabase connection pooler](https://supabase.com/docs/guides/database/connecting-to-postgres#server-side-poolers).

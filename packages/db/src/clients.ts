@@ -2,236 +2,205 @@
 import type { JwtPayload, SupabaseClient } from "@supabase/supabase-js"
 import type { AnyRelations, EmptyRelations } from "drizzle-orm"
 import { sql } from "drizzle-orm"
+import type { DrizzlePgConfig } from "drizzle-orm/pg-core"
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js"
 import postgres from "postgres"
 import { createRlsQueryClient } from "./rls-query-client.ts"
 
-// `set local role <ident>` can't be parameterized, so the role is interpolated
-// via sql.raw. Restrict it to the Supabase-managed roles so a forged `role`
-// claim can't inject SQL or switch into the service role.
+// Roles a user token may switch into. A forged/unexpected `role` claim is
+// clamped to `anon`; the privileged `service_role` is reachable only via the
+// explicit `createServiceClient`, never from a JWT.
 const ALLOWED_RLS_ROLES = new Set(["anon", "authenticated"])
 
-export type CreateAdminDrizzleOptions<
+type CloseFn = (options?: { timeout?: number }) => Promise<void>
+
+// Drizzle config minus the connection, which the factory resolves from
+// `SUPABASE_DATABASE_URL` (or the optional override).
+export type CreateClientConfig<
   TRelations extends AnyRelations = EmptyRelations,
-> = {
-  // Only used as the pool-cache key (object identity); not passed to drizzle —
-  // drizzle v1 derives the relational query API from `relations`, not `schema`.
-  // Pair a stable `schema` object with a stable `relations` object so the cached
-  // pools are reused.
-  schema: Record<string, unknown>
-  relations?: TRelations
+> = DrizzlePgConfig<TRelations> & {
+  /** Overrides `process.env.SUPABASE_DATABASE_URL`. */
   connectionString?: string
 }
 
-export type CreateSupabaseDrizzleOptions<
-  TRelations extends AnyRelations = EmptyRelations,
-> = CreateAdminDrizzleOptions<TRelations> & {
-  // Mandatory: queries resolve verified claims via `supabase.auth.getClaims()`.
-  // Raw tokens/claims are intentionally not accepted — JWT verification belongs
-  // to Supabase Auth.
-  supabase: SupabaseClient
-}
+// A directly-queryable Drizzle client plus a reference-counted `close()`.
+export type DrizzleClient<TRelations extends AnyRelations = EmptyRelations> =
+  PostgresJsDatabase<TRelations> & { close: CloseFn }
 
-// Relations are erased to `AnyRelations` inside the cache; each factory casts
-// back to its caller's `TRelations` at the point of return.
-type DrizzleClient = PostgresJsDatabase<AnyRelations>
-type PoolEndOptions = Parameters<ReturnType<typeof postgres>["end"]>[0]
+// The only JWT claims the RLS clients read.
+export type SupabaseToken = Pick<JwtPayload, "role" | "sub">
 
-// The two pools' drizzle clients, shared by every handle on the same schema +
-// connection url. `end` closes both underlying pools.
-type PooledClients = {
-  adminClient: DrizzleClient
-  rlsClient: DrizzleClient
-  end: (options?: PoolEndOptions) => Promise<void>
-}
+// The role-clamped RLS context installed into each transaction.
+type RlsContext = { claims: string; role: string; sub: string }
 
-// Cached pools are reference-counted so a request-scoped `close()` only ends the
-// underlying pools once the last handle sharing them is closed.
-type SharedEntry = { clients: PooledClients; refCount: number }
-
-const sharedClients = new WeakMap<
-  Record<string, unknown>,
-  Map<string, SharedEntry>
->()
-
-// RLS-aware client. Query it directly as the signed-in Supabase user:
-// `db.select().from(table)` / `db.query.table.findMany()` run each statement
-// inside its own RLS transaction (claims resolved from the bound Supabase
-// client, role switched). `db.transaction(cb)` runs several statements under
-// one atomic RLS transaction. `supabase` is mandatory.
-export function createSupabaseDrizzle<
-  TRelations extends AnyRelations = EmptyRelations,
->(options: CreateSupabaseDrizzleOptions<TRelations>) {
-  const url = resolveDatabaseUrl(options)
-  const entry = acquireSharedClients(options.schema, url, options.relations)
-  const close = createCloseHandle(options.schema, url, entry)
-  const runTransaction = createRlsTransactionRunner(
-    entry.clients.rlsClient,
-    options.supabase
-  )
-
-  return createRlsQueryClient(
-    runTransaction as (
-      transaction: (tx: unknown) => unknown
-    ) => Promise<unknown>,
-    close
-  ) as PostgresJsDatabase<TRelations> & { close: typeof close }
-}
-
-// Admin client. Query it directly to bypass RLS (webhooks, admin tasks,
-// background jobs, seeding). Needs no Supabase client — it connects with
-// `DATABASE_URL` (or the `connectionString` override).
-export function createAdminDrizzle<
-  TRelations extends AnyRelations = EmptyRelations,
->(options: CreateAdminDrizzleOptions<TRelations>) {
-  const url = resolveDatabaseUrl(options)
-  const entry = acquireSharedClients(options.schema, url, options.relations)
-  const close = createCloseHandle(options.schema, url, entry)
-
-  return attachClose(
-    entry.clients.adminClient,
-    close
-  ) as unknown as PostgresJsDatabase<TRelations> & {
-    close: typeof close
-  }
-}
-
-function resolveDatabaseUrl(options: { connectionString?: string }): string {
-  const url = options.connectionString ?? process.env.DATABASE_URL
-  if (!url) {
-    throw new Error("Missing DATABASE_URL environment variable")
-  }
-  return url
-}
-
-// prepare:false → required for the Supabase transaction pooler (port 6543).
-// Two separate pools: admin runs as the connection role (bypasses RLS), rls
-// switches role + sets JWT claims per transaction. Pools connect lazily, so the
-// one a given factory doesn't use never opens a connection. `relations` enables
-// the relational query API on both clients (and inside the rls tx).
-function createPooledClients(
-  url: string,
-  relations: AnyRelations | undefined
-): PooledClients {
-  const adminPool = postgres(url, { prepare: false })
-  const rlsPool = postgres(url, { prepare: false })
-  return {
-    adminClient: drizzle({ client: adminPool, relations }),
-    async end(options) {
-      await Promise.all([adminPool.end(options), rlsPool.end(options)])
-    },
-    rlsClient: drizzle({ client: rlsPool, relations }),
-  }
-}
-
-// Per-Supabase-client transaction runner: resolves the verified auth context,
-// then switches role + installs the JWT claims for the duration of each
-// transaction so RLS applies.
-function createRlsTransactionRunner(
-  rlsClient: DrizzleClient,
-  supabase: SupabaseClient
-) {
-  return (async (transaction, txConfig) => {
-    const { claims, role, sub } = await resolveAuthContext(supabase)
-    return await rlsClient.transaction(async (tx) => {
-      // auth.jwt()/auth.uid() read these; is_local scopes them to the tx, so
-      // they auto-reset when it commits or rolls back.
-      await tx.execute(
-        sql`select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true)`
-      )
-      await tx.execute(sql`set local role ${sql.raw(role)}`)
-      return await transaction(tx)
-    }, txConfig)
-  }) as typeof rlsClient.transaction
-}
-
-// Resolves verified claims from Supabase and clamps them to a safe RLS context.
-async function resolveAuthContext(supabase: SupabaseClient) {
-  const token = await resolveClaims(supabase)
-  const sub = token?.sub ?? ""
+// Clamps a token's role to the allowlist and re-serializes the claims so a
+// policy reading auth.jwt()->>'role' can never disagree with the role we
+// `set local role` to.
+function clampClaims(token: Partial<SupabaseToken>): RlsContext {
   const role =
-    token?.role && ALLOWED_RLS_ROLES.has(token.role) ? token.role : "anon"
-  // Force the serialized claims' role to match the role we actually `set local
-  // role` to, so a policy reading auth.jwt()->>'role' can never see a value that
-  // disagrees with the live Postgres role (e.g. a service_role claim downgraded
-  // to anon).
-  const claims = JSON.stringify({ ...token, role })
-  return { claims, role, sub }
+    token.role && ALLOWED_RLS_ROLES.has(token.role) ? token.role : "anon"
+  return { claims: JSON.stringify({ ...token, role }), role, sub: token.sub ?? "" }
 }
 
-async function resolveClaims(
-  supabase: SupabaseClient
-): Promise<JwtPayload | undefined> {
-  const { data, error } = await supabase.auth.getClaims()
-  if (error) {
-    throw error
-  }
-  return data?.claims
+// Trusted role chosen by the caller (not read from a JWT), so it skips the
+// user-token allowlist.
+function fixedContext(role: string): RlsContext {
+  return { claims: JSON.stringify({ role }), role, sub: "" }
 }
 
-// Returns the cached pools for this schema + url, creating them on first use and
-// bumping the reference count for every handle that shares them.
-function acquireSharedClients(
-  schema: Record<string, unknown>,
-  url: string,
-  relations: AnyRelations | undefined
-): SharedEntry {
-  let schemaClients = sharedClients.get(schema)
-  if (!schemaClients) {
-    schemaClients = new Map()
-    sharedClients.set(schema, schemaClients)
-  }
+// Pools are cached by kind + connection string. "admin" and "rls" get separate
+// pools on the same URL so the admin connection is never role-switched. Each
+// handle shares the cached pool and reference-counts it, so a per-request
+// `close()` ends the pool only once the last handle releases it.
+type PoolKind = "admin" | "rls"
+type PoolEntry = {
+  readonly client: ReturnType<typeof postgres>
+  readonly key: string
+  ended: boolean
+  refCount: number
+}
+const poolCache = new Map<string, PoolEntry>()
 
-  const existing = schemaClients.get(url)
-  if (existing) {
-    existing.refCount += 1
-    return existing
+function acquirePool(connectionString: string, kind: PoolKind): PoolEntry {
+  const key = `${kind} ${connectionString}`
+  let entry = poolCache.get(key)
+  if (!entry) {
+    // `prepare: false` is required for the Supabase transaction-mode pooler
+    // (port 6543), which doesn't support prepared statements.
+    entry = {
+      client: postgres(connectionString, { prepare: false }),
+      ended: false,
+      key,
+      refCount: 0,
+    }
+    poolCache.set(key, entry)
   }
-
-  const entry: SharedEntry = {
-    clients: createPooledClients(url, relations),
-    refCount: 1,
-  }
-  schemaClients.set(url, entry)
+  entry.refCount += 1
   return entry
 }
 
-// Reference-counted release of a handle's share of the cached pools. Guards
-// against double-close: each handle releases its reference at most once, and the
-// pools are only ended once the last handle closes.
-function createCloseHandle(
-  schema: Record<string, unknown>,
-  url: string,
-  entry: SharedEntry
-) {
+function makeClose(entry: PoolEntry): CloseFn {
   let released = false
-  return async (closeOptions?: PoolEndOptions): Promise<void> => {
+  // Idempotent per handle: closing twice must not double-decrement the pool.
+  return async (options) => {
     if (released) {
       return
     }
     released = true
     entry.refCount -= 1
-    // Other handles still share these pools — leave them open.
-    if (entry.refCount > 0) {
-      return
+    if (entry.refCount <= 0 && !entry.ended) {
+      entry.ended = true
+      if (poolCache.get(entry.key) === entry) {
+        poolCache.delete(entry.key)
+      }
+      await entry.client.end(options)
     }
-    sharedClients.get(schema)?.delete(url)
-    await entry.clients.end(closeOptions)
   }
 }
 
-// Wraps a drizzle client so `db.close()` releases the cached pools while every
-// other property/method forwards to the real client (bound so drizzle's `this`
-// — including private fields — keeps working). `close` does not collide with
-// any `PostgresJsDatabase` member.
-function attachClose<T extends object, TClose>(client: T, close: TClose): T {
-  return new Proxy(client, {
-    get(target, prop, receiver) {
-      if (prop === "close") {
-        return close
-      }
-      const value = Reflect.get(target, prop, receiver)
-      return typeof value === "function" ? value.bind(target) : value
-    },
+// Resolves the connection string, acquires the shared pool, and builds a fresh
+// (cheap) per-handle drizzle instance over it.
+function buildDrizzle<TRelations extends AnyRelations>(
+  kind: PoolKind,
+  config?: CreateClientConfig<TRelations>
+): { close: CloseFn; db: PostgresJsDatabase<TRelations> } {
+  const { connectionString, ...drizzleConfig } = config ?? {}
+  const url = connectionString ?? process.env.SUPABASE_DATABASE_URL ?? ""
+  if (!url) {
+    throw new Error("Missing SUPABASE_DATABASE_URL environment variable")
+  }
+  const entry = acquirePool(url, kind)
+  const db = drizzle<TRelations>({
+    client: entry.client,
+    ...(drizzleConfig as DrizzlePgConfig<TRelations>),
   })
+  return { close: makeClose(entry), db }
+}
+
+// Wraps a drizzle instance in the lazy RLS query proxy. Claims are resolved
+// before each transaction opens (so `createAuthClient` re-checks the live
+// session per query), then installed transaction-locally via
+// `set_config(..., true)` + `set local role`, which auto-reset at commit.
+function buildRlsClient<TRelations extends AnyRelations>(
+  resolveContext: () => Promise<RlsContext>,
+  config?: CreateClientConfig<TRelations>
+): DrizzleClient<TRelations> {
+  const { close, db } = buildDrizzle("rls", config)
+  const runTransaction = async (transaction: (tx: unknown) => unknown) => {
+    const { claims, role, sub } = await resolveContext()
+    return db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true)`
+      )
+      await tx.execute(sql`set local role ${sql.raw(role)}`)
+      return transaction(tx)
+    })
+  }
+  return createRlsQueryClient(runTransaction, close) as DrizzleClient<TRelations>
+}
+
+/**
+ * RLS-bypassing client (the docs' `admin`). Connects with
+ * `SUPABASE_DATABASE_URL` and queries drizzle directly. Use for webhooks,
+ * background jobs, and seeding, never for user-scoped reads/writes.
+ */
+export function createAdminClient<
+  TRelations extends AnyRelations = EmptyRelations,
+>(config?: CreateClientConfig<TRelations>): DrizzleClient<TRelations> {
+  const { close, db } = buildDrizzle("admin", config)
+  return Object.assign(db, { close })
+}
+
+/**
+ * RLS client scoped to an already-verified, decoded token (e.g. from
+ * `supabase.auth.getClaims()`). The role is clamped to the allowlist.
+ */
+export function createSupabaseClient<
+  TRelations extends AnyRelations = EmptyRelations,
+>(
+  accessToken: SupabaseToken,
+  config?: CreateClientConfig<TRelations>
+): DrizzleClient<TRelations> {
+  const context = clampClaims(accessToken)
+  return buildRlsClient(() => Promise.resolve(context), config)
+}
+
+/**
+ * RLS client bound to a Supabase client. Verified claims are resolved via
+ * `supabase.auth.getClaims()` on every query, so it always reflects the live
+ * session.
+ */
+export function createAuthClient<
+  TRelations extends AnyRelations = EmptyRelations,
+>(
+  supabase: SupabaseClient,
+  config?: CreateClientConfig<TRelations>
+): DrizzleClient<TRelations> {
+  return buildRlsClient(async () => {
+    const { data, error } = await supabase.auth.getClaims()
+    if (error) {
+      throw error
+    }
+    return clampClaims(data?.claims ?? {})
+  }, config)
+}
+
+/** RLS client that runs every query as the `anon` role. */
+export function createAnonClient<
+  TRelations extends AnyRelations = EmptyRelations,
+>(config?: CreateClientConfig<TRelations>): DrizzleClient<TRelations> {
+  return buildRlsClient(() => Promise.resolve(fixedContext("anon")), config)
+}
+
+/**
+ * Client that runs every query as `service_role`, which bypasses RLS via
+ * Supabase's BYPASSRLS grant. Use for trusted server-side work.
+ */
+export function createServiceClient<
+  TRelations extends AnyRelations = EmptyRelations,
+>(config?: CreateClientConfig<TRelations>): DrizzleClient<TRelations> {
+  return buildRlsClient(
+    () => Promise.resolve(fixedContext("service_role")),
+    config
+  )
 }
