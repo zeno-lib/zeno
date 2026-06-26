@@ -1,3 +1,4 @@
+import { t as requireSupabaseEnv } from "./env-zicg-Mwf.mjs";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 //#region src/next-middleware.ts
@@ -7,11 +8,9 @@ import { NextResponse } from "next/server";
 */
 async function updateSession(request, options) {
 	let supabaseResponse = NextResponse.next({ request });
-	const supabaseUrl = options?.supabaseUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-	const supabaseKey = options?.supabaseKey ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+	const { url: supabaseUrl, key: supabaseKey } = requireSupabaseEnv(options?.supabaseUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL, options?.supabaseKey ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
 	const signInPath = options?.signInPath ?? "/sign-in";
 	const publicPaths = options?.publicPaths ?? ["/sign-in"];
-	if (!(supabaseUrl && supabaseKey)) throw new Error("Missing Supabase update session environment variables");
 	const { data: { user } } = await createServerClient(supabaseUrl, supabaseKey, { cookies: {
 		getAll() {
 			return request.cookies.getAll();

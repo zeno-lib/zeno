@@ -1,6 +1,7 @@
 // https://supabase.com/docs/guides/auth/server-side/nextjs
 import { createServerClient } from "@supabase/ssr"
 import { type NextRequest, NextResponse } from "next/server"
+import { requireSupabaseEnv } from "./env"
 
 export type UpdateSessionOptions = {
   /** Supabase project URL. Defaults to `NEXT_PUBLIC_SUPABASE_URL`. */
@@ -24,16 +25,13 @@ export async function updateSession(
   let supabaseResponse = NextResponse.next({
     request,
   })
-  const supabaseUrl =
-    options?.supabaseUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey =
+  const { url: supabaseUrl, key: supabaseKey } = requireSupabaseEnv(
+    options?.supabaseUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL,
     options?.supabaseKey ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  )
   const signInPath = options?.signInPath ?? "/sign-in"
   const publicPaths = options?.publicPaths ?? ["/sign-in"]
 
-  if (!(supabaseUrl && supabaseKey)) {
-    throw new Error("Missing Supabase update session environment variables")
-  }
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() {

@@ -1,3 +1,4 @@
+import { t as requireSupabaseEnv } from "./env-zicg-Mwf.mjs";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 //#region src/next-server.ts
@@ -8,9 +9,7 @@ import { cookies } from "next/headers";
 */
 async function createClient(supabaseUrl, supabaseKey, options) {
 	const cookieStore = await cookies();
-	const url = supabaseUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-	const key = supabaseKey ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-	if (!(url && key)) throw new Error("Missing Supabase environment variables");
+	const { url, key } = requireSupabaseEnv(supabaseUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL, supabaseKey ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
 	return createServerClient(url, key, {
 		...options,
 		cookies: options?.cookies ?? {

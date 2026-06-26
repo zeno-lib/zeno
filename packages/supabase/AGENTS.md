@@ -1,6 +1,6 @@
 # `@zeno-lib/supabase` — Intent
 
-Wraps `@supabase/ssr` for the Next.js App Router. Five files, each with a specific role; the value of this package is in keeping the client/server/middleware split honest.
+Wraps `@supabase/ssr` for the Next.js App Router. Five entry points, each with a specific role (over a small shared `env` helper); the value of this package is in keeping the client/server/middleware split honest.
 
 ## Purpose & Scope
 
@@ -16,11 +16,11 @@ Provides factories for Supabase clients (browser, server, middleware), a plain `
 |---|---|---|
 | `@zeno-lib/supabase/next-client` | Client Components, browser code | `createBrowserClient` factory |
 | `@zeno-lib/supabase/next-server` | Server Components, Route Handlers, Server Actions | `createServerClient` with `next/headers` cookies; **async**, must be `await`ed |
-| `@zeno-lib/supabase/client` | Non-SSR backend / API / scripts | `createClient`, a plain `@supabase/supabase-js` client, no cookies; key resolves `SUPABASE_SECRET_KEY` ?? publishable |
+| `@zeno-lib/supabase/client` | Non-SSR backend / API / scripts | `createClient` (explicit url/key), `createAnonClient` (publishable key), `createAdminClient` (secret key); plain `@supabase/supabase-js` clients, no cookies |
 | `@zeno-lib/supabase/next-middleware` | App `middleware.ts` / custom middleware | `middleware` + static `config.matcher`, `createMiddleware(options)`, and `updateSession(request, options?)` (options: `signInPath`, `publicPaths`, `supabaseUrl`, `supabaseKey`) |
 | `@zeno-lib/supabase/next-image-loader` | `next.config.mjs` `images.loaderFile` | Supabase Storage transformation URL builder |
 
-Both `createClient` factories accept optional `(supabaseUrl, supabaseKey)` and fall back to `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. They throw `"Missing Supabase ... environment variables"` if neither side provides values. This is the only error path the factories own. `updateSession(request, options?)` takes the same `supabaseUrl`/`supabaseKey` overrides plus `signInPath` (redirect target, default `/sign-in`) and `publicPaths` (auth-exempt prefixes, default `["/sign-in"]`).
+The `next-client` and `next-server` factories accept optional `(supabaseUrl, supabaseKey)` and fall back to `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. They throw `"Missing Supabase URL environment variable"` or `"Missing Supabase key environment variable"` if a value is missing. This is the only error path the factories own. `updateSession(request, options?)` takes the same `supabaseUrl`/`supabaseKey` overrides plus `signInPath` (redirect target, default `/sign-in`) and `publicPaths` (auth-exempt prefixes, default `["/sign-in"]`).
 
 The image loader resolves the project ID from `NEXT_PUBLIC_SUPABASE_STORAGE_PROJECT_ID` (preferred) or `NEXT_PUBLIC_SUPABASE_PROJECT_ID`, or from an explicit `createSupabaseImageLoader({ projectId })`. URLs starting with `http` pass through unchanged; relative paths are rewritten to `https://<projectId>.supabase.co/storage/v1/object/public/<src>?width=<w>&quality=<q|75>`.
 
@@ -78,7 +78,7 @@ Used by: `@zeno-lib/authentication` (client + server). Used directly by every ap
 - **Redirect defaults to `/sign-in`** (configurable via `signInPath`), matching `@zeno-lib/authentication`'s `/sign-in` UI, so the two pair with no config. Invariant: `signInPath` must be in `publicPaths`, or unauthenticated users hit an infinite redirect loop (sent to sign-in → not exempt → redirected again). The defaults keep both in sync (`/sign-in` + `["/sign-in"]`).
 - **Auth-exempt prefixes default to `/sign-in` only** (configurable via `publicPaths`). Sign-up, password recovery, and the OTP confirm route are not exempt by default, so unauthenticated users get bounced from e.g. `/recover-password` → `/sign-in`. Pass `publicPaths` to match your route structure.
 - **Server `createClient` is async** and uses `await cookies()`. Next 15+ requires this. Forgetting `await` returns a `Promise<SupabaseClient>`, which TypeScript will catch but runtime will not (every method call resolves to `undefined`).
-- **`client` defaults to the service-role key**: its key resolves `SUPABASE_SECRET_KEY ?? SUPABASE_PUBLISHABLE_KEY ?? NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, so on the server (where the secret is set) `createClient()` returns a service-role client that **bypasses RLS** by default. Pass a key explicitly, scope `SUPABASE_SECRET_KEY` to where admin access is intended, and never import `client` into a Client Component expecting an anon-scoped client.
+- **`createAdminClient` bypasses RLS**: it defaults to `SUPABASE_SECRET_KEY`, returning a service-role client that can read or write any row. Use `createAnonClient` (publishable key, honors RLS) for untrusted contexts, keep `createAdminClient` server-side, and scope `SUPABASE_SECRET_KEY` to where admin access is intended. The base `createClient` takes an explicit url and key with no environment fallback.
 - **Image loader throws at request time**, not at config time, if `NEXT_PUBLIC_SUPABASE_STORAGE_PROJECT_ID` is missing. The error surfaces as a broken image, not a build failure.
 - **`next-image-loader` is the only `next/image` integration point** and it exposes a *named* export (`supabaseImageLoader`), not a default. Next's `loaderFile` needs a default-exporting, project-relative file, so consumers must add the one-line re-export wrapper shown above. Pointing `loaderFile` straight at the package will silently fail.
 - **Bundled with tsdown**: ships compiled `dist/*.mjs` + `.d.mts` (committed; un-ignored in `.gitignore`). After editing `src/`, run `pnpm --filter @zeno-lib/supabase build`; CI (`bundle-packages.yml`) also rebuilds and commits `dist` on PRs. The tsdown config's `external` list keeps `next/*` imports bare; `next` ships no exports map, so otherwise they'd emit as `next/headers.js` and break on stricter `next` versions.
