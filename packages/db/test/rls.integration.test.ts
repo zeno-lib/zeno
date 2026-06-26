@@ -13,8 +13,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 import * as schema from "./schema"
 import { posts } from "./schema"
 
-// SUPABASE_DATABASE_URL is injected by vitest.config.ts (local Supabase on
-// 54322). Start it with `pnpm dev` before running these tests.
+// SUPABASE_DATABASE_URL is loaded from .env.test (local Supabase on 54322).
+// These tests connect for real, so start the stack with `pnpm dev` first.
 
 const LOCAL_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 // Two distinct owners. `posts.user_id` FKs to auth.users, so these must exist as

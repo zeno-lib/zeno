@@ -39,7 +39,11 @@ type RlsContext = { claims: string; role: string; sub: string }
 function clampClaims(token: Partial<SupabaseToken>): RlsContext {
   const role =
     token.role && ALLOWED_RLS_ROLES.has(token.role) ? token.role : "anon"
-  return { claims: JSON.stringify({ ...token, role }), role, sub: token.sub ?? "" }
+  return {
+    claims: JSON.stringify({ ...token, role }),
+    role,
+    sub: token.sub ?? "",
+  }
 }
 
 // Trusted role chosen by the caller (not read from a JWT), so it skips the
@@ -136,7 +140,10 @@ function buildRlsClient<TRelations extends AnyRelations>(
       return transaction(tx)
     })
   }
-  return createRlsQueryClient(runTransaction, close) as DrizzleClient<TRelations>
+  return createRlsQueryClient(
+    runTransaction,
+    close
+  ) as DrizzleClient<TRelations>
 }
 
 /**

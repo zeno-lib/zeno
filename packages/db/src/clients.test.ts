@@ -1,25 +1,32 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-// Hoisted module mocks: set up before any import so they always apply (no
-// resetModules/dynamic-import race). Each test configures the return values.
-const { drizzleMock, postgresDefault } = vi.hoisted(() => ({
-  drizzleMock: vi.fn(),
-  postgresDefault: vi.fn(),
+// Use the REAL postgres driver and REAL drizzle here — postgres-js connects
+// lazily, so a pool can be built and `end()`ed without a running server. We
+// only intercept the factory (a counting passthrough) to observe the pool
+// caching and reference-counted close() that live in clients.ts. Behavioral
+// concerns (RLS, role/claims, query replay) are covered by the integration
+// suite in test/rls.integration.test.ts, which runs against real Postgres.
+const { postgresSpy, endSpies } = vi.hoisted(() => ({
+  endSpies: [] as ReturnType<typeof vi.fn>[],
+  postgresSpy: vi.fn(),
 }))
 
-vi.mock("postgres", () => ({ default: postgresDefault }))
-vi.mock("drizzle-orm/postgres-js", () => ({ drizzle: drizzleMock }))
+vi.mock("postgres", async (importOriginal) => {
+  const actual = await importOriginal<{ default: typeof import("postgres") }>()
+  return {
+    default: (url: string, options?: unknown) => {
+      postgresSpy(url, options)
+      const client = actual.default(url, options as never)
+      const realEnd = client.end.bind(client)
+      const end = vi.fn((opts?: { timeout?: number }) => realEnd(opts))
+      client.end = end as typeof client.end
+      endSpies.push(end)
+      return client
+    },
+  }
+})
 
-import type { SupabaseClient } from "@supabase/supabase-js"
-import { sql } from "drizzle-orm"
-import {
-  createAdminClient,
-  createAnonClient,
-  createAuthClient,
-  createServiceClient,
-  createSupabaseClient,
-  type SupabaseToken,
-} from "./clients.ts"
+import { createAdminClient } from "./clients.ts"
 
 // Pools are cached by connection string, so each test uses a fresh URL to stay
 // isolated; the pool-sharing tests deliberately reuse one URL.
@@ -29,197 +36,13 @@ function url() {
   return `postgresql://postgres:postgres@localhost/db${urlCounter}`
 }
 
-const TOKEN: SupabaseToken = {
-  role: "authenticated",
-  sub: "00000000-0000-0000-0000-000000000000",
-}
-
 beforeEach(() => {
-  drizzleMock.mockReset()
-  postgresDefault.mockReset()
-  // Default postgres pool stub; tests that assert on `end` override this.
-  postgresDefault.mockReturnValue({ end: vi.fn(async () => undefined) })
+  postgresSpy.mockClear()
+  endSpies.length = 0
 })
 
-// Builds the rls drizzle client whose `transaction` records the query chain into
-// `events`, plus a `tx` that records each step. Wires it onto `drizzleMock`.
-function mockRlsDrizzle() {
-  const events: string[] = []
-  const selectResult = [{ id: "select" }]
-  const findManyResult = [{ id: "findMany" }]
-  const tx = {
-    execute: vi.fn(() => {
-      events.push("execute")
-    }),
-    query: {
-      posts: {
-        findMany: vi.fn(() => {
-          events.push("findMany")
-          return findManyResult
-        }),
-      },
-    },
-    select: vi.fn(() => {
-      events.push("select")
-      return {
-        from: vi.fn(() => {
-          events.push("from")
-          return selectResult
-        }),
-      }
-    }),
-  }
-  const db = {
-    transaction: vi.fn(async (transaction: (tx: unknown) => unknown) => {
-      events.push("transaction-start")
-      return await transaction(tx)
-    }),
-  }
-  drizzleMock.mockReturnValue(db)
-  return { db, events, findManyResult, selectResult, tx }
-}
-
-function mockAdminDrizzle() {
-  const adminSelectResult = [{ id: "admin-select" }]
-  const db = {
-    select: vi.fn(() => ({ from: vi.fn(() => adminSelectResult) })),
-  }
-  drizzleMock.mockReturnValue(db)
-  return { adminSelectResult, db }
-}
-
-function mockSupabase(
-  role = "authenticated",
-  events?: string[]
-): SupabaseClient {
-  return {
-    auth: {
-      getClaims: vi.fn(() => {
-        events?.push("claims")
-        return Promise.resolve({
-          data: {
-            claims: { role, sub: "00000000-0000-0000-0000-000000000000" },
-          },
-          error: null,
-        })
-      }),
-    },
-  } as unknown as SupabaseClient
-}
-
-describe("createAuthClient (RLS context)", () => {
-  it("resolves Supabase claims before opening the RLS transaction", async () => {
-    const { events } = mockRlsDrizzle()
-    const db = createAuthClient(mockSupabase("authenticated", events), {
-      connectionString: url(),
-    })
-
-    await db.transaction(() => {
-      events.push("callback")
-      return Promise.resolve()
-    })
-
-    expect(events).toEqual([
-      "claims",
-      "transaction-start",
-      "execute",
-      "execute",
-      "callback",
-    ])
-  })
-})
-
-describe("createSupabaseClient (direct RLS query client)", () => {
-  it("records and replays a select() chain inside one RLS transaction", async () => {
-    const { events, selectResult } = mockRlsDrizzle()
-    const db = createSupabaseClient(TOKEN, { connectionString: url() })
-
-    const rows = await db.select().from({} as never)
-
-    expect(rows).toBe(selectResult)
-    // The transaction sets RLS context (2 execute calls) before the recorded
-    // select().from() chain is replayed on `tx`. No `getClaims` is called — the
-    // token is supplied directly.
-    expect(events).toEqual([
-      "transaction-start",
-      "execute",
-      "execute",
-      "select",
-      "from",
-    ])
-  })
-
-  it("replays the relational query API (db.query.table.findMany)", async () => {
-    const { events, findManyResult } = mockRlsDrizzle()
-    const db = createSupabaseClient(TOKEN, { connectionString: url() })
-
-    const rows = await (
-      db as unknown as {
-        query: { posts: { findMany: () => Promise<unknown> } }
-      }
-    ).query.posts.findMany()
-
-    expect(rows).toBe(findManyResult)
-    expect(events).toContain("findMany")
-    // The relational chain still runs inside the role-switched transaction.
-    expect(events.indexOf("execute")).toBeLessThan(events.indexOf("findMany"))
-  })
-
-  it("forwards the relations object to drizzle", () => {
-    mockRlsDrizzle()
-    const relations = { posts: {} } as never
-    createSupabaseClient(TOKEN, { connectionString: url(), relations })
-
-    expect(drizzleMock).toHaveBeenCalledWith(
-      expect.objectContaining({ relations })
-    )
-  })
-})
-
-describe("createAnonClient / createServiceClient", () => {
-  it("runs multiple statements under one role-switched transaction via db.transaction", async () => {
-    const { events } = mockRlsDrizzle()
-    const db = createAnonClient({ connectionString: url() })
-
-    const result = await db.transaction(async (tx) => {
-      await tx.execute(sql`select 1`)
-      return "ok"
-    })
-
-    expect(result).toBe("ok")
-    // Two execute calls set the RLS context, then the user's statement runs.
-    expect(events.filter((event) => event === "execute")).toHaveLength(3)
-  })
-
-  it("exposes a directly-queryable service client", async () => {
-    const { events, selectResult } = mockRlsDrizzle()
-    const db = createServiceClient({ connectionString: url() })
-
-    const rows = await db.select().from({} as never)
-
-    expect(rows).toBe(selectResult)
-    expect(events).toEqual([
-      "transaction-start",
-      "execute",
-      "execute",
-      "select",
-      "from",
-    ])
-  })
-})
-
-describe("createAdminClient (RLS-bypassing query client)", () => {
-  it("queries directly without a Supabase client", async () => {
-    const { adminSelectResult } = mockAdminDrizzle()
-    const db = createAdminClient({ connectionString: url() })
-
-    const rows = await db.select().from({} as never)
-
-    expect(rows).toBe(adminSelectResult)
-  })
-
+describe("createAdminClient", () => {
   it("exposes close", () => {
-    mockAdminDrizzle()
     const db = createAdminClient({ connectionString: url() })
 
     expect(db.close).toEqual(expect.any(Function))
@@ -236,24 +59,23 @@ describe("createAdminClient (RLS-bypassing query client)", () => {
 
 describe("pool sharing", () => {
   it("creates one pool per connection string", () => {
-    drizzleMock.mockImplementation(() => ({}))
     const shared = url()
 
     createAdminClient({ connectionString: shared })
     createAdminClient({ connectionString: shared })
 
-    expect(postgresDefault).toHaveBeenCalledTimes(1)
+    expect(postgresSpy).toHaveBeenCalledTimes(1)
   })
 
   it("reference-counts the shared pool so close() ends it once the last handle closes", async () => {
-    const end = vi.fn(async () => undefined)
-    postgresDefault.mockReturnValue({ end })
-    // Fresh drizzle instance per handle so each gets its own `close`.
-    drizzleMock.mockImplementation(() => ({}))
     const shared = url()
 
     const first = createAdminClient({ connectionString: shared })
     const second = createAdminClient({ connectionString: shared })
+
+    // One underlying pool was created for the shared connection string.
+    expect(endSpies).toHaveLength(1)
+    const end = endSpies[0]
 
     expect(end).not.toHaveBeenCalled()
 

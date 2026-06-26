@@ -3,6 +3,13 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
+    "dev": "pnpm exec supabase start",
+    "stop": "pnpm exec supabase stop",
+    "reset": "pnpm exec supabase db reset",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
     "test": "vitest --run",
     "test:watch": "vitest watch",
     "types:check": "tsc --noEmit"
@@ -33,9 +40,11 @@
     "@types/node": "24.10.0",
     "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
+    "dotenv": "16.4.7",
     "drizzle-kit": "1.0.0-rc.3",
     "drizzle-orm": "1.0.0-rc.3",
     "postgres": "3.4.7",
+    "supabase": "2.84.1",
     "vite": "8.0.16",
     "vitest": "4.1.0"
   }

@@ -195,11 +195,28 @@ export default defineDrizzleConfig({ schema: "./src/schema.ts" })
 
 Peer deps: `drizzle-orm 1.0.0-rc.3`, `drizzle-kit 1.0.0-rc.3`,
 `postgres >=3.4`. Dev deps: `@zeno-lib/typescript`, `@zeno-lib/test` (shared
-Vitest config, wired via `vitest.config.ts`), `@types/node`, `vite`, `vitest`,
-plus local copies of the peer deps for tests and type-checking. `vitest.config.ts`
-loads `.env.test`, so tests resolve `SUPABASE_DATABASE_URL` from there (the unit
-suites never actually connect — they mock `postgres` or only render SQL). No
-workspace runtime deps.
+Vitest config, wired via `vitest.config.ts`), `@types/node`, `dotenv`,
+`supabase` (CLI for the local test stack), `vite`, `vitest`, plus local copies of
+the peer deps for tests and type-checking. Both configs load `.env.test`, so
+tests resolve `SUPABASE_DATABASE_URL` from there. No workspace runtime deps.
+
+Tests run under a single Vitest config and fall into two kinds:
+
+- **Unit** (`src/*.test.ts`): no connection. `clients.test.ts` exercises only the
+  pool lifecycle (caching + reference-counted `close()`) using the **real**
+  `postgres` driver via a counting passthrough — `postgres-js` connects lazily,
+  so pools build and `end()` without a server. No `drizzle` mock.
+- **Integration** (`test/rls.integration.test.ts`): connects to a **real local
+  Supabase** (`pnpm dev` → `supabase start`, Postgres on `54322`) and verifies RLS
+  enforcement, role/claims clamping, transaction-local context, and the relational
+  query API end-to-end. The fixture lives under `test/` (schema) + `supabase/`
+  (config + migrations) so it stays out of the published surface (`files: ["src"]`);
+  the `dev`/`stop`/`reset`/`db:*` scripts drive the stack.
+
+Both kinds run together under `pnpm test`, so **`test` requires the local Supabase
+stack to be up** (CI starts it before `pnpm run ci`; locally run `pnpm dev` first,
+or filter to a specific file — e.g. `pnpm exec vitest clients` — for a quick
+connection-free unit run).
 
 JWT verification belongs to Supabase Auth; `createAuthClient` calls
 `supabase.auth.getClaims()` on the bound Supabase client, then installs the
@@ -265,6 +282,7 @@ by Client Components for validation.
 - **Each awaited single-statement `db` query is its own transaction.** It cannot
   span multiple statements; reach for `db.transaction(...)` when several
   statements must be atomic.
-- **`test` covers public package behavior without connecting eagerly** — peer
-  dependency expectations, focused package exports, and the RLS/client
-  contracts.
+- **`test` needs the local Supabase stack running.** Unit specs
+  (`src/*.test.ts`) never connect, but the integration spec
+  (`test/rls.integration.test.ts`) runs in the same `pnpm test` pass and connects
+  for real — start it with `pnpm dev` first, or that spec fails to connect.

@@ -42,8 +42,8 @@ jobs:
       uses: supabase/setup-cli@v1
       with:
         version: 2.84.1
-    - name: Start Example Supabase
-      working-directory: packages/example
+    - name: Start Supabase
+      working-directory: packages/db
       run: supabase start -x=postgres-meta,studio,logflare,supavisor
     - name: Run turbo ci command
       run: pnpm run ci

@@ -1,3 +1,4 @@
 {
-  "extends": "@zeno-lib/typescript/node.json"
+  "extends": "@zeno-lib/typescript/node.json",
+  "include": ["src/**/*", "test/**/*", "drizzle.config.ts", "vitest.config.ts"]
 }
