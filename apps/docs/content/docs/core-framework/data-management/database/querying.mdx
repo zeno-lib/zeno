@@ -16,10 +16,10 @@ override. For local and deployed connection strings, see
 | Factory | Runs as | Use for |
 |---|---|---|
 | `createAuthClient(supabase, config?)` | the signed-in user (`anon`/`authenticated`) | per-request, RLS-enforced reads and writes |
-| `createSupabaseClient(accessToken, config?)` | the token's role (`anon`/`authenticated`) | RLS work when you already hold the verified, decoded claims |
 | `createAnonClient(config?)` | `anon` | unauthenticated, RLS-enforced reads |
-| `createAdminClient(config?)` | the `postgres` connection role (bypasses RLS) | seeds, webhooks, cron, background jobs |
 | `createServiceClient(config?)` | `service_role` (bypasses RLS) | trusted server work that needs `service_role` |
+| `createSupabaseClient(accessToken, config?)` | the token's role (`anon`/`authenticated`) | RLS work when you already hold the verified, decoded claims |
+| `createAdminClient(config?)` | the `postgres` connection role (bypasses RLS) | seeds, webhooks, cron, background jobs |
 
 The RLS clients (`createAuthClient`, `createSupabaseClient`, `createAnonClient`)
 clamp a user token's role to `anon` or `authenticated`. A forged or unexpected
