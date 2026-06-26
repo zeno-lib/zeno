@@ -79,16 +79,16 @@ describe("pool sharing", () => {
 
     expect(end).not.toHaveBeenCalled()
 
-    await first.close({ timeout: 0 })
+    await first.close()
     // Second handle still shares the pool — it must stay open.
     expect(end).not.toHaveBeenCalled()
 
-    await second.close({ timeout: 0 })
+    await second.close()
     // Last handle closed -> pool ended exactly once.
     expect(end).toHaveBeenCalledTimes(1)
 
     // Closing again is a no-op (does not re-end an already-closed pool).
-    await second.close({ timeout: 0 })
+    await second.close()
     expect(end).toHaveBeenCalledTimes(1)
   })
 })

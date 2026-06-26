@@ -73,7 +73,7 @@ describe("default casing", () => {
     expect(db.select().from(posts).toSQL().sql).toContain('"display_name"')
     expect(db.select().from(posts).toSQL().sql).toContain('"owner_id"')
 
-    await db.close({ timeout: 0 })
+    await db.close()
   })
 
   it("allows callers to opt into camelCase table builders", async () => {
@@ -84,7 +84,7 @@ describe("default casing", () => {
 
     expect(db.select().from(posts).toSQL().sql).toContain('"displayName"')
 
-    await db.close({ timeout: 0 })
+    await db.close()
   })
 
   it("exports an RLS-enabled snake_case table helper", async () => {
@@ -98,7 +98,7 @@ describe("default casing", () => {
     expect(db.select().from(posts).toSQL().sql).toContain('"owner_id"')
     expect(getTableConfig(posts).enableRLS).toBe(true)
 
-    await db.close({ timeout: 0 })
+    await db.close()
   })
 
   it("exports an explicit non-RLS snake_case table helper", async () => {
@@ -114,7 +114,7 @@ describe("default casing", () => {
     expect(db.select().from(auditEvents).toSQL().sql).toContain('"owner_id"')
     expect(getTableConfig(auditEvents).enableRLS).toBe(false)
 
-    await db.close({ timeout: 0 })
+    await db.close()
   })
 
   it("re-exports likely pg-prefixed schema builders without the pg prefix", () => {

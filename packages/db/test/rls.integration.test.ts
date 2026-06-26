@@ -97,7 +97,7 @@ afterAll(async () => {
   await adminDb.delete(posts).where(inArray(posts.userId, [USER_A, USER_B]))
   await supabaseAdmin.auth.admin.deleteUser(USER_A)
   await supabaseAdmin.auth.admin.deleteUser(USER_B)
-  await adminDb.close({ timeout: 0 })
+  await adminDb.close()
 })
 
 // The posts_owner_select policy (USING user_id = auth.uid(), TO authenticated)
@@ -243,7 +243,7 @@ describe("createAdminClient", () => {
 
     expect(result[0]).toEqual({ ok: 1 })
 
-    await db.close({ timeout: 0 })
+    await db.close()
   })
 })
 
