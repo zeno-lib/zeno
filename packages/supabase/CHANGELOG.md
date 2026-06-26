@@ -1,5 +1,11 @@
 # @zeno-lib/supabase
 
+## 0.0.3
+
+### Patch Changes
+
+- 341f9f7: Split plain client into createAdminClient, createAnonClient and createClient
+
 ## 0.0.2
 
 ### Patch Changes
