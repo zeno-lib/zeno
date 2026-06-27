@@ -4,6 +4,7 @@
   "scripts": {
     "build": "turbo build",
     "changeset": "changeset",
+    "changeset:pr": "node ./scripts/create-pr-changeset.mjs",
     "types:check": "turbo types:check",
     "ci": "pnpm run lint && turbo run types:check build test e2e",
     "ci:force": "turbo run types:check build test e2e --force",

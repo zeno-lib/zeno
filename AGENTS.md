@@ -40,11 +40,12 @@ Don't update the node for mechanical refactors, formatting, or implementation de
 | `pnpm install` | Install workspace deps. Triggers `fumadocs-mdx` codegen via `apps/docs` postinstall. |
 | `pnpm dev` | Run every package's dev task in parallel (docs serves on port 5002). |
 | `pnpm build` | Build everything (`turbo build`). |
+| `pnpm changeset:pr` | Generate or update the PR-scoped auto changeset from GitHub Actions metadata and the changed publishable packages under `packages/`. |
 | `pnpm types:check` | Run `tsc --noEmit` across the graph (the docs app runs `fumadocs-mdx` + `next typegen` first). |
 | `pnpm test` / `pnpm test:watch` | Run / watch Vitest unit tests. `test` depends on `build` and `lint`. |
+| `pnpm changeset` | Create a release note for publishable packages under `packages/`. |
 | `pnpm e2e` / `pnpm e2e:watch` | Run / watch Playwright. Requires `pnpm exec playwright install --with-deps` once in `packages/e2e/`. |
 | `pnpm lint` / `pnpm lint:fix` | Ultracite check / autofix. |
-| `pnpm changeset` | Create a release note for publishable packages under `packages/`. |
 | `pnpm prerelease:beta:enter` / `pnpm prerelease:beta:exit` | Enter or leave Changesets beta prerelease mode for test publishes. |
 | `pnpm version-packages` | Apply pending Changesets and update package versions/changelogs (with commit links via `@changesets/changelog-git`). |
 | `pnpm release` | Publish the pending package releases to npm. |
