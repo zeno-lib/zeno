@@ -6,8 +6,8 @@
   "pages": [
     "index",
     "---Data Management---",
-    "data-management/schemas",
     "data-management/database",
+    "data-management/schemas",
     "data-management/supabase",
     "data-management/real-time",
     "---User Management---",

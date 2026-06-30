@@ -67,7 +67,7 @@ Three pieces to know:
 The field components on `form` are stable, so destructure them at the top
 of your component for cleaner JSX:
 
-```tsx
+```tsx lineNumbers
 const form = useForm({ /* … */ })
 const { EmailField, PasswordField, SubmitButton } = form
 
@@ -135,7 +135,7 @@ so you don't repeat yourself in `defaultValues`:
 - Nested `z.object(...)` recurses with the same rules; partial user
   overrides are deep-merged into the schema-derived shape.
 
-```tsx
+```tsx lineNumbers
 const schema = z.object({
   email: z.email(),                    // → ""
   password: z.string().min(8),         // → ""

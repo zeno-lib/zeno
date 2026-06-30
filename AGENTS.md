@@ -14,8 +14,10 @@ Linked entries below have a leaf node — open it before working in that area. E
   - [`docs/`](apps/docs/AGENTS.md) — Documentation site (Next.js + Fumadocs) on port 5002
 - `packages/`
   - [`ui/`](packages/ui/AGENTS.md) — `@zeno-lib/ui` component primitives (Base UI + Tailwind)
+  - [`schema/`](packages/schema/AGENTS.md) — `@zeno-lib/schema` pure Drizzle table → Zod schema helpers
   - [`authentication/`](packages/authentication/AGENTS.md) — `@zeno-lib/authentication` Supabase auth flows (read before touching `verify/` or `email-sent/`)
   - [`supabase/`](packages/supabase/AGENTS.md) — `@zeno-lib/supabase` SSR client + middleware
+  - [`db/`](packages/db/AGENTS.md) — `@zeno-lib/db` Drizzle ORM client + schema + migrations + RLS
   - [`e2e/`](packages/e2e/AGENTS.md) — `@zeno-lib/e2e` Playwright suite
   - `typescript/` — shared `tsconfig` presets
   - `tailwind/` — shared Tailwind globals
@@ -40,15 +42,15 @@ Don't update the node for mechanical refactors, formatting, or implementation de
 | `pnpm install` | Install workspace deps. Triggers `fumadocs-mdx` codegen via `apps/docs` postinstall. |
 | `pnpm dev` | Run every package's dev task in parallel (docs serves on port 5002). |
 | `pnpm build` | Build everything (`turbo build`). |
-| `pnpm types:check` | Run `tsc --noEmit` across the graph (the docs app runs `fumadocs-mdx` + `next typegen` first). |
-| `pnpm test` / `pnpm test:watch` | Run / watch Vitest unit tests. `test` depends on `build` and `lint`. |
+| `pnpm types:check` | Run `tsc --noEmit` across the graph (the docs app runs `next typegen` + `fumadocs-mdx` first). |
+| `pnpm test` / `pnpm test:watch` | Run / watch Vitest. `test` depends on `build` and `lint`. Some specs (e.g. `@zeno-lib/db`'s RLS integration test) connect to a real local Supabase, so start it first (`pnpm --filter @zeno-lib/db dev`). |
 | `pnpm e2e` / `pnpm e2e:watch` | Run / watch Playwright. Requires `pnpm exec playwright install --with-deps` once in `packages/e2e/`. |
 | `pnpm lint` / `pnpm lint:fix` | Ultracite check / autofix. |
 | `pnpm changeset` | Create a release note for publishable packages under `packages/`. |
 | `pnpm prerelease:beta:enter` / `pnpm prerelease:beta:exit` | Enter or leave Changesets beta prerelease mode for test publishes. |
 | `pnpm version-packages` | Apply pending Changesets and update package versions/changelogs (with commit links via `@changesets/changelog-git`). |
 | `pnpm release` | Publish the pending package releases to npm. |
-| `pnpm ci` | Full pre-PR pipeline: `lint → types:check → build → test → e2e`. |
+| `pnpm ci` | Full pre-PR pipeline: `lint → types:check → build → test → e2e` (CI starts local Supabase before running, since `test` includes DB-backed specs). |
 
 Scope a command to one package with `pnpm turbo run <task> --filter <pkg-name>` (e.g. `--filter @zeno-lib/docs`).
 

@@ -29,11 +29,11 @@ Content lives at `content/docs/` and is organised into top-level sections — `f
 Build pipeline:
 
 ```
-pnpm types:check  →  fumadocs-mdx && next typegen && tsc --noEmit
+pnpm types:check  →  next typegen && fumadocs-mdx && tsc --noEmit
 pnpm postinstall  →  fumadocs-mdx
 ```
 
-`fumadocs-mdx` generates a `.source` directory the rest of the codebase imports from. **Plain `tsc --noEmit` will fail without the codegen step**, so always go through the script — don't run `tsc` directly to "skip overhead".
+`fumadocs-mdx` generates a `.source` directory the rest of the codebase imports from. **Plain `tsc --noEmit` will fail without the codegen step**, so always go through the script — don't run `tsc` directly to "skip overhead". Run Fumadocs after `next typegen`; Next's type generation can leave `.source` empty, and the final `fumadocs-mdx` pass restores the collection modules before TypeScript reads them.
 
 ## Usage Patterns
 
@@ -70,5 +70,5 @@ Consumed by: `@zeno-lib/e2e` lists this app as a workspace dep so `turbo run e2e
 
 - **Port 5002 is hardcoded** in the dev script and assumed by `packages/e2e/playwright.config.ts` (`webServer.command` runs `npm run start -- -p 5002`). Changing the port here also requires updating the e2e config.
 - **`postinstall` runs `fumadocs-mdx`** — every fresh `pnpm install` triggers codegen. If you see stale `.source` issues after pulling, re-run `pnpm install` or `pnpm exec fumadocs-mdx`.
-- **`types:check` chains three commands** (`fumadocs-mdx && next typegen && tsc --noEmit`). If type errors look like missing modules from `.source` or `.next/types`, you skipped one of the codegen steps.
+- **`types:check` chains three commands** (`next typegen && fumadocs-mdx && tsc --noEmit`). If type errors look like missing modules from `.source` or `.next/types`, you skipped one of the codegen steps or ran them in the wrong order.
 - **MDX components live in `src/mdx-components.tsx`** at the app root, not under `src/components/` — Fumadocs convention. Don't move it.

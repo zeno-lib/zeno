@@ -1,0 +1,65 @@
+---
+title: Migrations
+description: Configure Drizzle Kit and generate, apply, and seed SQL migrations
+icon: FileStack
+status: in progress
+---
+
+## Configure Drizzle Kit
+
+Create a
+[`drizzle.config.ts`](https://orm.drizzle.team/docs/drizzle-config-file) next to
+the package or app that owns the schema:
+
+```typescript title="{project}-db/drizzle.config.ts"
+import "dotenv/config"
+import { defineDrizzleConfig } from "@zeno-lib/db/config"
+
+export default defineDrizzleConfig()
+```
+
+Keep `import "dotenv/config"` here. Next.js loads `.env*` files for code running
+inside the Next runtime, and Vercel provides environment variables during builds
+and function execution, but Drizzle Kit runs this config as its own CLI process.
+The import makes local `.env` values available before `defineDrizzleConfig()`
+reads `process.env.SUPABASE_DATABASE_URL`.
+
+The preset:
+
+- Reads schema from `./src/schema.ts`.
+- Writes migrations to `./supabase/migrations`.
+- Uses the `postgresql` dialect.
+- Reads `SUPABASE_DATABASE_URL`.
+- Keeps Supabase's built-in roles marked as existing.
+
+You can still pass Drizzle Kit overrides for package-specific credentials or
+paths, for example a separate migrations connection string:
+
+```typescript title="{project}-db/drizzle.config.ts"
+import "dotenv/config"
+import { defineDrizzleConfig } from "@zeno-lib/db/config"
+
+export default defineDrizzleConfig({
+  dbCredentials: {
+    url: process.env.MIGRATIONS_DATABASE_URL ?? "",
+  },
+})
+```
+
+## Generate migrations
+
+With the [package scripts](/docs/core-framework/data-management/database#package-scripts)
+from installation in place, `db:generate` reads your TypeScript schema and writes
+a SQL migration under `supabase/migrations`, and `db:migrate` applies generated
+migrations to a database and records them in Drizzle Kit's migration table.
+
+Author tables and RLS policies in your Drizzle schema, run `db:generate`
+(`drizzle-kit generate`), review the generated SQL, and commit it under
+`supabase/migrations`. Apply generated migrations with `db:migrate`
+(`drizzle-kit migrate`) in environments where the database is not reset from
+scratch.
+
+## Pitfalls
+
+- Do not remove `entities.roles.provider: "supabase"` from Drizzle Kit config,
+  or generated migrations may try to create or drop Supabase-managed roles.

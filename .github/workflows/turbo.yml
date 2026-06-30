@@ -16,10 +16,11 @@ jobs:
     name: Continuous Integration
     timeout-minutes: 15
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    # env:
-    #   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-    #   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
-    #   TURBO_CACHE: remote:rw
+    env:
+      SUPABASE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+    # TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+    # TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+    # TURBO_CACHE: remote:rw
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
@@ -38,6 +39,13 @@ jobs:
       run: pnpm install
     - name: Install Playwright Browsers
       run: pnpm --filter @zeno-lib/e2e exec playwright install --with-deps chromium
+    - name: Setup Supabase CLI
+      uses: supabase/setup-cli@v1
+      with:
+        version: 2.84.1
+    - name: Start Supabase
+      working-directory: packages/db
+      run: supabase start -x=postgres-meta,studio,logflare,supavisor
     - name: Run turbo ci command
       run: pnpm run ci
     - name: Upload Playwright report

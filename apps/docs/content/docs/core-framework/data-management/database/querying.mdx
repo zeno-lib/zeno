@@ -1,0 +1,183 @@
+---
+title: Querying
+description: Create clients and run RLS-scoped, admin, and service-role queries
+icon: Search
+status: in progress
+---
+
+## Clients
+
+`@zeno-lib/db` exports five client factories. Each takes an optional Drizzle
+config (`{ relations?, logger?, casing? }`) plus an optional `connectionString`,
+and reads `SUPABASE_DATABASE_URL` from the environment unless you pass that
+override. For local and deployed connection strings, see
+[Environment](/docs/core-framework/data-management/database#environment).
+
+| Factory | Runs as | Use for |
+|---|---|---|
+| `createAuthClient(supabase, config?)` | the signed-in user (`anon`/`authenticated`) | per-request, RLS-enforced reads and writes |
+| `createAnonClient(config?)` | `anon` | unauthenticated, RLS-enforced reads |
+| `createServiceClient(config?)` | `service_role` (bypasses RLS) | trusted server work that needs `service_role` |
+| `createSupabaseClient(accessToken, config?)` | the token's role (`anon`/`authenticated`) | RLS work when you already hold the verified, decoded claims |
+| `createAdminClient(config?)` | the `postgres` connection role (bypasses RLS) | seeds, webhooks, cron, background jobs |
+
+The RLS clients (`createAuthClient`, `createSupabaseClient`, `createAnonClient`)
+clamp a user token's role to `anon` or `authenticated`. A forged or unexpected
+role claim falls back to `anon`, and `service_role` is reachable only through the
+explicit `createServiceClient`, never from a JWT.
+
+For deployed Supabase projects, prefer the
+[Supabase connection pooler](https://supabase.com/docs/guides/database/connecting-to-postgres#server-side-poolers)
+for serverless or autoscaling environments. The package sets `prepare: false` on
+the underlying `postgres-js` pools so Supabase's transaction-mode pooler works.
+Pools are cached per `(kind, connectionString)`, and `close()` is
+reference-counted, so a handle releases only its share of the shared pool.
+
+## Query with RLS
+
+Create the request-scoped Supabase client first, then bind it to
+`createAuthClient(...)`. The returned client is queried directly **as the
+signed-in Supabase user**, so `auth.uid()` resolves to that user and their RLS
+policies apply:
+
+```typescript title="app/posts/route.ts"
+import { createAuthClient } from "@zeno-lib/db"
+import { createClient } from "@zeno-lib/supabase/server"
+import * as schema from "{project}-db"
+
+const supabase = await createClient()
+const db = createAuthClient(supabase)
+
+const myPosts = await db.select().from(schema.posts)
+```
+
+Awaiting a query calls `supabase.auth.getClaims()`, opens a transaction,
+installs the verified JWT claims into transaction-local Postgres settings (so
+`auth.uid()` and `auth.jwt()` work inside RLS policies), and runs the query as
+the claims' role. Claims are re-resolved on **every** awaited statement, so a
+single client always reflects the live session. Each awaited statement is its
+own transaction.
+
+`createAuthClient(...)` does not take a `schema`: the client resolves types from
+the tables you reference in the query itself. Pass a `relations` object only when
+you want the relational query API (see below).
+
+### Relational queries
+
+The [relational query API](https://orm.drizzle.team/docs/relations-v2) works the
+same way once you pass a `relations` object (from Drizzle's `defineRelations`) to
+the factory. Build the `relations` object once at module scope, not per request:
+
+```typescript title="app/posts/route.ts"
+import { createAuthClient } from "@zeno-lib/db"
+import { createClient } from "@zeno-lib/supabase/server"
+import { defineRelations } from "drizzle-orm"
+import * as schema from "{project}-db"
+
+const relations = defineRelations(schema)
+const supabase = await createClient()
+const db = createAuthClient(supabase, { relations })
+
+const myPosts = await db.query.posts.findMany()
+```
+
+### Multiple statements in one transaction
+
+When you need several statements to share one atomic RLS transaction (for
+example a read followed by a dependent write), use `db.transaction(...)`. Every
+statement on the `tx` argument runs under the same claims and role:
+
+```typescript title="app/posts/route.ts"
+const created = await db.transaction(async (tx) => {
+  const [post] = await tx
+    .insert(schema.posts)
+    .values({ title: "Hello" })
+    .returning()
+  await tx.insert(schema.auditLog).values({ postId: post.id })
+  return post
+})
+```
+
+Reach for `db.transaction` only when a single statement is not enough; one
+direct statement is the common case.
+
+## Other RLS clients
+
+When you already hold the verified, decoded claims (for example from a prior
+`supabase.auth.getClaims()` call), skip the per-query round-trip with
+`createSupabaseClient(accessToken, config?)`. It accepts a decoded
+`SupabaseToken` (the `role` and `sub` claims), not a raw JWT string, and does not
+re-verify it:
+
+```typescript title="app/posts/route.ts"
+import { createSupabaseClient } from "@zeno-lib/db"
+import * as schema from "{project}-db"
+
+const db = createSupabaseClient({ role: "authenticated", sub: userId })
+
+const myPosts = await db.select().from(schema.posts)
+```
+
+For unauthenticated, RLS-enforced reads, use `createAnonClient()`, which runs
+every query as `anon`:
+
+```typescript
+import { createAnonClient } from "@zeno-lib/db"
+
+const db = createAnonClient()
+```
+
+Prefer `createAuthClient` when you have a Supabase client: it resolves and
+verifies claims via `auth.getClaims()` itself, so it cannot drift from the live
+session.
+
+## Use admin and service queries carefully
+
+For trusted server work that should bypass user RLS, use `createAdminClient(...)`.
+It needs no Supabase client (it connects via `SUPABASE_DATABASE_URL`) and is
+queried directly:
+
+```typescript title="{project}-db/src/seed.ts"
+import { createAdminClient } from "@zeno-lib/db"
+import * as schema from "./schema"
+
+const db = createAdminClient()
+
+await db.select().from(schema.posts)
+```
+
+`createAdminClient(...)` does not switch roles. It runs as the role the client
+connects as (the `postgres` role by default), which is not subject to RLS. That
+connection role, not `service_role`, is what makes admin queries bypass policies.
+
+`createServiceClient(...)` instead runs every statement as `service_role`, which
+bypasses RLS through Supabase's `BYPASSRLS` grant. It is the only path to
+`service_role`; reach for it when trusted work specifically needs that role
+rather than the `postgres` connection role:
+
+```typescript
+import { createServiceClient } from "@zeno-lib/db"
+import * as schema from "./schema"
+
+const db = createServiceClient()
+
+await db.select().from(schema.posts)
+```
+
+Both are appropriate for seed scripts, webhooks, cron jobs, admin tools, and
+background jobs. Neither should be used for user-scoped reads or writes.
+
+## Pitfalls
+
+- Do not import `@zeno-lib/db` runtime clients from Client Components or browser
+  code.
+- Do not use `createAdminClient(...)` or `createServiceClient(...)` for
+  user-scoped reads and writes; they bypass RLS. Use `createAuthClient(...)`,
+  `createSupabaseClient(...)`, or `createAnonClient(...)` for RLS-enforced work.
+- Do not pass a raw access token string to `createSupabaseClient(...)`; it
+  expects a verified, decoded `SupabaseToken` and does not re-verify it. Prefer
+  `createAuthClient(...)`, which verifies claims itself.
+- Do not feed a user-supplied token to `createServiceClient(...)`. It clamps
+  nothing and grants `service_role`; it is a trusted backend decision.
+- Do not build a fresh `relations` object literal per request. Pass a stable
+  `relations` object, or a cached client built without relations may be reused.

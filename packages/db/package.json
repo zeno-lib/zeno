@@ -1,0 +1,51 @@
+{
+  "name": "@zeno-lib/db",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm exec supabase start",
+    "stop": "pnpm exec supabase stop",
+    "reset": "pnpm exec supabase db reset",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "test": "vitest --run",
+    "test:watch": "vitest watch",
+    "types:check": "tsc --noEmit"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./config": "./src/config.ts",
+    "./schema": "./src/schema.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/db"
+  },
+  "peerDependencies": {
+    "@supabase/supabase-js": ">=2",
+    "drizzle-kit": "1.0.0-rc.3",
+    "drizzle-orm": "1.0.0-rc.3",
+    "postgres": ">=3.4"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "2.106.1",
+    "@types/node": "24.10.0",
+    "@zeno-lib/test": "workspace:*",
+    "@zeno-lib/typescript": "workspace:^",
+    "dotenv": "16.4.7",
+    "drizzle-kit": "1.0.0-rc.3",
+    "drizzle-orm": "1.0.0-rc.3",
+    "postgres": "3.4.7",
+    "supabase": "2.84.1",
+    "vite": "8.0.16",
+    "vitest": "4.1.0"
+  }
+}
