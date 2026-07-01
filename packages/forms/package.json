@@ -32,7 +32,7 @@
     "zod": ">=4"
   },
   "dependencies": {
-    "@tanstack/react-form": "1.29.1",
+    "@tanstack/react-form": "1.33.0",
     "@tanstack/react-form-nextjs": "1.29.1"
   },
   "devDependencies": {
