@@ -23,7 +23,7 @@ jobs:
     # TURBO_CACHE: remote:rw
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         fetch-depth: 0
     - name: Setup pnpm
@@ -40,7 +40,7 @@ jobs:
     - name: Install Playwright Browsers
       run: pnpm --filter @zeno-lib/e2e exec playwright install --with-deps chromium
     - name: Setup Supabase CLI
-      uses: supabase/setup-cli@v1
+      uses: supabase/setup-cli@v2
       with:
         version: 2.84.1
     - name: Start Supabase
