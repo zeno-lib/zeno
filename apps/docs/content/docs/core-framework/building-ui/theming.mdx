@@ -9,16 +9,20 @@ Zeno uses [Tailwind CSS 4](https://tailwindcss.com) with CSS variables for themi
 
 ## Setup
 
-Import the base styles in your app:
+Import the UI styles once in your app:
 
 ```css
-@import "@zeno-lib/tailwind/globals.css";
 @import "@zeno-lib/ui/styles/globals.css";
 ```
 
+This single import pulls in everything you need: `@zeno-lib/tailwind/globals.css`,
+animations, component base styles, and `@zeno-lib/ui/styles/theme.css`. You
+do not need to import Tailwind or `theme.css` separately.
+
 ## CSS Variables
 
-Theme colors are defined as CSS variables in `theme.css`:
+Theme colors are defined as CSS variables in `theme.css` (included by
+`globals.css`):
 
 ```css lineNumbers
 :root {
