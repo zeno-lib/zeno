@@ -37,8 +37,17 @@ import { Button } from "@zeno-lib/ui/button"
 
 ## Theming
 
-Theme tokens live in `@zeno-lib/ui/styles/theme.css`. Import it once in
-your consuming app's global stylesheet:
+Add one import to your app's global stylesheet, depending on what you need:
+
+**All styles** (recommended for most apps) — base styles, animations, and
+design tokens:
+
+```css
+@import "@zeno-lib/ui/styles/globals.css";
+```
+
+**Design tokens only** — if you already have your own Tailwind setup and
+just need Zeno's color, radius, and spacing variables:
 
 ```css
 @import "@zeno-lib/ui/styles/theme.css";
