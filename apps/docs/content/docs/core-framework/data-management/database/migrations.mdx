@@ -58,8 +58,3 @@ Author tables and RLS policies in your Drizzle schema, run `db:generate`
 `supabase/migrations`. Apply generated migrations with `db:migrate`
 (`drizzle-kit migrate`) in environments where the database is not reset from
 scratch.
-
-## Pitfalls
-
-- Do not remove `entities.roles.provider: "supabase"` from Drizzle Kit config,
-  or generated migrations may try to create or drop Supabase-managed roles.
