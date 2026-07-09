@@ -1,3 +1,9 @@
 {
-  "extends": "@zeno-lib/typescript/strictest.json"
+  "extends": "@zeno-lib/typescript/strictest.json",
+  "compilerOptions": {
+    // This package uses Node builtins (fs, path, util, process) directly and
+    // imports no library that transitively references the Node types, so pull
+    // them in explicitly.
+    "types": ["node"]
+  }
 }

@@ -1,14 +1,17 @@
 # `@zeno-lib/e2e` — Intent
 
-Playwright end-to-end suite for every app in the workspace. Note the package name is `@zeno-lib/e2e` (not `@zeno-lib/e2e`) — keep that scope when referring to it.
+Playwright end-to-end tooling for the workspace, published as a reusable package so other monorepos (for example `resolve`) share the same Playwright preset and dependency verifier. This repo's own suite dogfoods the published exports.
 
 ## Purpose & Scope
 
-Cross-app browser tests run against the production builds of apps under `apps/`. Each tested app has its own subdirectory under `tests/` whose name **must match the app's directory name** under `apps/`.
+Two published pieces, plus this repo's per-app specs that consume them:
 
-**Owns:** the Playwright config, the per-app test specs, the dependency-verification script that keeps Turbo's build graph honest.
+- `@zeno-lib/e2e/config`: a `baseConfig` Playwright preset (browsers, reporter, retries, timeout, trace) with no `webServer`/`testDir`.
+- `@zeno-lib/e2e/verify-deps`: `verifyAppDeps()` and the `zeno-verify-app-deps` bin, a parameterized checker that keeps a Turborepo `^build` graph honest.
 
-**Does NOT own:** unit tests (those live alongside source via Vitest), staging/prod smoke tests (separate concern), test data seeding.
+**Owns:** the shared Playwright defaults, the dependency-verification tool, this repo's specs.
+
+**Does NOT own:** unit tests (Vitest, alongside source), staging/prod smoke tests, test data seeding, and the app-specific `webServer`/`testDir` (the consumer supplies those).
 
 ## Entry Points & Contracts
 
@@ -16,66 +19,88 @@ Layout:
 
 ```
 packages/e2e/
-├── playwright.config.ts
-├── verify-app-deps.mjs        # Turbo dep-graph verifier (see Pitfalls)
-└── tests/
-    └── <app-dir-name>/        # e.g. tests/docs/ for apps/docs/
-        └── *.spec.ts
+├── src/
+│   ├── config.ts                    # published: @zeno-lib/e2e/config
+│   ├── verify-deps.ts               # published: @zeno-lib/e2e/verify-deps
+│   └── verify-deps-cli.ts           # published: zeno-verify-app-deps bin
+├── dist/                            # tsdown output (published)
+├── tsdown.config.ts
+├── playwright.config.ts             # repo-only: consumes @zeno-lib/e2e/config
+└── tests/<app-dir-name>/*.spec.ts   # repo-only; <dir> must match apps/<dir>
 ```
 
-Scripts (`package.json`):
-- `e2e` — `playwright test` (CI mode runs `forbidOnly`, retries 3, html reporter)
-- `e2e:watch` — `playwright test --ui`
-- `verify-deps` — runs `verify-app-deps.mjs`
+Published surface:
 
-Turbo wiring: `verify-deps` must complete before `e2e`, and `e2e` depends on `^build` so apps are built before Playwright boots their `next start` server.
+| Import | Provides |
+|---|---|
+| `@zeno-lib/e2e/config` | `baseConfig` Playwright preset (import `defineConfig`/`devices` directly from `@playwright/test`) |
+| `@zeno-lib/e2e/verify-deps` | `verifyAppDeps({ appsDir, testsDir, packageJsonPath }) -> { ok, checked, missing }` |
+| `zeno-verify-app-deps` (bin) | CLI wrapper: `--apps-dir` (default `../../apps`), `--tests-dir` (default `./tests`), `--package-json` (default `./package.json`) |
 
-`webServer` config (`playwright.config.ts:68-75`) currently boots the docs app:
+`baseConfig` omits `webServer` and `testDir` on purpose. Consumers spread it and add their own. It reads `process.env.CI` at run time for `forbidOnly`/`retries`/`timeout`/`reporter`.
 
-```
-cd ../../apps/docs && npm run start -- -p 5002
-```
+`verifyAppDeps` checks the union of `dependencies` and `devDependencies`, so an app can be listed under either field.
 
-Adding a new tested app means: (1) creating `tests/<app-dir-name>/` with at least one spec, (2) adding the app as a workspace dep in this package's `package.json`, (3) appending another entry to the `webServer` array.
+Scripts (`package.json`): `build` (tsdown), `types:check` (`tsc --noEmit`), `e2e` (`playwright test`), `e2e:watch` (`playwright test --ui`), `verify-deps` (runs the built `verify-deps-cli.mjs` directly, since pnpm does not link this leaf package's own bin; external consumers invoke it as the `zeno-verify-app-deps` bin).
+
+Turbo wiring: `build` produces `dist/` before `verify-deps` and `e2e` (both depend on `build`), and `e2e` also depends on `^build` so the tested apps are built first.
+
+Adding a new tested app: (1) create `tests/<app-dir-name>/` with at least one spec, (2) add the app as a `devDependency` (workspace protocol), (3) add its server to the `webServer` array in `playwright.config.ts`.
 
 ## Usage Patterns
 
-Run against the docs app locally (uses an existing dev server if one is already on port 5002):
+Run the repo suite locally (reuses an existing dev server on port 5002 if one is up):
 
 ```bash
 pnpm exec playwright install --with-deps   # one-time, in this package
 pnpm turbo run e2e --filter @zeno-lib/e2e
 ```
 
-Author a new spec for the docs app:
+Consume the preset elsewhere:
 
 ```ts
-// tests/docs/<feature>.spec.ts
+import { defineConfig } from "@playwright/test"
+import { baseConfig } from "@zeno-lib/e2e/config"
+
+export default defineConfig({
+  ...baseConfig,
+  testDir: "./tests",
+  webServer: { command: "npm run start", url: "http://localhost:3000" },
+})
+```
+
+Author a spec (the tests folder name must match the app directory name under `apps/`):
+
+```ts
 import { expect, test } from "@playwright/test"
 
 test("description", async ({ page }) => {
-  const response = await page.goto("http://localhost:5002/<path>", { waitUntil: "networkidle" })
+  const response = await page.goto("http://localhost:5002/<path>", {
+    waitUntil: "networkidle",
+  })
   expect(response?.status()).toBe(200)
 })
 ```
 
-The existing `tests/docs/example.spec.ts` is the canonical minimal shape.
-
 ## Anti-patterns
 
-- **Don't add a spec under `tests/<dir>/` whose `<dir>` doesn't match an actual app directory name.** `verify-app-deps.mjs` walks `tests/` looking for matching `apps/<dir>` and will pass-through any orphan folder, so the spec will run against an unbuilt app and confusingly fail.
-- **Don't hardcode `localhost:3000` in tests.** The docs app runs on `5002`; new apps should pick non-default ports too. Prefer reading from `webServer.url` patterns or extracting a base URL constant per app.
-- **Don't disable `forbidOnly`.** It's already off in dev and on in CI; flipping the CI behaviour means a stray `test.only` ships green.
+- **Don't add `webServer`/`testDir` to `baseConfig`.** Those are app-specific and belong in the consumer's config; the preset stays reusable only if it omits them.
+- **Don't add a spec under `tests/<dir>/` whose `<dir>` doesn't match an actual app directory name.** `verifyAppDeps` only matches folders that have a sibling `apps/<dir>` with a `package.json`.
+- **Don't hardcode `localhost:3000`.** The docs app runs on `5002`; new apps should pick non-default ports too.
+- **Don't disable `forbidOnly`.** `baseConfig` enables it only in CI; flipping that ships a stray `test.only` green.
+- **Don't move an app under test into `dependencies`.** Apps stay in `devDependencies` so they never ship in the published package; Turbo's `^build` still builds them because its graph includes devDependencies.
 
 ## Dependencies & Edges
 
-Workspace deps: each app under test must be listed in this package's `dependencies` (workspace protocol). The `verify-deps` script enforces this and prints the exact JSON snippet to add when an app is missing.
-
-Tooling: `@playwright/test@1.59.1`. After `pnpm install`, **every developer must run `pnpm exec playwright install --with-deps` once inside this package** to download browser binaries (per `README.md`).
+- **Peer:** `@playwright/test` (`>=1`). Consumers install it; the repo also keeps it as a devDependency for its own tests and for dts generation.
+- **Apps under test** are listed in `devDependencies` (workspace protocol). `verifyAppDeps` enforces this and prints the exact JSON snippet to add when one is missing.
+- **Build:** `tsdown` bundles `src/` to `dist/`; `@playwright/test` is marked `external` so it stays a bare specifier in the output.
+- After `pnpm install`, run `pnpm exec playwright install --with-deps` once in this package to download browser binaries.
 
 ## Pitfalls
 
-- **`verify-app-deps.mjs` is the contract enforcement point** for Turbo's `^build` to actually rebuild the app before tests. If you skip listing an app as a workspace dep, Turbo runs e2e against whatever stale build sits on disk and the failure is non-obvious. Always run `pnpm turbo run verify-deps --filter @zeno-lib/e2e` after restructuring.
-- **`webServer.reuseExistingServer: !process.env.CI`** — locally, Playwright will reuse a dev server you already started; in CI it always boots a fresh `next start`. So locally with a running `pnpm dev`, e2e tests hit the dev server (HMR enabled), not the production build, which can mask production-only bugs. For trustworthy local runs, kill the dev server first.
-- **CI test timeout is 30s, local is 120s** (`playwright.config.ts:57`). Tests that pass locally because they slowly poll a network-idle page can time out in CI; budget accordingly.
-- **`reporter: process.env.CI ? "html" : "list"`** — HTML reports go to a `playwright-report/` directory that should not be committed; ensure it stays in `.gitignore`.
+- **The repo's `playwright.config.ts` and `verify-deps` script consume the built `dist/`,** so `build` must run first. Turbo handles this (`verify-deps` and `e2e` depend on `build`); if you invoke Playwright directly, run `pnpm turbo run build --filter @zeno-lib/e2e` beforehand.
+- **`verifyAppDeps` is the contract enforcement point** for Turbo's `^build`. If an app under test is not a workspace dep, Turbo runs e2e against a stale build and the failure is non-obvious. Run `pnpm turbo run verify-deps --filter @zeno-lib/e2e` after restructuring.
+- **`webServer.reuseExistingServer: !process.env.CI`** means locally Playwright reuses a dev server already on the port (HMR, not the production build), which can mask production-only bugs. Kill the dev server for a trustworthy local run.
+- **CI test timeout is 30s, local is 120s** (from `baseConfig`). A test that slowly polls a network-idle page can pass locally and time out in CI.
+- **`reporter` is `html` in CI**, writing to `playwright-report/`, which should stay in `.gitignore`.

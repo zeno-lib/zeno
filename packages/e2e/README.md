@@ -1,3 +1,3 @@
-# Setup
+# @zeno-lib/e2e
 
-After running `pnpm i` at this repo root, run `pnpm exec playwright install --with-deps` inside this package.
+See [E2E Testing](https://www.zeno-lib.com/docs/core-framework/testing/e2e-testing).

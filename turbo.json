@@ -12,7 +12,7 @@
       "dependsOn": ["^types:check", "^build"]
     },
     "e2e": {
-      "dependsOn": ["^build", "@zeno-lib/e2e#verify-deps"],
+      "dependsOn": ["^build", "build", "@zeno-lib/e2e#verify-deps"],
       "outputs": [
         "./packages/e2e/playwright-report/**",
         "./packages/e2e/test-results/**"
@@ -20,7 +20,8 @@
       "passThroughEnv": ["PLAYWRIGHT_*"]
     },
     "verify-deps": {
-      "cache": false
+      "cache": false,
+      "dependsOn": ["build"]
     },
     "e2e:watch": {
       "cache": false,

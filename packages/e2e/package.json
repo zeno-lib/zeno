@@ -1,7 +1,24 @@
 {
   "name": "@zeno-lib/e2e",
   "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    "./config": {
+      "types": "./dist/config.d.mts",
+      "import": "./dist/config.mjs",
+      "default": "./dist/config.mjs"
+    },
+    "./verify-deps": {
+      "types": "./dist/verify-deps.d.mts",
+      "import": "./dist/verify-deps.mjs",
+      "default": "./dist/verify-deps.mjs"
+    }
+  },
+  "bin": {
+    "zeno-verify-app-deps": "./dist/verify-deps-cli.mjs"
+  },
   "files": [
+    "dist",
     "src"
   ],
   "publishConfig": {
@@ -12,17 +29,21 @@
     "directory": "packages/e2e"
   },
   "scripts": {
+    "build": "tsdown",
     "e2e": "playwright test",
     "e2e:watch": "playwright test --ui",
-    "verify-deps": "./verify-app-deps.mjs"
+    "types:check": "tsc --noEmit",
+    "verify-deps": "node ./dist/verify-deps-cli.mjs"
   },
-  "dependencies": {
-    "@zeno-lib/docs": "workspace:*"
+  "peerDependencies": {
+    "@playwright/test": ">=1"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",
     "@types/node": "^25.6.0",
+    "@zeno-lib/docs": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
+    "tsdown": "^0.22.2",
     "typescript": "6.0.3"
   }
 }
