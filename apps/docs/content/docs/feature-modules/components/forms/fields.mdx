@@ -77,7 +77,7 @@ Preset over `InputField` with `type="email"`, `inputMode="email"`, and
   <EmailFieldPreview />
 
 ```tsx
-<EmailField placeholder="you@zeno.dev" />
+<EmailField name="email" placeholder="you@zeno.dev" />
 ```
 
 </Preview>
@@ -92,7 +92,7 @@ signup. Defaults `label` to `"Password"` and `name` to `"password"`.
   <PasswordFieldPreview />
 
 ```tsx
-<PasswordField autoComplete="new-password" />
+<PasswordField autoComplete="new-password" name="password" />
 ```
 
 </Preview>
@@ -148,7 +148,7 @@ order doesn't matter.
 import { InputGroupAddon } from "@zeno-lib/ui/input-group"
 import { MailIcon } from "lucide-react"
 
-<EmailField placeholder="you@zeno.dev">
+<EmailField name="email" placeholder="you@zeno.dev">
   <InputGroupAddon align="inline-start">
     <MailIcon />
   </InputGroupAddon>
@@ -216,9 +216,10 @@ for a full setup.
   <AddonValidationSpinnerPreview />
 
 ```tsx lineNumbers
-import { ValidationSpinner } from "@zeno-lib/forms"
+import { ValidationSpinner } from "@zeno-lib/forms/create-form"
 
 <EmailField
+  name="email"
   placeholder="Try taken@example.com"
   validators={{
     onChangeAsync: async ({ value }: { value: string }) => {
@@ -305,7 +306,7 @@ with its label and `htmlFor` so you don't wire IDs by hand.
   <RadioGroupFieldPreview />
 
 ```tsx
-import { RadioGroupFieldItem } from "@zeno-lib/forms/fields"
+import { RadioGroupFieldItem } from "@zeno-lib/forms/create-form"
 
 <RadioGroupField label="Plan" name="plan">
   <RadioGroupFieldItem value="free">Free</RadioGroupFieldItem>
@@ -384,7 +385,7 @@ underlying `<Calendar>`.
 
 Wraps `@zeno-lib/ui/combobox`. Single-select with client-side filtering as the
 user types. Pass plain strings for `string[]` items, or `{ value, label }`
-objects when the value isn't a string — see
+objects when the value isn't a string; see
 [Numeric IDs](/docs/feature-modules/components/forms/examples#numeric-ids).
 
 <Preview>
@@ -432,7 +433,7 @@ same typed field state and accessibility plumbing the shipped fields use.
 ```tsx lineNumbers
 "use client"
 
-import { useFieldContext, useIsInvalid } from "@zeno-lib/forms"
+import { useFieldContext, useIsInvalid } from "@zeno-lib/forms/create-form"
 import { Field, FieldError, FieldLabel } from "@zeno-lib/ui/field"
 import { Slider } from "@zeno-lib/ui/slider"
 

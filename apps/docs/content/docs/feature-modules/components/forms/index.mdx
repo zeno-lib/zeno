@@ -1,6 +1,6 @@
 ---
 title: Forms
-description: Typed form hook with pre-wired field components, Zod validation, and shadcn-style layout
+description: Typed form factory, a registry field kit, and Zod validation on a shadcn-style layout
 icon: Form
 status: in progress
 ---
@@ -8,9 +8,23 @@ status: in progress
 import { NewsletterPreview } from "@/components/forms/newsletter-preview"
 
 `@zeno-lib/forms` is a thin layer over [TanStack Form](https://tanstack.com/form)
-and [Zod](https://zod.dev) that ships ready-to-use field components built on
-`@zeno-lib/ui` primitives. You get type-safe field names, an automatic submit
-button, and a single `schema` prop instead of hand-wiring validators.
+and [Zod](https://zod.dev). The **headless core** (the form factory, validation, and schema
+helpers) ships on npm and is UI-free. The **field components** (built on shadcn primitives) drop
+into your repo via the registry, so you own and restyle them. You get type-safe field names, an
+automatic submit button, and a single `schema` prop instead of hand-wiring validators.
+
+## Setup
+
+Add the field kit + `create-form` composition with the CLI, then install the headless core:
+
+```npm
+pnpm dlx shadcn@latest add zeno-lib/zeno/create-form
+pnpm add @zeno-lib/forms
+```
+
+`create-form` wires your dropped-in fields into the factory and exports the `useForm` hook. Import
+it from wherever you added it (`@zeno-lib/forms/create-form` is the batteries-included shortcut used
+in the examples below).
 
 ## Quick start
 
@@ -22,7 +36,7 @@ A newsletter form, validated with Zod:
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { z } from "zod"
 
 const schema = z.object({
@@ -41,7 +55,7 @@ export function Newsletter() {
   return (
     <FormProvider form={form}>
       <Form>
-        <EmailField placeholder="you@zeno.dev" />
+        <EmailField name="email" placeholder="you@zeno.dev" />
         <SubmitButton>Subscribe</SubmitButton>
       </Form>
     </FormProvider>
@@ -75,8 +89,8 @@ return (
   <FormProvider form={form}>
     <Form>
       <FieldGroup>
-        <EmailField />
-        <PasswordField />
+        <EmailField name="email" />
+        <PasswordField name="password" />
       </FieldGroup>
       <SubmitButton>Sign in</SubmitButton>
     </Form>
@@ -128,9 +142,9 @@ so you don't repeat yourself in `defaultValues`:
   respectively, so React inputs render controlled.
 - **Numbers, booleans, dates, enums, files** without a `.default(...)`
   carry domain meaning (`0`? `false`? `today`?), so the user supplies
-  them explicitly via `defaultValues` — passing them is the only way to
+  them explicitly via `defaultValues`; passing them is the only way to
   tell the form "this is the empty value I want".
-- Anything you put in `defaultValues` always wins on conflict — schema
+- Anything you put in `defaultValues` always wins on conflict; schema
   defaults are a baseline, not a guard.
 - Nested `z.object(...)` recurses with the same rules; partial user
   overrides are deep-merged into the schema-derived shape.

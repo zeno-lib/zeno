@@ -1,115 +1,121 @@
 ---
 title: Theming
-description: Customizing your app's appearance with Tailwind CSS 4
+description: A thin overlay on shadcn theming with easy-to-override color tokens
 icon: Palette
 status: in progress
 ---
 
-Zeno uses [Tailwind CSS 4](https://tailwindcss.com) with CSS variables for theming, supporting light and dark modes.
+Zeno's theme is a thin overlay on [shadcn theming](https://ui.shadcn.com/docs/theming). It uses the
+exact same semantic CSS-variable tokens (`--background`, `--foreground`, `--primary`, `--radius`,
+[and so on](https://ui.shadcn.com/docs/theming#theme-tokens)); Zeno only ships a set of default values, each mapped to a Tailwind color variable so
+every token is easy to override.
 
-## Setup
+Install it as part of [setup](/docs/core-framework/building-ui/installation#add-the-theme).
 
-Import the UI styles once in your app:
+The default lives in `packages/ui/src/styles/theme.css` and is imported by the shared package's
+`globals.css`. Every app then pulls that in through its own stylesheet:
 
-```css
-@import "@zeno-lib/ui/styles/globals.css";
+```css title="apps/{yourApp}/src/app/globals.css"
+@import "@{yourWorkspace}/ui/styles/globals.css";
 ```
 
-This single import pulls in everything you need: `@zeno-lib/tailwind/globals.css`,
-animations, component base styles, and `@zeno-lib/ui/styles/theme.css`. You
-do not need to import Tailwind or `theme.css` separately.
+Because of the cascade, tokens redeclared **after** that import win.
 
-## CSS Variables
+## Override globally
 
-Theme colors are defined as CSS variables in `theme.css` (included by
-`globals.css`):
+Each token points at a Tailwind `--color-*` variable, so restyling is a one-line change per token.
+Edit the values in the shared theme, or append an override block after it:
 
-```css lineNumbers
-:root {
-  --background: var(--color-white);
-  --foreground: var(--color-gray-950);
-  --primary: var(--color-gray-900);
-  --primary-foreground: var(--color-gray-50);
-  --secondary: var(--color-gray-100);
-  --muted: var(--color-gray-100);
-  --accent: var(--color-gray-100);
-  --destructive: var(--color-error-600);
-  --border: var(--color-gray-200);
-  --ring: var(--color-gray-400);
-  --radius: 0.625rem;
-}
-
-.dark {
-  --background: var(--color-gray-950);
-  --foreground: var(--color-gray-50);
-  /* ... dark mode overrides */
-}
-```
-
-## Using Theme Colors
-
-Reference theme colors in Tailwind classes:
-
-```tsx
-<div className="bg-background text-foreground">
-  <button className="bg-primary text-primary-foreground">
-    Primary Button
-  </button>
-  <span className="text-muted-foreground">Muted text</span>
-</div>
-```
-
-## Available Colors
-
-| Variable | Light | Dark |
-|----------|-------|------|
-| `background` | White | Gray 950 |
-| `foreground` | Gray 950 | Gray 50 |
-| `primary` | Gray 900 | Gray 200 |
-| `secondary` | Gray 100 | Gray 800 |
-| `muted` | Gray 100 | Gray 800 |
-| `accent` | Gray 100 | Gray 700 |
-| `destructive` | Error 600 | Error 400 |
-| `border` | Gray 200 | 10% white |
-| `card` | White | Gray 900 |
-| `popover` | White | Gray 800 |
-
-## Dark Mode
-
-Dark mode uses the `.dark` class on the root element. Use `next-themes` for automatic switching:
-
-```tsx
-import { ThemeProvider } from "next-themes"
-
-function App({ children }) {
-  return (
-    <ThemeProvider attribute="class" defaultTheme="system">
-      {children}
-    </ThemeProvider>
-  )
-}
-```
-
-## Customizing
-
-Override variables in your app's CSS:
-
-```css
+```css title="packages/ui/src/styles/theme.css"
 :root {
   --primary: var(--color-blue-600);
   --primary-foreground: var(--color-white);
   --radius: 0.5rem;
 }
+
+.dark {
+  --primary: var(--color-blue-400);
+  --primary-foreground: var(--color-blue-950);
+}
 ```
 
-## Utilities
+A token can point at any Tailwind color (`--color-*`) or a raw value (`oklch(...)`, `#hex`). The
+radius scale (`--radius-sm` through `--radius-4xl`) derives from `--radius`, so one value rescales
+every rounded corner. For the full token list and conventions, see
+[shadcn theming](https://ui.shadcn.com/docs/theming).
 
-The `cn` function merges Tailwind classes safely:
+## Override in a single app
+
+To restyle one app without touching the shared default, redeclare the tokens after the import in
+that app's stylesheet. These values win only inside that app; every other consumer keeps the shared
+theme:
+
+```css title="apps/{yourApp}/src/app/globals.css"
+@import "@{yourWorkspace}/ui/styles/globals.css";
+
+:root {
+  --primary: var(--color-emerald-600);
+  --primary-foreground: var(--color-white);
+}
+
+.dark {
+  --primary: var(--color-emerald-400);
+}
+```
+
+Use the shared theme for tokens the app should inherit, and only list the ones it changes.
+
+## Fonts
+
+The theme ships two font tokens, `--font-text` (body) and `--font-title` (headings).
+Tailwind turns each into a utility (`font-text`, `font-title`); you just supply the fonts they point at.
+
+Load them per app with [`next/font`](https://nextjs.org/docs/app/api-reference/components/font),
+giving each the matching CSS variable:
+
+```tsx title="apps/{yourApp}/src/app/layout.tsx"
+import { Aleo, Inter } from "next/font/google"
+import { cn } from "@{yourWorkspace}/ui/utils"
+
+const textFont = Inter({ subsets: ["latin"], variable: "--font-text" })
+const titleFont = Aleo({ subsets: ["latin"], variable: "--font-title" })
+
+export default function Layout({ children }: LayoutProps<"/">) {
+  return (
+    <html
+      className={cn(textFont.variable, titleFont.variable)}
+      suppressHydrationWarning
+    >
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+Use `.variable` (not `.className`): it exposes each font as the CSS variable the theme's tokens read,
+which is what lets a single `<html>` carry both fonts at once.
+
+Now you can apply them anywhere with the utility classes:
 
 ```tsx
-import { cn } from "@zeno-lib/ui/lib/utils"
-
-// Merges and deduplicates classes
-cn("px-4 py-2", "px-6") // → "py-2 px-6"
-cn("text-red-500", isError && "text-red-700")
+<h1 className="font-title">Zeno</h1>
+<p className="font-text">A thin overlay on shadcn.</p>
 ```
+
+To make them the app-wide default instead of opting in per element, set them in the base layer:
+
+```css title="apps/{yourApp}/src/app/globals.css"
+@layer base {
+  body {
+    @apply font-text;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-title;
+  }
+}
+```
+
+## Dark mode
+
+Zeno uses the `.dark` class strategy. To add a theme toggle, follow shadcn's
+[Next.js dark mode guide](https://ui.shadcn.com/docs/dark-mode/next).
