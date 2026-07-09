@@ -1,6 +1,6 @@
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import {
   Card,
   CardContent,
@@ -40,7 +40,7 @@ export function NewsletterPreview() {
         <CardContent>
           <Form id="newsletter-form">
             <FieldGroup>
-              <EmailField placeholder="you@zeno.dev" />
+              <EmailField name="email" placeholder="you@zeno.dev" />
             </FieldGroup>
           </Form>
         </CardContent>

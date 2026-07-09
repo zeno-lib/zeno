@@ -209,9 +209,6 @@ importers:
       '@tanstack/react-form-nextjs':
         specifier: 1.33.0
         version: 1.33.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@zeno-lib/ui':
-        specifier: workspace:^
-        version: link:../ui
       next:
         specifier: '>=16'
         version: 16.2.4(@babel/core@7.29.0)(@playwright/test@1.60.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -237,6 +234,9 @@ importers:
       '@zeno-lib/typescript':
         specifier: workspace:^
         version: link:../typescript
+      '@zeno-lib/ui':
+        specifier: workspace:^
+        version: link:../ui
       typescript:
         specifier: 6.0.3
         version: 6.0.3

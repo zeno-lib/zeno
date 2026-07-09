@@ -1,3 +1,10 @@
 {
-  "extends": "@zeno-lib/typescript/react.json"
+  "extends": "@zeno-lib/typescript/react.json",
+  "compilerOptions": {
+    "paths": {
+      "@/components/ui/*": ["../ui/src/components/*"],
+      "@/lib/*": ["../ui/src/lib/*"],
+      "@/hooks/*": ["../ui/src/hooks/*"]
+    }
+  }
 }

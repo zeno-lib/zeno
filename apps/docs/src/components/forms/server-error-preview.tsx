@@ -1,6 +1,11 @@
 "use client"
 
-import { Form, FormProvider, useForm, ValidationError } from "@zeno-lib/forms"
+import {
+  Form,
+  FormProvider,
+  useForm,
+  ValidationError,
+} from "@zeno-lib/forms/create-form"
 import {
   Card,
   CardContent,
@@ -60,7 +65,7 @@ export function ServerErrorExample() {
           <Form id="server-error-form">
             <FieldGroup>
               <InputField label="Username" name="username" placeholder="zeno" />
-              <EmailField placeholder="you@zeno.dev" />
+              <EmailField name="email" placeholder="you@zeno.dev" />
             </FieldGroup>
           </Form>
         </CardContent>

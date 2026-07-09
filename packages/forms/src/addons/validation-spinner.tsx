@@ -1,9 +1,8 @@
 "use client"
 
-import { InputGroupAddon } from "@zeno-lib/ui/input-group"
-import { Spinner } from "@zeno-lib/ui/spinner"
-
-import { useFieldContext } from "../lib/contexts"
+import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { InputGroupAddon } from "@/components/ui/input-group"
+import { Spinner } from "@/components/ui/spinner"
 
 type ValidationSpinnerProps = {
   align?: "inline-start" | "inline-end"

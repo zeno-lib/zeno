@@ -1,0 +1,123 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "items": [
+    {
+      "dependencies": [
+        "@zeno-lib/forms"
+      ],
+      "description": "The shadcn-based field components + the create-form composition root. Wires your dropped-in fields into @zeno-lib/forms' headless factory.",
+      "files": [
+        {
+          "path": "src/addons/validation-spinner.tsx",
+          "target": "@components/form/addons/validation-spinner.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/create-form.tsx",
+          "target": "@components/form/create-form.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/checkbox-field.tsx",
+          "target": "@components/form/fields/checkbox-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/combobox-field.tsx",
+          "target": "@components/form/fields/combobox-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/date-picker-field.tsx",
+          "target": "@components/form/fields/date-picker-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/email-field.tsx",
+          "target": "@components/form/fields/email-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/input-field.tsx",
+          "target": "@components/form/fields/input-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/number-field.tsx",
+          "target": "@components/form/fields/number-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/otp-field.tsx",
+          "target": "@components/form/fields/otp-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/password-field.tsx",
+          "target": "@components/form/fields/password-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/radio-group-field.tsx",
+          "target": "@components/form/fields/radio-group-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/reset-button.tsx",
+          "target": "@components/form/fields/reset-button.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/select-field.tsx",
+          "target": "@components/form/fields/select-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/slider-field.tsx",
+          "target": "@components/form/fields/slider-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/submit-button.tsx",
+          "target": "@components/form/fields/submit-button.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/switch-field.tsx",
+          "target": "@components/form/fields/switch-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/textarea-field.tsx",
+          "target": "@components/form/fields/textarea-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/lib/required-indicator.tsx",
+          "target": "@components/form/lib/required-indicator.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "name": "create-form",
+      "registryDependencies": [
+        "button",
+        "calendar",
+        "checkbox",
+        "combobox",
+        "field",
+        "input",
+        "input-group",
+        "input-otp",
+        "popover",
+        "radio-group",
+        "select",
+        "slider",
+        "spinner",
+        "switch",
+        "textarea"
+      ],
+      "title": "Create form",
+      "type": "registry:block"
+    }
+  ]
+}

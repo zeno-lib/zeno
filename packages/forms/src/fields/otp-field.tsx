@@ -1,22 +1,25 @@
 "use client"
 
+import { describedBy } from "@zeno-lib/forms/lib/aria"
+import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import {
+  useHideFieldErrors,
+  useIsFieldRequired,
+  useIsInvalid,
+} from "@zeno-lib/forms/lib/use-is-invalid"
+import type { ReactNode } from "react"
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldLabel,
-} from "@zeno-lib/ui/field"
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@zeno-lib/ui/input-otp"
-import type { ReactNode } from "react"
-
-import { describedBy } from "../lib/aria"
-import { useFieldContext } from "../lib/contexts"
-import { RequiredIndicator } from "../lib/required-indicator"
+} from "@/components/ui/field"
 import {
-  useHideFieldErrors,
-  useIsFieldRequired,
-  useIsInvalid,
-} from "../lib/use-is-invalid"
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp"
+import { RequiredIndicator } from "../lib/required-indicator"
 
 // Flat surface — `OTPInput`'s prop type is a discriminated union over
 // `render`/`children`, which doesn't compose cleanly with `Omit`. Listing the

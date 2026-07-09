@@ -1,6 +1,11 @@
 "use client"
 
-import { Form, FormProvider, useForm, ValidationSpinner } from "@zeno-lib/forms"
+import {
+  Form,
+  FormProvider,
+  useForm,
+  ValidationSpinner,
+} from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import {
   InputGroupAddon,
@@ -21,7 +26,7 @@ export function AddonInlineIconPreview() {
     <FormProvider form={form}>
       <Form className={wrapperClass}>
         <FieldGroup>
-          <EmailField placeholder="you@zeno.dev">
+          <EmailField name="email" placeholder="you@zeno.dev">
             <InputGroupAddon align="inline-start">
               <MailIcon />
             </InputGroupAddon>
@@ -103,6 +108,7 @@ export function AddonValidationSpinnerPreview() {
       <Form className={wrapperClass}>
         <FieldGroup>
           <EmailField
+            name="email"
             placeholder="Try taken@example.com"
             validators={{
               onChangeAsync: async ({ value }: { value: string }) => {

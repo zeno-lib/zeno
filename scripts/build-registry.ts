@@ -171,21 +171,17 @@ type Transformed = {
 }
 
 type SpecAction = {
-  relative?: boolean
   replaceTo?: string
   dep?: string
   registryDep?: string
 }
 
 /**
- * Classify one import specifier for registry distribution. Intra-package (relative) imports are
- * preserved; `@zeno-lib/ui/*` maps to shadcn-canonical aliases (with a bare shadcn registry dep);
- * `@zeno-lib/*` workspace + third-party packages become npm dependencies (kept verbatim).
+ * Classify one non-relative import specifier for registry distribution. `@zeno-lib/ui/*` maps to
+ * shadcn-canonical aliases (with a bare shadcn registry dep); `@zeno-lib/*` workspace + third-party
+ * packages become npm dependencies (kept verbatim). Relative imports are handled in `transformFile`.
  */
 function classifySpec(spec: string): SpecAction {
-  if (spec.startsWith(".")) {
-    return { relative: true }
-  }
   if (spec === "@zeno-lib/ui/lib/utils") {
     return { replaceTo: "@/lib/utils" }
   }
@@ -218,8 +214,40 @@ function classifySpec(spec: string): SpecAction {
   return { dep: pkg }
 }
 
+/** npm package + subdir whose `.ts` modules are provided by npm, not bundled into the block. */
+type NpmDir = { pkg: string; dir: string }
+
+/**
+ * If a resolved relative import points at a `.ts` module directly inside the npm-provided dir,
+ * return its npm subpath (e.g. `@zeno-lib/forms/lib/contexts`). `.tsx` files there (visual, e.g.
+ * `required-indicator`) and files elsewhere return null so they stay bundled.
+ */
+function npmSubpath(
+  resolved: string,
+  srcDir: string,
+  npm: NpmDir
+): string | null {
+  const rel = relative(join(srcDir, npm.dir), resolved)
+  if (rel.startsWith("..") || rel.includes("/") || !rel.endsWith(".ts")) {
+    return null
+  }
+  return `${npm.pkg}/${npm.dir}/${rel.slice(0, -".ts".length)}`
+}
+
+function replaceSpec(text: string, from: string, to: string): string {
+  return text
+    .split(`"${from}"`)
+    .join(`"${to}"`)
+    .split(`'${from}'`)
+    .join(`'${to}'`)
+}
+
 /** Rewrite one source file's imports for registry distribution and collect its dependencies. */
-function transformFile(absPath: string): Transformed {
+function transformFile(
+  absPath: string,
+  srcDir: string,
+  npm?: NpmDir
+): Transformed {
   let text = readFileSync(absPath, "utf8")
   const deps = new Set<string>()
   const registryDeps = new Set<string>()
@@ -229,16 +257,20 @@ function transformFile(absPath: string): Transformed {
     .preProcessFile(text, true, true)
     .importedFiles.map((f) => f.fileName)
   for (const spec of specs) {
-    const action = classifySpec(spec)
-    if (action.relative) {
-      relativeImports.push(spec)
+    if (spec.startsWith(".")) {
+      const resolved = resolveRelative(absPath, spec)
+      const sub = resolved && npm ? npmSubpath(resolved, srcDir, npm) : null
+      if (sub && npm) {
+        text = replaceSpec(text, spec, sub)
+        deps.add(npm.pkg)
+      } else {
+        relativeImports.push(spec)
+      }
+      continue
     }
+    const action = classifySpec(spec)
     if (action.replaceTo) {
-      text = text
-        .split(`"${spec}"`)
-        .join(`"${action.replaceTo}"`)
-        .split(`'${spec}'`)
-        .join(`'${action.replaceTo}'`)
+      text = replaceSpec(text, spec, action.replaceTo)
     }
     if (action.dep) {
       deps.add(action.dep)
@@ -257,6 +289,7 @@ type BlockConfig = {
   title?: string
   description?: string
   targetPrefix: string // consumer subdir under the components alias, e.g. "auth"
+  npm?: NpmDir // dir whose .ts modules stay on npm instead of being bundled
 }
 
 type BlockAcc = {
@@ -271,10 +304,10 @@ function collectFile(
   abs: string,
   srcDir: string,
   outDir: string,
-  targetPrefix: string,
+  config: BlockConfig,
   acc: BlockAcc
 ): void {
-  const result = transformFile(abs)
+  const result = transformFile(abs, srcDir, config.npm)
   for (const d of result.deps) {
     acc.deps.add(d)
   }
@@ -288,7 +321,7 @@ function collectFile(
   writeFileSync(outPath, result.text)
   acc.files.push({
     path: join("registry", rel),
-    target: `@components/${targetPrefix}/${rel}`,
+    target: `@components/${config.targetPrefix}/${rel}`,
     type: "registry:component",
   })
 
@@ -322,7 +355,7 @@ function buildBlock(pkgDir: string, config: BlockConfig): RegistryItem {
       continue
     }
     seen.add(abs)
-    collectFile(abs, srcDir, outDir, config.targetPrefix, acc)
+    collectFile(abs, srcDir, outDir, config, acc)
   }
 
   for (const extra of DEP_OVERRIDES[config.name] ?? []) {
@@ -437,6 +470,19 @@ const AUTH_FLOWS: BlockConfig[] = [
   },
 ]
 
+// packages/forms: one block bundling the shadcn-dependent fields + the `create-form` wiring. The
+// headless core (`createZenoForm`, `lib/*.ts` logic) stays on npm; `lib/*.ts` imports are rewritten
+// to `@zeno-lib/forms/lib/*`, while `lib/required-indicator.tsx` (visual) is bundled.
+const FORM_BLOCK: BlockConfig = {
+  description:
+    "The shadcn-based field components + the create-form composition root. Wires your dropped-in fields into @zeno-lib/forms' headless factory.",
+  entry: "create-form.tsx",
+  name: "create-form",
+  npm: { dir: "lib", pkg: "@zeno-lib/forms" },
+  targetPrefix: "form",
+  title: "Create form",
+}
+
 function main(): void {
   // packages/ui: no primitives (all vanilla shadcn — installed from shadcn directly). Ships the theme.
   writeRegistry("packages/ui", [buildThemeItem()])
@@ -450,6 +496,13 @@ function main(): void {
     "packages/authentication",
     AUTH_FLOWS.map((c) => buildBlock("packages/authentication", c))
   )
+
+  // packages/forms: field components + create-form wiring (UI). Headless core stays on npm.
+  rmSync(join(ROOT, "packages/forms/registry"), {
+    force: true,
+    recursive: true,
+  })
+  writeRegistry("packages/forms", [buildBlock("packages/forms", FORM_BLOCK)])
 }
 
 main()

@@ -3,9 +3,8 @@ import userEvent from "@zeno-lib/test/user-event"
 import { useRef } from "react"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
-import { Form, FormProvider } from "./form"
+import { Form, FormProvider, useForm } from "./create-form"
 import { ValidationError } from "./lib/validation-error"
-import { useForm } from "./use-form"
 
 const EMAIL_LABEL = /Email/
 const VALID_EMAIL_MSG = /Enter a valid email/i
@@ -75,7 +74,7 @@ describe("useForm — required indicator", () => {
       return (
         <FormProvider form={form}>
           <Form>
-            <EmailField label="Email" />
+            <EmailField label="Email" name="email" />
             <InputField label="Role" name="role" />
           </Form>
         </FormProvider>
@@ -104,7 +103,7 @@ describe("useForm — required indicator", () => {
       return (
         <FormProvider form={form}>
           <Form>
-            <EmailField label="Email" />
+            <EmailField label="Email" name="email" />
           </Form>
         </FormProvider>
       )
@@ -133,7 +132,7 @@ describe("useForm — hideFieldErrors", () => {
       return (
         <FormProvider form={form}>
           <Form>
-            <EmailField label="Email" />
+            <EmailField label="Email" name="email" />
             <SubmitButton>Submit</SubmitButton>
           </Form>
         </FormProvider>
@@ -163,7 +162,7 @@ describe("useForm — ValidationError from onSubmit", () => {
       return (
         <FormProvider form={form}>
           <Form>
-            <EmailField label="Email" />
+            <EmailField label="Email" name="email" />
             <SubmitButton>Submit</SubmitButton>
           </Form>
         </FormProvider>
@@ -194,7 +193,7 @@ describe("useForm — ValidationError from onSubmit", () => {
       return (
         <FormProvider form={form}>
           <Form>
-            <EmailField label="Email" />
+            <EmailField label="Email" name="email" />
             <SubmitButton>Submit</SubmitButton>
           </Form>
         </FormProvider>
@@ -223,7 +222,7 @@ describe("useForm — ValidationError from onSubmit", () => {
       return (
         <FormProvider form={form}>
           <Form>
-            <EmailField label="Email" />
+            <EmailField label="Email" name="email" />
             <SubmitButton>Submit</SubmitButton>
           </Form>
         </FormProvider>
@@ -246,7 +245,7 @@ describe("useForm — ValidationError from onSubmit", () => {
       return (
         <FormProvider form={form}>
           <Form>
-            <EmailField label="Email" />
+            <EmailField label="Email" name="email" />
             <SubmitButton>Submit</SubmitButton>
           </Form>
         </FormProvider>
@@ -274,7 +273,7 @@ describe("useForm — SubmitButton state", () => {
       return (
         <FormProvider form={form}>
           <Form>
-            <EmailField label="Email" />
+            <EmailField label="Email" name="email" />
             <SubmitButton>Submit</SubmitButton>
           </Form>
         </FormProvider>

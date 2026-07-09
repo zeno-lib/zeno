@@ -2,9 +2,8 @@ import { cleanup, render, screen } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
-import { Form, FormProvider } from "./form"
+import { Form, FormProvider, useForm } from "./create-form"
 import type { ValidationMode } from "./lib/validation-modes"
-import { useForm } from "./use-form"
 
 afterEach(() => {
   cleanup()
@@ -24,7 +23,7 @@ function Harness({ mode }: { mode?: ValidationMode }) {
   return (
     <FormProvider form={form}>
       <Form>
-        <EmailField label="Email" />
+        <EmailField label="Email" name="email" />
         <SubmitButton>Submit</SubmitButton>
       </Form>
     </FormProvider>
@@ -132,7 +131,11 @@ describe("per-field validators bypass form-level gating", () => {
       return (
         <FormProvider form={form}>
           <Form>
-            <EmailField label="Email" validators={{ onChange: validator }} />
+            <EmailField
+              label="Email"
+              name="email"
+              validators={{ onChange: validator }}
+            />
           </Form>
         </FormProvider>
       )

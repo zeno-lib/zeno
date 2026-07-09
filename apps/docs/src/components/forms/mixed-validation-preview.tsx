@@ -1,6 +1,6 @@
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import {
   Card,
   CardContent,
@@ -61,7 +61,7 @@ export function MixedValidationExample() {
                 name="name"
                 placeholder="Resolve"
               />
-              <EmailField placeholder="you@zeno.dev" />
+              <EmailField name="email" placeholder="you@zeno.dev" />
               <InputField
                 description={`Try "admin" or "api" to see the per-field check.`}
                 label="Slug"

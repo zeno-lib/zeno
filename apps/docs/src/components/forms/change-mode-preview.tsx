@@ -1,6 +1,6 @@
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import {
   Card,
   CardContent,
@@ -42,7 +42,11 @@ export function ChangeModeExample() {
         <CardContent>
           <Form id="change-mode-form">
             <FieldGroup>
-              <PasswordField autoComplete="new-password" label="New password" />
+              <PasswordField
+                autoComplete="new-password"
+                label="New password"
+                name="password"
+              />
             </FieldGroup>
           </Form>
         </CardContent>

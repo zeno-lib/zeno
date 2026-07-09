@@ -2,9 +2,9 @@
   "name": "@zeno-lib/forms",
   "version": "0.0.1",
   "exports": {
-    ".": "./src/form.tsx",
-    "./addons": "./src/addons/index.ts",
-    "./fields": "./src/fields/index.ts",
+    ".": "./src/index.ts",
+    "./create-form": "./src/create-form.tsx",
+    "./lib/*": "./src/lib/*.ts",
     "./tanstack": "./src/tanstack.ts"
   },
   "files": [
@@ -31,6 +31,11 @@
     "react-dom": ">=19",
     "zod": ">=4"
   },
+  "peerDependenciesMeta": {
+    "@zeno-lib/ui": {
+      "optional": true
+    }
+  },
   "dependencies": {
     "@tanstack/react-form": "1.33.0",
     "@tanstack/react-form-nextjs": "1.33.0"
@@ -41,6 +46,7 @@
     "@types/react-dom": "19.2.3",
     "@zeno-lib/typescript": "workspace:^",
     "@zeno-lib/test": "workspace:^",
+    "@zeno-lib/ui": "workspace:^",
     "typescript": "6.0.3",
     "vite": "8.0.16",
     "vitest": "4.1.0",

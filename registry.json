@@ -4,6 +4,7 @@
   "homepage": "https://github.com/zeno-lib/zeno",
   "include": [
     "packages/ui/registry.json",
-    "packages/authentication/registry.json"
+    "packages/authentication/registry.json",
+    "packages/forms/registry.json"
   ]
 }

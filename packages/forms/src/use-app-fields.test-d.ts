@@ -1,6 +1,6 @@
 import { test } from "vitest"
 import { z } from "zod"
-import { useForm } from "./use-form"
+import { useForm } from "./create-form"
 
 const schema = z.object({
   accept: z.boolean(),
@@ -11,10 +11,6 @@ const schema = z.object({
   password: z.string(),
   profile: z.object({ nick: z.string() }),
   size: z.string(),
-})
-
-const schemaNoEmail = z.object({
-  contact: z.string(),
 })
 
 test("InputField.name is constrained to DeepKeys<T>", () => {
@@ -56,34 +52,22 @@ test("TextAreaField.name is constrained to DeepKeys<T>", () => {
   form.TextAreaField({ name: "nonexistent" })
 })
 
-test("EmailField.name is optional when T has an `email` field", () => {
+test("EmailField.name is required and constrained to DeepKeys<T>", () => {
   const form = useForm({ onSubmit: () => undefined, schema })
   const { EmailField } = form
-  // No `name` required.
+  // @ts-expect-error — name is required
   EmailField({})
-  EmailField({ label: "Email" })
   EmailField({ name: "email" })
+  // @ts-expect-error — not a valid path
+  EmailField({ name: "nonexistent" })
 })
 
-test("EmailField.name is required when T has no `email` field", () => {
-  const form = useForm({ onSubmit: () => undefined, schema: schemaNoEmail })
-  // @ts-expect-error — name becomes required without an "email" key on T
-  form.EmailField({})
-  form.EmailField({ name: "contact" })
-})
-
-test("PasswordField.name is optional when T has a `password` field", () => {
+test("PasswordField.name is required and constrained to DeepKeys<T>", () => {
   const form = useForm({ onSubmit: () => undefined, schema })
   const { PasswordField } = form
+  // @ts-expect-error — name is required
   PasswordField({})
   PasswordField({ name: "password" })
-})
-
-test("PasswordField.name is required when T has no `password` field", () => {
-  const form = useForm({ onSubmit: () => undefined, schema: schemaNoEmail })
-  // @ts-expect-error — name becomes required without a "password" key on T
-  form.PasswordField({})
-  form.PasswordField({ name: "contact" })
 })
 
 test("validators prop is accepted on every field wrapper", () => {

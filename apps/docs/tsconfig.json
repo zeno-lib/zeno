@@ -3,7 +3,9 @@
   "compilerOptions": {
     "paths": {
       "@/*": ["./src/*"],
-      "fumadocs-mdx:collections/*": ["./.source/*"]
+      "fumadocs-mdx:collections/*": ["./.source/*"],
+      "@/components/ui/*": ["../../packages/ui/src/components/*"],
+      "@/lib/utils": ["../../packages/ui/src/lib/utils"]
     }
   },
   "include": ["next-env.d.ts", ".next/types/**/*.ts", "**/*.ts", "**/*.tsx"]

@@ -1,7 +1,7 @@
 "use client"
 
-import { cn } from "@zeno-lib/ui/lib/utils"
 import type { ComponentProps } from "react"
+import { cn } from "@/lib/utils"
 
 type RequiredIndicatorProps = ComponentProps<"span">
 
