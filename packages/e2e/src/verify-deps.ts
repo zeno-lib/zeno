@@ -15,8 +15,24 @@ export type VerifyAppDepsResult = {
   ok: boolean
   /** Number of apps-with-tests that were checked. */
   checked: number
-  /** Package names of tested apps missing from the deps. */
+  /** Sorted package names of tested apps missing from the deps. */
   missing: string[]
+}
+
+type PackageJson = {
+  name?: string
+  dependencies?: Record<string, string>
+  devDependencies?: Record<string, string>
+}
+
+/** Read and parse a package.json, wrapping failures with the offending path. */
+function readPackageJson(path: string): PackageJson {
+  try {
+    return JSON.parse(readFileSync(path, "utf-8")) as PackageJson
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    throw new Error(`Could not read ${path}: ${reason}`)
+  }
 }
 
 /**
@@ -29,8 +45,9 @@ export type VerifyAppDepsResult = {
  * devDependencies is checked, so it does not matter which field an app is
  * listed under.
  *
- * Pure: it returns a result and never calls `process.exit`.
- * See the `zeno-verify-app-deps` bin for the CLI wrapper.
+ * Pure: it returns a result and never calls `process.exit`. It throws only when
+ * a package.json cannot be read or parsed. See the `zeno-verify-app-deps` bin
+ * for the CLI wrapper.
  */
 export function verifyAppDeps(
   options: VerifyAppDepsOptions
@@ -43,6 +60,7 @@ export function verifyAppDeps(
       )
     : []
 
+  // Sorted so the result (and the CLI's output) is stable across platforms.
   const appsWithTests = (existsSync(appsDir) ? readdirSync(appsDir) : [])
     .filter(
       (name) =>
@@ -50,17 +68,11 @@ export function verifyAppDeps(
         statSync(join(appsDir, name)).isDirectory() &&
         existsSync(join(appsDir, name, "package.json"))
     )
-    .map((name) => {
-      const pkg = JSON.parse(
-        readFileSync(join(appsDir, name, "package.json"), "utf-8")
-      ) as { name: string }
-      return pkg.name
-    })
+    .map((name) => readPackageJson(join(appsDir, name, "package.json")).name)
+    .filter((name): name is string => typeof name === "string")
+    .sort()
 
-  const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as {
-    dependencies?: Record<string, string>
-    devDependencies?: Record<string, string>
-  }
+  const pkg = readPackageJson(packageJsonPath)
   const deps = new Set([
     ...Object.keys(pkg.dependencies ?? {}),
     ...Object.keys(pkg.devDependencies ?? {}),
