@@ -1,6 +1,6 @@
-import { cn } from "@zeno-lib/ui/lib/utils"
 import Image from "next/image"
 import Link from "next/link"
+import { cn } from "@/lib/utils"
 
 interface WelcomeProps {
   className?: string

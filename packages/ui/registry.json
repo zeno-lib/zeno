@@ -2,15 +2,6 @@
   "$schema": "https://ui.shadcn.com/schema/registry.json",
   "items": [
     {
-      "css": {
-        "@custom-variant dark": "(&:is(.dark *))",
-        "@import": "tw-animate-css",
-        "@layer base": {
-          "html": {
-            "@apply": "text-[15px] sm:text-[15.5px] md:text-[16px] lg:text-[16.5px] xl:text-[17px]"
-          }
-        }
-      },
       "cssVars": {
         "dark": {
           "accent": "var(--color-gray-700)",
@@ -134,8 +125,10 @@
           "radius-xl": "calc(var(--radius) * 1.4)"
         }
       },
-      "description": "Zeno's design tokens (emerald primary, stone gray scale), radius scale, dark mode, and animations. Add this after `shadcn init` to match Zeno's look.",
-      "devDependencies": ["tw-animate-css"],
+      "description": "Zeno's design tokens (emerald primary, stone gray scale) and radius scale. Add this after `shadcn init`, then follow the setup docs to wire up `tw-animate-css` and the responsive base styles.",
+      "devDependencies": [
+        "tw-animate-css"
+      ],
       "name": "theme",
       "title": "Zeno theme",
       "type": "registry:theme"

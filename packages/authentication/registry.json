@@ -1,0 +1,361 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "items": [
+    {
+      "dependencies": [
+        "@supabase/supabase-js",
+        "sonner"
+      ],
+      "description": "Auth layout shell + AuthProvider.",
+      "files": [
+        {
+          "path": "src/components/context.tsx",
+          "target": "@components/auth/components/context.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/welcome.tsx",
+          "target": "@components/auth/components/welcome.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/layout.tsx",
+          "target": "@components/auth/layout.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "name": "auth-layout",
+      "registryDependencies": [
+        "sonner"
+      ],
+      "title": "Auth layout",
+      "type": "registry:block"
+    },
+    {
+      "dependencies": [
+        "@supabase/supabase-js",
+        "sonner"
+      ],
+      "description": "Confirmation screen shown after a magic link is sent.",
+      "files": [
+        {
+          "path": "src/components/container.tsx",
+          "target": "@components/auth/components/container.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/context.tsx",
+          "target": "@components/auth/components/context.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/subtitle.tsx",
+          "target": "@components/auth/components/subtitle.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/title.tsx",
+          "target": "@components/auth/components/title.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/email-sent/index.tsx",
+          "target": "@components/auth/email-sent/index.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "name": "email-sent",
+      "registryDependencies": [
+        "sonner"
+      ],
+      "title": "Email sent",
+      "type": "registry:block"
+    },
+    {
+      "dependencies": [
+        "@zeno-lib/supabase"
+      ],
+      "description": "Auth error screen.",
+      "files": [
+        {
+          "path": "src/components/container.tsx",
+          "target": "@components/auth/components/container.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/subtitle.tsx",
+          "target": "@components/auth/components/subtitle.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/title.tsx",
+          "target": "@components/auth/components/title.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/error/index.tsx",
+          "target": "@components/auth/error/index.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "name": "error",
+      "registryDependencies": [
+        "button"
+      ],
+      "title": "Auth error",
+      "type": "registry:block"
+    },
+    {
+      "dependencies": [
+        "@supabase/supabase-js",
+        "sonner"
+      ],
+      "description": "Request a password recovery email.",
+      "files": [
+        {
+          "path": "src/components/container.tsx",
+          "target": "@components/auth/components/container.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/context.tsx",
+          "target": "@components/auth/components/context.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/inputs.tsx",
+          "target": "@components/auth/components/inputs.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/subtitle.tsx",
+          "target": "@components/auth/components/subtitle.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/title.tsx",
+          "target": "@components/auth/components/title.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/recover-password/index.tsx",
+          "target": "@components/auth/recover-password/index.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "name": "recover-password",
+      "registryDependencies": [
+        "button",
+        "input",
+        "label",
+        "sonner"
+      ],
+      "title": "Recover password",
+      "type": "registry:block"
+    },
+    {
+      "dependencies": [
+        "@supabase/supabase-js",
+        "sonner"
+      ],
+      "description": "Set a new password from a recovery link.",
+      "files": [
+        {
+          "path": "src/components/container.tsx",
+          "target": "@components/auth/components/container.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/context.tsx",
+          "target": "@components/auth/components/context.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/inputs.tsx",
+          "target": "@components/auth/components/inputs.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/subtitle.tsx",
+          "target": "@components/auth/components/subtitle.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/title.tsx",
+          "target": "@components/auth/components/title.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/reset-password/index.tsx",
+          "target": "@components/auth/reset-password/index.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "name": "reset-password",
+      "registryDependencies": [
+        "button",
+        "input",
+        "label",
+        "sonner"
+      ],
+      "title": "Reset password",
+      "type": "registry:block"
+    },
+    {
+      "dependencies": [
+        "@supabase/supabase-js",
+        "sonner"
+      ],
+      "description": "Magic-link and password sign-in flow.",
+      "files": [
+        {
+          "path": "src/components/container.tsx",
+          "target": "@components/auth/components/container.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/context.tsx",
+          "target": "@components/auth/components/context.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/inputs.tsx",
+          "target": "@components/auth/components/inputs.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/subtitle.tsx",
+          "target": "@components/auth/components/subtitle.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/title.tsx",
+          "target": "@components/auth/components/title.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/sign-in/about-magic-links.tsx",
+          "target": "@components/auth/sign-in/about-magic-links.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/sign-in/index.tsx",
+          "target": "@components/auth/sign-in/index.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "name": "sign-in",
+      "registryDependencies": [
+        "button",
+        "dialog",
+        "input",
+        "label",
+        "sonner"
+      ],
+      "title": "Sign in",
+      "type": "registry:block"
+    },
+    {
+      "dependencies": [
+        "@supabase/supabase-js"
+      ],
+      "description": "Sign-out control.",
+      "files": [
+        {
+          "path": "src/sign-out/index.tsx",
+          "target": "@components/auth/sign-out/index.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "name": "sign-out",
+      "registryDependencies": [
+        "spinner"
+      ],
+      "title": "Sign out",
+      "type": "registry:block"
+    },
+    {
+      "dependencies": [
+        "@supabase/supabase-js",
+        "sonner"
+      ],
+      "description": "Sign-up flow.",
+      "files": [
+        {
+          "path": "src/components/container.tsx",
+          "target": "@components/auth/components/container.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/context.tsx",
+          "target": "@components/auth/components/context.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/inputs.tsx",
+          "target": "@components/auth/components/inputs.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/subtitle.tsx",
+          "target": "@components/auth/components/subtitle.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/title.tsx",
+          "target": "@components/auth/components/title.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/sign-up/index.tsx",
+          "target": "@components/auth/sign-up/index.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "name": "sign-up",
+      "registryDependencies": [
+        "button",
+        "input",
+        "label",
+        "sonner"
+      ],
+      "title": "Sign up",
+      "type": "registry:block"
+    },
+    {
+      "dependencies": [
+        "sonner"
+      ],
+      "description": "OTP / magic-link verification screen.",
+      "files": [
+        {
+          "path": "src/components/container.tsx",
+          "target": "@components/auth/components/container.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/subtitle.tsx",
+          "target": "@components/auth/components/subtitle.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/components/title.tsx",
+          "target": "@components/auth/components/title.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/verify/index.tsx",
+          "target": "@components/auth/verify/index.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "name": "verify",
+      "registryDependencies": [
+        "button",
+        "sonner"
+      ],
+      "title": "Verify",
+      "type": "registry:block"
+    }
+  ]
+}

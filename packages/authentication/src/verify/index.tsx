@@ -12,10 +12,10 @@
  */
 "use client"
 
-import { Button } from "@zeno-lib/ui/button"
-import { toast } from "@zeno-lib/ui/sonner"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useState } from "react"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
 import { Container } from "../components/container"
 
 interface VerifyProps {

@@ -1,7 +1,7 @@
 import { createClient } from "@zeno-lib/supabase/next-server"
-import { Button } from "@zeno-lib/ui/button"
 import Link from "next/link"
 import { redirect } from "next/navigation"
+import { Button } from "@/components/ui/button"
 import { Container } from "../components/container"
 
 const isExpiredLinkError = (error?: string) =>
