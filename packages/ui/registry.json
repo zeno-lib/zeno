@@ -23,8 +23,8 @@
           "muted-foreground": "var(--color-gray-400)",
           "popover": "var(--color-gray-800)",
           "popover-foreground": "var(--color-gray-50)",
-          "primary": "var(--color-emerald-400)",
-          "primary-foreground": "var(--color-emerald-900)",
+          "primary": "var(--color-gray-50)",
+          "primary-foreground": "var(--color-gray-900)",
           "ring": "var(--color-gray-500)",
           "secondary": "var(--color-gray-800)",
           "secondary-foreground": "var(--color-gray-50)",
@@ -57,8 +57,8 @@
           "muted-foreground": "var(--color-gray-500)",
           "popover": "var(--color-white)",
           "popover-foreground": "var(--color-gray-950)",
-          "primary": "var(--color-emerald-600)",
-          "primary-foreground": "var(--color-emerald-50)",
+          "primary": "var(--color-gray-900)",
+          "primary-foreground": "var(--color-gray-50)",
           "radius": "0.625rem",
           "ring": "var(--color-gray-400)",
           "secondary": "var(--color-gray-100)",
@@ -116,6 +116,8 @@
           "color-sidebar-primary": "var(--sidebar-primary)",
           "color-sidebar-primary-foreground": "var(--sidebar-primary-foreground)",
           "color-sidebar-ring": "var(--sidebar-ring)",
+          "font-text": "var(--font-text)",
+          "font-title": "var(--font-title)",
           "radius-2xl": "calc(var(--radius) * 1.8)",
           "radius-3xl": "calc(var(--radius) * 2.2)",
           "radius-4xl": "calc(var(--radius) * 2.6)",
@@ -125,7 +127,7 @@
           "radius-xl": "calc(var(--radius) * 1.4)"
         }
       },
-      "description": "Zeno's design tokens (emerald primary, stone gray scale) and radius scale. Add this after `shadcn init`, then follow the setup docs to wire up `tw-animate-css` and the responsive base styles.",
+      "description": "Zeno's design tokens (neutral base color, stone gray scale) and radius scale. Add this after `shadcn init`, then follow the setup docs to wire up `tw-animate-css` and the responsive base styles.",
       "devDependencies": [
         "tw-animate-css"
       ],

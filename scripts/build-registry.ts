@@ -1,26 +1,22 @@
 /**
- * Generates the per-package `registry.json` files consumed by the shadcn GitHub registry
+ * Generates the per-package `registry.json` manifests consumed by the shadcn GitHub registry
  * (`pnpm dlx shadcn@latest add zeno-lib/zeno/<item>`).
  *
  * Zeno ships only value-add via the registry — the shadcn primitives themselves are installed
  * by the end user from shadcn directly. See `AGENTS.md` and the building-ui docs.
  *
- * For every registry item the generator follows the entry file's relative imports to collect a
- * self-contained file set, writes transformed copies under `packages/<pkg>/registry/**` (intra
- * imports stay relative; `@zeno-lib/ui/*` and workspace imports are rewritten to shadcn-canonical
- * aliases / npm packages), and records npm `dependencies` + bare shadcn `registryDependencies`.
+ * The registry-distributed source under `packages/<pkg>/src/**` is authored in the shadcn
+ * consumer dialect (`@/components/ui/*`, `@/lib/utils`, `@zeno-lib/forms/lib/*`, `sonner`, ...)
+ * and served to consumers VERBATIM — there are no generated file copies. This script only reads
+ * the source: for every registry item it BFS-walks the entry file's relative-import graph to
+ * collect the self-contained file set (each `files[].path` points straight at `src/**`), and
+ * records npm `dependencies` + bare shadcn `registryDependencies` inferred from the imports.
  *
  * Run with: `pnpm registry:build`. Output is deterministic so `git diff --exit-code` in CI fails
  * when source changes without regenerating.
  */
 
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs"
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
 import ts from "typescript"
@@ -131,7 +127,7 @@ function buildThemeItem(): RegistryItem {
       theme: sortKeys(theme),
     },
     description:
-      "Zeno's design tokens (emerald primary, stone gray scale) and radius scale. Add this after `shadcn init`, then follow the setup docs to wire up `tw-animate-css` and the responsive base styles.",
+      "Zeno's design tokens (neutral base color, stone gray scale) and radius scale. Add this after `shadcn init`, then follow the setup docs to wire up `tw-animate-css` and the responsive base styles.",
     devDependencies: ["tw-animate-css"],
     name: "theme",
     title: "Zeno theme",
@@ -163,92 +159,43 @@ function topLevelPackage(spec: string): string {
   return spec.startsWith("@") ? `${parts[0]}/${parts[1]}` : parts[0]
 }
 
-type Transformed = {
-  text: string
+type Scanned = {
   deps: Set<string>
   registryDeps: Set<string>
   relativeImports: string[]
 }
 
 type SpecAction = {
-  replaceTo?: string
   dep?: string
   registryDep?: string
 }
 
 /**
- * Classify one non-relative import specifier for registry distribution. `@zeno-lib/ui/*` maps to
- * shadcn-canonical aliases (with a bare shadcn registry dep); `@zeno-lib/*` workspace + third-party
- * packages become npm dependencies (kept verbatim). Relative imports are handled in `transformFile`.
+ * Classify one non-relative import specifier for registry distribution. The source is already in
+ * the consumer dialect, so `@/components/ui/<name>` maps to a bare shadcn `registryDependency`
+ * (or `zeno-lib/zeno/<name>` for a Zeno original); other `@/*` aliases (`@/lib/*`, `@/hooks/*`)
+ * are supplied by the consumer's shadcn setup; everything else bare becomes an npm dependency.
  */
 function classifySpec(spec: string): SpecAction {
-  if (spec === "@zeno-lib/ui/lib/utils") {
-    return { replaceTo: "@/lib/utils" }
-  }
-  if (spec === "@zeno-lib/ui/sonner") {
-    // Zeno's sonner re-exports `toast`; shadcn's base-nova sonner exports only `Toaster`.
-    // Import `toast` from the `sonner` package; keep the `sonner` registry dep for `<Toaster />`.
-    return { dep: "sonner", registryDep: "sonner", replaceTo: "sonner" }
-  }
-  if (spec === "@zeno-lib/ui/icons" || spec.startsWith("@zeno-lib/ui/icons/")) {
-    return { dep: "lucide-react", replaceTo: "lucide-react" }
-  }
-  if (spec.startsWith("@zeno-lib/ui/hooks/")) {
-    return { replaceTo: `@/hooks/${spec.slice("@zeno-lib/ui/hooks/".length)}` }
-  }
-  if (spec.startsWith("@zeno-lib/ui/")) {
-    const name = spec.slice("@zeno-lib/ui/".length)
-    const shadcn = SHADCN_COMPONENTS.has(name)
+  if (spec.startsWith("@/components/ui/")) {
+    const name = spec.slice("@/components/ui/".length).split("/")[0]
     return {
-      registryDep: shadcn ? name : `zeno-lib/zeno/${name}`,
-      replaceTo: `@/components/ui/${name}`,
+      registryDep: SHADCN_COMPONENTS.has(name) ? name : `zeno-lib/zeno/${name}`,
     }
   }
-  if (spec.startsWith("@zeno-lib/")) {
-    return { dep: topLevelPackage(spec) } // @zeno-lib/supabase, @zeno-lib/forms — kept verbatim
+  if (spec.startsWith("@/")) {
+    return {} // @/lib/*, @/hooks/* — provided by the consumer's shadcn install
   }
   const pkg = topLevelPackage(spec)
   if (ASSUMED_PRESENT.has(pkg) || pkg.startsWith("node:")) {
     return {}
   }
-  return { dep: pkg }
+  return { dep: pkg } // sonner, lucide-react, @zeno-lib/forms, @supabase/supabase-js, ...
 }
 
-/** npm package + subdir whose `.ts` modules are provided by npm, not bundled into the block. */
-type NpmDir = { pkg: string; dir: string }
-
-/**
- * If a resolved relative import points at a `.ts` module directly inside the npm-provided dir,
- * return its npm subpath (e.g. `@zeno-lib/forms/lib/contexts`). `.tsx` files there (visual, e.g.
- * `required-indicator`) and files elsewhere return null so they stay bundled.
- */
-function npmSubpath(
-  resolved: string,
-  srcDir: string,
-  npm: NpmDir
-): string | null {
-  const rel = relative(join(srcDir, npm.dir), resolved)
-  if (rel.startsWith("..") || rel.includes("/") || !rel.endsWith(".ts")) {
-    return null
-  }
-  return `${npm.pkg}/${npm.dir}/${rel.slice(0, -".ts".length)}`
-}
-
-function replaceSpec(text: string, from: string, to: string): string {
-  return text
-    .split(`"${from}"`)
-    .join(`"${to}"`)
-    .split(`'${from}'`)
-    .join(`'${to}'`)
-}
-
-/** Rewrite one source file's imports for registry distribution and collect its dependencies. */
-function transformFile(
-  absPath: string,
-  srcDir: string,
-  npm?: NpmDir
-): Transformed {
-  let text = readFileSync(absPath, "utf8")
+/** Scan one source file's imports: collect relative specifiers to bundle + classify the rest. */
+function scanFile(absPath: string): Scanned {
+  const text = readFileSync(absPath, "utf8")
   const deps = new Set<string>()
   const registryDeps = new Set<string>()
   const relativeImports: string[] = []
@@ -258,20 +205,10 @@ function transformFile(
     .importedFiles.map((f) => f.fileName)
   for (const spec of specs) {
     if (spec.startsWith(".")) {
-      const resolved = resolveRelative(absPath, spec)
-      const sub = resolved && npm ? npmSubpath(resolved, srcDir, npm) : null
-      if (sub && npm) {
-        text = replaceSpec(text, spec, sub)
-        deps.add(npm.pkg)
-      } else {
-        relativeImports.push(spec)
-      }
+      relativeImports.push(spec)
       continue
     }
     const action = classifySpec(spec)
-    if (action.replaceTo) {
-      text = replaceSpec(text, spec, action.replaceTo)
-    }
     if (action.dep) {
       deps.add(action.dep)
     }
@@ -279,7 +216,7 @@ function transformFile(
       registryDeps.add(action.registryDep)
     }
   }
-  return { deps, registryDeps, relativeImports, text }
+  return { deps, registryDeps, relativeImports }
 }
 
 type BlockConfig = {
@@ -289,7 +226,6 @@ type BlockConfig = {
   title?: string
   description?: string
   targetPrefix: string // consumer subdir under the components alias, e.g. "auth"
-  npm?: NpmDir // dir whose .ts modules stay on npm instead of being bundled
 }
 
 type BlockAcc = {
@@ -299,15 +235,14 @@ type BlockAcc = {
   queue: string[]
 }
 
-/** Transform one file, write its registry copy, and fold its contributions into the accumulator. */
+/** Record one source file in the block and fold its imports' contributions into the accumulator. */
 function collectFile(
   abs: string,
   srcDir: string,
-  outDir: string,
   config: BlockConfig,
   acc: BlockAcc
 ): void {
-  const result = transformFile(abs, srcDir, config.npm)
+  const result = scanFile(abs)
   for (const d of result.deps) {
     acc.deps.add(d)
   }
@@ -316,11 +251,8 @@ function collectFile(
   }
 
   const rel = relative(srcDir, abs)
-  const outPath = join(outDir, rel)
-  mkdirSync(dirname(outPath), { recursive: true })
-  writeFileSync(outPath, result.text)
   acc.files.push({
-    path: join("registry", rel),
+    path: join("src", rel),
     target: `@components/${config.targetPrefix}/${rel}`,
     type: "registry:component",
   })
@@ -334,13 +266,13 @@ function collectFile(
 }
 
 /**
- * Build one self-contained block: BFS the entry's relative-import graph, transform each reachable
- * file, and emit transformed copies under `packages/<pkg>/registry/**` preserving structure so the
- * preserved relative imports keep resolving in the consumer.
+ * Build one self-contained block: BFS the entry's relative-import graph and record every reachable
+ * source file under `packages/<pkg>/src/**` (bundled verbatim; consumers receive them at each
+ * file's `target`). Bare `@zeno-lib/forms/lib/*` imports stop the traversal — that headless core
+ * ships on npm, so it is recorded as a dependency rather than bundled.
  */
 function buildBlock(pkgDir: string, config: BlockConfig): RegistryItem {
   const srcDir = join(ROOT, pkgDir, "src")
-  const outDir = join(ROOT, pkgDir, "registry")
   const acc: BlockAcc = {
     deps: new Set(),
     files: [],
@@ -355,11 +287,17 @@ function buildBlock(pkgDir: string, config: BlockConfig): RegistryItem {
       continue
     }
     seen.add(abs)
-    collectFile(abs, srcDir, outDir, config, acc)
+    collectFile(abs, srcDir, config, acc)
   }
 
   for (const extra of DEP_OVERRIDES[config.name] ?? []) {
     acc.deps.add(extra)
+  }
+
+  // A block that imports `toast` from `sonner` (npm dep) renders a `<Toaster />`, whose primitive
+  // the consumer installs from shadcn — so pair the npm dep with the `sonner` registry dep.
+  if (acc.deps.has("sonner")) {
+    acc.registryDeps.add("sonner")
   }
 
   return {
@@ -471,14 +409,14 @@ const AUTH_FLOWS: BlockConfig[] = [
 ]
 
 // packages/forms: one block bundling the shadcn-dependent fields + the `create-form` wiring. The
-// headless core (`createZenoForm`, `lib/*.ts` logic) stays on npm; `lib/*.ts` imports are rewritten
-// to `@zeno-lib/forms/lib/*`, while `lib/required-indicator.tsx` (visual) is bundled.
+// headless core (`createZenoForm`, `lib/*.ts` logic) stays on npm; the field source imports it as
+// `@zeno-lib/forms/lib/*`, while `lib/required-indicator.tsx` (visual) is bundled via a relative
+// import.
 const FORM_BLOCK: BlockConfig = {
   description:
     "The shadcn-based field components + the create-form composition root. Wires your dropped-in fields into @zeno-lib/forms' headless factory.",
   entry: "create-form.tsx",
   name: "create-form",
-  npm: { dir: "lib", pkg: "@zeno-lib/forms" },
   targetPrefix: "form",
   title: "Create form",
 }
@@ -488,20 +426,12 @@ function main(): void {
   writeRegistry("packages/ui", [buildThemeItem()])
 
   // packages/authentication: flow blocks (UI). The server-only confirm handler stays on npm.
-  rmSync(join(ROOT, "packages/authentication/registry"), {
-    force: true,
-    recursive: true,
-  })
   writeRegistry(
     "packages/authentication",
     AUTH_FLOWS.map((c) => buildBlock("packages/authentication", c))
   )
 
   // packages/forms: field components + create-form wiring (UI). Headless core stays on npm.
-  rmSync(join(ROOT, "packages/forms/registry"), {
-    force: true,
-    recursive: true,
-  })
   writeRegistry("packages/forms", [buildBlock("packages/forms", FORM_BLOCK)])
 }
 

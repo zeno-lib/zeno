@@ -20,8 +20,8 @@
   --card-foreground: var(--color-gray-950);
   --popover: var(--color-white);
   --popover-foreground: var(--color-gray-950);
-  --primary: var(--color-emerald-600);
-  --primary-foreground: var(--color-emerald-50);
+  --primary: var(--color-gray-900);
+  --primary-foreground: var(--color-gray-50);
   --secondary: var(--color-gray-100);
   --secondary-foreground: var(--color-gray-900);
   --muted: var(--color-gray-100);
@@ -55,8 +55,8 @@
   --card-foreground: var(--color-gray-50);
   --popover: var(--color-gray-800);
   --popover-foreground: var(--color-gray-50);
-  --primary: var(--color-emerald-400);
-  --primary-foreground: var(--color-emerald-900);
+  --primary: var(--color-gray-50);
+  --primary-foreground: var(--color-gray-900);
   --secondary: var(--color-gray-800);
   --secondary-foreground: var(--color-gray-50);
   --muted: var(--color-gray-800);
@@ -84,6 +84,8 @@
 }
 
 @theme inline {
+  --font-text: var(--font-text);
+  --font-title: var(--font-title);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
