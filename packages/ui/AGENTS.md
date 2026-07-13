@@ -74,7 +74,7 @@ External apps get the same tokens (as `cssVars`) via `shadcn add zeno-lib/zeno/t
 
 ## Dependencies & Edges
 
-Workspace: `@zeno-lib/typescript`, `@zeno-lib/tailwind` (dev only: for the shared globals.css used by consuming apps).
+Workspace: `@zeno-lib/typescript`. The package's `globals.css` imports `tailwindcss` directly (no separate Tailwind config package).
 
 Notable runtime deps: `@base-ui/react` (primitives), `class-variance-authority` (variants), `tailwind-merge` + `clsx` (class composition), `lucide-react` (icons), `recharts` (chart), `embla-carousel-react`, `react-hook-form`, `react-day-picker`, `cmdk`, `vaul`, `sonner`, `next-themes`.
 

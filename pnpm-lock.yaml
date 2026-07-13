@@ -292,12 +292,6 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
-  packages/tailwind:
-    dependencies:
-      tailwindcss:
-        specifier: '>=4'
-        version: 4.0.12
-
   packages/test:
     dependencies:
       '@testing-library/react':
@@ -418,9 +412,6 @@ importers:
       '@types/react-dom':
         specifier: 19.2.3
         version: 19.2.3(@types/react@19.2.14)
-      '@zeno-lib/tailwind':
-        specifier: workspace:*
-        version: link:../tailwind
       '@zeno-lib/typescript':
         specifier: workspace:^
         version: link:../typescript

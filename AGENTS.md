@@ -8,7 +8,7 @@ Zeno is a Turborepo monorepo containing shared packages and applications for bui
 
 This file is the **root of an [Intent Layer](https://intent-systems.com/blog/intent-layer)**: a hierarchy of small `AGENTS.md` files placed at semantic boundaries so agents load high-signal local context (purpose, contracts, anti-patterns, sharp edges) before touching code. This file holds workspace-wide conventions and inherits *down* into every package; per-package nodes hold their own invariants and inherit conventions *up* from here. Don't duplicate facts across nodes: put them at the shallowest node that covers all relevant paths.
 
-Linked entries below have a leaf node: open it before working in that area. Each leaf uses the same six sections (Purpose & Scope, Entry Points & Contracts, Usage Patterns, Anti-patterns, Dependencies & Edges, Pitfalls) so you can pattern-match across the workspace; copy that template when adding a new package with non-trivial invariants. Config-only packages (`typescript/`, `tailwind/`, `test/`) deliberately have no node; their config files are self-documenting and a node would only repeat them.
+Linked entries below have a leaf node: open it before working in that area. Each leaf uses the same six sections (Purpose & Scope, Entry Points & Contracts, Usage Patterns, Anti-patterns, Dependencies & Edges, Pitfalls) so you can pattern-match across the workspace; copy that template when adding a new package with non-trivial invariants. Config-only packages (`typescript/`, `test/`) deliberately have no node; their config files are self-documenting and a node would only repeat them.
 
 - `apps/`
   - [`docs/`](apps/docs/AGENTS.md): Documentation site (Next.js + Fumadocs) on port 5002
@@ -21,7 +21,6 @@ Linked entries below have a leaf node: open it before working in that area. Each
   - [`db/`](packages/db/AGENTS.md): `@zeno-lib/db` Drizzle ORM client + schema + migrations + RLS
   - [`e2e/`](packages/e2e/AGENTS.md): `@zeno-lib/e2e` Playwright suite
   - `typescript/`: shared `tsconfig` presets
-  - `tailwind/`: shared Tailwind globals
   - `test/`: shared Vitest config
 
 ### Keeping the Intent Layer current
