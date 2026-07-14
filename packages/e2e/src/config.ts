@@ -3,8 +3,8 @@ import { devices, type PlaywrightTestConfig } from "@playwright/test"
 /**
  * Shared, app-agnostic Playwright defaults.
  *
- * Spread this into your own config and supply the app-specific `testDir` and
- * `webServer`, which are intentionally omitted here:
+ * Spread this into your own config and add a `webServer` (`webServer` defines how to start your apps).
+ * `testDir` defaults to `./tests`; override it if your specs live elsewhere.
  *
  * ```ts
  * import { defineConfig } from "@playwright/test"
@@ -13,7 +13,9 @@ import { devices, type PlaywrightTestConfig } from "@playwright/test"
  * export default defineConfig({
  *   ...baseConfig,
  *   webServer: {
- *   webServer: { command: "npm run start", url: "http://localhost:3000" },
+ *     command: "pnpm --filter @yourorg/webapp start",
+ *     url: "http://localhost:3000",
+ *   },
  * })
  * ```
  *

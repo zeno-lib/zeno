@@ -4,8 +4,8 @@ export default defineConfig({
   clean: true,
   dts: true,
   entry: {
+    cli: "src/cli.ts",
     config: "src/config.ts",
     "verify-deps": "src/verify-deps.ts",
-    "verify-deps-cli": "src/verify-deps-cli.ts",
   },
 })

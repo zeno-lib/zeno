@@ -1,6 +1,5 @@
-#!/usr/bin/env node
 import { parseArgs, styleText } from "node:util"
-import { verifyAppDeps } from "./verify-deps.ts"
+import { verifyAppDeps } from "../verify-deps.ts"
 
 const DEFAULTS = {
   appsDir: "../../apps",
@@ -8,7 +7,7 @@ const DEFAULTS = {
   testsDir: "./tests",
 }
 
-const USAGE = `Usage: zeno-verify-app-deps [options]
+const USAGE = `Usage: zeno-e2e verify-deps [options]
 
 Check that every app with an e2e test folder is a dependency of the e2e
 package, so a task runner rebuilds it before its tests run.
@@ -20,8 +19,10 @@ Options:
   -h, --help             Show this help
 `
 
-function main(): void {
+/** Run the `zeno-e2e verify-deps` subcommand. `argv` is the args after the command. */
+export function runVerifyDeps(argv: string[]): void {
   const { values } = parseArgs({
+    args: argv,
     options: {
       "apps-dir": { default: DEFAULTS.appsDir, type: "string" },
       help: { short: "h", type: "boolean" },
@@ -78,13 +79,5 @@ function main(): void {
       "Listing them as dependencies lets your task runner rebuild each app before its e2e tests run."
     )
   )
-  process.exit(1)
-}
-
-try {
-  main()
-} catch (error) {
-  const reason = error instanceof Error ? error.message : String(error)
-  console.error(styleText("red", `✗ ${reason}`, { stream: process.stderr }))
   process.exit(1)
 }

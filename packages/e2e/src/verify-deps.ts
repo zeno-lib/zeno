@@ -35,6 +35,11 @@ function readPackageJson(path: string): PackageJson {
   }
 }
 
+/** True if `path` is a directory, treating missing/dangling entries as false. */
+function isDirectory(path: string): boolean {
+  return statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false
+}
+
 /**
  * Verify that every app under `appsDir` with a matching test folder under
  * `testsDir` is listed in the dependencies (or devDependencies) of `packageJsonPath`.
@@ -46,8 +51,8 @@ function readPackageJson(path: string): PackageJson {
  * listed under.
  *
  * Pure: it returns a result and never calls `process.exit`. It throws only when
- * a package.json cannot be read or parsed. See the `zeno-verify-app-deps` bin
- * for the CLI wrapper.
+ * a package.json cannot be read or parsed, or a tested app has no `name`. See
+ * the `zeno-e2e verify-deps` command for the CLI wrapper.
  */
 export function verifyAppDeps(
   options: VerifyAppDepsOptions
@@ -55,22 +60,33 @@ export function verifyAppDeps(
   const { appsDir, testsDir, packageJsonPath } = options
 
   const testDirs = existsSync(testsDir)
-    ? readdirSync(testsDir).filter((name) =>
-        statSync(join(testsDir, name)).isDirectory()
-      )
+    ? readdirSync(testsDir).filter((name) => isDirectory(join(testsDir, name)))
     : []
 
-  // Sorted so the result (and the CLI's output) is stable across platforms.
-  const appsWithTests = (existsSync(appsDir) ? readdirSync(appsDir) : [])
-    .filter(
-      (name) =>
+  // Collected in a Set so duplicate package names count once, then sorted so
+  // the result (and the CLI's output) is stable across platforms.
+  const appDirs = existsSync(appsDir) ? readdirSync(appsDir) : []
+  const appNames = new Set<string>()
+  for (const name of appDirs) {
+    const pkgPath = join(appsDir, name, "package.json")
+    if (
+      !(
         testDirs.includes(name) &&
-        statSync(join(appsDir, name)).isDirectory() &&
-        existsSync(join(appsDir, name, "package.json"))
-    )
-    .map((name) => readPackageJson(join(appsDir, name, "package.json")).name)
-    .filter((name): name is string => typeof name === "string")
-    .sort()
+        isDirectory(join(appsDir, name)) &&
+        existsSync(pkgPath)
+      )
+    ) {
+      continue
+    }
+    const pkgName = readPackageJson(pkgPath).name
+    if (typeof pkgName !== "string") {
+      throw new Error(
+        `${pkgPath} has no "name" field, so the app cannot be listed as a dependency`
+      )
+    }
+    appNames.add(pkgName)
+  }
+  const appsWithTests = [...appNames].sort()
 
   const pkg = readPackageJson(packageJsonPath)
   const deps = new Set([

@@ -7,9 +7,37 @@ status: in progress
 
 Unlike unit tests, end-to-end tests don't live inside each app. They run with [Playwright](https://playwright.dev) from a single `packages/e2e` workspace that tests every app in your monorepo. `@zeno-lib/e2e` provides a shared config preset and testing utilities.
 
-## How it fits together
+## Setup
 
-Install `@zeno-lib/e2e` alongside its `@playwright/test` peer dependency, then download the browser binaries:
+The examples below use two placeholders: `@yourorg` for your monorepo's npm scope, and `webapp` for one of the apps you test. Swap in your own names.
+
+### 1. Create the e2e package
+
+```
+packages/e2e/
+├── playwright.config.ts     # extends @zeno-lib/e2e's baseConfig
+├── package.json             # depends on @zeno-lib/e2e and each tested app
+└── tests/
+    └── webapp/                # tests for apps/webapp
+        └── home.spec.ts
+```
+
+Create the `package.json`:
+
+```json title="packages/e2e/package.json"
+{
+  "name": "@yourorg/e2e",
+  "type": "module",
+  "scripts": {
+    "e2e": "playwright test",
+    "e2e:watch": "playwright test --ui"
+  }
+}
+```
+
+### 2. Install Playwright and the preset
+
+From inside `packages/e2e`, add `@zeno-lib/e2e` with its `@playwright/test` peer dependency, then download the browsers:
 
 ```npm
 npm install --save-dev @zeno-lib/e2e @playwright/test
@@ -19,66 +47,119 @@ npm install --save-dev @zeno-lib/e2e @playwright/test
 npx playwright install --with-deps
 ```
 
-## Config preset
+### 3. List the apps you test
 
-`@zeno-lib/e2e/config` exports `baseConfig`, a plain Playwright config object with the shared defaults. Spread it into `defineConfig` and add the app-specific `testDir` and `webServer`, which it deliberately omits:
+Add every app you write tests for as a workspace dependency:
 
-```typescript title="playwright.config.ts"
+```json title="packages/e2e/package.json"
+{
+  "devDependencies": {
+    "@yourorg/webapp": "workspace:*"
+  }
+}
+```
+
+### 4. Configure Playwright
+
+Spread `baseConfig` and add a `webServer` entry per app:
+
+```typescript title="packages/e2e/playwright.config.ts"
 import { defineConfig } from "@playwright/test"
 import { baseConfig } from "@zeno-lib/e2e/config"
 
 export default defineConfig({
   ...baseConfig,
-  testDir: "./tests",
-  webServer: {
-    command: "npm run start -- -p 3000",
-    url: "http://localhost:3000",
-  },
+  webServer: [
+    {
+      // Command that starts the app you want to test
+      command: "pnpm --filter @yourorg/webapp start -- --port 5002",
+      url: "http://localhost:5002",
+      reuseExistingServer: !process.env.CI,
+    },
+  ],
 })
 ```
 
-`baseConfig` sets:
+Each `webServer` entry starts one app and waits for its `url`. Add one entry per app you test, each on the port that app serves.
+
+### 5. Configure Turborepo
+
+Add a `verify-deps` script, then make the `e2e` task build the tested apps and run that check before the tests:
+
+```json title="packages/e2e/package.json"
+{
+  "scripts": {
+    "verify-deps": "zeno-e2e verify-deps"
+  }
+}
+```
+
+```json title="turbo.json"
+{
+  "tasks": {
+    "e2e": {
+      "dependsOn": ["^build", "@yourorg/e2e#verify-deps"]
+    },
+    "verify-deps": {
+      "cache": false
+    }
+  }
+}
+```
+
+`^build` builds every dependency, and [`verify-deps`](#keeping-app-dependencies-in-sync) fails if one is missing. Now `turbo run e2e` builds the apps, verifies the wiring, and runs the tests.
+
+## The config preset
+
+`@zeno-lib/e2e/config` exports `baseConfig`, a plain Playwright config object you spread and override. It sets:
 
 | Field | Locally | In CI |
 |---|---|---|
+| `testDir` | `./tests` | `./tests` |
 | `projects` | one `chromium` project (`Desktop Chrome`) | same |
 | `fullyParallel` | `true` | `true` |
-| `forbidOnly` | off | **on**: a stray `test.only` fails the build |
+| `forbidOnly` | off | **on** (a stray `test.only` fails the build) |
 | `retries` | `0` | `3` |
 | `timeout` | 120s | 30s |
 | `reporter` | `list` | `html` |
 | `use.trace` | `on-first-retry` | `on-first-retry` |
 
-## Dependency verifier
+It intentionally leaves `webServer` unset, because only you know how to start your apps. Everything else you need (`defineConfig`, `devices`, `test`, `expect`) comes straight from `@playwright/test`.
 
-In a monorepo, e2e tests should run against freshly built apps. `@zeno-lib/e2e/verify-deps` checks that every app with a matching test folder is listed as a dependency of the e2e package, so that a task runner like Turborepo rebuilds it (via `^build`) before the tests run.
+## Writing tests
 
-Run the `zeno-verify-app-deps` CLI before your e2e task. If a tested app is missing from the package's dependencies, it exits and prints the required dependencies.
+Put test files under `tests/<app>/`, where `<app>` matches the app's folder under `apps/`. Import `test` and `expect` from `@playwright/test`:
 
-```bash
-zeno-verify-app-deps --apps-dir ../../apps --tests-dir ./tests
-```
+```typescript title="packages/e2e/tests/webapp/home.spec.ts"
+import { expect, test } from "@playwright/test"
 
-| Flag | Option | Default | What it does |
-|---|---|---|---|
-| `--apps-dir` | `appsDir` | `../../apps` | Directory that contains the apps |
-| `--tests-dir` | `testsDir` | `./tests` | Directory with one folder per tested app |
-| `--package-json` | `packageJsonPath` | `./package.json` | package.json whose deps must list the apps |
-
-The same check is available as `verifyAppDeps(options)`, which returns `{ ok, checked, missing }` instead of exiting:
-
-```typescript title="scripts/check-e2e-deps.ts"
-import { verifyAppDeps } from "@zeno-lib/e2e/verify-deps"
-
-const { ok, missing } = verifyAppDeps({
-  appsDir: "../../apps",
-  testsDir: "./tests",
-  packageJsonPath: "./package.json",
+test("home page loads", async ({ page }) => {
+  const response = await page.goto("http://localhost:5002")
+  expect(response?.status()).toBe(200)
 })
 ```
 
+Run them with `pnpm e2e` inside the package, or `turbo run e2e` from the root to build the apps first.
+
+## Keeping app dependencies in sync
+
+Every app with a `tests/<app>/` folder must be a dependency of the e2e package. Otherwise Turborepo has no reason to rebuild it, and the tests run against a stale build. `zeno-e2e verify-deps` (installed with `@zeno-lib/e2e`) enforces this.
+
+See [step 5](#5-configure-turborepo) of Setup to wire it automatically. It also works on its own:
+
+```bash
+zeno-e2e verify-deps
+```
+
+It matches each `tests/<app>/` folder to `apps/<app>`, and if an app is missing from the e2e package's dependencies it prints the `devDependencies` to add and exits. It can accept different configurations:
+
+| Flag | Default | What it does |
+|---|---|---|
+| `--apps-dir` | `../../apps` | Directory that contains the apps |
+| `--tests-dir` | `./tests` | Directory with one folder per tested app |
+| `--package-json` | `./package.json` | package.json whose deps must list the apps |
+
 ## Common mistakes
 
-- **Skipping `npx playwright install`.** The npm install brings the test runner but not the browsers, so every run fails at launch with "Executable doesn't exist".
-- **Treating a local pass as a CI pass.** In CI `baseConfig` turns on `forbidOnly` (a leftover `test.only` fails the build) and drops the timeout from 120s to 30s, so a slow test can pass locally and time out in CI.
-- **Not listing a tested app in the e2e package's deps.** The task runner has no edge to rebuild it, so tests run against a stale build. The verifier catches exactly this.
+- **Skipping `npx playwright install`.** `npm install` brings the test runner but not the browsers, so every run fails at launch with "Executable doesn't exist".
+- **Forgetting to list a tested app as a dependency.** Turborepo then has no edge to rebuild it, and tests hit a stale build. `zeno-e2e verify-deps` catches this.

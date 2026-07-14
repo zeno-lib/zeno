@@ -15,7 +15,7 @@
     }
   },
   "bin": {
-    "zeno-verify-app-deps": "./dist/verify-deps-cli.mjs"
+    "zeno-e2e": "./dist/cli.mjs"
   },
   "files": [
     "dist",
@@ -32,8 +32,9 @@
     "build": "tsdown",
     "e2e": "playwright test",
     "e2e:watch": "playwright test --ui",
+    "prepack": "tsdown",
     "types:check": "tsc --noEmit",
-    "verify-deps": "node ./dist/verify-deps-cli.mjs"
+    "verify-deps": "node ./dist/cli.mjs verify-deps"
   },
   "peerDependencies": {
     "@playwright/test": ">=1"

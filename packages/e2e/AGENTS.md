@@ -6,12 +6,12 @@ Playwright end-to-end tooling for the workspace, published as a reusable package
 
 Two published pieces, plus this repo's per-app specs that consume them:
 
-- `@zeno-lib/e2e/config`: a `baseConfig` Playwright preset (browsers, reporter, retries, timeout, trace) with no `webServer`/`testDir`.
-- `@zeno-lib/e2e/verify-deps`: `verifyAppDeps()` and the `zeno-verify-app-deps` bin, a parameterized checker that keeps a Turborepo `^build` graph honest.
+- `@zeno-lib/e2e/config`: a `baseConfig` Playwright preset (browsers, reporter, retries, timeout, trace, and a `testDir` default of `./tests`) with no `webServer`.
+- `@zeno-lib/e2e/verify-deps`: `verifyAppDeps()` and the `zeno-e2e verify-deps` command, a parameterized checker that keeps a Turborepo `^build` graph honest.
 
 **Owns:** the shared Playwright defaults, the dependency-verification tool, this repo's specs.
 
-**Does NOT own:** unit tests (Vitest, alongside source), staging/prod smoke tests, test data seeding, and the app-specific `webServer`/`testDir` (the consumer supplies those).
+**Does NOT own:** unit tests (Vitest, alongside source), staging/prod smoke tests, test data seeding, and the app-specific `webServer` (the consumer supplies that).
 
 ## Entry Points & Contracts
 
@@ -22,7 +22,8 @@ packages/e2e/
 ├── src/
 │   ├── config.ts                    # published: @zeno-lib/e2e/config
 │   ├── verify-deps.ts               # published: @zeno-lib/e2e/verify-deps
-│   └── verify-deps-cli.ts           # published: zeno-verify-app-deps bin
+│   ├── cli.ts                       # published: zeno-e2e bin (dispatcher)
+│   └── commands/verify-deps.ts      # zeno-e2e verify-deps subcommand
 ├── dist/                            # tsdown output (published)
 ├── tsdown.config.ts
 ├── playwright.config.ts             # repo-only: consumes @zeno-lib/e2e/config
@@ -35,13 +36,13 @@ Published surface:
 |---|---|
 | `@zeno-lib/e2e/config` | `baseConfig` Playwright preset (import `defineConfig`/`devices` directly from `@playwright/test`) |
 | `@zeno-lib/e2e/verify-deps` | `verifyAppDeps({ appsDir, testsDir, packageJsonPath }) -> { ok, checked, missing }` |
-| `zeno-verify-app-deps` (bin) | CLI wrapper: `--apps-dir` (default `../../apps`), `--tests-dir` (default `./tests`), `--package-json` (default `./package.json`) |
+| `zeno-e2e` (bin) | CLI dispatcher; `zeno-e2e verify-deps` runs the checker (`--apps-dir` default `../../apps`, `--tests-dir` default `./tests`, `--package-json` default `./package.json`) |
 
-`baseConfig` omits `webServer` and `testDir` on purpose. Consumers spread it and add their own. It reads `process.env.CI` at run time for `forbidOnly`/`retries`/`timeout`/`reporter`.
+`baseConfig` omits `webServer` on purpose (only the consumer knows how to start their apps) but defaults `testDir` to `./tests`. Consumers spread it, add a `webServer`, and override `testDir` only if their specs live elsewhere. It reads `process.env.CI` at run time for `forbidOnly`/`retries`/`timeout`/`reporter`.
 
 `verifyAppDeps` checks the union of `dependencies` and `devDependencies`, so an app can be listed under either field.
 
-Scripts (`package.json`): `build` (tsdown), `types:check` (`tsc --noEmit`), `e2e` (`playwright test`), `e2e:watch` (`playwright test --ui`), `verify-deps` (runs the built `verify-deps-cli.mjs` directly, since pnpm does not link this leaf package's own bin; external consumers invoke it as the `zeno-verify-app-deps` bin).
+Scripts (`package.json`): `build` (tsdown), `types:check` (`tsc --noEmit`), `e2e` (`playwright test`), `e2e:watch` (`playwright test --ui`), `prepack` (`tsdown`, builds `dist/` at publish), `verify-deps` (runs `node ./dist/cli.mjs verify-deps` directly, since pnpm does not link this leaf package's own bin; external consumers invoke it as `zeno-e2e verify-deps`).
 
 Turbo wiring: `build` produces `dist/` before `verify-deps` and `e2e` (both depend on `build`), and `e2e` also depends on `^build` so the tested apps are built first.
 
@@ -64,8 +65,7 @@ import { baseConfig } from "@zeno-lib/e2e/config"
 
 export default defineConfig({
   ...baseConfig,
-  testDir: "./tests",
-  webServer: { command: "npm run start", url: "http://localhost:3000" },
+  webServer: { command: "pnpm --filter @yourorg/webapp start", url: "http://localhost:3000" },
 })
 ```
 
@@ -84,7 +84,7 @@ test("description", async ({ page }) => {
 
 ## Anti-patterns
 
-- **Don't add `webServer`/`testDir` to `baseConfig`.** Those are app-specific and belong in the consumer's config; the preset stays reusable only if it omits them.
+- **Don't bake a `webServer` into `baseConfig`.** It is app-specific and belongs in the consumer's config. (`testDir` defaults to `./tests` but stays overridable.)
 - **Don't add a spec under `tests/<dir>/` whose `<dir>` doesn't match an actual app directory name.** `verifyAppDeps` only matches folders that have a sibling `apps/<dir>` with a `package.json`.
 - **Don't hardcode `localhost:3000`.** The docs app runs on `5002`; new apps should pick non-default ports too.
 - **Don't disable `forbidOnly`.** `baseConfig` enables it only in CI; flipping that ships a stray `test.only` green.
@@ -94,7 +94,8 @@ test("description", async ({ page }) => {
 
 - **Peer:** `@playwright/test` (`>=1`). Consumers install it; the repo also keeps it as a devDependency for its own tests and for dts generation.
 - **Apps under test** are listed in `devDependencies` (workspace protocol). `verifyAppDeps` enforces this and prints the exact JSON snippet to add when one is missing.
-- **Build:** `tsdown` bundles `src/` to `dist/`; `@playwright/test` is marked `external` so it stays a bare specifier in the output.
+- **Build:** `tsdown` bundles `src/` to `dist/`; `@playwright/test` (a peer dependency) is left external automatically, so it stays a bare specifier in the output.
+- **Publish:** `dist/` is gitignored and built at publish time by the `prepack` script, so it is never committed. This differs from `@zeno-lib/test`/`@zeno-lib/supabase`, whose committed `dist/` is kept in sync by `bundle-packages.yml`; e2e opts out because nothing imports it during `pnpm dev` (its `dist/` is only needed to publish, and the repo's own e2e run builds it via Turbo).
 - After `pnpm install`, run `pnpm exec playwright install --with-deps` once in this package to download browser binaries.
 
 ## Pitfalls
