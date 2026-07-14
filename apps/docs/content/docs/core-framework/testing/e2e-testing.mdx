@@ -1,13 +1,13 @@
 ---
 title: E2E Testing
-description: Shared Playwright config preset and e2e utilities
+description: Shared Playwright presets and utilities
 icon: MonitorCheck
 status: in progress
 ---
 
-`@zeno-lib/e2e` provides a shared [Playwright](https://playwright.dev) config preset and e2e testing utilities. Import the Playwright runtime (`defineConfig`, `devices`, `test`, `expect`) directly from `@playwright/test`.
+Unlike unit tests, end-to-end tests don't live inside each app. They run with [Playwright](https://playwright.dev) from a single `packages/e2e` workspace that tests every app in your monorepo. `@zeno-lib/e2e` provides a shared config preset and testing utilities.
 
-## Installation
+## How it fits together
 
 Install `@zeno-lib/e2e` alongside its `@playwright/test` peer dependency, then download the browser binaries:
 

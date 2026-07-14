@@ -12,7 +12,7 @@ import { devices, type PlaywrightTestConfig } from "@playwright/test"
  *
  * export default defineConfig({
  *   ...baseConfig,
- *   testDir: "./tests",
+ *   webServer: {
  *   webServer: { command: "npm run start", url: "http://localhost:3000" },
  * })
  * ```
@@ -26,6 +26,7 @@ export const baseConfig: PlaywrightTestConfig = {
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   reporter: process.env.CI ? "html" : "list",
   retries: process.env.CI ? 3 : 0,
+  testDir: "./tests",
   timeout: process.env.CI ? 30_000 : 120_000,
   use: { trace: "on-first-retry" },
 }
