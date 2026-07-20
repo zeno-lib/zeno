@@ -1,0 +1,38 @@
+{
+  "name": "@zeno-lib/web",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 5003",
+    "build": "next build",
+    "start": "next start",
+    "types:check": "next typegen && tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@zeno-lib/db": "workspace:*",
+    "@zeno-lib/schema": "workspace:*",
+    "@zeno-lib/supabase": "workspace:*",
+    "@zeno-lib/ui": "workspace:*",
+    "drizzle-orm": "1.0.0-rc.3",
+    "next": "16.2.8",
+    "postgres": "^3.4.5",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.4",
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@zeno-lib/typescript": "workspace:^",
+    "dotenv": "^16.4.7",
+    "drizzle-kit": "1.0.0-rc.3",
+    "postcss": "^8.5.14",
+    "tailwindcss": "^4.2.4",
+    "typescript": "^6.0.3"
+  }
+}
