@@ -40,7 +40,7 @@ jobs:
     - name: Install Playwright Browsers
       run: pnpm --filter @zeno-lib/e2e exec playwright install --with-deps chromium
     - name: Setup Supabase CLI
-      uses: supabase/setup-cli@v2
+      uses: supabase/setup-cli@v3
       with:
         version: 2.84.1
     - name: Start Supabase
