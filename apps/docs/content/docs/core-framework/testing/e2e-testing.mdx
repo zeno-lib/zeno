@@ -5,7 +5,7 @@ icon: MonitorCheck
 status: in progress
 ---
 
-Unlike unit tests, end-to-end tests don't live inside each app. They run with [Playwright](https://playwright.dev) from a single `packages/e2e` workspace that tests every app in your monorepo. `@zeno-lib/e2e` provides a shared config preset and testing utilities.
+In Zeno, [E2E tests](https://circleci.com/blog/what-is-end-to-end-testing/) live in a single package at `packages/e2e`. They're centralised because e2e tests often span several apps at once, so the setup in `packages/e2e/playwright.config.ts` waits for every app to be running and ready before the suite starts.
 
 ## Setup
 
