@@ -1,7 +1,7 @@
 "use client"
 
-import { Button } from "@zeno-lib/ui/button"
 import Link from "next/link"
+import { Button } from "@/components/ui/button"
 
 import { Container } from "../components/container"
 import { useAuthForm } from "../components/context"

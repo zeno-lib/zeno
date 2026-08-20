@@ -1,10 +1,10 @@
 "use client"
 
-import { Button } from "@zeno-lib/ui/button"
-import { Dialog, DialogContent, DialogTrigger } from "@zeno-lib/ui/dialog"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 import { Container } from "../components/container"
 import { useAuthForm } from "../components/context"
 import { EmailInput, PasswordInput } from "../components/inputs"

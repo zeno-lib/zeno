@@ -5,4 +5,15 @@ icon: Play
 status: todo
 ---
 
-Motions documentation coming soon.
+Zeno's primitives animate with [`tw-animate-css`](https://github.com/Wombosvideo/tw-animate-css),
+which is installed and imported when you add the theme (see
+[Installation](/docs/core-framework/building-ui/installation)):
+
+```css title="src/app/globals.css"
+@import "tw-animate-css";
+```
+
+The shadcn primitives (accordion, dialog, dropdown, etc.) use its utility classes for their
+enter/exit transitions, and respect `prefers-reduced-motion`.
+
+More motion documentation coming soon.

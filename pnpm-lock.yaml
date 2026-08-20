@@ -17,6 +17,9 @@ importers:
       '@changesets/cli':
         specifier: ^2.31.0
         version: 2.31.0(@types/node@25.6.0)
+      tsx:
+        specifier: ^4.20.6
+        version: 4.20.6
       turbo:
         specifier: 2.9.14
         version: 2.9.14
@@ -105,9 +108,6 @@ importers:
       '@zeno-lib/supabase':
         specifier: workspace:^
         version: link:../supabase
-      '@zeno-lib/ui':
-        specifier: workspace:^
-        version: link:../ui
       next:
         specifier: '>=16'
         version: 16.2.4(@babel/core@7.29.0)(@playwright/test@1.60.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -133,6 +133,12 @@ importers:
       '@zeno-lib/typescript':
         specifier: workspace:^
         version: link:../typescript
+      '@zeno-lib/ui':
+        specifier: workspace:^
+        version: link:../ui
+      sonner:
+        specifier: ^2.0.7
+        version: 2.0.7(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
 
   packages/db:
     devDependencies:
@@ -205,9 +211,6 @@ importers:
       '@tanstack/react-form-nextjs':
         specifier: 1.33.0
         version: 1.33.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@zeno-lib/ui':
-        specifier: workspace:^
-        version: link:../ui
       next:
         specifier: '>=16'
         version: 16.2.4(@babel/core@7.29.0)(@playwright/test@1.60.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -233,6 +236,9 @@ importers:
       '@zeno-lib/typescript':
         specifier: workspace:^
         version: link:../typescript
+      '@zeno-lib/ui':
+        specifier: workspace:^
+        version: link:../ui
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -287,12 +293,6 @@ importers:
       typescript:
         specifier: 6.0.3
         version: 6.0.3
-
-  packages/tailwind:
-    dependencies:
-      tailwindcss:
-        specifier: '>=4'
-        version: 4.0.12
 
   packages/test:
     dependencies:
@@ -414,9 +414,6 @@ importers:
       '@types/react-dom':
         specifier: 19.2.3
         version: 19.2.3(@types/react@19.2.14)
-      '@zeno-lib/tailwind':
-        specifier: workspace:*
-        version: link:../tailwind
       '@zeno-lib/typescript':
         specifier: workspace:^
         version: link:../typescript
@@ -11330,7 +11327,6 @@ snapshots:
       get-tsconfig: 4.14.2
     optionalDependencies:
       fsevents: 2.3.3
-    optional: true
 
   turbo@2.9.14:
     optionalDependencies:

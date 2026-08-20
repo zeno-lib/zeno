@@ -15,6 +15,7 @@
     "lint:fix": "ultracite fix",
     "prerelease:beta:enter": "changeset pre enter beta",
     "prerelease:beta:exit": "changeset pre exit",
+    "registry:build": "tsx scripts/build-registry.ts",
     "release": "changeset publish",
     "release:status": "changeset status --verbose",
     "test": "NODE_ENV=test && turbo run test",
@@ -25,6 +26,7 @@
     "@biomejs/biome": "2.4.14",
     "@changesets/changelog-git": "^0.2.1",
     "@changesets/cli": "^2.31.0",
+    "tsx": "^4.20.6",
     "turbo": "2.9.14",
     "typescript": "6.0.3",
     "ultracite": "7.8.1"

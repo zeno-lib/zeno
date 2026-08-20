@@ -2,10 +2,8 @@ import { cleanup, render, screen } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
-import { Form, FormProvider } from "./form"
-import { useForm } from "./use-form"
+import { Form, FormProvider, useForm } from "./create-form"
 
-const EMAIL_LABEL = /Email/
 const CONTACT_EMAIL_LABEL = /Contact email/
 const PASSWORD_LABEL = /Password/
 const NAME_LABEL = /Name/
@@ -15,27 +13,7 @@ afterEach(() => {
   cleanup()
 })
 
-describe("EmailField / PasswordField — default name", () => {
-  test("EmailField with no `name` renders an input with id='email'", () => {
-    const schema = z.object({ email: z.email() })
-    function H() {
-      const form = useForm({ onSubmit: vi.fn(), schema })
-      const { EmailField } = form
-      return (
-        <FormProvider form={form}>
-          <Form>
-            <EmailField label="Email" />
-          </Form>
-        </FormProvider>
-      )
-    }
-    render(<H />)
-    const input = screen.getByLabelText(EMAIL_LABEL) as HTMLInputElement
-    expect(input.id).toBe("email")
-    expect(input.name).toBe("email")
-    expect(input.type).toBe("email")
-  })
-
+describe("EmailField / PasswordField", () => {
   test("EmailField with an explicit `name` binds to that field", async () => {
     const user = userEvent.setup()
     const schema = z.object({ contactEmail: z.email() })
@@ -58,19 +36,18 @@ describe("EmailField / PasswordField — default name", () => {
     expect(input.value).toBe("u@example.com")
   })
 
-  test("PasswordField with no `name` renders an input with id='password'", () => {
+  test("PasswordField with an explicit `name` renders a password input", () => {
     const schema = z.object({
       email: z.email(),
       password: z.string().min(1),
     })
     function H() {
       const form = useForm({ onSubmit: vi.fn(), schema })
-      const { EmailField, PasswordField } = form
+      const { PasswordField } = form
       return (
         <FormProvider form={form}>
           <Form>
-            <EmailField />
-            <PasswordField label="Password" />
+            <PasswordField label="Password" name="password" />
           </Form>
         </FormProvider>
       )

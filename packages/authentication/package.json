@@ -5,11 +5,10 @@
     "types:check": "tsc --noEmit"
   },
   "exports": {
-    "./*": "./src/*.tsx",
     "./confirm/*": "./src/confirm/*.ts"
   },
   "files": [
-    "src"
+    "src/confirm"
   ],
   "publishConfig": {
     "access": "public"
@@ -26,13 +25,14 @@
     "react-hook-form": ">=7"
   },
   "dependencies": {
-    "@zeno-lib/supabase": "workspace:^",
-    "@zeno-lib/ui": "workspace:^"
+    "@zeno-lib/supabase": "workspace:^"
   },
   "devDependencies": {
     "@zeno-lib/typescript": "workspace:^",
+    "@zeno-lib/ui": "workspace:^",
     "@types/node": "24.12.2",
     "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3"
+    "@types/react-dom": "19.2.3",
+    "sonner": "^2.0.7"
   }
 }

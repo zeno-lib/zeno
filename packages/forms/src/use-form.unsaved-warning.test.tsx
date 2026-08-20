@@ -2,8 +2,7 @@ import { act, cleanup, render, screen } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
-import { Form, FormProvider } from "./form"
-import { useForm } from "./use-form"
+import { Form, FormProvider, useForm } from "./create-form"
 
 const NAME_LABEL = /Name/
 

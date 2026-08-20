@@ -1,10 +1,9 @@
 "use client"
 
-import { Button } from "@zeno-lib/ui/button"
-import { Spinner } from "@zeno-lib/ui/spinner"
+import { useFormContext } from "@zeno-lib/forms/lib/contexts"
 import type { ComponentProps } from "react"
-
-import { useFormContext } from "../lib/contexts"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 
 type SubmitButtonProps = Omit<ComponentProps<typeof Button>, "type">
 

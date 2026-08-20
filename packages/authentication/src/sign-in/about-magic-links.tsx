@@ -1,4 +1,4 @@
-import { DialogTitle } from "@zeno-lib/ui/dialog"
+import { DialogTitle } from "@/components/ui/dialog"
 
 export const AboutMagicLinks = () => (
   <>

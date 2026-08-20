@@ -14,6 +14,7 @@
     "user-management/authentication",
     "user-management/authorization",
     "---UI & Experience---",
+    "building-ui/installation",
     "building-ui/components",
     "building-ui/theming",
     "building-ui/animations",

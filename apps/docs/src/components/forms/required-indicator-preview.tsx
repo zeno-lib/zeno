@@ -1,6 +1,6 @@
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import {
   Card,
   CardContent,
@@ -43,8 +43,8 @@ export function RequiredIndicatorExample() {
         <CardContent>
           <Form>
             <FieldGroup>
-              <EmailField placeholder="you@zeno.dev" />
-              <PasswordField />
+              <EmailField name="email" placeholder="you@zeno.dev" />
+              <PasswordField name="password" />
               <SelectField label="Role" name="role" placeholder="Pick a role">
                 <SelectItem value="member">Member</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>

@@ -1,8 +1,81 @@
 ---
 title: Authentication
-description: Setting up authentication and providers
+description: Drop-in Supabase auth flows via the registry, plus the server-side confirm handler
 icon: Lock
-status: todo
+status: in progress
 ---
 
-Authentication guide coming soon.
+Zeno ships the standard Supabase auth flows: magic-link + password sign-in, sign-up, email
+verification, password recovery/reset, and sign-out. The **UI flows** are shadcn-style components
+you install from the registry and own; the **server-side OTP confirm handler** is headless and
+ships on npm as `@zeno-lib/authentication`.
+
+## Install
+
+Add the flows you need from the registry; each drops into `@/components/auth/*` and pulls the
+shadcn primitives it uses automatically:
+
+```npm
+pnpm dlx shadcn@latest add zeno-lib/zeno/sign-in zeno-lib/zeno/auth-layout
+```
+
+Other flows: `sign-up`, `email-sent`, `verify`, `error`, `recover-password`, `reset-password`,
+`sign-out`. Then install the server handler and the Supabase client:
+
+```npm
+pnpm add @zeno-lib/authentication @zeno-lib/supabase
+```
+
+## Wire the provider
+
+Mount `AuthProvider` once near the auth route group and pass it a Supabase client. It owns the form
+state and the per-flow submit handlers:
+
+```tsx title="app/(auth)/layout.tsx"
+"use client"
+
+import { AuthProvider } from "@/components/auth/components/context"
+import { createClient } from "@zeno-lib/supabase/next-client"
+
+export default function AuthLayout({ children }: { children: React.ReactNode }) {
+  return <AuthProvider supabase={createClient()}>{children}</AuthProvider>
+}
+```
+
+Render each flow on its route:
+
+```tsx title="app/(auth)/sign-in/page.tsx"
+import { SignIn } from "@/components/auth/sign-in"
+
+export default function Page() {
+  return <SignIn />
+}
+```
+
+<Callout type="info">
+  Errors surface through `toast` from [`sonner`](https://ui.shadcn.com/docs/components/sonner), so
+  mount `<Toaster />` (add it with `pnpm dlx shadcn@latest add sonner`) in your root layout.
+</Callout>
+
+## The confirm route (server)
+
+Magic links and OTPs are verified **on the server**, never in a client component. Wire the handler
+from the npm package at `/confirm`:
+
+```ts title="app/confirm/route.ts"
+export { getRoute as GET } from "@zeno-lib/authentication/confirm/index"
+```
+
+## Route contract
+
+The flows navigate by convention, so mount these paths (or wire your own equivalents):
+
+- After a magic link is sent → `/email-sent`
+- Verification link → `/confirm?token_hash=…&type=…`
+- Middleware (`@zeno-lib/supabase/next-middleware`) redirects unauthenticated users to `/sign-in`
+
+<Callout type="warn">
+  **Don't auto-redirect from the verify screen.** The manual button click is a security measure:
+  email link-scanners (e.g. Microsoft Safe Links) prefetch URLs and would consume a one-time OTP
+  before the user clicks. Verification must stay behind the click.
+</Callout>

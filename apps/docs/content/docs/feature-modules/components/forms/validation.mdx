@@ -15,16 +15,16 @@ import { ReValidateExample } from "@/components/forms/revalidate-preview"
 `useForm` has two validation paths, selected by what you pass to
 `validators`:
 
-- **Schema path** — pass `schema` (any [Standard Schema](https://standardschema.dev/):
+- **Schema path**: pass `schema` (any [Standard Schema](https://standardschema.dev/):
   Zod, Valibot, ArkType, …). `validators` is then an optional
   `ValidationMode` string controlling *when* the schema fires:
   `'blur-then-change'` (default), `'change'`, `'blur'`, or `'submit'`.
-- **Manual path** — omit `schema` and pass `validators` as TanStack Form's
+- **Manual path**: omit `schema` and pass `validators` as TanStack Form's
   native per-cause object (`{ onChange, onBlur, onSubmit, … }`). Use this
   when you need split sync/async slots, debounce knobs, or any mix the
   schema modes don't cover.
 
-The two are mutually exclusive at the type level — `useForm({ schema, validators: { onChange } })`
+The two are mutually exclusive at the type level: `useForm({ schema, validators: { onChange } })`
 is a TS error.
 
 ```tsx
@@ -67,7 +67,7 @@ as the user corrects:
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
@@ -87,8 +87,8 @@ export function SignIn() {
     <FormProvider form={form}>
       <Form>
         <FieldGroup>
-          <EmailField placeholder="you@zeno.dev" />
-          <PasswordField />
+          <EmailField name="email" placeholder="you@zeno.dev" />
+          <PasswordField name="password" />
         </FieldGroup>
         <ResetButton />
         <SubmitButton>Sign in</SubmitButton>
@@ -113,7 +113,7 @@ soon as the field is dirty.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
@@ -137,7 +137,7 @@ export function ChangePassword() {
     <FormProvider form={form}>
       <Form>
         <FieldGroup>
-          <PasswordField autoComplete="new-password" label="New password" />
+          <PasswordField autoComplete="new-password" label="New password" name="password" />
         </FieldGroup>
         <ResetButton />
         <SubmitButton>Save</SubmitButton>
@@ -161,7 +161,7 @@ schema from `useForm` and validate manually inside `listeners.onChange`:
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
@@ -243,7 +243,7 @@ even though the form is in the default `'blur-then-change'` mode.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
@@ -280,7 +280,7 @@ export function CreateWorkspace() {
             name="name"
             placeholder="Resolve"
           />
-          <EmailField placeholder="you@zeno.dev" />
+          <EmailField name="email" placeholder="you@zeno.dev" />
           <InputField
             description={`Try "admin" or "api" to see the per-field check.`}
             label="Slug"
@@ -321,7 +321,7 @@ boolean `required` prop.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { SelectItem } from "@zeno-lib/ui/select"
 import { z } from "zod"
@@ -345,8 +345,8 @@ export function SignUp() {
     <FormProvider form={form}>
       <Form>
         <FieldGroup>
-          <EmailField placeholder="you@zeno.dev" />
-          <PasswordField />
+          <EmailField name="email" placeholder="you@zeno.dev" />
+          <PasswordField name="password" />
           <SelectField label="Role" name="role" placeholder="Pick a role">
             <SelectItem value="member">Member</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
@@ -391,7 +391,7 @@ yourself.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
@@ -413,8 +413,8 @@ export function SignInWithSummary() {
     <FormProvider form={form}>
       <Form>
         <FieldGroup>
-          <EmailField placeholder="you@zeno.dev" />
-          <PasswordField />
+          <EmailField name="email" placeholder="you@zeno.dev" />
+          <PasswordField name="password" />
         </FieldGroup>
 
         <Subscribe
@@ -478,7 +478,7 @@ the native object when you need finer control:
 - **`validators`**: the original per-cause object (`{ onMount, onChange,
   onBlur, onSubmit, onChangeAsync, … }`). Useful for split sync/async
   slots, debounce knobs, or per-cause schemas. A schema variable can
-  still be used inside any slot (`onChange: schema`) — what TS forbids
+  still be used inside any slot (`onChange: schema`); what TS forbids
   is the `schema` *prop* coexisting with the object form.
 - **`validationLogic`**: only accepted in the manual path. The function
   that decides which validator runs for each event.

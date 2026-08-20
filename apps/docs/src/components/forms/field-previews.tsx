@@ -1,7 +1,11 @@
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
-import { RadioGroupFieldItem } from "@zeno-lib/forms/fields"
+import {
+  Form,
+  FormProvider,
+  RadioGroupFieldItem,
+  useForm,
+} from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { SelectItem } from "@zeno-lib/ui/select"
 import { z } from "zod"
@@ -38,7 +42,7 @@ export function EmailFieldPreview() {
     <FormProvider form={form}>
       <Form className={wrapperClass}>
         <FieldGroup>
-          <EmailField placeholder="you@zeno.dev" />
+          <EmailField name="email" placeholder="you@zeno.dev" />
         </FieldGroup>
       </Form>
     </FormProvider>
@@ -56,7 +60,7 @@ export function PasswordFieldPreview() {
     <FormProvider form={form}>
       <Form className={wrapperClass}>
         <FieldGroup>
-          <PasswordField autoComplete="new-password" />
+          <PasswordField autoComplete="new-password" name="password" />
         </FieldGroup>
       </Form>
     </FormProvider>

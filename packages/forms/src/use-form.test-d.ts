@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from "vitest"
 import { z } from "zod"
-import { useForm } from "./use-form"
+import { useForm } from "./create-form"
 
 const stringSchema = z.object({
   age: z.number(),

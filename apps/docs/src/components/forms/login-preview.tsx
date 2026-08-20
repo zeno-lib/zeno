@@ -1,6 +1,6 @@
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import {
   Card,
   CardContent,
@@ -38,8 +38,8 @@ export function LoginExample() {
         <CardContent>
           <Form id="login-form">
             <FieldGroup>
-              <EmailField placeholder="you@zeno.dev" />
-              <PasswordField />
+              <EmailField name="email" placeholder="you@zeno.dev" />
+              <PasswordField name="password" />
             </FieldGroup>
           </Form>
         </CardContent>

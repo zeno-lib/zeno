@@ -1,6 +1,6 @@
-import { Input } from "@zeno-lib/ui/input"
-import { Label } from "@zeno-lib/ui/label"
 import type { ChangeEvent } from "react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 import { useAuthForm } from "./context"
 

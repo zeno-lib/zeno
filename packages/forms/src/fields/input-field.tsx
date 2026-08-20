@@ -1,23 +1,22 @@
 "use client"
 
+import { describedBy } from "@zeno-lib/forms/lib/aria"
+import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import {
+  useHideFieldErrors,
+  useIsFieldRequired,
+  useIsInvalid,
+} from "@zeno-lib/forms/lib/use-is-invalid"
+import { Children, type ComponentProps, type ReactNode } from "react"
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldLabel,
-} from "@zeno-lib/ui/field"
-import { Input } from "@zeno-lib/ui/input"
-import { InputGroup, InputGroupInput } from "@zeno-lib/ui/input-group"
-import { Children, type ComponentProps, type ReactNode } from "react"
-
-import { describedBy } from "../lib/aria"
-import { useFieldContext } from "../lib/contexts"
+} from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
+import { InputGroup, InputGroupInput } from "@/components/ui/input-group"
 import { RequiredIndicator } from "../lib/required-indicator"
-import {
-  useHideFieldErrors,
-  useIsFieldRequired,
-  useIsInvalid,
-} from "../lib/use-is-invalid"
 
 type InputFieldProps = Omit<
   ComponentProps<typeof Input>,

@@ -1,23 +1,22 @@
 "use client"
 
+import { describedBy } from "@zeno-lib/forms/lib/aria"
+import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import {
+  useHideFieldErrors,
+  useIsFieldRequired,
+  useIsInvalid,
+} from "@zeno-lib/forms/lib/use-is-invalid"
+import type { ComponentProps, ReactNode } from "react"
 import {
   Field,
   FieldContent,
   FieldDescription,
   FieldError,
   FieldLabel,
-} from "@zeno-lib/ui/field"
-import { Slider } from "@zeno-lib/ui/slider"
-import type { ComponentProps, ReactNode } from "react"
-
-import { describedBy } from "../lib/aria"
-import { useFieldContext } from "../lib/contexts"
+} from "@/components/ui/field"
+import { Slider } from "@/components/ui/slider"
 import { RequiredIndicator } from "../lib/required-indicator"
-import {
-  useHideFieldErrors,
-  useIsFieldRequired,
-  useIsInvalid,
-} from "../lib/use-is-invalid"
 
 type SliderValue = number | number[]
 

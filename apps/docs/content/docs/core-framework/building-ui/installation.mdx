@@ -1,0 +1,160 @@
+---
+title: Installation
+description: Configure shadcn in your Zeno monorepo and add components with the CLI
+icon: Download
+status: in progress
+---
+
+Zeno's UI primitives are plain [Shadcn](https://ui.shadcn.com) [Base UI](https://base-ui.com) components;
+you add them with the CLI and own the code. Zeno layers
+on a [registry](https://ui.shadcn.com/docs/registry/github) that ships the design elements as
+`shadcn add` commands. Everything lands in **your** repo for further customization.
+
+## Project structure
+
+One shared `ui` package owns the primitives and the **default
+theme**, and one or more apps that consume that package and **override** the theme as needed.
+It follows the [shadcn monorepo](https://ui.shadcn.com/docs/monorepo#file-structure) convention, with
+a theme living in the `ui` package:
+
+```txt
+apps
+└── {yourApp}                  # a Zeno app; consumes @{yourWorkspace}/ui
+    ├── src
+    │   ├── app
+    │   │   └── globals.css     # imports the ui theme; per-app token overrides go here
+    │   ├── components          # app-only components  (@/components)
+    │   ├── hooks               # app-only hooks        (@/hooks)
+    │   └── lib                 # app-only helpers      (@/lib)
+    ├── components.json
+    ├── package.json
+    └── tsconfig.json           # backs the @/* alias (paths)
+packages
+└── ui                         # @{yourWorkspace}/ui; the shared UI package
+    ├── src
+    │   ├── components
+    │   │   └── button.tsx      # shadcn primitives you add land here
+    │   ├── hooks
+    │   ├── lib
+    │   │   └── utils.ts        # cn() and shared helpers
+    │   └── styles
+    │       └── globals.css     # holds the default Zeno theme
+    ├── components.json
+    ├── package.json            # exports back the @{yourWorkspace}/ui/* alias
+    └── tsconfig.json
+package.json
+turbo.json
+```
+
+## Configure shadcn
+
+<Callout>
+An upcoming `zeno-cli` will generate the whole structure for you. But for now, you need to manually configure the project structure.
+`shadcn-cli` is not great at generating the the monorepo structure for you.
+</Callout>
+
+Give app(s) and the shared `ui` package each a `components.json`.
+Copy paste or edit as needed the following into your project with `{yourApp}` (your app's directory)
+and `@{yourWorkspace}` (your monorepo's package scope):
+
+```json title="apps/{yourApp}/components.json"
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "base-nova",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/app/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@/components",
+    "ui": "@{yourWorkspace}/ui/components",
+    "lib": "@/lib",
+    "hooks": "@/hooks",
+    "utils": "@{yourWorkspace}/ui/lib/utils"
+  }
+}
+```
+
+```json title="packages/ui/components.json"
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "base-nova",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@{yourWorkspace}/ui/components",
+    "ui": "@{yourWorkspace}/ui/components",
+    "lib": "@{yourWorkspace}/ui/lib",
+    "hooks": "@{yourWorkspace}/ui/hooks",
+    "utils": "@{yourWorkspace}/ui/lib/utils"
+  }
+}
+```
+
+Keep `style`, `baseColor`, and `iconLibrary` identical across both files; the
+[shadcn monorepo guide](https://ui.shadcn.com/docs/monorepo) covers the full rationale, and running
+`add` from the app path installs primitives into `packages/ui` while wiring imports in the app.
+
+## Back the aliases with tsconfig paths
+
+The CLI resolves the `components.json` aliases through your TypeScript config:
+
+```json title="apps/{yourApp}/tsconfig.json"
+{
+  "extends": "@zeno-lib/typescript/nextjs.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}
+```
+```json title="packages/ui/tsconfig.json"
+{
+  "extends": "@zeno-lib/typescript/react.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}
+```
+
+## Add the theme
+
+Add Zeno's pre-set theme:
+
+```npm
+pnpm dlx shadcn@latest add zeno-lib/zeno/theme -c packages/ui
+```
+
+Then make sure that stylesheet imports Tailwind, the animations, and declares the dark variant:
+
+```css title="packages/ui/src/styles/globals.css"
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+```
+
+For the full token reference, dark mode, and how to override the palette, see
+[Theming](/docs/core-framework/building-ui/theming).
+
+## Add primitives
+
+Add the shadcn primitives you need with the CLI. See
+[UI Primitives](/docs/core-framework/building-ui/components).

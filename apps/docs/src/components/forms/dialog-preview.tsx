@@ -1,6 +1,6 @@
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { Button } from "@zeno-lib/ui/button"
 import {
   Card,

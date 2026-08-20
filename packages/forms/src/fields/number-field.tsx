@@ -1,8 +1,7 @@
 "use client"
 
+import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import type { ChangeEvent } from "react"
-
-import { useFieldContext } from "../lib/contexts"
 import { InputField, type InputFieldProps } from "./input-field"
 
 type NumberFieldProps = Omit<

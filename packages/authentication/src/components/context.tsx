@@ -1,7 +1,6 @@
 "use client"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { toast } from "@zeno-lib/ui/sonner"
 import { useRouter } from "next/navigation"
 import {
   createContext,
@@ -12,6 +11,7 @@ import {
   useContext,
   useState,
 } from "react"
+import { toast } from "sonner"
 
 // Helper function to safely get origin
 const getBaseUrl = () => {

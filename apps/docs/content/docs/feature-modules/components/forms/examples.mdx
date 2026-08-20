@@ -43,7 +43,7 @@ submission working (Enter-to-submit, accessibility).
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import {
   Card,
   CardContent,
@@ -104,7 +104,7 @@ Keep the form inside `<DialogContent>` and close the dialog from
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { Button } from "@zeno-lib/ui/button"
 import {
   Dialog,
@@ -187,7 +187,7 @@ A two-field form with a Zod schema. `name` autocompletes against
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
@@ -207,8 +207,8 @@ export function Login() {
     <FormProvider form={form}>
       <Form>
         <FieldGroup>
-          <EmailField placeholder="you@zeno.dev" />
-          <PasswordField />
+          <EmailField name="email" placeholder="you@zeno.dev" />
+          <PasswordField name="password" />
         </FieldGroup>
         <ResetButton />
         <SubmitButton>Sign in</SubmitButton>
@@ -238,7 +238,7 @@ to disable it during the round-trip.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm, ValidationSpinner } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm, ValidationSpinner } from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
@@ -299,7 +299,7 @@ at, here the "Confirm password" field.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
@@ -325,8 +325,8 @@ export function Signup() {
     <FormProvider form={form}>
       <Form>
         <FieldGroup>
-          <EmailField placeholder="you@zeno.dev" />
-          <PasswordField autoComplete="new-password" />
+          <EmailField name="email" placeholder="you@zeno.dev" />
+          <PasswordField autoComplete="new-password" name="password" />
           <PasswordField
             autoComplete="new-password"
             label="Confirm password"
@@ -355,7 +355,7 @@ bracketed paths like `members[0].name`, typed against the schema.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { Button } from "@zeno-lib/ui/button"
 import { FieldGroup, FieldLegend, FieldSet } from "@zeno-lib/ui/field"
 import { TrashIcon } from "lucide-react"
@@ -452,7 +452,7 @@ between a `SelectField` and an `InputField`.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { SelectItem } from "@zeno-lib/ui/select"
 
@@ -503,7 +503,7 @@ export function Shipping() {
 
 ## Dynamic fields
 
-Pass `listeners.onChange` to a field to react to its value changes — call
+Pass `listeners.onChange` to a field to react to its value changes; call
 `form.setFieldValue(...)` inside the listener to cascade an update onto
 another field. Here, switching dietary preference auto-unticks incompatible
 meals so the form value stays consistent. Meals are stored as a nested
@@ -516,7 +516,7 @@ object (`meals.salad`, `meals.sausage`, `meals.eggs`) so each
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { FieldGroup, FieldLegend, FieldSet } from "@zeno-lib/ui/field"
 import { SelectItem } from "@zeno-lib/ui/select"
 import { z } from "zod"
@@ -575,7 +575,7 @@ export function Order() {
 
 ## Numeric IDs
 
-Both `SelectField` and `ComboboxField` accept numeric values directly — useful
+Both `SelectField` and `ComboboxField` accept numeric values directly: useful
 for database rows whose primary key is a number. Declare the schema field as
 `z.number()` and submit the form to see `categoryId` arrive as a number, not a
 string.
@@ -592,7 +592,7 @@ children automatically.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { SelectItem } from "@zeno-lib/ui/select"
 import { z } from "zod"
@@ -640,7 +640,7 @@ returns `value` (the numeric ID) to the form.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
@@ -679,18 +679,18 @@ const { ComboboxField, SubmitButton } = form
 The wrapper-free pattern for advanced Combobox use cases. This example
 combines four Base UI features into one field:
 
-- **`multiple`** — chips render inside the trigger via `<ComboboxValue>`.
-- **Input inside popup** — search lives in the popup, not in the trigger,
+- **`multiple`**: chips render inside the trigger via `<ComboboxValue>`.
+- **Input inside popup**: search lives in the popup, not in the trigger,
   so the chips have room to breathe.
-- **Grouped** — `<ComboboxList>` iterates groups; `<ComboboxGroup
+- **Grouped**: `<ComboboxList>` iterates groups; `<ComboboxGroup
   items={group.items}>` + `<ComboboxCollection>` iterate items.
-- **Creatable** — when the query has no exact match, an extra group is
+- **Creatable**: when the query has no exact match, an extra group is
   appended with a `Create "…"` item. Selecting it appends a custom skill
   to local state and to the form value.
 
 Wired to the form with `<AppField>` + `useFieldContext<string[]>()`. Items
 follow Base UI's `{ value, label }` shape so the chip text comes from
-`label` automatically — pair with `isItemEqualToValue` so referential
+`label` automatically; pair with `isItemEqualToValue` so referential
 equality doesn't bite when `groupsForView` is rebuilt each render.
 
 <Preview>
@@ -699,7 +699,7 @@ equality doesn't bite when `groupsForView` is rebuilt each render.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useFieldContext, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useFieldContext, useForm } from "@zeno-lib/forms/create-form"
 import {
   Combobox,
   ComboboxChip,
@@ -851,7 +851,7 @@ context the same way and needs no extra wiring.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
@@ -901,7 +901,7 @@ table on
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { useEffect, useState } from "react"
 
@@ -980,7 +980,7 @@ the user sees feedback once and it goes away as they fix the value.
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm, ValidationError } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm, ValidationError } from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
@@ -1012,7 +1012,7 @@ export function CreateAccount() {
       <Form>
         <FieldGroup>
           <InputField label="Username" name="username" />
-          <EmailField />
+          <EmailField name="email" />
         </FieldGroup>
         <SubmitButton>Create</SubmitButton>
       </Form>
@@ -1061,7 +1061,7 @@ Two trigger modes:
 ```tsx lineNumbers
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { Badge } from "@zeno-lib/ui/badge"
 import { FieldGroup } from "@zeno-lib/ui/field"
 

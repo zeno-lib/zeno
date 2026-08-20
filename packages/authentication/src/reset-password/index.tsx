@@ -1,10 +1,10 @@
 "use client"
 
-import { Button } from "@zeno-lib/ui/button"
-import { toast } from "@zeno-lib/ui/sonner"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Suspense, useEffect } from "react"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
 
 import { Container } from "../components/container"
 import { useAuthForm } from "../components/context"
