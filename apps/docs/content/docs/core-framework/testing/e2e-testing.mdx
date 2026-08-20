@@ -1,130 +1,165 @@
 ---
 title: E2E Testing
-description: End-to-end testing with Playwright
+description: End-to-end testing based on Playwright
 icon: MonitorCheck
 status: in progress
 ---
 
-Zeno uses [Playwright](https://playwright.dev) for reliable end-to-end testing across browsers.
+In Zeno, [E2E tests](https://circleci.com/blog/what-is-end-to-end-testing/) live in a single package at `packages/e2e`. They're centralised because e2e tests often span several apps at once, so the setup in `packages/e2e/playwright.config.ts` waits for every app to be running and ready before the suite starts.
 
 ## Setup
 
-E2E tests are located in `packages/e2e/`:
+The examples below use two placeholders: `@yourorg` for your monorepo's npm scope, and `webapp` for one of the apps you test. Swap in your own names.
+
+### 1. Create the e2e package
 
 ```
 packages/e2e/
-├── playwright.config.ts
-├── tests/
-│   └── docs/
-│       └── example.spec.ts
-└── test-results/
+├── playwright.config.ts     # extends @zeno-lib/e2e's baseConfig
+├── package.json             # depends on @zeno-lib/e2e and each tested app
+└── tests/
+    └── webapp/                # tests for apps/webapp
+        └── home.spec.ts
 ```
 
-## Configuration
+Create the `package.json`:
 
-```typescript lineNumbers
-// playwright.config.ts
-import { defineConfig, devices } from "@playwright/test"
-
-export default defineConfig({
-  testDir: "./tests",
-  fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 3 : 0,
-  reporter: process.env.CI ? "html" : "list",
-  use: {
-    trace: "on-first-retry",
-  },
-  projects: [
-    {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
-    },
-  ],
-  webServer: {
-    command: "cd ../../apps/docs && npm run start -- -p 5002",
-    url: "http://localhost:5002",
-    reuseExistingServer: !process.env.CI,
-  },
-})
-```
-
-## Writing Tests
-
-```typescript lineNumbers
-import { expect, test } from "@playwright/test"
-
-test("homepage loads successfully", async ({ page }) => {
-  const response = await page.goto("http://localhost:5002", {
-    waitUntil: "networkidle",
-  })
-  await expect(response?.status()).toBe(200)
-})
-
-test("navigation works", async ({ page }) => {
-  await page.goto("http://localhost:5002")
-  await page.click('a[href="/docs"]')
-  await expect(page).toHaveURL(/.*docs/)
-})
-```
-
-## Commands
-
-```bash
-# Run E2E tests
-pnpm e2e
-
-# Watch mode (with dev server)
-pnpm e2e:watch
-
-# Run specific test file
-pnpm turbo run e2e -- tests/docs/example.spec.ts
-```
-
-## CI Configuration
-
-In CI, tests run with:
-- HTML reporter for artifacts
-- 3 retries on failure
-- 30-second timeout
-- Trace collection on first retry
-
-## Page Object Pattern
-
-For larger test suites, use page objects:
-
-```typescript lineNumbers
-// pages/home.ts
-import { Page } from "@playwright/test"
-
-export class HomePage {
-  constructor(private page: Page) {}
-
-  async goto() {
-    await this.page.goto("http://localhost:5002")
-  }
-
-  async clickDocs() {
-    await this.page.click('a[href="/docs"]')
+```json title="packages/e2e/package.json"
+{
+  "name": "@yourorg/e2e",
+  "type": "module",
+  "scripts": {
+    "e2e": "playwright test",
+    "e2e:watch": "playwright test --ui"
   }
 }
+```
 
-// tests/navigation.spec.ts
-import { test, expect } from "@playwright/test"
-import { HomePage } from "../pages/home"
+### 2. Install Playwright and the preset
 
-test("navigate to docs", async ({ page }) => {
-  const home = new HomePage(page)
-  await home.goto()
-  await home.clickDocs()
-  await expect(page).toHaveURL(/.*docs/)
+From inside `packages/e2e`, add `@zeno-lib/e2e` with its `@playwright/test` peer dependency, then download the browsers:
+
+```npm
+npm install --save-dev @zeno-lib/e2e @playwright/test
+```
+
+```bash
+npx playwright install --with-deps
+```
+
+### 3. List the apps you test
+
+Add every app you write tests for as a workspace dependency:
+
+```json title="packages/e2e/package.json"
+{
+  "devDependencies": {
+    "@yourorg/webapp": "workspace:*"
+  }
+}
+```
+
+### 4. Configure Playwright
+
+Spread `baseConfig` and add a `webServer` entry per app:
+
+```typescript title="packages/e2e/playwright.config.ts"
+import { defineConfig } from "@playwright/test"
+import { baseConfig } from "@zeno-lib/e2e/config"
+
+export default defineConfig({
+  ...baseConfig,
+  webServer: [
+    {
+      // Command that starts the app you want to test
+      command: "pnpm --filter @yourorg/webapp start -- --port 5002",
+      url: "http://localhost:5002",
+      reuseExistingServer: !process.env.CI,
+    },
+  ],
 })
 ```
 
-## Best Practices
+Each `webServer` entry starts one app and waits for its `url`. Add one entry per app you test, each on the port that app serves.
 
-- Use `networkidle` for page loads
-- Prefer role-based selectors (`getByRole`, `getByText`)
-- Don't use `test.only` in committed code
-- Keep tests independent
-- Use fixtures for shared setup
+### 5. Configure Turborepo
+
+Add a `verify-deps` script, then make the `e2e` task build the tested apps and run that check before the tests:
+
+```json title="packages/e2e/package.json"
+{
+  "scripts": {
+    "verify-deps": "zeno-e2e verify-deps"
+  }
+}
+```
+
+```json title="turbo.json"
+{
+  "tasks": {
+    "e2e": {
+      "dependsOn": ["^build", "@yourorg/e2e#verify-deps"]
+    },
+    "verify-deps": {
+      "cache": false
+    }
+  }
+}
+```
+
+`^build` builds every dependency, and [`verify-deps`](#keeping-app-dependencies-in-sync) fails if one is missing. Now `turbo run e2e` builds the apps, verifies the wiring, and runs the tests.
+
+## The config preset
+
+`@zeno-lib/e2e/config` exports `baseConfig`, a plain Playwright config object you spread and override. It sets:
+
+| Field | Locally | In CI |
+|---|---|---|
+| `testDir` | `./tests` | `./tests` |
+| `projects` | one `chromium` project (`Desktop Chrome`) | same |
+| `fullyParallel` | `true` | `true` |
+| `forbidOnly` | off | **on** (a stray `test.only` fails the build) |
+| `retries` | `0` | `3` |
+| `timeout` | 120s | 30s |
+| `reporter` | `list` | `html` |
+| `use.trace` | `on-first-retry` | `on-first-retry` |
+
+It intentionally leaves `webServer` unset, because only you know how to start your apps. Everything else you need (`defineConfig`, `devices`, `test`, `expect`) comes straight from `@playwright/test`.
+
+## Writing tests
+
+Put test files under `tests/<app>/`, where `<app>` matches the app's folder under `apps/`. Import `test` and `expect` from `@playwright/test`:
+
+```typescript title="packages/e2e/tests/webapp/home.spec.ts"
+import { expect, test } from "@playwright/test"
+
+test("home page loads", async ({ page }) => {
+  const response = await page.goto("http://localhost:5002")
+  expect(response?.status()).toBe(200)
+})
+```
+
+Run them with `pnpm e2e` inside the package, or `turbo run e2e` from the root to build the apps first.
+
+## Keeping app dependencies in sync
+
+Every app with a `tests/<app>/` folder must be a dependency of the e2e package. Otherwise Turborepo has no reason to rebuild it, and the tests run against a stale build. `zeno-e2e verify-deps` (installed with `@zeno-lib/e2e`) enforces this.
+
+See [step 5](#5-configure-turborepo) of Setup to wire it automatically. It also works on its own:
+
+```bash
+zeno-e2e verify-deps
+```
+
+It matches each `tests/<app>/` folder to `apps/<app>`, and if an app is missing from the e2e package's dependencies it prints the `devDependencies` to add and exits. It can accept different configurations:
+
+| Flag | Default | What it does |
+|---|---|---|
+| `--apps-dir` | `../../apps` | Directory that contains the apps |
+| `--tests-dir` | `./tests` | Directory with one folder per tested app |
+| `--package-json` | `./package.json` | package.json whose deps must list the apps |
+
+## Common mistakes
+
+- **Skipping `npx playwright install`.** `npm install` brings the test runner but not the browsers, so every run fails at launch with "Executable doesn't exist".
+- **Forgetting to list a tested app as a dependency.** Turborepo then has no edge to rebuild it, and tests hit a stale build. `zeno-e2e verify-deps` catches this.

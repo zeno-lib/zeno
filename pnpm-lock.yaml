@@ -171,10 +171,6 @@ importers:
         version: 4.1.0(@types/node@24.10.0)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.14.3(@types/node@24.10.0)(typescript@6.0.3))(vite@8.0.16(@types/node@24.10.0)(esbuild@0.28.0)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.9.0))
 
   packages/e2e:
-    dependencies:
-      '@zeno-lib/docs':
-        specifier: workspace:*
-        version: link:../../apps/docs
     devDependencies:
       '@playwright/test':
         specifier: 1.60.0
@@ -182,9 +178,15 @@ importers:
       '@types/node':
         specifier: ^25.6.0
         version: 25.6.0
+      '@zeno-lib/docs':
+        specifier: workspace:*
+        version: link:../../apps/docs
       '@zeno-lib/typescript':
         specifier: workspace:^
         version: link:../typescript
+      tsdown:
+        specifier: ^0.22.2
+        version: 0.22.2(tsx@4.20.6)(typescript@6.0.3)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
