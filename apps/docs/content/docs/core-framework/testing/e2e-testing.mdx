@@ -5,9 +5,9 @@ icon: MonitorCheck
 status: in progress
 ---
 
-Zeno uses [Playwright](https://playwright.dev) for [end-to-end tests](https://circleci.com/blog/what-is-end-to-end-testing/). The `@zeno-lib/e2e` package provides a shared Playwright config preset and a dependency checker, so a single `packages/e2e` package can cover every app in your monorepo. Install it alongside `@playwright/test`.
+Zeno uses [Playwright](https://playwright.dev) for [end-to-end tests](https://circleci.com/blog/what-is-end-to-end-testing/). The `@zeno-lib/e2e` package provides a shared Playwright config preset and a dependency checker, so a single `packages/e2e` package can cover every app in your monorepo.
 
-Keeping the whole suite in one package means one Playwright install, one set of browser binaries, one config, and one task-runner entry point. It also lets a single test walk across two of your apps when a flow spans both. For tests that live next to the code they cover, see [Unit Testing](/docs/core-framework/testing/unit-testing) instead.
+Keeping the whole suite in one package means one Playwright install, one set of browser binaries, one config, and one task-runner entry point. It also lets tests walk across multiple apps when needed. For tests that live next to the code they cover, see [Unit Testing](/docs/core-framework/testing/unit-testing) instead.
 
 ## What you get
 
