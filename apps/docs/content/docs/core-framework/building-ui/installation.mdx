@@ -40,7 +40,7 @@ packages
     │   └── styles
     │       └── globals.css     # holds the default Zeno theme
     ├── components.json
-    ├── package.json            # exports back the @{yourWorkspace}/ui/* alias
+    ├── package.json            # `exports` back the @{yourWorkspace}/ui/* aliases
     └── tsconfig.json
 package.json
 turbo.json
@@ -107,9 +107,24 @@ Keep `style`, `baseColor`, and `iconLibrary` identical across both files; the
 [shadcn monorepo guide](https://ui.shadcn.com/docs/monorepo) covers the full rationale, and running
 `add` from the app path installs primitives into `packages/ui` while wiring imports in the app.
 
-## Back the aliases with tsconfig paths
+## Back the aliases
 
-The CLI resolves the `components.json` aliases through your TypeScript config:
+Declare the `@{yourWorkspace}/ui/*` aliases in the shared package's `exports`:
+
+```json title="packages/ui/package.json"
+{
+  "name": "@{yourWorkspace}/ui",
+  "exports": {
+    "./components/*": "./src/components/*.tsx",
+    "./hooks/*": "./src/hooks/*.ts",
+    "./lib/*": "./src/lib/*.ts",
+    "./styles/*.css": "./src/styles/*.css"
+  }
+}
+```
+
+
+Then give the app its `@/*` alias. The shared package needs no `paths`:
 
 ```json title="apps/{yourApp}/tsconfig.json"
 {
@@ -124,13 +139,7 @@ The CLI resolves the `components.json` aliases through your TypeScript config:
 ```
 ```json title="packages/ui/tsconfig.json"
 {
-  "extends": "@zeno-lib/typescript/react.json",
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  }
+  "extends": "@zeno-lib/typescript/react.json"
 }
 ```
 
