@@ -36,7 +36,7 @@
     "postgres": ">=3.4"
   },
   "devDependencies": {
-    "@supabase/supabase-js": "2.106.1",
+    "@supabase/supabase-js": "2.112.4",
     "@types/node": "24.10.0",
     "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
