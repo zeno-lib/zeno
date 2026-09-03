@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-
 //#region src/next-middleware.d.ts
 type UpdateSessionOptions = {
-  /** Supabase project URL. Defaults to `NEXT_PUBLIC_SUPABASE_URL`. */supabaseUrl?: string; /** Supabase key. Defaults to `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. */
-  supabaseKey?: string; /** Where to redirect unauthenticated requests. Defaults to `/sign-in`. */
-  signInPath?: string; /** Path prefixes that skip the auth check. Defaults to `["/sign-in"]`. */
+  /** Supabase project URL. Defaults to `NEXT_PUBLIC_SUPABASE_URL`. */
+  supabaseUrl?: string;
+  /** Supabase key. Defaults to `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. */
+  supabaseKey?: string;
+  /** Where to redirect unauthenticated requests. Defaults to `/sign-in`. */
+  signInPath?: string;
+  /** Path prefixes that skip the auth check. Defaults to `["/sign-in"]`. */
   publicPaths?: string[];
 };
 /**
