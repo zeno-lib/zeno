@@ -1,5 +1,4 @@
 export * from "vitest/config";
-
 //#region src/configs/default.d.ts
 declare const _default: import("vite").UserConfig;
 //#endregion
