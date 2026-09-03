@@ -15,7 +15,7 @@
     "@tanstack/react-form-devtools": "^0.2.29",
     "@zeno-lib/forms": "workspace:*",
     "@zeno-lib/ui": "workspace:*",
-    "fumadocs-core": "16.8.5",
+    "fumadocs-core": "16.15.4",
     "fumadocs-mdx": "14.3.2",
     "fumadocs-ui": "16.8.5",
     "lucide-react": "^1.23.0",
