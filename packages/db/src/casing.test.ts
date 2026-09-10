@@ -156,9 +156,9 @@ describe("default casing", () => {
 
   it("exports audit timestamp and auth-user column helpers with runtime defaults", () => {
     const posts = table("posts", {
-      createdBy,
-      updatedBy,
-      ...timestamps,
+      createdBy: createdBy(),
+      updatedBy: updatedBy(),
+      ...timestamps(),
     })
     const columns = getTableColumns(posts)
     const config = getTableConfig(posts)
@@ -188,9 +188,9 @@ describe("default casing", () => {
   })
 
   it("exports grouped audit column mixins", () => {
-    expect(Object.keys(timestamps)).toEqual(["createdAt", "updatedAt"])
-    expect(Object.keys(authorship)).toEqual(["createdBy", "updatedBy"])
-    expect(Object.keys(auditColumns)).toEqual([
+    expect(Object.keys(timestamps())).toEqual(["createdAt", "updatedAt"])
+    expect(Object.keys(authorship())).toEqual(["createdBy", "updatedBy"])
+    expect(Object.keys(auditColumns())).toEqual([
       "createdAt",
       "updatedAt",
       "createdBy",
@@ -199,7 +199,7 @@ describe("default casing", () => {
 
     const posts = table("posts", {
       id: primaryId("uuid"),
-      ...auditColumns,
+      ...auditColumns(),
     })
     const columns = getTableColumns(posts)
 
@@ -207,6 +207,40 @@ describe("default casing", () => {
     expect(columns.updatedAt.name).toBe("updated_at")
     expect(columns.createdBy.name).toBe("created_by")
     expect(columns.updatedBy.name).toBe("updated_by")
+  })
+
+  it("builds a fresh column builder on every audit mixin call", () => {
+    expect(timestamps().createdAt).not.toBe(timestamps().createdAt)
+    expect(authorship().createdBy).not.toBe(authorship().createdBy)
+    expect(createdBy()).not.toBe(createdBy())
+    expect(updatedBy()).not.toBe(updatedBy())
+  })
+
+  it("keeps tables built from separate audit mixin calls independent", () => {
+    const postsAuthorship = authorship()
+    const commentsAuthorship = authorship()
+    const posts = table("posts", {
+      ...postsAuthorship,
+      createdBy: postsAuthorship.createdBy.unique(),
+    })
+    const comments = table("comments", { ...commentsAuthorship })
+
+    expect(getTableColumns(posts).createdBy.isUnique).toBe(true)
+    expect(getTableColumns(comments).createdBy.isUnique).toBe(false)
+  })
+
+  it("does not share foreign keys between audit mixin calls", () => {
+    const profiles = table("profiles", { id: primaryId("uuid") })
+    const postsAudit = auditColumns()
+    const commentsAudit = auditColumns()
+    const posts = table("posts", {
+      ...postsAudit,
+      createdBy: postsAudit.createdBy.references(() => profiles.id),
+    })
+    const comments = table("comments", { ...commentsAudit })
+
+    expect(getTableConfig(posts).foreignKeys).toHaveLength(3)
+    expect(getTableConfig(comments).foreignKeys).toHaveLength(2)
   })
 
   it("exports generic policy helpers that set the policy operation", () => {

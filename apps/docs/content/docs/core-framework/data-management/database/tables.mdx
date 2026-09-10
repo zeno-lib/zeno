@@ -34,7 +34,7 @@ export const posts = table(
     // Supabase owns auth.users; this reference links your table to the signed-in user.
     userId: authUserId(),
     // created_at, updated_at, created_by, and updated_by, from @zeno-lib/db/schema.
-    ...auditColumns,
+    ...auditColumns(),
   },
   (t) => [
     authenticatedOwnerSelectPolicy("posts_owner_select", t.userId),
@@ -81,7 +81,7 @@ export const posts = table(   // ① table builder: wraps the table, toggles RLS
   {                           // ② columns map: primary key, columns, column builders
     id: primaryId("uuid"),
     userId: authUserId(),
-    ...auditColumns,
+    ...auditColumns(),
   },
   (t) => [                    // ③ extra callback: indexes, constraints, RLS policies
     authenticatedOwnerSelectPolicy("posts_owner_select", t.userId),
@@ -90,7 +90,7 @@ export const posts = table(   // ① table builder: wraps the table, toggles RLS
 ```
 
 - **① table builder**: wraps the columns and the extra callback.
-- **② columns map**: spread a group (`...auditColumns`) or assign to a key
+- **② columns map**: spread a group (`...auditColumns()`) or assign to a key
   (`userId: authUserId()`).
 - **③ extra callback**: receives the built columns `t` and returns indexes,
   constraints, and RLS policies.
@@ -147,15 +147,18 @@ id: primaryId("sequential") // integer("id").primaryKey().generatedAlwaysAsIdent
 ### Columns
 
 _Slot ②: in the columns map._ Utils that create commonly-used columns so you
-don't redeclare them on every table. They come in two shapes.
+don't redeclare them on every table. All of them are functions you call at each
+use site, and they come in two shapes.
 
 **Ready-made columns** have fixed database names. Spread a group into your column
-map (`...auditColumns`), or assign a single column to a key.
+map (`...auditColumns()`), or assign a single column to a key. Every call returns
+fresh Drizzle column builders, so customising a column on one table can never
+reach another table built from the same helper.
 
-`timestamps` adds `createdAt` and `updatedAt`:
+`timestamps()` adds `createdAt` and `updatedAt`:
 
 ```typescript
-...timestamps
+...timestamps()
 // createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 // updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 //   .$onUpdate(() => new Date())
@@ -170,11 +173,11 @@ map (`...auditColumns`), or assign a single column to a key.
 your app when you write through Drizzle. It is **not** a SQL trigger, so the
 generated DDL is just the `DEFAULT now()` above.
 
-`authorship` adds `createdBy` and `updatedBy`, UUID references to `auth.users`
+`authorship()` adds `createdBy` and `updatedBy`, UUID references to `auth.users`
 defaulting to the current user:
 
 ```typescript
-...authorship
+...authorship()
 // createdBy: authUserId("created_by").default(authUid)
 // updatedBy: authUserId("updated_by").default(authUid).$onUpdate(() => authUid)
 ```
@@ -192,12 +195,12 @@ ALTER TABLE "<table>" ADD CONSTRAINT "<table>_updated_by_users_id_fkey"
 As with `updatedAt`, `updatedBy`'s refresh to the current user happens in Drizzle
 on write, not in SQL.
 
-`auditColumns` is `timestamps` plus `authorship`, the full four-column audit
-set. `createdBy` and `updatedBy` are also exported individually, for tables that
-want only one of them.
+`auditColumns()` is `timestamps()` plus `authorship()`, the full four-column
+audit set. `createdBy()` and `updatedBy()` are also exported individually, for
+tables that want only one of them.
 
-**Column builders** are functions you assign to a key; the column takes its name
-from that key, or from an explicit argument.
+**Column builders** take their column name from the key you assign them to, or
+from an explicit argument.
 
 `authUserId(name?)` is a `NOT NULL` UUID column referencing `auth.users.id`:
 

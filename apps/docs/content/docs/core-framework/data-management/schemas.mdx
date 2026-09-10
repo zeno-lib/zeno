@@ -59,7 +59,7 @@ export const posts = table("posts", {
   title: text("title").notNull(),
   userId: authUserId(),
   body: text("body").notNull(),
-  ...auditColumns,
+  ...auditColumns(),
 })
 ```
 
