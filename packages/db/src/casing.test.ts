@@ -23,6 +23,7 @@ import { createAdminClient } from "./clients.ts"
 import { defineDrizzleConfig } from "./config.ts"
 import {
   allPolicy,
+  assignedPrimaryId,
   auditColumns,
   authenticatedOwnerDeletePolicy,
   authenticatedOwnerInsertPolicy,
@@ -49,12 +50,14 @@ import {
   schema,
   selectPolicy,
   sequence,
+  sequentialPrimaryId,
   table,
   tableCreator,
   timestamps,
   unsecureTable,
   updatedBy,
   updatePolicy,
+  uuidPrimaryId,
   view,
 } from "./schema.ts"
 
@@ -133,25 +136,167 @@ describe("default casing", () => {
     expect(view).toBe(pgView)
   })
 
-  it("exports common ID and Supabase auth-user column helpers", () => {
+  it("exports a Supabase auth-user column helper", () => {
     const posts = table("posts", {
       id: primaryId("uuid"),
       ownerId: authUserId(),
-      sequentialId: primaryId("sequential"),
     })
     const columns = getTableColumns(posts)
     const config = getTableConfig(posts)
 
-    expect(columns.id.getSQLType()).toBe("uuid")
-    expect(columns.id.primary).toBe(true)
-    expect(columns.id.default).toBeDefined()
-    expect(columns.sequentialId.getSQLType()).toBe("integer")
-    expect(columns.sequentialId.primary).toBe(true)
-    expect(columns.sequentialId.generatedIdentity?.type).toBe("always")
     expect(columns.ownerId.getSQLType()).toBe("uuid")
     expect(columns.ownerId.notNull).toBe(true)
     expect(config.foreignKeys).toHaveLength(1)
     expect(config.foreignKeys[0]?.reference().foreignTable).toBe(authUsers)
+  })
+
+  // Each helper gets its own table: all three name the column "id" by default,
+  // and Drizzle's setName returns early once a name is set, so two of them in
+  // one table would silently share the name.
+  it("builds a random-UUID primary key", () => {
+    const columns = getTableColumns(table("posts", { id: primaryId("uuid") }))
+
+    expect(columns.id.name).toBe("id")
+    expect(columns.id.getSQLType()).toBe("uuid")
+    expect(columns.id.primary).toBe(true)
+    expect(columns.id.default).toBeDefined()
+    expect(columns.id.generatedIdentity).toBeUndefined()
+  })
+
+  it("builds a UUID primary key without a default", () => {
+    const columns = getTableColumns(
+      table("profiles", { id: uuidPrimaryId({ defaultRandom: false }) })
+    )
+
+    expect(columns.id.getSQLType()).toBe("uuid")
+    expect(columns.id.primary).toBe(true)
+    expect(columns.id.hasDefault).toBe(false)
+    expect(columns.id.default).toBeUndefined()
+  })
+
+  it("defaults a sequential primary key to Supabase's bigint by-default shape", () => {
+    const columns = getTableColumns(
+      table("posts", { id: primaryId("sequential") })
+    )
+
+    expect(columns.id.name).toBe("id")
+    expect(columns.id.getSQLType()).toBe("bigint")
+    expect(columns.id.primary).toBe(true)
+    expect(columns.id.generatedIdentity?.type).toBe("byDefault")
+  })
+
+  it("builds always-generated, integer, and bigint-mode sequential keys", () => {
+    const always = getTableColumns(
+      table("always", { id: sequentialPrimaryId({ generated: "always" }) })
+    )
+    const int = getTableColumns(
+      table("int", { id: sequentialPrimaryId({ type: "integer" }) })
+    )
+    const big = getTableColumns(
+      table("big", { id: sequentialPrimaryId({ mode: "bigint" }) })
+    )
+
+    expect(always.id.getSQLType()).toBe("bigint")
+    expect(always.id.generatedIdentity?.type).toBe("always")
+    expect(int.id.getSQLType()).toBe("integer")
+    expect(int.id.generatedIdentity?.type).toBe("byDefault")
+    expect(big.id.getSQLType()).toBe("bigint")
+    expect(big.id.generatedIdentity?.type).toBe("byDefault")
+  })
+
+  it("builds an application-assigned primary key with no default", () => {
+    const columns = getTableColumns(
+      table("invoices", { id: primaryId("assigned") })
+    )
+    const sized = getTableColumns(
+      table("sized", { id: assignedPrimaryId({ length: 32 }) })
+    )
+
+    expect(columns.id.name).toBe("id")
+    expect(columns.id.getSQLType()).toBe("varchar")
+    expect(columns.id.primary).toBe(true)
+    expect(columns.id.default).toBeUndefined()
+    expect(columns.id.generatedIdentity).toBeUndefined()
+    expect(sized.id.getSQLType()).toBe("varchar(32)")
+  })
+
+  it("lets every primary key helper override the column name", () => {
+    const columns = getTableColumns(
+      table("posts", {
+        assignedKey: assignedPrimaryId({ name: "assigned_key" }),
+        sequentialKey: sequentialPrimaryId({ name: "sequential_key" }),
+        uuidKey: uuidPrimaryId({ name: "uuid_key" }),
+      })
+    )
+
+    expect(columns.uuidKey.name).toBe("uuid_key")
+    expect(columns.sequentialKey.name).toBe("sequential_key")
+    expect(columns.assignedKey.name).toBe("assigned_key")
+  })
+
+  it("keeps a UUID key chainable into a cascading auth.users reference", () => {
+    const profiles = table("profiles", {
+      id: uuidPrimaryId({ defaultRandom: false }).references(
+        () => authUsers.id,
+        {
+          onDelete: "cascade",
+          onUpdate: "cascade",
+        }
+      ),
+    })
+    const columns = getTableColumns(profiles)
+    const foreignKey = getTableConfig(profiles).foreignKeys[0]
+
+    expect(columns.id.primary).toBe(true)
+    expect(columns.id.notNull).toBe(true)
+    expect(columns.id.default).toBeUndefined()
+    expect(foreignKey?.reference().foreignTable).toBe(authUsers)
+    expect(foreignKey?.onDelete).toBe("cascade")
+    expect(foreignKey?.onUpdate).toBe("cascade")
+  })
+
+  it("keeps the random default when a UUID key also references auth.users", () => {
+    const profiles = table("profiles", {
+      id: uuidPrimaryId().references(() => authUsers.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    })
+    const columns = getTableColumns(profiles)
+    const foreignKey = getTableConfig(profiles).foreignKeys[0]
+
+    expect(columns.id.primary).toBe(true)
+    expect(columns.id.default).toBeDefined()
+    expect(foreignKey?.reference().foreignTable).toBe(authUsers)
+    expect(foreignKey?.onDelete).toBe("cascade")
+  })
+
+  it("routes every primaryId kind to its dedicated helper", () => {
+    const selected = {
+      assigned: getTableColumns(table("t", { id: primaryId("assigned") })).id,
+      sequential: getTableColumns(table("t", { id: primaryId("sequential") }))
+        .id,
+      uuid: getTableColumns(table("t", { id: primaryId("uuid") })).id,
+    }
+    const direct = {
+      assigned: getTableColumns(table("t", { id: assignedPrimaryId() })).id,
+      sequential: getTableColumns(table("t", { id: sequentialPrimaryId() })).id,
+      uuid: getTableColumns(table("t", { id: uuidPrimaryId() })).id,
+    }
+
+    for (const kind of ["uuid", "sequential", "assigned"] as const) {
+      expect(selected[kind].getSQLType()).toBe(direct[kind].getSQLType())
+      expect(selected[kind].primary).toBe(direct[kind].primary)
+      expect(selected[kind].hasDefault).toBe(direct[kind].hasDefault)
+      expect(selected[kind].generatedIdentity?.type).toBe(
+        direct[kind].generatedIdentity?.type
+      )
+    }
+
+    // The bare call is Supabase's own default for a new table.
+    expect(
+      getTableColumns(table("t", { id: primaryId() })).id.getSQLType()
+    ).toBe("bigint")
   })
 
   it("exports audit timestamp and auth-user column helpers with runtime defaults", () => {
