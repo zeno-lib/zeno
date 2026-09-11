@@ -44,8 +44,12 @@ export {
   supabaseAuthAdminRole,
 } from "drizzle-orm/supabase"
 
-// Reusable created_at / updated_at columns — spread into a pgTable column map.
-export const timestamps = {
+// Reusable created_at / updated_at columns — call and spread into a pgTable
+// column map. Every audit mixin below is a factory because Drizzle's column
+// builder methods mutate `this` and return it: one builder reaching two tables
+// would leak `.notNull()`, `.references()` and the name `setName` assigns from
+// whichever table customised it into the other.
+export const timestamps = () => ({
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -53,27 +57,28 @@ export const timestamps = {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
-}
+})
 
 export const authUserId = (name?: string) =>
   uuid(name)
     .notNull()
     .references(() => authUsers.id)
 
-export const createdBy = authUserId("created_by").default(authUid)
-export const updatedBy = authUserId("updated_by")
-  .default(authUid)
-  .$onUpdate(() => authUid)
+export const createdBy = () => authUserId("created_by").default(authUid)
+export const updatedBy = () =>
+  authUserId("updated_by")
+    .default(authUid)
+    .$onUpdate(() => authUid)
 
-export const authorship = {
-  createdBy,
-  updatedBy,
-}
+export const authorship = () => ({
+  createdBy: createdBy(),
+  updatedBy: updatedBy(),
+})
 
-export const auditColumns = {
-  ...timestamps,
-  ...authorship,
-}
+export const auditColumns = () => ({
+  ...timestamps(),
+  ...authorship(),
+})
 
 const uuidPrimaryId = () => uuid("id").primaryKey().defaultRandom()
 const sequentialPrimaryId = () =>

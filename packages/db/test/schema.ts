@@ -14,7 +14,7 @@ export const posts = table(
     id: primaryId("uuid"),
     title: text("title").notNull(),
     userId: authUserId(),
-    ...timestamps,
+    ...timestamps(),
   },
   (t) => [
     authenticatedOwnerSelectPolicy("posts_owner_select", t.userId),
