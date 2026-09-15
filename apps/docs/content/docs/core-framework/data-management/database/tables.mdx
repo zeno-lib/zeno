@@ -238,7 +238,7 @@ reach another table built from the same helper.
 ...timestamps()
 // createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 // updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
-//   .$onUpdate(() => new Date())
+//   .$onUpdateFn(() => sql`now()`)
 ```
 
 ```sql
@@ -246,9 +246,33 @@ reach another table built from the same helper.
 "updated_at" timestamp with time zone DEFAULT now() NOT NULL
 ```
 
-`updatedAt`'s refresh-on-write comes from Drizzle's `$onUpdate`, which runs in
-your app when you write through Drizzle. It is **not** a SQL trigger, so the
-generated DDL is just the `DEFAULT now()` above.
+It takes three options, and `auditColumns()` forwards them:
+
+| Option | Default | What it changes |
+|---|---|---|
+| `onUpdate` | `true` | Whether Drizzle refreshes `updated_at` on a write. |
+| `withTimezone` | `true` | `timestamptz` or `timestamp`. |
+| `precision` | none | Fractional-second digits, 0 to 6. |
+
+`updatedAt`'s refresh comes from Drizzle's `$onUpdateFn`, which adds the column
+to the `UPDATE` statement Drizzle builds. Because the callback returns SQL, the
+value is `now()` evaluated by Postgres rather than a timestamp from your Node
+process, so it agrees with `created_at`'s `DEFAULT now()`:
+
+```sql
+UPDATE "posts" SET "title" = $1, "updated_at" = now() WHERE ...
+```
+
+<Callout type="warn">
+  This is **not** a SQL trigger, so the generated DDL is just the `DEFAULT now()`
+  above, and only writes that go through Drizzle run it. A write arriving
+  through PostgREST (the `supabase-js` client, the dashboard, any REST caller)
+  does not, and in a Supabase app that is most writes. If `updated_at` has to be
+  right for every writer, give the column a
+  [`moddatetime`](https://supabase.com/docs/guides/database/extensions/moddatetime)
+  trigger and pass `timestamps({ onUpdate: false })` so Drizzle stops claiming
+  ownership of a column the trigger maintains.
+</Callout>
 
 `authorship()` adds `createdBy` and `updatedBy`, UUID references to `auth.users`
 defaulting to the current user:

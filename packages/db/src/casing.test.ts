@@ -1,4 +1,4 @@
-import { getTableColumns, sql } from "drizzle-orm"
+import { getTableColumns, is, SQL, sql } from "drizzle-orm"
 import {
   getTableConfig,
   isPgEnum,
@@ -315,7 +315,8 @@ describe("default casing", () => {
     expect(columns.updatedAt.name).toBe("updated_at")
     expect(columns.updatedAt.notNull).toBe(true)
     expect(columns.updatedAt.default).toBeDefined()
-    expect(columns.updatedAt.onUpdateFn?.()).toBeInstanceOf(Date)
+    // SQL, not a Date: the database clock stamps it, like created_at's default.
+    expect(is(columns.updatedAt.onUpdateFn?.(), SQL)).toBe(true)
     expect(columns.createdBy.name).toBe("created_by")
     expect(columns.createdBy.notNull).toBe(true)
     expect(columns.createdBy.default).toBe(authUid)
@@ -330,6 +331,46 @@ describe("default casing", () => {
         (foreignKey) => foreignKey.reference().foreignTable
       )
     ).toEqual([authUsers, authUsers])
+  })
+
+  it("stamps updated_at from the database clock, not the Node process", async () => {
+    const posts = table("posts", { title: text(), ...timestamps() })
+    const db = createAdminClient()
+    const { params, sql: statement } = db
+      .update(posts)
+      .set({ title: "hello" })
+      .toSQL()
+
+    // `now()` is inlined rather than bound, so the value comes from Postgres.
+    expect(statement).toContain('"updated_at" = now()')
+    expect(params).toEqual(["hello"])
+
+    await db.close()
+  })
+
+  it("drops the refresh hook when a trigger owns updated_at", () => {
+    const posts = table("posts", { ...timestamps({ onUpdate: false }) })
+
+    expect(getTableColumns(posts).updatedAt.onUpdateFn).toBeUndefined()
+    // The column itself is unchanged; only the Drizzle-side hook goes.
+    expect(getTableColumns(posts).updatedAt.notNull).toBe(true)
+    expect(getTableColumns(posts).updatedAt.default).toBeDefined()
+  })
+
+  it("passes timezone and precision through to the column type", () => {
+    const naive = table("naive", { ...timestamps({ withTimezone: false }) })
+    const precise = table("precise", { ...timestamps({ precision: 3 }) })
+    const audited = table("audited", {
+      ...auditColumns({ precision: 0, withTimezone: false }),
+    })
+
+    expect(getTableColumns(naive).createdAt.getSQLType()).toBe("timestamp")
+    expect(getTableColumns(precise).updatedAt.getSQLType()).toBe(
+      "timestamp (3) with time zone"
+    )
+    expect(getTableColumns(audited).createdAt.getSQLType()).toBe(
+      "timestamp (0)"
+    )
   })
 
   it("exports grouped audit column mixins", () => {

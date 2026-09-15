@@ -10,6 +10,7 @@ import {
   type PgIntegerBuilder,
   type PgPolicyConfig,
   type PgUUIDBuilder,
+  type Precision,
   pgPolicy,
   type SetHasDefault,
   type SetIsPrimaryKey,
@@ -53,19 +54,41 @@ export {
   supabaseAuthAdminRole,
 } from "drizzle-orm/supabase"
 
+type TimestampsOptions = {
+  /** Refresh `updated_at` on a Drizzle write. Default `true`. */
+  onUpdate?: boolean
+  withTimezone?: boolean
+  /** Fractional-second digits. Postgres allows 0 to 6. */
+  precision?: Precision
+}
+
+// `$onUpdateFn` returning SQL rather than a JavaScript value matters: drizzle
+// inlines a SQL result into the UPDATE and binds anything else as a parameter,
+// so `sql`now()`` stamps the column from the database clock, the same clock
+// `defaultNow()` uses for created_at. A `new Date()` here would stamp it from
+// whichever Node process happened to run the write.
+//
+// It is still Drizzle applying it while building the statement, so a write
+// arriving through PostgREST never runs it. In a Supabase app that is most
+// writes, and the column wants a `moddatetime` trigger; drizzle-kit emits no
+// trigger DDL, so that half is tracked separately.
 // Call and spread into a column map. Every audit mixin here is a factory rather
 // than a shared object, because Drizzle's builder methods mutate `this` and
 // return it. One builder in two tables would leak `.notNull()`, `.references()`
 // and its name from whichever table customised it first.
-export const timestamps = () => ({
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-})
+export const timestamps = ({
+  onUpdate = true,
+  precision,
+  withTimezone = true,
+}: TimestampsOptions = {}) => {
+  const config = { precision, withTimezone }
+  const updatedAt = timestamp("updated_at", config).notNull().defaultNow()
+
+  return {
+    createdAt: timestamp("created_at", config).notNull().defaultNow(),
+    updatedAt: onUpdate ? updatedAt.$onUpdateFn(() => sql`now()`) : updatedAt,
+  }
+}
 
 export const authUserId = (name?: string) =>
   uuid(name)
@@ -83,8 +106,8 @@ export const authorship = () => ({
   updatedBy: updatedBy(),
 })
 
-export const auditColumns = () => ({
-  ...timestamps(),
+export const auditColumns = (options: TimestampsOptions = {}) => ({
+  ...timestamps(options),
   ...authorship(),
 })
 
