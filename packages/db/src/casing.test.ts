@@ -57,6 +57,7 @@ import {
   unsecureTable,
   updatedBy,
   updatePolicy,
+  userId,
   uuidPrimaryId,
   view,
 } from "./schema.ts"
@@ -143,11 +144,86 @@ describe("default casing", () => {
     })
     const columns = getTableColumns(posts)
     const config = getTableConfig(posts)
+    const foreignKey = config.foreignKeys[0]
 
     expect(columns.ownerId.getSQLType()).toBe("uuid")
-    expect(columns.ownerId.notNull).toBe(true)
+    // Nullable so deleting the user blanks the author instead of failing.
+    expect(columns.ownerId.notNull).toBe(false)
     expect(config.foreignKeys).toHaveLength(1)
-    expect(config.foreignKeys[0]?.reference().foreignTable).toBe(authUsers)
+    expect(foreignKey?.reference().foreignTable).toBe(authUsers)
+    expect(foreignKey?.onDelete).toBe("set null")
+    expect(foreignKey?.onUpdate).toBe("cascade")
+  })
+
+  it("restricts the delete when an author column is required", () => {
+    const posts = table("posts", { ownerId: authUserId({ notNull: true }) })
+    const foreignKey = getTableConfig(posts).foreignKeys[0]
+
+    expect(getTableColumns(posts).ownerId.notNull).toBe(true)
+    // `set null` against a NOT NULL column is a foreign key that can never
+    // fire, so a required author restricts instead.
+    expect(foreignKey?.onDelete).toBe("restrict")
+    expect(foreignKey?.onUpdate).toBe("cascade")
+  })
+
+  it("takes an explicit column name and reference actions", () => {
+    const posts = table("posts", {
+      ownerId: authUserId({
+        actions: { onDelete: "cascade", onUpdate: "no action" },
+        name: "owner_id",
+      }),
+    })
+    const foreignKey = getTableConfig(posts).foreignKeys[0]
+
+    expect(getTableColumns(posts).ownerId.name).toBe("owner_id")
+    expect(foreignKey?.onDelete).toBe("cascade")
+    expect(foreignKey?.onUpdate).toBe("no action")
+  })
+
+  it("drops the foreign key entirely when the reference is null", () => {
+    const posts = table("posts", {
+      ownerId: authUserId({ reference: null }),
+      ...authorship({ reference: null }),
+    })
+
+    expect(getTableConfig(posts).foreignKeys).toHaveLength(0)
+    expect(getTableColumns(posts).ownerId.getSQLType()).toBe("uuid")
+    expect(getTableColumns(posts).createdBy.name).toBe("created_by")
+  })
+
+  it("points author columns at a public profiles mirror", () => {
+    const profiles = table("profiles", {
+      id: uuidPrimaryId({ defaultRandom: false }),
+    })
+    const posts = table("posts", {
+      ownerId: userId(() => profiles.id),
+      ...authorship({ reference: () => profiles.id }),
+    })
+    const foreignKeys = getTableConfig(posts).foreignKeys
+
+    expect(foreignKeys).toHaveLength(3)
+    for (const foreignKey of foreignKeys) {
+      expect(foreignKey.reference().foreignTable).toBe(profiles)
+      expect(foreignKey.onDelete).toBe("set null")
+    }
+    expect(getTableColumns(posts).ownerId.notNull).toBe(false)
+  })
+
+  it("builds the same column through userId as through authUserId", () => {
+    const viaAuth = table("a", { ownerId: authUserId({ notNull: true }) })
+    const viaUserId = table("b", {
+      ownerId: userId(() => authUsers.id, { notNull: true }),
+    })
+    const authForeignKey = getTableConfig(viaAuth).foreignKeys[0]
+    const userForeignKey = getTableConfig(viaUserId).foreignKeys[0]
+
+    expect(getTableColumns(viaUserId).ownerId.notNull).toBe(
+      getTableColumns(viaAuth).ownerId.notNull
+    )
+    expect(userForeignKey?.reference().foreignTable).toBe(
+      authForeignKey?.reference().foreignTable
+    )
+    expect(userForeignKey?.onDelete).toBe(authForeignKey?.onDelete)
   })
 
   // Each helper gets its own table: all three name the column "id" by default,
@@ -317,11 +393,12 @@ describe("default casing", () => {
     expect(columns.updatedAt.default).toBeDefined()
     expect(columns.updatedAt.onUpdateFn?.()).toBeInstanceOf(Date)
     expect(columns.createdBy.name).toBe("created_by")
-    expect(columns.createdBy.notNull).toBe(true)
+    // Nullable by default so a user delete blanks the author, not fails.
+    expect(columns.createdBy.notNull).toBe(false)
     expect(columns.createdBy.default).toBe(authUid)
     expect(columns.createdBy.onUpdateFn).toBeUndefined()
     expect(columns.updatedBy.name).toBe("updated_by")
-    expect(columns.updatedBy.notNull).toBe(true)
+    expect(columns.updatedBy.notNull).toBe(false)
     expect(columns.updatedBy.default).toBe(authUid)
     expect(columns.updatedBy.onUpdateFn?.()).toBe(authUid)
     expect(config.foreignKeys).toHaveLength(2)
@@ -330,6 +407,23 @@ describe("default casing", () => {
         (foreignKey) => foreignKey.reference().foreignTable
       )
     ).toEqual([authUsers, authUsers])
+  })
+
+  it("applies one options object to both author columns", () => {
+    const posts = table("posts", {
+      ...auditColumns({ notNull: true }),
+    })
+    const columns = getTableColumns(posts)
+    const foreignKeys = getTableConfig(posts).foreignKeys
+
+    expect(columns.createdBy.notNull).toBe(true)
+    expect(columns.updatedBy.notNull).toBe(true)
+    expect(foreignKeys.map((foreignKey) => foreignKey.onDelete)).toEqual([
+      "restrict",
+      "restrict",
+    ])
+    // Timestamps are unaffected by the authorship options.
+    expect(columns.createdAt.notNull).toBe(true)
   })
 
   it("exports grouped audit column mixins", () => {

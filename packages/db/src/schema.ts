@@ -11,8 +11,10 @@ import {
   type PgPolicyConfig,
   type PgUUIDBuilder,
   pgPolicy,
+  type ReferenceConfig,
   type SetHasDefault,
   type SetIsPrimaryKey,
+  type SetNotNull,
   timestamp,
   uuid,
   varchar,
@@ -67,25 +69,121 @@ export const timestamps = () => ({
     .$onUpdate(() => new Date()),
 })
 
-export const authUserId = (name?: string) =>
-  uuid(name)
-    .notNull()
-    .references(() => authUsers.id)
+type ReferenceActions = ReferenceConfig["config"]
 
-export const createdBy = () => authUserId("created_by").default(authUid)
-export const updatedBy = () =>
-  authUserId("updated_by")
+// An audit row outlives its author, so the reference blanks rather than
+// blocking the delete. `set null` against a NOT NULL column is a foreign key
+// that can never fire, so a required author restricts the delete instead: still
+// the old behaviour, but now because you asked for it.
+const NULLABLE_AUTHOR_ACTIONS = {
+  onDelete: "set null",
+  onUpdate: "cascade",
+} as const satisfies ReferenceActions
+
+const REQUIRED_AUTHOR_ACTIONS = {
+  onDelete: "restrict",
+  onUpdate: "cascade",
+} as const satisfies ReferenceActions
+
+// `[T] extends [U]` blocks distribution, so a plain `boolean` gives one column
+// type rather than a union of both.
+type AuthorColumn<TNotNull extends boolean> = [TNotNull] extends [true]
+  ? SetNotNull<PgUUIDBuilder>
+  : PgUUIDBuilder
+
+// `actions` is meaningless without a reference, the same way
+// `sequentialPrimaryId` rejects `mode` for an integer key.
+type AuthorReference =
+  | { reference?: () => AnyPgColumn; actions?: ReferenceActions }
+  | { reference: null; actions?: never }
+
+export type AuthorshipOptions<TNotNull extends boolean = false> =
+  AuthorReference & { notNull?: TNotNull }
+
+// The loose shape the implementation signatures take. Callers only ever see the
+// overload above each helper.
+type AuthorColumnConfig = {
+  name?: string
+  reference?: (() => AnyPgColumn) | null
+  actions?: ReferenceActions
+  notNull?: boolean
+}
+
+const authorColumn = ({
+  name,
+  reference = () => authUsers.id,
+  actions,
+  notNull = false,
+}: AuthorColumnConfig) => {
+  const column =
+    reference === null
+      ? uuid(name)
+      : uuid(name).references(
+          reference,
+          actions ??
+            (notNull ? REQUIRED_AUTHOR_ACTIONS : NULLABLE_AUTHOR_ACTIONS)
+        )
+
+  return notNull ? column.notNull() : column
+}
+
+// Nullable by default: a required reference to auth.users means deleting the
+// user fails, because the audit trail holds the row.
+export function authUserId<TNotNull extends boolean = false>(
+  options?: AuthorshipOptions<TNotNull> & { name?: string }
+): AuthorColumn<TNotNull>
+export function authUserId(options: AuthorColumnConfig = {}) {
+  return authorColumn(options)
+}
+
+// RLS policies and PostgREST joins cannot read auth.users, so applications
+// mirror it into a public `profiles` table. This points at that instead.
+export function userId<TNotNull extends boolean = false>(
+  reference: () => AnyPgColumn,
+  options?: {
+    name?: string
+    actions?: ReferenceActions
+    notNull?: TNotNull
+  }
+): AuthorColumn<TNotNull>
+export function userId(
+  reference: () => AnyPgColumn,
+  options: AuthorColumnConfig = {}
+) {
+  return authorColumn({ ...options, reference })
+}
+
+export function createdBy<TNotNull extends boolean = false>(
+  options?: AuthorshipOptions<TNotNull>
+): SetHasDefault<AuthorColumn<TNotNull>>
+export function createdBy(options: AuthorColumnConfig = {}) {
+  return authorColumn({ ...options, name: "created_by" }).default(authUid)
+}
+
+export function updatedBy<TNotNull extends boolean = false>(
+  options?: AuthorshipOptions<TNotNull>
+): SetHasDefault<AuthorColumn<TNotNull>>
+export function updatedBy(options: AuthorColumnConfig = {}) {
+  return authorColumn({ ...options, name: "updated_by" })
     .default(authUid)
     .$onUpdate(() => authUid)
+}
 
-export const authorship = () => ({
-  createdBy: createdBy(),
-  updatedBy: updatedBy(),
+// One options object covers both columns. A table that needs them to differ
+// calls `createdBy()` and `updatedBy()` separately, which also covers a schema
+// with `created_by` and no `updated_by`.
+export const authorship = <TNotNull extends boolean = false>(
+  options?: AuthorshipOptions<TNotNull>
+) => ({
+  createdBy: createdBy<TNotNull>(options),
+  updatedBy: updatedBy<TNotNull>(options),
 })
 
-export const auditColumns = () => ({
+export const auditColumns = <TNotNull extends boolean = false>(
+  options?: AuthorshipOptions<TNotNull>
+) => ({
   ...timestamps(),
-  ...authorship(),
+  ...authorship<TNotNull>(options),
 })
 
 const DEFAULT_ID_NAME = "id"

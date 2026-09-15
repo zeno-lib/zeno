@@ -57,7 +57,7 @@ export const posts = table("posts", {
   id: primaryId("uuid"),
   slug: text("slug").notNull(),
   title: text("title").notNull(),
-  userId: authUserId(),
+  userId: authUserId({ notNull: true }),
   body: text("body").notNull(),
   ...auditColumns(),
 })
