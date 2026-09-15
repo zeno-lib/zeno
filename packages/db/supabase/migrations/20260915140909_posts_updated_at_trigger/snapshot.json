@@ -1,10 +1,10 @@
 {
+  "id": "b254cb55-eee8-4aea-8c2f-fcd3c784c208",
+  "prevIds": [
+    "c1fcf069-69b3-4692-83ad-aff2fc31984c"
+  ],
   "version": "8",
   "dialect": "postgres",
-  "id": "2639115e-afe9-4b74-a097-b04b5afcebec",
-  "prevIds": [
-    "00000000-0000-0000-0000-000000000000"
-  ],
   "ddl": [
     {
       "isRlsEnabled": true,
@@ -87,8 +87,8 @@
       "columnsTo": [
         "id"
       ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
+      "onUpdate": "CASCADE",
+      "onDelete": "RESTRICT",
       "name": "posts_user_id_users_id_fkey",
       "entityType": "fks",
       "schema": "public",

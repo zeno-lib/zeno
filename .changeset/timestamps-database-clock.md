@@ -26,8 +26,24 @@ Three options, forwarded by `auditColumns()`:
 `onUpdate: false` is for a column a trigger owns. The hook only runs for writes
 that go through Drizzle: a write arriving through PostgREST (the `supabase-js`
 client, the dashboard, any REST caller) never runs it, and in a Supabase app
-that is most writes. A `moddatetime` trigger is what maintains the column for
-every writer, and pairing it with `timestamps({ onUpdate: false })` stops
-Drizzle claiming ownership of a column it does not own.
+that is most writes.
 
-No DDL changes for a default call, so this emits no migration on its own.
+For those, a new `@zeno-lib/db/triggers` entrypoint returns the SQL that makes
+Postgres maintain the column instead:
+
+```ts
+import { updatedAtTrigger } from "@zeno-lib/db/triggers"
+
+console.log(updatedAtTrigger(posts))
+```
+
+Drizzle Kit emits no trigger DDL and triggers are not part of its snapshot
+format, so the route is `drizzle-kit generate --custom`, which writes an empty
+migration that is still tracked (its snapshot links into the chain). Paste the
+SQL in, then pass `timestamps({ onUpdate: false })` so one mechanism owns the
+column. `updatedAtTrigger` reads the table's real name and schema, takes
+`column` / `name` / `schema` / `extensionSchema` / `createExtension`, accepts a
+plain table name, and emits re-runnable SQL.
+
+No DDL changes for a default call, so the column definitions emit no migration
+on their own.

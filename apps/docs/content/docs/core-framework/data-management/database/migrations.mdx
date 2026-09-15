@@ -30,7 +30,37 @@ The preset:
 - Writes migrations to `./supabase/migrations`.
 - Uses the `postgresql` dialect.
 - Reads `SUPABASE_DATABASE_URL`.
-- Keeps Supabase's built-in roles marked as existing.
+- Keeps Supabase's built-in roles marked as existing, including the 18 that
+  drizzle-kit's own `provider: "supabase"` does not cover.
+- Limits the diff to the `public` schema.
+
+Those last two matter to `drizzle-kit push` and `drizzle-kit pull`, which read
+the live database. Drizzle Kit manages every role it finds there but cannot see
+declared in your schema, and a stock Supabase project has 26 roles where
+`provider: "supabase"` excludes only 8, so a `push` would offer to `DROP ROLE`
+the other 18. The preset exports that list as `supabaseManagedRoles` and adds it
+to `entities.roles.exclude`, keeping any excludes of your own.
+
+`schemaFilter` is the same story for schemas rather than roles: without it,
+`push` and `pull` diff `auth`, `storage` and `realtime`, which Supabase owns and
+changes on upgrades. If you add your own non-`public` schema with
+[`schema(...)`](/docs/core-framework/data-management/database/tables), list it
+here rather than dropping the filter:
+
+```typescript title="{project}-db/drizzle.config.ts"
+export default defineDrizzleConfig({
+  schemaFilter: ["public", "billing"],
+})
+```
+
+<Callout type="warn">
+  `drizzle-kit generate` accepts neither option: it diffs your schema files
+  against the previous snapshot rather than against a database, and its config
+  schema has no `entities` or `schemaFilter` at all. So it never emits
+  `DROP ROLE`, but it also never filters by schema. Keeping a Supabase-owned
+  table out of a generated migration is a matter of not exporting it from the
+  files your `schema` glob reads.
+</Callout>
 
 You can still pass Drizzle Kit overrides for package-specific credentials or
 paths, for example a separate migrations connection string:
@@ -52,6 +82,34 @@ With the [package scripts](/docs/core-framework/data-management/database#package
 from installation in place, `db:generate` reads your TypeScript schema and writes
 a SQL migration under `supabase/migrations`, and `db:migrate` applies generated
 migrations to a database and records them in Drizzle Kit's migration table.
+
+## Custom SQL migrations
+
+Some objects have no Drizzle representation: triggers are the common case, since
+Drizzle Kit emits no trigger DDL and they are not part of its snapshot format.
+`drizzle-kit generate --custom` writes an **empty but tracked** migration for
+you to fill in; its snapshot links into the chain like any generated one, so
+`db:migrate` applies it in order and records it.
+
+```bash
+pnpm db:generate --custom --name=posts_updated_at_trigger
+```
+
+Put your SQL in the generated file. For the `updated_at` case,
+[`@zeno-lib/db/triggers`](/docs/core-framework/data-management/database/tables)
+prints exactly what goes in it. Write re-runnable SQL (`if not exists`,
+`drop ... if exists`) so re-applying a migration against an existing database is
+safe.
+
+<Callout type="warn">
+  `supabase db reset` applies every `.sql` file in `supabase/migrations`
+  alphabetically, while `drizzle-kit migrate` tracks state in
+  `__drizzle_migrations`. A hand-written `.sql` file that Drizzle Kit did not
+  generate works for a reset but is invisible to `db:migrate`, which is exactly
+  the drift `--custom` avoids: use it rather than dropping a loose file in.
+</Callout>
+
+## Generate migrations, day to day
 
 Author tables and RLS policies in your Drizzle schema, run `db:generate`
 (`drizzle-kit generate`), review the generated SQL, and commit it under

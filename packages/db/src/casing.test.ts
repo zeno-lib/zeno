@@ -6,11 +6,11 @@ import {
   isPgSchema,
   isPgSequence,
   isPgView,
+  PgDialect,
   pgEnum,
   pgMaterializedView,
   pgPolicy,
   pgRole,
-  pgSchema,
   pgSequence,
   pgTableCreator,
   pgView,
@@ -19,24 +19,30 @@ import {
 } from "drizzle-orm/pg-core"
 import { camelCase, snakeCase } from "drizzle-orm/pg-core/casing"
 import { describe, expect, it } from "vitest"
+import { authUsers } from "./auth-schema.ts"
 import { createAdminClient } from "./clients.ts"
-import { defineDrizzleConfig } from "./config.ts"
+import { defineDrizzleConfig, supabaseManagedRoles } from "./config.ts"
 import {
   allPolicy,
   assignedPrimaryId,
   auditColumns,
+  authenticatedAllPolicy,
+  authenticatedDeletePolicy,
+  authenticatedInsertPolicy,
   authenticatedOwnerDeletePolicy,
   authenticatedOwnerInsertPolicy,
   authenticatedOwnerSelectPolicy,
   authenticatedOwnerUpdatePolicy,
   authenticatedRole,
+  authenticatedSelectPolicy,
+  authenticatedUpdatePolicy,
   authorship,
   authUid,
   authUserId,
-  authUsers,
   createdBy,
   deletePolicy,
   enum as enum_,
+  functionPolicies,
   insertPolicy,
   isEnum,
   isMaterializedView,
@@ -57,6 +63,7 @@ import {
   unsecureTable,
   updatedBy,
   updatePolicy,
+  userId,
   uuidPrimaryId,
   view,
 } from "./schema.ts"
@@ -64,6 +71,33 @@ import {
 describe("default casing", () => {
   it("leaves casing to Drizzle table constructors", () => {
     expect(defineDrizzleConfig()).not.toHaveProperty("casing")
+  })
+
+  it("excludes every Supabase-managed role from the role diff", () => {
+    const roles = defineDrizzleConfig().entities?.roles
+
+    expect(roles).toMatchObject({ provider: "supabase" })
+    expect(typeof roles === "object" ? roles.exclude : []).toEqual(
+      expect.arrayContaining([...supabaseManagedRoles])
+    )
+  })
+
+  it("keeps a caller's own excluded roles alongside the Supabase ones", () => {
+    const roles = defineDrizzleConfig({
+      entities: { roles: { exclude: ["my_reporting_role"] } },
+    }).entities?.roles
+    const exclude = typeof roles === "object" ? (roles.exclude ?? []) : []
+
+    expect(exclude).toContain("my_reporting_role")
+    expect(exclude).toContain("supabase_replication_admin")
+    expect(roles).toMatchObject({ provider: "supabase" })
+  })
+
+  it("diffs only the public schema unless told otherwise", () => {
+    expect(defineDrizzleConfig().schemaFilter).toEqual(["public"])
+    expect(
+      defineDrizzleConfig({ schemaFilter: ["public", "billing"] }).schemaFilter
+    ).toEqual(["public", "billing"])
   })
 
   it("works with Drizzle's snake_case table builders", async () => {
@@ -130,7 +164,6 @@ describe("default casing", () => {
     expect(materializedView).toBe(pgMaterializedView)
     expect(policy).toBe(pgPolicy)
     expect(role).toBe(pgRole)
-    expect(schema).toBe(pgSchema)
     expect(sequence).toBe(pgSequence)
     expect(tableCreator).toBe(pgTableCreator)
     expect(view).toBe(pgView)
@@ -143,11 +176,86 @@ describe("default casing", () => {
     })
     const columns = getTableColumns(posts)
     const config = getTableConfig(posts)
+    const foreignKey = config.foreignKeys[0]
 
     expect(columns.ownerId.getSQLType()).toBe("uuid")
-    expect(columns.ownerId.notNull).toBe(true)
+    // Nullable so deleting the user blanks the author instead of failing.
+    expect(columns.ownerId.notNull).toBe(false)
     expect(config.foreignKeys).toHaveLength(1)
-    expect(config.foreignKeys[0]?.reference().foreignTable).toBe(authUsers)
+    expect(foreignKey?.reference().foreignTable).toBe(authUsers)
+    expect(foreignKey?.onDelete).toBe("set null")
+    expect(foreignKey?.onUpdate).toBe("cascade")
+  })
+
+  it("restricts the delete when an author column is required", () => {
+    const posts = table("posts", { ownerId: authUserId({ notNull: true }) })
+    const foreignKey = getTableConfig(posts).foreignKeys[0]
+
+    expect(getTableColumns(posts).ownerId.notNull).toBe(true)
+    // `set null` against a NOT NULL column is a foreign key that can never
+    // fire, so a required author restricts instead.
+    expect(foreignKey?.onDelete).toBe("restrict")
+    expect(foreignKey?.onUpdate).toBe("cascade")
+  })
+
+  it("takes an explicit column name and reference actions", () => {
+    const posts = table("posts", {
+      ownerId: authUserId({
+        actions: { onDelete: "cascade", onUpdate: "no action" },
+        name: "owner_id",
+      }),
+    })
+    const foreignKey = getTableConfig(posts).foreignKeys[0]
+
+    expect(getTableColumns(posts).ownerId.name).toBe("owner_id")
+    expect(foreignKey?.onDelete).toBe("cascade")
+    expect(foreignKey?.onUpdate).toBe("no action")
+  })
+
+  it("drops the foreign key entirely when the reference is null", () => {
+    const posts = table("posts", {
+      ownerId: authUserId({ reference: null }),
+      ...authorship({ reference: null }),
+    })
+
+    expect(getTableConfig(posts).foreignKeys).toHaveLength(0)
+    expect(getTableColumns(posts).ownerId.getSQLType()).toBe("uuid")
+    expect(getTableColumns(posts).createdBy.name).toBe("created_by")
+  })
+
+  it("points author columns at a public profiles mirror", () => {
+    const profiles = table("profiles", {
+      id: uuidPrimaryId({ defaultRandom: false }),
+    })
+    const posts = table("posts", {
+      ownerId: userId(() => profiles.id),
+      ...authorship({ reference: () => profiles.id }),
+    })
+    const foreignKeys = getTableConfig(posts).foreignKeys
+
+    expect(foreignKeys).toHaveLength(3)
+    for (const foreignKey of foreignKeys) {
+      expect(foreignKey.reference().foreignTable).toBe(profiles)
+      expect(foreignKey.onDelete).toBe("set null")
+    }
+    expect(getTableColumns(posts).ownerId.notNull).toBe(false)
+  })
+
+  it("builds the same column through userId as through authUserId", () => {
+    const viaAuth = table("a", { ownerId: authUserId({ notNull: true }) })
+    const viaUserId = table("b", {
+      ownerId: userId(() => authUsers.id, { notNull: true }),
+    })
+    const authForeignKey = getTableConfig(viaAuth).foreignKeys[0]
+    const userForeignKey = getTableConfig(viaUserId).foreignKeys[0]
+
+    expect(getTableColumns(viaUserId).ownerId.notNull).toBe(
+      getTableColumns(viaAuth).ownerId.notNull
+    )
+    expect(userForeignKey?.reference().foreignTable).toBe(
+      authForeignKey?.reference().foreignTable
+    )
+    expect(userForeignKey?.onDelete).toBe(authForeignKey?.onDelete)
   })
 
   // Each helper gets its own table: all three name the column "id" by default,
@@ -318,11 +426,12 @@ describe("default casing", () => {
     // SQL, not a Date: the database clock stamps it, like created_at's default.
     expect(is(columns.updatedAt.onUpdateFn?.(), SQL)).toBe(true)
     expect(columns.createdBy.name).toBe("created_by")
-    expect(columns.createdBy.notNull).toBe(true)
+    // Nullable by default so a user delete blanks the author, not fails.
+    expect(columns.createdBy.notNull).toBe(false)
     expect(columns.createdBy.default).toBe(authUid)
     expect(columns.createdBy.onUpdateFn).toBeUndefined()
     expect(columns.updatedBy.name).toBe("updated_by")
-    expect(columns.updatedBy.notNull).toBe(true)
+    expect(columns.updatedBy.notNull).toBe(false)
     expect(columns.updatedBy.default).toBe(authUid)
     expect(columns.updatedBy.onUpdateFn?.()).toBe(authUid)
     expect(config.foreignKeys).toHaveLength(2)
@@ -331,6 +440,23 @@ describe("default casing", () => {
         (foreignKey) => foreignKey.reference().foreignTable
       )
     ).toEqual([authUsers, authUsers])
+  })
+
+  it("applies one options object to both author columns", () => {
+    const posts = table("posts", {
+      ...auditColumns({ notNull: true }),
+    })
+    const columns = getTableColumns(posts)
+    const foreignKeys = getTableConfig(posts).foreignKeys
+
+    expect(columns.createdBy.notNull).toBe(true)
+    expect(columns.updatedBy.notNull).toBe(true)
+    expect(foreignKeys.map((foreignKey) => foreignKey.onDelete)).toEqual([
+      "restrict",
+      "restrict",
+    ])
+    // Timestamps are unaffected by the authorship options.
+    expect(columns.createdAt.notNull).toBe(true)
   })
 
   it("stamps updated_at from the database clock, not the Node process", async () => {
@@ -480,5 +606,136 @@ describe("default casing", () => {
     expect(policies[2]?.using).toBeDefined()
     expect(policies[2]?.withCheck).toBeDefined()
     expect(policies[3]?.using).toBeDefined()
+  })
+
+  it("cases column names in a non-public schema", async () => {
+    const billing = schema("billing")
+    const invoices = billing.table("invoices", {
+      displayName: text(),
+      ownerId: uuid(),
+    })
+    const db = createAdminClient()
+
+    expect(db.select().from(invoices).toSQL().sql).toContain('"display_name"')
+    expect(db.select().from(invoices).toSQL().sql).toContain('"owner_id"')
+    expect(getTableConfig(invoices).schema).toBe("billing")
+
+    await db.close()
+  })
+
+  it("enables RLS on a schema table and leaves unsecureTable alone", () => {
+    const billing = schema("billing")
+
+    expect(
+      getTableConfig(billing.table("invoices", { ownerId: uuid() })).enableRLS
+    ).toBe(true)
+    expect(
+      getTableConfig(billing.unsecureTable("rates", { ownerId: uuid() }))
+        .enableRLS
+    ).toBe(false)
+  })
+
+  it("stays a drizzle schema so the rest of its builders still work", () => {
+    const billing = schema("billing")
+
+    expect(isSchema(billing)).toBe(true)
+    expect(billing.schemaName).toBe("billing")
+    expect(billing.existing().isExisting).toBe(true)
+    expect(isEnum(billing.enum("plan", ["free", "paid"]))).toBe(true)
+    expect(isSequence(billing.sequence("invoice_no"))).toBe(true)
+  })
+
+  it("presets the authenticated role and leaves the condition to the caller", () => {
+    const condition = sql`true`
+    const presets = [
+      authenticatedSelectPolicy("s", { using: condition }),
+      authenticatedInsertPolicy("i", { withCheck: condition }),
+      authenticatedUpdatePolicy("u", { using: condition }),
+      authenticatedDeletePolicy("d", { using: condition }),
+      authenticatedAllPolicy("a", { using: condition }),
+    ]
+
+    expect(presets.map((preset) => preset.for)).toEqual([
+      "select",
+      "insert",
+      "update",
+      "delete",
+      "all",
+    ])
+    for (const preset of presets) {
+      expect(preset.to).toBe(authenticatedRole)
+    }
+    // No owner check is assumed; the caller's condition is what lands.
+    expect(presets[0]?.using).toBe(condition)
+    expect(presets[1]?.withCheck).toBe(condition)
+  })
+
+  it("delegates each operation to a security definer function", async () => {
+    const posts = table("posts", { id: primaryId("uuid") }, (t) =>
+      functionPolicies(t, { argument: t.id })
+    )
+    const policies = getTableConfig(posts).policies
+    const db = createAdminClient()
+
+    expect(policies.map((rlsPolicy) => rlsPolicy.name)).toEqual([
+      "can_select_posts",
+      "can_insert_posts",
+      "can_update_posts",
+      "can_delete_posts",
+    ])
+    for (const rlsPolicy of policies) {
+      expect(rlsPolicy.to).toBe(authenticatedRole)
+    }
+    // using for select and delete, withCheck for insert, both for update.
+    expect(policies[0]?.using).toBeDefined()
+    expect(policies[0]?.withCheck).toBeUndefined()
+    expect(policies[1]?.using).toBeUndefined()
+    expect(policies[1]?.withCheck).toBeDefined()
+    expect(policies[2]?.using).toBeDefined()
+    expect(policies[2]?.withCheck).toBeDefined()
+    expect(policies[3]?.using).toBeDefined()
+    expect(policies[3]?.withCheck).toBeUndefined()
+
+    const dialect = new PgDialect()
+
+    // The shape the issue asks for: the call wrapped in a select, with the
+    // column passed through.
+    expect(dialect.sqlToQuery(policies[0]?.using as SQL).sql).toBe(
+      '(select "can_select_posts"("posts"."id"))'
+    )
+    expect(dialect.sqlToQuery(policies[2]?.withCheck as SQL).sql).toBe(
+      '(select "can_update_posts"("posts"."id"))'
+    )
+
+    expect(db.select().from(posts).toSQL().sql).toBeDefined()
+    await db.close()
+  })
+
+  it("calls the function with no argument when none is given", () => {
+    const tags = table("tags", { id: primaryId("uuid") }, (t) =>
+      functionPolicies(t)
+    )
+    const policies = getTableConfig(tags).policies
+
+    expect(policies).toHaveLength(4)
+    expect(new PgDialect().sqlToQuery(policies[0]?.using as SQL).sql).toBe(
+      '(select "can_select_tags"())'
+    )
+  })
+
+  it("takes a prefix and a policy name override", () => {
+    const posts = table("posts", { id: primaryId("uuid") }, (t) =>
+      functionPolicies(t, {
+        name: (operation, tableName) => `${tableName}_${operation}`,
+        prefix: "may",
+      })
+    )
+
+    expect(getTableConfig(posts).policies.map((p) => p.name)).toEqual([
+      "posts_select",
+      "posts_insert",
+      "posts_update",
+      "posts_delete",
+    ])
   })
 })

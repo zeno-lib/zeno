@@ -260,3 +260,39 @@ describe("db.transaction (multi-statement)", () => {
     expect(result.uid).toEqual({ uid: USER_A })
   })
 })
+
+describe("updated_at trigger", () => {
+  // The Drizzle-side `$onUpdateFn` only fires for statements Drizzle builds, so
+  // it misses PostgREST, the dashboard and psql. The `moddatetime` trigger from
+  // `supabase/migrations/*_posts_updated_at_trigger.sql` covers those, and this
+  // asserts it, because a trigger that silently stops firing looks exactly like
+  // one that works.
+  it("refreshes updated_at for a write Drizzle never sees", async () => {
+    const db = createAdminClient()
+    const [created] = await db
+      .insert(posts)
+      .values({ title: "trigger seed", userId: USER_A })
+      .returning({ id: posts.id, updatedAt: posts.updatedAt })
+
+    if (!created) {
+      throw new Error("insert returned no row")
+    }
+
+    // Raw SQL, exactly the shape PostgREST issues. `updated_at` is not in the
+    // SET list, so only the trigger can move it.
+    await db.execute(
+      sql`update posts set title = 'changed by raw sql' where id = ${created.id}`
+    )
+    const [after] = await db
+      .select({ updatedAt: posts.updatedAt })
+      .from(posts)
+      .where(eq(posts.id, created.id))
+
+    expect(after?.updatedAt.getTime()).toBeGreaterThan(
+      created.updatedAt.getTime()
+    )
+
+    await db.delete(posts).where(eq(posts.id, created.id))
+    await db.close()
+  })
+})
