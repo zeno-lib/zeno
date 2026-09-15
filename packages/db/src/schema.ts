@@ -1,4 +1,4 @@
-// https://orm.drizzle.team/docs/rls#using-with-supabase  (re-exported roles, authUsers, authUid, realtimeMessages)
+// https://orm.drizzle.team/docs/rls#using-with-supabase  (re-exported roles, authUid, realtimeMessages)
 import { sql } from "drizzle-orm"
 import {
   type AnyPgColumn,
@@ -18,7 +18,8 @@ import {
   varchar,
 } from "drizzle-orm/pg-core"
 import { snakeCase } from "drizzle-orm/pg-core/casing"
-import { authenticatedRole, authUid, authUsers } from "drizzle-orm/supabase"
+import { authenticatedRole, authUid } from "drizzle-orm/supabase"
+import { authUsers } from "./auth-schema.ts"
 
 // pg-core primitives without the `pg` prefix they repeat at every call site.
 // `table` is missing on purpose. Zeno's own is at the bottom of this file.
@@ -45,7 +46,6 @@ export {
   anonRole,
   authenticatedRole,
   authUid,
-  authUsers,
   postgresRole,
   realtimeMessages,
   realtimeTopic,

@@ -19,6 +19,7 @@ import {
 } from "drizzle-orm/pg-core"
 import { camelCase, snakeCase } from "drizzle-orm/pg-core/casing"
 import { describe, expect, it } from "vitest"
+import { authUsers } from "./auth-schema.ts"
 import { createAdminClient } from "./clients.ts"
 import { defineDrizzleConfig } from "./config.ts"
 import {
@@ -33,7 +34,6 @@ import {
   authorship,
   authUid,
   authUserId,
-  authUsers,
   createdBy,
   deletePolicy,
   enum as enum_,

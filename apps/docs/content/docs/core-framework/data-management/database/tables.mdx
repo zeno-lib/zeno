@@ -373,10 +373,56 @@ redeclare Supabase's built-in roles in your schema.
 | `serviceRole` | The `service_role` (RLS-bypassing) role. |
 | `postgresRole` | The `postgres` superuser role. |
 | `supabaseAuthAdminRole` | The `supabase_auth_admin` role that owns the auth schema. |
-| `authUsers` | The Supabase `auth.users` table. |
 | `authUid` | The `auth.uid()` SQL helper for the current user id. |
 | `realtimeMessages` | The Supabase Realtime `messages` table. |
 | `realtimeTopic` | The `realtime.topic()` SQL helper. |
+
+### auth.users
+
+`auth.users` comes from a **separate** entrypoint, `@zeno-lib/db/auth`:
+
+```typescript
+import { authUsers } from "@zeno-lib/db/auth"
+```
+
+It is the full 35-column table, generated with `drizzle-kit pull` and pinned to
+Supabase CLI 2.84.1 / GoTrue v2.188.1. Drizzle's own `drizzle-orm/supabase`
+export has 8 of those columns, so putting `auth` in `schemaFilter` made
+drizzle-kit want to drop the other 27, and anyone needing a foreign key into
+`auth.users` hand-wrote the table instead.
+
+<Callout type="warn">
+  The reason it has its own entrypoint is that `drizzle-kit generate` applies
+  **no** entity filter: it passes `() => true`, and its config accepts neither
+  `schemaFilter` nor `entities`. So neither `pgSchema("auth").existing()` nor a
+  `schemaFilter` in your drizzle config stops it emitting
+  `CREATE TABLE "auth"."users"`. The only thing that does is the table never
+  reaching the files your `schema` glob reads.
+
+  Import it in queries. Do **not** re-export it from the
+  `{project}-db/src/schema.ts` barrel your `drizzle.config.ts` points at, or the
+  next `drizzle-kit generate` will try to create a table Supabase already owns.
+  Referencing it from a column (`authUserId()`) is always safe: a table reached
+  only through a `references()` thunk is never collected.
+</Callout>
+
+Several columns hold credential material (`encryptedPassword`, the `*Token`
+columns), and reading the table at all needs an RLS-bypassing client. Select the
+columns you need rather than `select()`:
+
+```typescript
+import { createAdminClient } from "@zeno-lib/db"
+import { authUsers } from "@zeno-lib/db/auth"
+
+const db = createAdminClient()
+const users = await db
+  .select({ email: authUsers.email, lastSignInAt: authUsers.lastSignInAt })
+  .from(authUsers)
+```
+
+The nine `auth` enums are deliberately not shipped. `auth.users` uses none of
+them (they belong to the `mfa_*`, `oauth_*` and `sso_*` tables), and drizzle-kit
+never filters enums, so an exported one would be `CREATE TYPE` in every command.
 
 ### pg-core aliases
 
