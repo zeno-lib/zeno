@@ -27,7 +27,7 @@ policy helpers.
 | Import | Use from | Returns / does |
 |---|---|---|
 | `@zeno-lib/db` | Server code (Server Components, Route Handlers, Server Actions, cron, scripts) | Five factories, each `(…, config?: CreateClientConfig)` where `config` is a Drizzle config (`{ relations?, logger?, casing? }`) plus an optional `connectionString` (defaults to `SUPABASE_DATABASE_URL`). **`createAdminClient(config?)`** -> a client that **bypasses RLS** (webhooks, admin tasks, background jobs, seeding); queried directly (`db.select().from(t)`, `db.transaction(cb)`). **`createAuthClient(supabase, config?)`** -> RLS client bound to a Supabase client; verified claims are resolved via `supabase.auth.getClaims()` on **every** query (always reflects the live session). **`createSupabaseClient(accessToken, config?)`** -> RLS client scoped to an already-verified, **decoded** token (`SupabaseToken` = the `role` + `sub` claims, e.g. from `getClaims()`). **`createAnonClient(config?)`** -> RLS client that runs every query as `anon`. **`createServiceClient(config?)`** -> client that runs every query as `service_role` (bypasses RLS via Supabase's BYPASSRLS grant) — the only path to `service_role`. All four RLS clients are **queried directly**: each awaited single statement (`db.select().from(t)`, `db.query.t.findMany()`) is recorded and replayed inside its own RLS transaction with the claims set and the role switched; `db.transaction(async (tx) => { … })` runs several statements under one atomic RLS transaction. `relations` (from `defineRelations`) enables the relational query API. Postgres pools are cached per `(kind, connectionString)` — the `admin` and `rls` kinds get separate pools so the admin connection is never role-switched. `close()` is reference-counted: it releases this handle's share of the pool and only ends it once the last handle closes. |
-| `@zeno-lib/db/config` | `drizzle.config.ts` in each consuming package/app | `defineDrizzleConfig({ schema, ...overrides })` — preset that defaults `out` to `./supabase/migrations`, dialect to `postgresql`, reads `SUPABASE_DATABASE_URL` from env, and sets `entities.roles.provider: "supabase"`. |
+| `@zeno-lib/db/config` | `drizzle.config.ts` in each consuming package/app | `defineDrizzleConfig({ schema, ...overrides })`, a preset that defaults `out` to `./supabase/migrations`, dialect to `postgresql`, reads `SUPABASE_DATABASE_URL` from env, sets `entities.roles.provider: "supabase"` plus `entities.roles.exclude` from the exported `supabaseManagedRoles` (the 18 Supabase roles `provider` misses), and defaults `schemaFilter` to `["public"]`. Also exports `supabaseManagedRoles`. |
 | `@zeno-lib/db/schema` | Application schema files | `table` (`snakeCase.table.withRLS`) for RLS-by-default tables, `unsecureTable` (`snakeCase.table`) for intentional non-RLS tables, `primaryId(kind)` for a primary key (`"sequential"` \| `"uuid"` \| `"assigned"`, default `"sequential"`, which is the id the Supabase table editor gives a new table), each kind emitting the column Supabase creates for that choice; it takes the kind and nothing else, so renaming the column or changing how the value is generated goes through the helper behind the kind (`uuidPrimaryId()`, `sequentialPrimaryId()`, `assignedPrimaryId()`), other common column helpers (`authUserId`, `createdBy()`, `updatedBy()`), audit mixin factories (`timestamps()` for xAt, `authorship()` for xBy, `auditColumns()` for all four — call one per table; each call returns fresh builders, so one table's customisation can't leak into another), generic policy helpers (`selectPolicy`, `insertPolicy`, `updatePolicy`, `deletePolicy`, `allPolicy`), authenticated-owner policy helpers, curated Supabase role/helper exports from `drizzle-orm/supabase`, and curated `pg-core` aliases such as `policy`, `role`, `schema`, `sequence`, `view`, `materializedView`, `tableCreator`, and `enum` (import with a local alias because `enum` is reserved). |
 
 Keep this entrypoint list focused on Zeno-owned DB helpers. Consumers import
@@ -258,10 +258,19 @@ by Client Components for validation.
   snake_case database identifiers. Use direct Drizzle casing helpers only when
   the database intentionally preserves camelCase identifiers or needs a custom
   table constructor.
-- **Forgetting `entities.roles.provider: "supabase"`** would make drizzle-kit
-  try to drop Supabase's built-in roles in the next migration. The shared
-  `defineDrizzleConfig` sets this by default — don't override `entities` without
-  re-merging this flag.
+- **Role and schema filters bind `push`/`pull`, never `generate`.**
+  `defineDrizzleConfig` sets `entities.roles` (provider plus
+  `supabaseManagedRoles`) and `schemaFilter: ["public"]`, which stop
+  `drizzle-kit push`/`pull` offering to `DROP ROLE` Supabase's 26 built-in roles
+  or to migrate the `auth` schema. `drizzle-kit generate` reads neither:
+  `configGenerate` in the drizzle-kit bundle is `configCommonSchema` plus
+  `schema` only, with no `entities` and no `schemaFilter`, and the generate path
+  passes `() => true` as its entity filter. Verified against
+  `drizzle-kit@1.0.0-rc.3`. So `generate` never emits `DROP ROLE`, but it also
+  never filters by schema: a Supabase-owned table stays out of a generated
+  migration only by not being exported from the files the `schema` glob reads.
+  Don't override `entities` or `schemaFilter` without re-merging what the preset
+  set.
 - **Primary key defaults track Supabase, not Drizzle.** `primaryId("sequential")`
   emits `bigint … generated by default as identity` because that is what the
   Supabase table editor creates; `integer` and `generated always` are opt-ins on

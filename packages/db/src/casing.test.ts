@@ -20,7 +20,7 @@ import {
 import { camelCase, snakeCase } from "drizzle-orm/pg-core/casing"
 import { describe, expect, it } from "vitest"
 import { createAdminClient } from "./clients.ts"
-import { defineDrizzleConfig } from "./config.ts"
+import { defineDrizzleConfig, supabaseManagedRoles } from "./config.ts"
 import {
   allPolicy,
   assignedPrimaryId,
@@ -64,6 +64,33 @@ import {
 describe("default casing", () => {
   it("leaves casing to Drizzle table constructors", () => {
     expect(defineDrizzleConfig()).not.toHaveProperty("casing")
+  })
+
+  it("excludes every Supabase-managed role from the role diff", () => {
+    const roles = defineDrizzleConfig().entities?.roles
+
+    expect(roles).toMatchObject({ provider: "supabase" })
+    expect(typeof roles === "object" ? roles.exclude : []).toEqual(
+      expect.arrayContaining([...supabaseManagedRoles])
+    )
+  })
+
+  it("keeps a caller's own excluded roles alongside the Supabase ones", () => {
+    const roles = defineDrizzleConfig({
+      entities: { roles: { exclude: ["my_reporting_role"] } },
+    }).entities?.roles
+    const exclude = typeof roles === "object" ? (roles.exclude ?? []) : []
+
+    expect(exclude).toContain("my_reporting_role")
+    expect(exclude).toContain("supabase_replication_admin")
+    expect(roles).toMatchObject({ provider: "supabase" })
+  })
+
+  it("diffs only the public schema unless told otherwise", () => {
+    expect(defineDrizzleConfig().schemaFilter).toEqual(["public"])
+    expect(
+      defineDrizzleConfig({ schemaFilter: ["public", "billing"] }).schemaFilter
+    ).toEqual(["public", "billing"])
   })
 
   it("works with Drizzle's snake_case table builders", async () => {
