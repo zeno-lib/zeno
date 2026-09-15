@@ -339,8 +339,71 @@ authUserOwns(t.userId) // sql`${t.userId} = ${authUid}`
 "posts"."user_id" = (select auth.uid())
 ```
 
-**Owner policies** build on those: they force `TO authenticated` and default the
-owner check to `authUserOwns(ownerColumn)`. Each takes `(name, ownerColumn,
+**Authenticated policies** sit between the two: they preset `TO authenticated`,
+which every hand-written policy repeats, and leave the condition to you. Reach
+for these whenever access depends on more than the row's own owner column.
+
+```typescript
+authenticatedSelectPolicy("posts_read", { using: sql`is_published(posts.id)` })
+```
+
+```sql
+CREATE POLICY "posts_read" ON "posts" AS PERMISSIVE FOR SELECT
+  TO "authenticated" USING (is_published(posts.id));
+```
+
+| Export | `for` | Condition goes in |
+|---|---|---|
+| `authenticatedSelectPolicy(name, config?)` | `SELECT` | `using` |
+| `authenticatedInsertPolicy(name, config?)` | `INSERT` | `withCheck` |
+| `authenticatedUpdatePolicy(name, config?)` | `UPDATE` | `using` + `withCheck` |
+| `authenticatedDeletePolicy(name, config?)` | `DELETE` | `using` |
+| `authenticatedAllPolicy(name, config?)` | `ALL` | `using` + `withCheck` |
+
+**Function policies** cover the case those still leave verbose. Once access
+depends on anything but the row's own owner column, the usual answer is a
+`security definer` function, which is also the standard advice for keeping RLS
+predicates out of the planner's way. `functionPolicies(columns, options?)`
+writes all four:
+
+```typescript
+export const posts = table("posts", { id: primaryId("uuid") }, (t) =>
+  functionPolicies(t, { argument: t.id })
+)
+```
+
+```sql
+CREATE POLICY "can_select_posts" ON "posts" AS PERMISSIVE FOR SELECT
+  TO "authenticated" USING ((select "can_select_posts"("posts"."id")));
+CREATE POLICY "can_insert_posts" ON "posts" AS PERMISSIVE FOR INSERT
+  TO "authenticated" WITH CHECK ((select "can_insert_posts"("posts"."id")));
+CREATE POLICY "can_update_posts" ON "posts" AS PERMISSIVE FOR UPDATE
+  TO "authenticated" USING ((select "can_update_posts"("posts"."id")))
+  WITH CHECK ((select "can_update_posts"("posts"."id")));
+CREATE POLICY "can_delete_posts" ON "posts" AS PERMISSIVE FOR DELETE
+  TO "authenticated" USING ((select "can_delete_posts"("posts"."id")));
+```
+
+It puts the condition in the clause each operation takes: `using` for select and
+delete, `withCheck` for insert, both for update. The call is wrapped in a
+`select` so Postgres evaluates it once per statement rather than once per row,
+the same shape `auth.uid()` uses.
+
+| Option | Default | What it changes |
+|---|---|---|
+| `argument` | none | Column passed to each function. Omit for functions that take none. |
+| `prefix` | `"can"` | Start of the generated function and policy names. |
+| `name` | `(operation, table) => …` | Overrides the policy name only. |
+
+It takes the columns object the extra callback gives you (`t`), not the table,
+because naming a table inside its own definition makes its type circular. The
+table name comes from the columns, so it stays right through a rename.
+
+You write the functions themselves; Zeno only writes the policies that call
+them.
+
+**Owner policies** are the narrowest preset: they force `TO authenticated` and
+default the owner check to `authUserOwns(ownerColumn)`. Each takes `(name, ownerColumn,
 config?)`; pass `using` or `withCheck` to override.
 
 ```typescript
