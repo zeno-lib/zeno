@@ -1,10 +1,11 @@
 import {
+  auditColumns,
   authenticatedOwnerInsertPolicy,
   authenticatedOwnerSelectPolicy,
+  authenticatedOwnerUpdatePolicy,
   authUserId,
   primaryId,
   table,
-  timestamps,
 } from "@zeno-lib/db/schema"
 import { text } from "drizzle-orm/pg-core"
 
@@ -13,11 +14,13 @@ export const posts = table(
   {
     id: primaryId("uuid"),
     title: text("title").notNull(),
-    userId: authUserId(),
-    ...timestamps,
+    userId: authUserId({ notNull: true }),
+    // The full audit set, so both update triggers have real coverage.
+    ...auditColumns(),
   },
   (t) => [
     authenticatedOwnerSelectPolicy("posts_owner_select", t.userId),
     authenticatedOwnerInsertPolicy("posts_owner_insert", t.userId),
+    authenticatedOwnerUpdatePolicy("posts_owner_update", t.userId),
   ]
 )
