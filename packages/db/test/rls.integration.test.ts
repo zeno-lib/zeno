@@ -261,7 +261,7 @@ describe("db.transaction (multi-statement)", () => {
   })
 })
 
-describe("updated_at trigger", () => {
+describe("audit triggers", () => {
   // The Drizzle-side `$onUpdateFn` only fires for statements Drizzle builds, so
   // it misses PostgREST, the dashboard and psql. The `moddatetime` trigger from
   // `supabase/migrations/*_posts_updated_at_trigger.sql` covers those, and this
@@ -294,5 +294,36 @@ describe("updated_at trigger", () => {
 
     await db.delete(posts).where(eq(posts.id, created.id))
     await db.close()
+  })
+
+  it("stamps updated_by with the acting user, not the admin connection", async () => {
+    const admin = createAdminClient()
+    const [created] = await admin
+      .insert(posts)
+      .values({ title: "authored", userId: USER_A })
+      .returning({ id: posts.id, updatedBy: posts.updatedBy })
+
+    if (!created) {
+      throw new Error("insert returned no row")
+    }
+
+    // Seeded by the admin client, which has no session, so auth.uid() is null.
+    expect(created.updatedBy).toBeNull()
+
+    // User A edits their own row through the RLS client.
+    await authClient(USER_A)
+      .update(posts)
+      .set({ title: "edited by A" })
+      .where(eq(posts.id, created.id))
+
+    const [after] = await admin
+      .select({ updatedBy: posts.updatedBy })
+      .from(posts)
+      .where(eq(posts.id, created.id))
+
+    expect(after?.updatedBy).toBe(USER_A)
+
+    await admin.delete(posts).where(eq(posts.id, created.id))
+    await admin.close()
   })
 })

@@ -1,4 +1,4 @@
-import { getTableColumns, is, SQL, sql } from "drizzle-orm"
+import { getTableColumns, type SQL, sql } from "drizzle-orm"
 import {
   getTableConfig,
   isPgEnum,
@@ -37,7 +37,6 @@ import {
   authenticatedSelectPolicy,
   authenticatedUpdatePolicy,
   authorship,
-  authUid,
   authUserId,
   createdBy,
   deletePolicy,
@@ -423,17 +422,16 @@ describe("default casing", () => {
     expect(columns.updatedAt.name).toBe("updated_at")
     expect(columns.updatedAt.notNull).toBe(true)
     expect(columns.updatedAt.default).toBeDefined()
-    // SQL, not a Date: the database clock stamps it, like created_at's default.
-    expect(is(columns.updatedAt.onUpdateFn?.(), SQL)).toBe(true)
+    expect(columns.updatedAt.onUpdateFn).toBeUndefined()
     expect(columns.createdBy.name).toBe("created_by")
     // Nullable by default so a user delete blanks the author, not fails.
     expect(columns.createdBy.notNull).toBe(false)
-    expect(columns.createdBy.default).toBe(authUid)
+    expect(columns.createdBy.default).toBeDefined()
     expect(columns.createdBy.onUpdateFn).toBeUndefined()
     expect(columns.updatedBy.name).toBe("updated_by")
     expect(columns.updatedBy.notNull).toBe(false)
-    expect(columns.updatedBy.default).toBe(authUid)
-    expect(columns.updatedBy.onUpdateFn?.()).toBe(authUid)
+    expect(columns.updatedBy.default).toBeDefined()
+    expect(columns.updatedBy.onUpdateFn).toBeUndefined()
     expect(config.foreignKeys).toHaveLength(2)
     expect(
       config.foreignKeys.map(
@@ -459,7 +457,7 @@ describe("default casing", () => {
     expect(columns.createdAt.notNull).toBe(true)
   })
 
-  it("stamps updated_at from the database clock, not the Node process", async () => {
+  it("does not add updated_at to an UPDATE Drizzle builds", async () => {
     const posts = table("posts", { title: text(), ...timestamps() })
     const db = createAdminClient()
     const { params, sql: statement } = db
@@ -467,20 +465,29 @@ describe("default casing", () => {
       .set({ title: "hello" })
       .toSQL()
 
-    // `now()` is inlined rather than bound, so the value comes from Postgres.
-    expect(statement).toContain('"updated_at" = now()')
+    // Drizzle no longer touches the column, so the trigger is the only thing
+    // that sets it and every writer gets the same behaviour.
+    expect(statement).not.toContain('"updated_at"')
     expect(params).toEqual(["hello"])
 
     await db.close()
   })
 
-  it("drops the refresh hook when a trigger owns updated_at", () => {
-    const posts = table("posts", { ...timestamps({ onUpdate: false }) })
+  it("leaves the update side of the audit columns to Postgres", () => {
+    const posts = table("posts", { ...auditColumns() })
+    const columns = getTableColumns(posts)
 
-    expect(getTableColumns(posts).updatedAt.onUpdateFn).toBeUndefined()
-    // The column itself is unchanged; only the Drizzle-side hook goes.
-    expect(getTableColumns(posts).updatedAt.notNull).toBe(true)
-    expect(getTableColumns(posts).updatedAt.default).toBeDefined()
+    // No Drizzle-side hooks at all: `$onUpdateFn` is applied while Drizzle
+    // builds its own statement, so it would miss every PostgREST write. The
+    // triggers in @zeno-lib/db/triggers own these columns instead.
+    expect(columns.updatedAt.onUpdateFn).toBeUndefined()
+    expect(columns.updatedBy.onUpdateFn).toBeUndefined()
+
+    // The insert side stays real SQL, so it covers every writer.
+    expect(columns.createdAt.default).toBeDefined()
+    expect(columns.updatedAt.default).toBeDefined()
+    expect(columns.createdBy.default).toBeDefined()
+    expect(columns.updatedBy.default).toBeDefined()
   })
 
   it("passes timezone and precision through to the column type", () => {
