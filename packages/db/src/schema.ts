@@ -11,6 +11,7 @@ import {
   type PgIntegerBuilder,
   type PgPolicyConfig,
   type PgUUIDBuilder,
+  type Precision,
   pgPolicy,
   type ReferenceConfig,
   type SetHasDefault,
@@ -55,19 +56,35 @@ export {
   supabaseAuthAdminRole,
 } from "drizzle-orm/supabase"
 
+type TimestampsOptions = {
+  withTimezone?: boolean
+  /** Fractional-second digits. Postgres allows 0 to 6. */
+  precision?: Precision
+}
+
+// `created_at` is a column DEFAULT, so Postgres fills it for every writer.
+// `updated_at` has no equivalent: SQL has no "on update" default, and Drizzle's
+// `$onUpdateFn` is applied while Drizzle builds its own statement, so a write
+// arriving through PostgREST never runs it. In a Supabase app that is most
+// writes, which made the hook a column half Drizzle claimed and never
+// maintained. It is gone: `updatedAtTrigger` from `@zeno-lib/db/triggers` puts
+// the column in Postgres's hands, where every writer reaches it.
+//
 // Call and spread into a column map. Every audit mixin here is a factory rather
 // than a shared object, because Drizzle's builder methods mutate `this` and
 // return it. One builder in two tables would leak `.notNull()`, `.references()`
 // and its name from whichever table customised it first.
-export const timestamps = () => ({
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-})
+export const timestamps = ({
+  precision,
+  withTimezone = true,
+}: TimestampsOptions = {}) => {
+  const config = { precision, withTimezone }
+
+  return {
+    createdAt: timestamp("created_at", config).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", config).notNull().defaultNow(),
+  }
+}
 
 type ReferenceActions = ReferenceConfig["config"]
 
@@ -153,20 +170,31 @@ export function userId(
   return authorColumn({ ...options, reference })
 }
 
+// `authUid` is `(select auth.uid())`, which is right for a policy predicate
+// (the wrapper lets the planner evaluate it once per statement) but invalid in
+// a column DEFAULT: Postgres rejects a subquery there with
+// "cannot use subquery in DEFAULT expression". The bare call is what a DEFAULT
+// takes, and it resolves the same request.jwt.claims setting.
+const AUTH_UID_DEFAULT = sql`auth.uid()`
+
 export function createdBy<TNotNull extends boolean = false>(
   options?: AuthorshipOptions<TNotNull>
 ): SetHasDefault<AuthorColumn<TNotNull>>
 export function createdBy(options: AuthorColumnConfig = {}) {
-  return authorColumn({ ...options, name: "created_by" }).default(authUid)
+  return authorColumn({ ...options, name: "created_by" }).default(
+    AUTH_UID_DEFAULT
+  )
 }
 
 export function updatedBy<TNotNull extends boolean = false>(
   options?: AuthorshipOptions<TNotNull>
 ): SetHasDefault<AuthorColumn<TNotNull>>
 export function updatedBy(options: AuthorColumnConfig = {}) {
-  return authorColumn({ ...options, name: "updated_by" })
-    .default(authUid)
-    .$onUpdate(() => authUid)
+  // The DEFAULT covers the insert for every writer. The update side is
+  // `updatedByTrigger`, for the same reason `updated_at` needs one.
+  return authorColumn({ ...options, name: "updated_by" }).default(
+    AUTH_UID_DEFAULT
+  )
 }
 
 // One options object covers both columns. A table that needs them to differ
@@ -179,10 +207,11 @@ export const authorship = <TNotNull extends boolean = false>(
   updatedBy: updatedBy<TNotNull>(options),
 })
 
+// Takes both halves' options, since it builds both halves.
 export const auditColumns = <TNotNull extends boolean = false>(
-  options?: AuthorshipOptions<TNotNull>
+  options: AuthorshipOptions<TNotNull> & TimestampsOptions = {}
 ) => ({
-  ...timestamps(),
+  ...timestamps(options),
   ...authorship<TNotNull>(options),
 })
 

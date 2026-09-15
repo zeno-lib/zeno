@@ -37,7 +37,6 @@ import {
   authenticatedSelectPolicy,
   authenticatedUpdatePolicy,
   authorship,
-  authUid,
   authUserId,
   createdBy,
   deletePolicy,
@@ -423,16 +422,16 @@ describe("default casing", () => {
     expect(columns.updatedAt.name).toBe("updated_at")
     expect(columns.updatedAt.notNull).toBe(true)
     expect(columns.updatedAt.default).toBeDefined()
-    expect(columns.updatedAt.onUpdateFn?.()).toBeInstanceOf(Date)
+    expect(columns.updatedAt.onUpdateFn).toBeUndefined()
     expect(columns.createdBy.name).toBe("created_by")
     // Nullable by default so a user delete blanks the author, not fails.
     expect(columns.createdBy.notNull).toBe(false)
-    expect(columns.createdBy.default).toBe(authUid)
+    expect(columns.createdBy.default).toBeDefined()
     expect(columns.createdBy.onUpdateFn).toBeUndefined()
     expect(columns.updatedBy.name).toBe("updated_by")
     expect(columns.updatedBy.notNull).toBe(false)
-    expect(columns.updatedBy.default).toBe(authUid)
-    expect(columns.updatedBy.onUpdateFn?.()).toBe(authUid)
+    expect(columns.updatedBy.default).toBeDefined()
+    expect(columns.updatedBy.onUpdateFn).toBeUndefined()
     expect(config.foreignKeys).toHaveLength(2)
     expect(
       config.foreignKeys.map(
@@ -456,6 +455,55 @@ describe("default casing", () => {
     ])
     // Timestamps are unaffected by the authorship options.
     expect(columns.createdAt.notNull).toBe(true)
+  })
+
+  it("does not add updated_at to an UPDATE Drizzle builds", async () => {
+    const posts = table("posts", { title: text(), ...timestamps() })
+    const db = createAdminClient()
+    const { params, sql: statement } = db
+      .update(posts)
+      .set({ title: "hello" })
+      .toSQL()
+
+    // Drizzle no longer touches the column, so the trigger is the only thing
+    // that sets it and every writer gets the same behaviour.
+    expect(statement).not.toContain('"updated_at"')
+    expect(params).toEqual(["hello"])
+
+    await db.close()
+  })
+
+  it("leaves the update side of the audit columns to Postgres", () => {
+    const posts = table("posts", { ...auditColumns() })
+    const columns = getTableColumns(posts)
+
+    // No Drizzle-side hooks at all: `$onUpdateFn` is applied while Drizzle
+    // builds its own statement, so it would miss every PostgREST write. The
+    // triggers in @zeno-lib/db/triggers own these columns instead.
+    expect(columns.updatedAt.onUpdateFn).toBeUndefined()
+    expect(columns.updatedBy.onUpdateFn).toBeUndefined()
+
+    // The insert side stays real SQL, so it covers every writer.
+    expect(columns.createdAt.default).toBeDefined()
+    expect(columns.updatedAt.default).toBeDefined()
+    expect(columns.createdBy.default).toBeDefined()
+    expect(columns.updatedBy.default).toBeDefined()
+  })
+
+  it("passes timezone and precision through to the column type", () => {
+    const naive = table("naive", { ...timestamps({ withTimezone: false }) })
+    const precise = table("precise", { ...timestamps({ precision: 3 }) })
+    const audited = table("audited", {
+      ...auditColumns({ precision: 0, withTimezone: false }),
+    })
+
+    expect(getTableColumns(naive).createdAt.getSQLType()).toBe("timestamp")
+    expect(getTableColumns(precise).updatedAt.getSQLType()).toBe(
+      "timestamp (3) with time zone"
+    )
+    expect(getTableColumns(audited).createdAt.getSQLType()).toBe(
+      "timestamp (0)"
+    )
   })
 
   it("exports grouped audit column mixins", () => {

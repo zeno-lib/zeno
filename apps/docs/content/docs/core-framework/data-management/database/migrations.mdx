@@ -83,6 +83,34 @@ from installation in place, `db:generate` reads your TypeScript schema and write
 a SQL migration under `supabase/migrations`, and `db:migrate` applies generated
 migrations to a database and records them in Drizzle Kit's migration table.
 
+## Custom SQL migrations
+
+Some objects have no Drizzle representation: triggers are the common case, since
+Drizzle Kit emits no trigger DDL and they are not part of its snapshot format.
+`drizzle-kit generate --custom` writes an **empty but tracked** migration for
+you to fill in; its snapshot links into the chain like any generated one, so
+`db:migrate` applies it in order and records it.
+
+```bash
+pnpm db:generate --custom --name=posts_updated_at_trigger
+```
+
+Put your SQL in the generated file. For the `updated_at` case,
+[`@zeno-lib/db/triggers`](/docs/core-framework/data-management/database/tables)
+prints exactly what goes in it. Write re-runnable SQL (`if not exists`,
+`drop ... if exists`) so re-applying a migration against an existing database is
+safe.
+
+<Callout type="warn">
+  `supabase db reset` applies every `.sql` file in `supabase/migrations`
+  alphabetically, while `drizzle-kit migrate` tracks state in
+  `__drizzle_migrations`. A hand-written `.sql` file that Drizzle Kit did not
+  generate works for a reset but is invisible to `db:migrate`, which is exactly
+  the drift `--custom` avoids: use it rather than dropping a loose file in.
+</Callout>
+
+## Generate migrations, day to day
+
 Author tables and RLS policies in your Drizzle schema, run `db:generate`
 (`drizzle-kit generate`), review the generated SQL, and commit it under
 `supabase/migrations`. Apply generated migrations with `db:migrate`

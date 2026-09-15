@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "c1fcf069-69b3-4692-83ad-aff2fc31984c",
+  "id": "c0df8cb7-3b4e-47a8-80c2-f4d8cf606c1f",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -78,6 +78,32 @@
       "table": "posts"
     },
     {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": "auth.uid()",
+      "generated": null,
+      "identity": null,
+      "name": "created_by",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "posts"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": "auth.uid()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_by",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "posts"
+    },
+    {
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -90,6 +116,40 @@
       "onUpdate": "CASCADE",
       "onDelete": "RESTRICT",
       "name": "posts_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "posts"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "created_by"
+      ],
+      "schemaTo": "auth",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "SET NULL",
+      "name": "posts_created_by_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "posts"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "updated_by"
+      ],
+      "schemaTo": "auth",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "CASCADE",
+      "onDelete": "SET NULL",
+      "name": "posts_updated_by_users_id_fkey",
       "entityType": "fks",
       "schema": "public",
       "table": "posts"
@@ -126,6 +186,19 @@
       "using": null,
       "withCheck": "\"posts\".\"user_id\" = (select auth.uid())",
       "name": "posts_owner_insert",
+      "entityType": "policies",
+      "schema": "public",
+      "table": "posts"
+    },
+    {
+      "as": "PERMISSIVE",
+      "for": "UPDATE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "\"posts\".\"user_id\" = (select auth.uid())",
+      "withCheck": "\"posts\".\"user_id\" = (select auth.uid())",
+      "name": "posts_owner_update",
       "entityType": "policies",
       "schema": "public",
       "table": "posts"

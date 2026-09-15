@@ -18,7 +18,8 @@
     ".": "./src/index.ts",
     "./auth": "./src/auth-schema.ts",
     "./config": "./src/config.ts",
-    "./schema": "./src/schema.ts"
+    "./schema": "./src/schema.ts",
+    "./triggers": "./src/triggers.ts"
   },
   "files": [
     "src"
