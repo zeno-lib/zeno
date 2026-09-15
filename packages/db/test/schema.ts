@@ -13,7 +13,7 @@ export const posts = table(
   {
     id: primaryId("uuid"),
     title: text("title").notNull(),
-    userId: authUserId(),
+    userId: authUserId({ notNull: true }),
     ...timestamps(),
   },
   (t) => [

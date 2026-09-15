@@ -32,7 +32,8 @@ export const posts = table(
     id: primaryId("uuid"),
     title: text().notNull(),
     // Supabase owns auth.users; this reference links your table to the signed-in user.
-    userId: authUserId(),
+    // `notNull` because the owner policies below key on it.
+    userId: authUserId({ notNull: true }),
     // created_at, updated_at, created_by, and updated_by, from @zeno-lib/db/schema.
     ...auditColumns(),
   },
@@ -80,7 +81,7 @@ export const posts = table(   // ① table builder: wraps the table, toggles RLS
   "posts",
   {                           // ② columns map: primary key, columns, column builders
     id: primaryId("uuid"),
-    userId: authUserId(),
+    userId: authUserId({ notNull: true }),
     ...auditColumns(),
   },
   (t) => [                    // ③ extra callback: indexes, constraints, RLS policies
@@ -91,7 +92,7 @@ export const posts = table(   // ① table builder: wraps the table, toggles RLS
 
 - **① table builder**: wraps the columns and the extra callback.
 - **② columns map**: spread a group (`...auditColumns()`) or assign to a key
-  (`userId: authUserId()`).
+  (`userId: authUserId({ notNull: true })`).
 - **③ extra callback**: receives the built columns `t` and returns indexes,
   constraints, and RLS policies.
 
@@ -272,49 +273,102 @@ reach another table built from the same helper.
 your app when you write through Drizzle. It is **not** a SQL trigger, so the
 generated DDL is just the `DEFAULT now()` above.
 
-`authorship()` adds `createdBy` and `updatedBy`, UUID references to `auth.users`
-defaulting to the current user:
+`authorship()` adds `createdBy` and `updatedBy`, nullable UUID references to
+`auth.users` defaulting to the current user:
 
 ```typescript
 ...authorship()
-// createdBy: authUserId("created_by").default(authUid)
-// updatedBy: authUserId("updated_by").default(authUid).$onUpdate(() => authUid)
+// createdBy: authUserId({ name: "created_by" }).default(authUid)
+// updatedBy: authUserId({ name: "updated_by" }).default(authUid).$onUpdate(() => authUid)
 ```
 
 ```sql
-"created_by" uuid DEFAULT (select auth.uid()) NOT NULL,
-"updated_by" uuid DEFAULT (select auth.uid()) NOT NULL
+"created_by" uuid DEFAULT (select auth.uid()),
+"updated_by" uuid DEFAULT (select auth.uid())
 -- foreign keys are emitted as separate statements:
 ALTER TABLE "<table>" ADD CONSTRAINT "<table>_created_by_users_id_fkey"
-  FOREIGN KEY ("created_by") REFERENCES "auth"."users"("id");
+  FOREIGN KEY ("created_by") REFERENCES "auth"."users"("id")
+  ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "<table>" ADD CONSTRAINT "<table>_updated_by_users_id_fkey"
-  FOREIGN KEY ("updated_by") REFERENCES "auth"."users"("id");
+  FOREIGN KEY ("updated_by") REFERENCES "auth"."users"("id")
+  ON DELETE SET NULL ON UPDATE CASCADE;
 ```
+
+They are nullable on purpose. An audit trail should outlive its author: a
+required reference to `auth.users` means deleting that user fails, because the
+audit row still holds it. `ON DELETE SET NULL` blanks the author and keeps the
+row.
 
 As with `updatedAt`, `updatedBy`'s refresh to the current user happens in Drizzle
 on write, not in SQL.
 
 `auditColumns()` is `timestamps()` plus `authorship()`, the full four-column
-audit set. `createdBy()` and `updatedBy()` are also exported individually, for
-tables that want only one of them.
+audit set. `createdBy()` and `updatedBy()` are also exported individually, for a
+table that wants only one of them.
 
-**Column builders** take their column name from the key you assign them to, or
-from an explicit argument.
+`authorship()` and `auditColumns()` pass one options object to both author
+columns. Call `createdBy()` and `updatedBy()` yourself when they need to differ.
 
-`authUserId(name?)` is a `NOT NULL` UUID column referencing `auth.users.id`:
+#### Configuring an author column
+
+Every author helper takes the same three options:
+
+| Option | Default | What it changes |
+|---|---|---|
+| `reference` | `() => authUsers.id` | The foreign key target, or `null` for no foreign key. |
+| `actions` | see below | `onDelete` and `onUpdate` for that foreign key. |
+| `notNull` | `false` | Whether the column is required. |
+
+`actions` defaults to `{ onDelete: "set null", onUpdate: "cascade" }`, and to
+`{ onDelete: "restrict", onUpdate: "cascade" }` when `notNull` is `true`.
+`SET NULL` against a `NOT NULL` column is a foreign key that can never fire, so
+a required author restricts the delete instead.
+
+RLS policies and PostgREST joins cannot read `auth.users`, so applications
+usually mirror it into a public `profiles` table and reference that. Point the
+author columns at it with `reference`:
 
 ```typescript
-userId: authUserId()           // column name from the key → "user_id"
-ownerId: authUserId("owner_id") // explicit column name
-// uuid(name).notNull().references(() => authUsers.id)
+export const posts = table("posts", {
+  ...auditColumns({ reference: () => profiles.id }),
+})
+```
+
+`reference: null` drops the foreign key entirely, for a table that records an
+author id without constraining it.
+
+**Column builders** take their column name from the key you assign them to, or
+from the `name` option.
+
+`authUserId(options?)` is a nullable UUID column referencing `auth.users.id`:
+
+```typescript
+userId: authUserId()                              // name from the key → "user_id"
+ownerId: authUserId({ name: "owner_id" })         // explicit column name
+userId: authUserId({ notNull: true })             // required, ON DELETE RESTRICT
 ```
 
 ```sql
-"user_id" uuid NOT NULL
+"user_id" uuid
 -- foreign key emitted as a separate statement:
 ALTER TABLE "<table>" ADD CONSTRAINT "<table>_user_id_users_id_fkey"
-  FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id");
+  FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id")
+  ON DELETE SET NULL ON UPDATE CASCADE;
 ```
+
+`userId(reference, options?)` is the same column against your own table, which
+is the common case once you have a `profiles` mirror:
+
+```typescript
+ownerId: userId(() => profiles.id, { notNull: true })
+```
+
+<Callout type="warn">
+  An **ownership** column that an RLS policy keys on wants `notNull: true`.
+  `authUserOwns` builds `owner_column = auth.uid()`, which is `NULL` rather than
+  `true` for a null owner, so the row is invisible and cannot be inserted.
+  Nullable is right for an audit trail and wrong for ownership.
+</Callout>
 
 ### RLS policies
 
