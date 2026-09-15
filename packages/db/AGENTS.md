@@ -28,7 +28,8 @@ policy helpers.
 |---|---|---|
 | `@zeno-lib/db` | Server code (Server Components, Route Handlers, Server Actions, cron, scripts) | Five factories, each `(…, config?: CreateClientConfig)` where `config` is a Drizzle config (`{ relations?, logger?, casing? }`) plus an optional `connectionString` (defaults to `SUPABASE_DATABASE_URL`). **`createAdminClient(config?)`** -> a client that **bypasses RLS** (webhooks, admin tasks, background jobs, seeding); queried directly (`db.select().from(t)`, `db.transaction(cb)`). **`createAuthClient(supabase, config?)`** -> RLS client bound to a Supabase client; verified claims are resolved via `supabase.auth.getClaims()` on **every** query (always reflects the live session). **`createSupabaseClient(accessToken, config?)`** -> RLS client scoped to an already-verified, **decoded** token (`SupabaseToken` = the `role` + `sub` claims, e.g. from `getClaims()`). **`createAnonClient(config?)`** -> RLS client that runs every query as `anon`. **`createServiceClient(config?)`** -> client that runs every query as `service_role` (bypasses RLS via Supabase's BYPASSRLS grant) — the only path to `service_role`. All four RLS clients are **queried directly**: each awaited single statement (`db.select().from(t)`, `db.query.t.findMany()`) is recorded and replayed inside its own RLS transaction with the claims set and the role switched; `db.transaction(async (tx) => { … })` runs several statements under one atomic RLS transaction. `relations` (from `defineRelations`) enables the relational query API. Postgres pools are cached per `(kind, connectionString)` — the `admin` and `rls` kinds get separate pools so the admin connection is never role-switched. `close()` is reference-counted: it releases this handle's share of the pool and only ends it once the last handle closes. |
 | `@zeno-lib/db/config` | `drizzle.config.ts` in each consuming package/app | `defineDrizzleConfig({ schema, ...overrides })`, a preset that defaults `out` to `./supabase/migrations`, dialect to `postgresql`, reads `SUPABASE_DATABASE_URL` from env, sets `entities.roles.provider: "supabase"` plus `entities.roles.exclude` from the exported `supabaseManagedRoles` (the 18 Supabase roles `provider` misses), and defaults `schemaFilter` to `["public"]`. Also exports `supabaseManagedRoles`. |
-| `@zeno-lib/db/schema` | Application schema files | `table` (`snakeCase.table.withRLS`) for RLS-by-default tables, `unsecureTable` (`snakeCase.table`) for intentional non-RLS tables, `primaryId(kind)` for a primary key (`"sequential"` \| `"uuid"` \| `"assigned"`, default `"sequential"`, which is the id the Supabase table editor gives a new table), each kind emitting the column Supabase creates for that choice; it takes the kind and nothing else, so renaming the column or changing how the value is generated goes through the helper behind the kind (`uuidPrimaryId()`, `sequentialPrimaryId()`, `assignedPrimaryId()`), other common column helpers (`authUserId`, `createdBy()`, `updatedBy()`), audit mixin factories (`timestamps()` for xAt, `authorship()` for xBy, `auditColumns()` for all four — call one per table; each call returns fresh builders, so one table's customisation can't leak into another), generic policy helpers (`selectPolicy`, `insertPolicy`, `updatePolicy`, `deletePolicy`, `allPolicy`), authenticated-owner policy helpers, curated Supabase role/helper exports from `drizzle-orm/supabase`, and `schema(name)` for a non-public schema, whose `.table` / `.unsecureTable` pair matches the top-level one (cased via `snakeCase.schema`, RLS on by default; drizzle's own `pgSchema` applies neither), and curated `pg-core` aliases such as `policy`, `role`, `sequence`, `view`, `materializedView`, `tableCreator`, and `enum` (import with a local alias because `enum` is reserved). |
+| `@zeno-lib/db/auth` | Queries and foreign keys against `auth.users` | `authUsers` (the full 35 columns, `drizzle-kit pull`-generated, pinned to Supabase CLI 2.84.1 / GoTrue v2.188.1) and `authSchema` (`pgSchema("auth").existing()`). Deliberately a separate entrypoint, and deliberately absent from `@zeno-lib/db/schema`: see the pitfall below. |
+| `@zeno-lib/db/schema` | Application schema files | `table` (`snakeCase.table.withRLS`) for RLS-by-default tables, `unsecureTable` (`snakeCase.table`) for intentional non-RLS tables, `primaryId(kind)` for a primary key (`"sequential"` \| `"uuid"` \| `"assigned"`, default `"sequential"`, which is the id the Supabase table editor gives a new table), each kind emitting the column Supabase creates for that choice; it takes the kind and nothing else, so renaming the column or changing how the value is generated goes through the helper behind the kind (`uuidPrimaryId()`, `sequentialPrimaryId()`, `assignedPrimaryId()`), other common column helpers (`authUserId`, `createdBy()`, `updatedBy()`), audit mixin factories (`timestamps()` for xAt, `authorship()` for xBy, `auditColumns()` for all four — call one per table; each call returns fresh builders, so one table's customisation can't leak into another), generic policy helpers (`selectPolicy`, `insertPolicy`, `updatePolicy`, `deletePolicy`, `allPolicy`), authenticated-owner policy helpers, curated Supabase role/helper exports from `drizzle-orm/supabase` (`authUsers` is **not** among them, it lives at `@zeno-lib/db/auth`), and `schema(name)` for a non-public schema, whose `.table` / `.unsecureTable` pair matches the top-level one (cased via `snakeCase.schema`, RLS on by default; drizzle's own `pgSchema` applies neither), and curated `pg-core` aliases such as `policy`, `role`, `sequence`, `view`, `materializedView`, `tableCreator`, and `enum` (import with a local alias because `enum` is reserved). |
 
 Keep this entrypoint list focused on Zeno-owned DB helpers. Consumers import
 Drizzle APIs and run Drizzle Kit directly from their peer dependencies.
@@ -167,6 +168,23 @@ export default defineDrizzleConfig({ schema: "./src/schema.ts" })
   `auth.getClaims()`), not a raw JWT string — it is not re-verified. Prefer
   `createAuthClient`, which resolves and verifies claims via `auth.getClaims()`
   itself.
+- **Never re-export `authUsers` from the barrel a `drizzle.config.ts` reads.**
+  `drizzle-kit generate` applies no entity filter: it passes `() => true`, and
+  `configGenerate` accepts neither `schemaFilter` nor `entities`. Verified by
+  generating against `pgSchema("auth").existing()` with
+  `schemaFilter: ["public"]` set, which still emitted
+  `CREATE TABLE "auth"."users"`. So the only protection is the table not
+  reaching the `schema` glob, which is why it sits behind `@zeno-lib/db/auth`
+  rather than in `@zeno-lib/db/schema`. Referencing it from a column is safe: a
+  table reached only through a `references()` thunk is never collected, which is
+  why the fixture migration has a clean `REFERENCES "auth"."users"` and no
+  `CREATE TABLE`. `src/auth-schema.test.ts` asserts the barrel emits no `auth`
+  entities. It does not yet assert the same for `realtime`:
+  `realtimeMessages` is still re-exported from the barrel and still emits
+  `CREATE TABLE "realtime"."messages"`, tracked in #152.
+- **The `auth` enums are deliberately not shipped.** `auth.users` uses none of
+  them, and `fromDrizzleSchema` maps enums with no filter and no `isExisting`
+  equivalent, so an exported `auth` enum is `CREATE TYPE` in every command.
 - **Do not write RLS policies as raw SQL in `supabase/migrations/` by hand.**
   `policy(...)` / `selectPolicy(...)` / owner policy helpers in the schema are
   the source of truth — drizzle-kit emits
@@ -239,6 +257,30 @@ Coexists with `@zeno-lib/schema`: consumers define Drizzle tables with
 domain-specific columns. They call `defineTableSchema(...)` from
 `@zeno-lib/schema`, and keep DB clients out of modules that need to be imported
 by Client Components for validation.
+
+## Regenerating auth.users
+
+`src/auth-schema.ts` is generated, not hand-written. After a Supabase CLI bump:
+
+```bash
+pnpm --filter @zeno-lib/db dev            # start the local stack
+pnpm exec supabase --version              # record the pins in the file header
+docker ps --format '{{.Names}}\t{{.Image}}' | grep supabase_
+docker exec supabase_db_db psql -U postgres -t -A \
+  -c "select version from auth.schema_migrations order by version desc limit 1;"
+
+pnpm --filter @zeno-lib/db exec drizzle-kit pull \
+  --dialect=postgresql \
+  --url=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+  --out=/tmp/auth-pull --schemaFilters=auth --introspect-casing=camel
+```
+
+Take only the `users` table body from `/tmp/auth-pull/schema.ts` and drop the
+rest (`relations.ts`, the other `auth` tables, every enum, the generated
+migration and snapshot). `pull` emits `usersInAuth` and a bare
+`pgSchema("auth")`; rename to `authUsers` and add `.existing()`, which `pull`
+never writes. Update the pins in the header comment, then let the column-count
+assertion in `src/auth-schema.test.ts` tell you whether the shape moved.
 
 ## Pitfalls
 
