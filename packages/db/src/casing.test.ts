@@ -10,7 +10,6 @@ import {
   pgMaterializedView,
   pgPolicy,
   pgRole,
-  pgSchema,
   pgSequence,
   pgTableCreator,
   pgView,
@@ -157,7 +156,6 @@ describe("default casing", () => {
     expect(materializedView).toBe(pgMaterializedView)
     expect(policy).toBe(pgPolicy)
     expect(role).toBe(pgRole)
-    expect(schema).toBe(pgSchema)
     expect(sequence).toBe(pgSequence)
     expect(tableCreator).toBe(pgTableCreator)
     expect(view).toBe(pgView)
@@ -466,5 +464,42 @@ describe("default casing", () => {
     expect(policies[2]?.using).toBeDefined()
     expect(policies[2]?.withCheck).toBeDefined()
     expect(policies[3]?.using).toBeDefined()
+  })
+
+  it("cases column names in a non-public schema", async () => {
+    const billing = schema("billing")
+    const invoices = billing.table("invoices", {
+      displayName: text(),
+      ownerId: uuid(),
+    })
+    const db = createAdminClient()
+
+    expect(db.select().from(invoices).toSQL().sql).toContain('"display_name"')
+    expect(db.select().from(invoices).toSQL().sql).toContain('"owner_id"')
+    expect(getTableConfig(invoices).schema).toBe("billing")
+
+    await db.close()
+  })
+
+  it("enables RLS on a schema table and leaves unsecureTable alone", () => {
+    const billing = schema("billing")
+
+    expect(
+      getTableConfig(billing.table("invoices", { ownerId: uuid() })).enableRLS
+    ).toBe(true)
+    expect(
+      getTableConfig(billing.unsecureTable("rates", { ownerId: uuid() }))
+        .enableRLS
+    ).toBe(false)
+  })
+
+  it("stays a drizzle schema so the rest of its builders still work", () => {
+    const billing = schema("billing")
+
+    expect(isSchema(billing)).toBe(true)
+    expect(billing.schemaName).toBe("billing")
+    expect(billing.existing().isExisting).toBe(true)
+    expect(isEnum(billing.enum("plan", ["free", "paid"]))).toBe(true)
+    expect(isSequence(billing.sequence("invoice_no"))).toBe(true)
   })
 })
