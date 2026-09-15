@@ -1,4 +1,4 @@
-// https://orm.drizzle.team/docs/rls#using-with-supabase  (re-exported roles, authUsers, authUid, realtimeMessages)
+// https://orm.drizzle.team/docs/rls#using-with-supabase  (re-exported roles, authUid, realtimeMessages)
 import { getColumnTable, getTableName, sql } from "drizzle-orm"
 import {
   type AnyPgColumn,
@@ -19,7 +19,8 @@ import {
   varchar,
 } from "drizzle-orm/pg-core"
 import { snakeCase } from "drizzle-orm/pg-core/casing"
-import { authenticatedRole, authUid, authUsers } from "drizzle-orm/supabase"
+import { authenticatedRole, authUid } from "drizzle-orm/supabase"
+import { authUsers } from "./auth-schema.ts"
 
 // pg-core primitives without the `pg` prefix they repeat at every call site.
 // `table` is missing on purpose. Zeno's own is at the bottom of this file.
@@ -34,7 +35,6 @@ export {
   pgMaterializedView as materializedView,
   pgPolicy as policy,
   pgRole as role,
-  pgSchema as schema,
   pgSequence as sequence,
   pgTableCreator as tableCreator,
   pgView as view,
@@ -46,7 +46,6 @@ export {
   anonRole,
   authenticatedRole,
   authUid,
-  authUsers,
   postgresRole,
   realtimeMessages,
   realtimeTopic,
@@ -428,3 +427,20 @@ export const table = snakeCase.table.withRLS
 
 // Escape hatch for intentionally non-RLS tables such as seed/reference data.
 export const unsecureTable = snakeCase.table
+
+// A non-public schema, with the same two guarantees `table` and `unsecureTable`
+// give at the top level. Drizzle's own `pgSchema(name)` takes no casing
+// argument, so a schema built with it names every column after its TypeScript
+// key; `snakeCase.schema` is the cased factory behind the same class.
+// `.table` enables RLS and `.unsecureTable` is the escape hatch, so a table in
+// a second schema doesn't have to remember `.withRLS`.
+export const schema = <TName extends string>(name: TName) => {
+  const built = snakeCase.schema(name)
+
+  // `Object.assign` mutates and returns the PgSchema instance, so `isSchema`
+  // and the `entityKind` checks drizzle-kit runs still recognise it.
+  return Object.assign(built, {
+    table: built.table.withRLS,
+    unsecureTable: built.table,
+  })
+}

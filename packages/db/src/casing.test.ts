@@ -11,7 +11,6 @@ import {
   pgMaterializedView,
   pgPolicy,
   pgRole,
-  pgSchema,
   pgSequence,
   pgTableCreator,
   pgView,
@@ -20,8 +19,9 @@ import {
 } from "drizzle-orm/pg-core"
 import { camelCase, snakeCase } from "drizzle-orm/pg-core/casing"
 import { describe, expect, it } from "vitest"
+import { authUsers } from "./auth-schema.ts"
 import { createAdminClient } from "./clients.ts"
-import { defineDrizzleConfig } from "./config.ts"
+import { defineDrizzleConfig, supabaseManagedRoles } from "./config.ts"
 import {
   allPolicy,
   assignedPrimaryId,
@@ -39,7 +39,6 @@ import {
   authorship,
   authUid,
   authUserId,
-  authUsers,
   createdBy,
   deletePolicy,
   enum as enum_,
@@ -71,6 +70,33 @@ import {
 describe("default casing", () => {
   it("leaves casing to Drizzle table constructors", () => {
     expect(defineDrizzleConfig()).not.toHaveProperty("casing")
+  })
+
+  it("excludes every Supabase-managed role from the role diff", () => {
+    const roles = defineDrizzleConfig().entities?.roles
+
+    expect(roles).toMatchObject({ provider: "supabase" })
+    expect(typeof roles === "object" ? roles.exclude : []).toEqual(
+      expect.arrayContaining([...supabaseManagedRoles])
+    )
+  })
+
+  it("keeps a caller's own excluded roles alongside the Supabase ones", () => {
+    const roles = defineDrizzleConfig({
+      entities: { roles: { exclude: ["my_reporting_role"] } },
+    }).entities?.roles
+    const exclude = typeof roles === "object" ? (roles.exclude ?? []) : []
+
+    expect(exclude).toContain("my_reporting_role")
+    expect(exclude).toContain("supabase_replication_admin")
+    expect(roles).toMatchObject({ provider: "supabase" })
+  })
+
+  it("diffs only the public schema unless told otherwise", () => {
+    expect(defineDrizzleConfig().schemaFilter).toEqual(["public"])
+    expect(
+      defineDrizzleConfig({ schemaFilter: ["public", "billing"] }).schemaFilter
+    ).toEqual(["public", "billing"])
   })
 
   it("works with Drizzle's snake_case table builders", async () => {
@@ -137,7 +163,6 @@ describe("default casing", () => {
     expect(materializedView).toBe(pgMaterializedView)
     expect(policy).toBe(pgPolicy)
     expect(role).toBe(pgRole)
-    expect(schema).toBe(pgSchema)
     expect(sequence).toBe(pgSequence)
     expect(tableCreator).toBe(pgTableCreator)
     expect(view).toBe(pgView)
@@ -446,6 +471,43 @@ describe("default casing", () => {
     expect(policies[2]?.using).toBeDefined()
     expect(policies[2]?.withCheck).toBeDefined()
     expect(policies[3]?.using).toBeDefined()
+  })
+
+  it("cases column names in a non-public schema", async () => {
+    const billing = schema("billing")
+    const invoices = billing.table("invoices", {
+      displayName: text(),
+      ownerId: uuid(),
+    })
+    const db = createAdminClient()
+
+    expect(db.select().from(invoices).toSQL().sql).toContain('"display_name"')
+    expect(db.select().from(invoices).toSQL().sql).toContain('"owner_id"')
+    expect(getTableConfig(invoices).schema).toBe("billing")
+
+    await db.close()
+  })
+
+  it("enables RLS on a schema table and leaves unsecureTable alone", () => {
+    const billing = schema("billing")
+
+    expect(
+      getTableConfig(billing.table("invoices", { ownerId: uuid() })).enableRLS
+    ).toBe(true)
+    expect(
+      getTableConfig(billing.unsecureTable("rates", { ownerId: uuid() }))
+        .enableRLS
+    ).toBe(false)
+  })
+
+  it("stays a drizzle schema so the rest of its builders still work", () => {
+    const billing = schema("billing")
+
+    expect(isSchema(billing)).toBe(true)
+    expect(billing.schemaName).toBe("billing")
+    expect(billing.existing().isExisting).toBe(true)
+    expect(isEnum(billing.enum("plan", ["free", "paid"]))).toBe(true)
+    expect(isSequence(billing.sequence("invoice_no"))).toBe(true)
   })
 
   it("presets the authenticated role and leaves the condition to the caller", () => {
