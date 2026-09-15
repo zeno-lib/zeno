@@ -120,6 +120,28 @@ ALTER TABLE "posts" ENABLE ROW LEVEL SECURITY;
 `ENABLE ROW LEVEL SECURITY` line. Use it only for intentionally unprotected
 tables such as seed or reference data.
 
+`schema(name)` builds a non-public schema that gives you the same two builders,
+with the same casing and the same RLS default:
+
+```typescript
+const billing = schema("billing")
+
+billing.table("invoices", { /* columns */ })        // RLS enabled
+billing.unsecureTable("rates", { /* columns */ })   // no RLS
+```
+
+```sql
+CREATE SCHEMA "billing";
+CREATE TABLE "billing"."invoices" ( /* columns */ );
+ALTER TABLE "billing"."invoices" ENABLE ROW LEVEL SECURITY;
+CREATE TABLE "billing"."rates" ( /* columns */ );
+```
+
+It is otherwise Drizzle's `pgSchema`, so `existing()`, `enum()`, `sequence()`,
+`view()` and `materializedView()` all work as they do there. Reach for Drizzle's
+`pgSchema` directly only when you want a schema whose column names come
+verbatim from their TypeScript keys.
+
 ### Primary keys
 
 _Slot ②: assign to a key in the columns map._ `primaryId(kind)` covers the three
@@ -393,8 +415,71 @@ authUserOwns(t.userId) // sql`${t.userId} = ${authUid}`
 "posts"."user_id" = (select auth.uid())
 ```
 
-**Owner policies** build on those: they force `TO authenticated` and default the
-owner check to `authUserOwns(ownerColumn)`. Each takes `(name, ownerColumn,
+**Authenticated policies** sit between the two: they preset `TO authenticated`,
+which every hand-written policy repeats, and leave the condition to you. Reach
+for these whenever access depends on more than the row's own owner column.
+
+```typescript
+authenticatedSelectPolicy("posts_read", { using: sql`is_published(posts.id)` })
+```
+
+```sql
+CREATE POLICY "posts_read" ON "posts" AS PERMISSIVE FOR SELECT
+  TO "authenticated" USING (is_published(posts.id));
+```
+
+| Export | `for` | Condition goes in |
+|---|---|---|
+| `authenticatedSelectPolicy(name, config?)` | `SELECT` | `using` |
+| `authenticatedInsertPolicy(name, config?)` | `INSERT` | `withCheck` |
+| `authenticatedUpdatePolicy(name, config?)` | `UPDATE` | `using` + `withCheck` |
+| `authenticatedDeletePolicy(name, config?)` | `DELETE` | `using` |
+| `authenticatedAllPolicy(name, config?)` | `ALL` | `using` + `withCheck` |
+
+**Function policies** cover the case those still leave verbose. Once access
+depends on anything but the row's own owner column, the usual answer is a
+`security definer` function, which is also the standard advice for keeping RLS
+predicates out of the planner's way. `functionPolicies(columns, options?)`
+writes all four:
+
+```typescript
+export const posts = table("posts", { id: primaryId("uuid") }, (t) =>
+  functionPolicies(t, { argument: t.id })
+)
+```
+
+```sql
+CREATE POLICY "can_select_posts" ON "posts" AS PERMISSIVE FOR SELECT
+  TO "authenticated" USING ((select "can_select_posts"("posts"."id")));
+CREATE POLICY "can_insert_posts" ON "posts" AS PERMISSIVE FOR INSERT
+  TO "authenticated" WITH CHECK ((select "can_insert_posts"("posts"."id")));
+CREATE POLICY "can_update_posts" ON "posts" AS PERMISSIVE FOR UPDATE
+  TO "authenticated" USING ((select "can_update_posts"("posts"."id")))
+  WITH CHECK ((select "can_update_posts"("posts"."id")));
+CREATE POLICY "can_delete_posts" ON "posts" AS PERMISSIVE FOR DELETE
+  TO "authenticated" USING ((select "can_delete_posts"("posts"."id")));
+```
+
+It puts the condition in the clause each operation takes: `using` for select and
+delete, `withCheck` for insert, both for update. The call is wrapped in a
+`select` so Postgres evaluates it once per statement rather than once per row,
+the same shape `auth.uid()` uses.
+
+| Option | Default | What it changes |
+|---|---|---|
+| `argument` | none | Column passed to each function. Omit for functions that take none. |
+| `prefix` | `"can"` | Start of the generated function and policy names. |
+| `name` | `(operation, table) => …` | Overrides the policy name only. |
+
+It takes the columns object the extra callback gives you (`t`), not the table,
+because naming a table inside its own definition makes its type circular. The
+table name comes from the columns, so it stays right through a rename.
+
+You write the functions themselves; Zeno only writes the policies that call
+them.
+
+**Owner policies** are the narrowest preset: they force `TO authenticated` and
+default the owner check to `authUserOwns(ownerColumn)`. Each takes `(name, ownerColumn,
 config?)`; pass `using` or `withCheck` to override.
 
 ```typescript
@@ -427,20 +512,67 @@ redeclare Supabase's built-in roles in your schema.
 | `serviceRole` | The `service_role` (RLS-bypassing) role. |
 | `postgresRole` | The `postgres` superuser role. |
 | `supabaseAuthAdminRole` | The `supabase_auth_admin` role that owns the auth schema. |
-| `authUsers` | The Supabase `auth.users` table. |
 | `authUid` | The `auth.uid()` SQL helper for the current user id. |
 | `realtimeMessages` | The Supabase Realtime `messages` table. |
 | `realtimeTopic` | The `realtime.topic()` SQL helper. |
+
+### auth.users
+
+`auth.users` comes from a **separate** entrypoint, `@zeno-lib/db/auth`:
+
+```typescript
+import { authUsers } from "@zeno-lib/db/auth"
+```
+
+It is the full 35-column table, generated with `drizzle-kit pull` and pinned to
+Supabase CLI 2.84.1 / GoTrue v2.188.1. Drizzle's own `drizzle-orm/supabase`
+export has 8 of those columns, so putting `auth` in `schemaFilter` made
+drizzle-kit want to drop the other 27, and anyone needing a foreign key into
+`auth.users` hand-wrote the table instead.
+
+<Callout type="warn">
+  The reason it has its own entrypoint is that `drizzle-kit generate` applies
+  **no** entity filter: it passes `() => true`, and its config accepts neither
+  `schemaFilter` nor `entities`. So neither `pgSchema("auth").existing()` nor a
+  `schemaFilter` in your drizzle config stops it emitting
+  `CREATE TABLE "auth"."users"`. The only thing that does is the table never
+  reaching the files your `schema` glob reads.
+
+  Import it in queries. Do **not** re-export it from the
+  `{project}-db/src/schema.ts` barrel your `drizzle.config.ts` points at, or the
+  next `drizzle-kit generate` will try to create a table Supabase already owns.
+  Referencing it from a column (`authUserId()`) is always safe: a table reached
+  only through a `references()` thunk is never collected.
+</Callout>
+
+Several columns hold credential material (`encryptedPassword`, the `*Token`
+columns), and reading the table at all needs an RLS-bypassing client. Select the
+columns you need rather than `select()`:
+
+```typescript
+import { createAdminClient } from "@zeno-lib/db"
+import { authUsers } from "@zeno-lib/db/auth"
+
+const db = createAdminClient()
+const users = await db
+  .select({ email: authUsers.email, lastSignInAt: authUsers.lastSignInAt })
+  .from(authUsers)
+```
+
+The nine `auth` enums are deliberately not shipped. `auth.users` uses none of
+them (they belong to the `mfa_*`, `oauth_*` and `sso_*` tables), and drizzle-kit
+never filters enums, so an exported one would be `CREATE TYPE` in every command.
 
 ### pg-core aliases
 
 Curated aliases over `drizzle-orm/pg-core` so schema files don't repeat the `pg`
 prefix at every call site. They behave exactly like their Drizzle counterparts.
+(`schema` is the one exception and has its own section above, because it applies
+casing and RLS where `pgSchema` applies neither.)
 
 | Alias | Drizzle export |
 |---|---|
 | `enum` | `pgEnum` |
-| `schema` | `pgSchema` |
 | `view` | `pgView` |
 | `materializedView` | `pgMaterializedView` |
 | `sequence` | `pgSequence` |

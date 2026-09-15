@@ -1,8 +1,9 @@
-// https://orm.drizzle.team/docs/rls#using-with-supabase  (re-exported roles, authUsers, authUid, realtimeMessages)
-import { sql } from "drizzle-orm"
+// https://orm.drizzle.team/docs/rls#using-with-supabase  (re-exported roles, authUid, realtimeMessages)
+import { getColumnTable, getTableName, sql } from "drizzle-orm"
 import {
   type AnyPgColumn,
   bigint,
+  type ExtraConfigColumn,
   type HasIdentity,
   integer,
   type PgBigInt53Builder,
@@ -20,7 +21,8 @@ import {
   varchar,
 } from "drizzle-orm/pg-core"
 import { snakeCase } from "drizzle-orm/pg-core/casing"
-import { authenticatedRole, authUid, authUsers } from "drizzle-orm/supabase"
+import { authenticatedRole, authUid } from "drizzle-orm/supabase"
+import { authUsers } from "./auth-schema.ts"
 
 // pg-core primitives without the `pg` prefix they repeat at every call site.
 // `table` is missing on purpose. Zeno's own is at the bottom of this file.
@@ -35,7 +37,6 @@ export {
   pgMaterializedView as materializedView,
   pgPolicy as policy,
   pgRole as role,
-  pgSchema as schema,
   pgSequence as sequence,
   pgTableCreator as tableCreator,
   pgView as view,
@@ -47,7 +48,6 @@ export {
   anonRole,
   authenticatedRole,
   authUid,
-  authUsers,
   postgresRole,
   realtimeMessages,
   realtimeTopic,
@@ -312,6 +312,7 @@ export function primaryId(kind: PrimaryIdKind = "sequential") {
 
 type PolicyOptions = Omit<PgPolicyConfig, "for">
 type PolicyOperation = NonNullable<PgPolicyConfig["for"]>
+type AuthenticatedPolicyOptions = Omit<PgPolicyConfig, "for" | "to">
 
 function operationPolicy(
   name: string,
@@ -335,6 +336,122 @@ export const deletePolicy = (name: string, config: PolicyOptions = {}) =>
 
 export const allPolicy = (name: string, config: PolicyOptions = {}) =>
   operationPolicy(name, "all", config)
+
+// `to: authenticatedRole` on its own, which every hand-written policy repeats.
+// The condition stays yours, unlike the owner helpers below.
+export const authenticatedSelectPolicy = (
+  name: string,
+  config: AuthenticatedPolicyOptions = {}
+) => selectPolicy(name, { ...config, to: authenticatedRole })
+
+export const authenticatedInsertPolicy = (
+  name: string,
+  config: AuthenticatedPolicyOptions = {}
+) => insertPolicy(name, { ...config, to: authenticatedRole })
+
+export const authenticatedUpdatePolicy = (
+  name: string,
+  config: AuthenticatedPolicyOptions = {}
+) => updatePolicy(name, { ...config, to: authenticatedRole })
+
+export const authenticatedDeletePolicy = (
+  name: string,
+  config: AuthenticatedPolicyOptions = {}
+) => deletePolicy(name, { ...config, to: authenticatedRole })
+
+export const authenticatedAllPolicy = (
+  name: string,
+  config: AuthenticatedPolicyOptions = {}
+) => allPolicy(name, { ...config, to: authenticatedRole })
+
+// Postgres takes the condition in a different clause per operation: `using`
+// filters the rows already there, `withCheck` vets the rows going in.
+const POLICY_CLAUSES = {
+  all: ["using", "withCheck"],
+  delete: ["using"],
+  insert: ["withCheck"],
+  select: ["using"],
+  update: ["using", "withCheck"],
+} as const satisfies Record<PolicyOperation, readonly ("using" | "withCheck")[]>
+
+const POLICY_BUILDERS = {
+  all: allPolicy,
+  delete: deletePolicy,
+  insert: insertPolicy,
+  select: selectPolicy,
+  update: updatePolicy,
+} as const satisfies Record<PolicyOperation, typeof selectPolicy>
+
+const FUNCTION_POLICY_OPERATIONS = [
+  "select",
+  "insert",
+  "update",
+  "delete",
+] as const
+
+type FunctionPoliciesOptions = {
+  /** Passed to each function, e.g. the row's id. Omit for a function that takes none. */
+  argument?: AnyPgColumn
+  /** Prefix for the default function and policy names. Default `"can"`. */
+  prefix?: string
+  /** Overrides the generated policy name. */
+  name?: (operation: PolicyOperation, table: string) => string
+}
+
+// The columns object drizzle hands the extra-config callback. Taking it rather
+// than the table is what keeps `functionPolicies` usable: naming the table
+// inside its own definition makes its type circular, so `(t) => ...` is the
+// only reference available at that point.
+type ExtraConfigColumns = Record<string, ExtraConfigColumn>
+
+/**
+ * One policy per operation, each delegating to a `security definer` function.
+ *
+ * Access rarely depends only on the row's own owner column, and the usual
+ * answer is a function, which is also the standard advice for keeping RLS
+ * predicates out of the planner's way:
+ *
+ * ```ts
+ * table("posts", { id: primaryId("uuid") }, (t) =>
+ *   functionPolicies(t, { argument: t.id })
+ * )
+ * ```
+ *
+ * ```sql
+ * CREATE POLICY "can_select_posts" ON "posts" FOR SELECT TO "authenticated"
+ *   USING ((select "can_select_posts"("posts"."id")));
+ * ```
+ */
+export const functionPolicies = (
+  columns: ExtraConfigColumns,
+  { argument, name, prefix = "can" }: FunctionPoliciesOptions = {}
+) => {
+  const [firstColumn] = Object.values(columns)
+
+  if (!firstColumn) {
+    throw new Error("functionPolicies needs a table with at least one column")
+  }
+
+  const tableName = getTableName(getColumnTable(firstColumn))
+
+  return FUNCTION_POLICY_OPERATIONS.map((operation) => {
+    const functionName = `${prefix}_${operation}_${tableName}`
+    // `select` wraps it so Postgres evaluates the call once per statement
+    // rather than once per row, the same shape `authUid` uses.
+    const condition = argument
+      ? sql`(select ${sql.identifier(functionName)}(${argument}))`
+      : sql`(select ${sql.identifier(functionName)}())`
+    const clauses = POLICY_CLAUSES[operation]
+
+    return POLICY_BUILDERS[operation](
+      name?.(operation, tableName) ?? functionName,
+      {
+        to: authenticatedRole,
+        ...Object.fromEntries(clauses.map((clause) => [clause, condition])),
+      }
+    )
+  })
+}
 
 export const authUserOwns = (ownerColumn: AnyPgColumn) =>
   sql`${ownerColumn} = ${authUid}`
@@ -408,3 +525,20 @@ export const table = snakeCase.table.withRLS
 
 // Escape hatch for intentionally non-RLS tables such as seed/reference data.
 export const unsecureTable = snakeCase.table
+
+// A non-public schema, with the same two guarantees `table` and `unsecureTable`
+// give at the top level. Drizzle's own `pgSchema(name)` takes no casing
+// argument, so a schema built with it names every column after its TypeScript
+// key; `snakeCase.schema` is the cased factory behind the same class.
+// `.table` enables RLS and `.unsecureTable` is the escape hatch, so a table in
+// a second schema doesn't have to remember `.withRLS`.
+export const schema = <TName extends string>(name: TName) => {
+  const built = snakeCase.schema(name)
+
+  // `Object.assign` mutates and returns the PgSchema instance, so `isSchema`
+  // and the `entityKind` checks drizzle-kit runs still recognise it.
+  return Object.assign(built, {
+    table: built.table.withRLS,
+    unsecureTable: built.table,
+  })
+}
