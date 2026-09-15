@@ -119,6 +119,28 @@ ALTER TABLE "posts" ENABLE ROW LEVEL SECURITY;
 `ENABLE ROW LEVEL SECURITY` line. Use it only for intentionally unprotected
 tables such as seed or reference data.
 
+`schema(name)` builds a non-public schema that gives you the same two builders,
+with the same casing and the same RLS default:
+
+```typescript
+const billing = schema("billing")
+
+billing.table("invoices", { /* columns */ })        // RLS enabled
+billing.unsecureTable("rates", { /* columns */ })   // no RLS
+```
+
+```sql
+CREATE SCHEMA "billing";
+CREATE TABLE "billing"."invoices" ( /* columns */ );
+ALTER TABLE "billing"."invoices" ENABLE ROW LEVEL SECURITY;
+CREATE TABLE "billing"."rates" ( /* columns */ );
+```
+
+It is otherwise Drizzle's `pgSchema`, so `existing()`, `enum()`, `sequence()`,
+`view()` and `materializedView()` all work as they do there. Reach for Drizzle's
+`pgSchema` directly only when you want a schema whose column names come
+verbatim from their TypeScript keys.
+
 ### Primary keys
 
 _Slot ②: assign to a key in the columns map._ `primaryId(kind)` covers the three
@@ -428,11 +450,12 @@ never filters enums, so an exported one would be `CREATE TYPE` in every command.
 
 Curated aliases over `drizzle-orm/pg-core` so schema files don't repeat the `pg`
 prefix at every call site. They behave exactly like their Drizzle counterparts.
+(`schema` is the one exception and has its own section above, because it applies
+casing and RLS where `pgSchema` applies neither.)
 
 | Alias | Drizzle export |
 |---|---|
 | `enum` | `pgEnum` |
-| `schema` | `pgSchema` |
 | `view` | `pgView` |
 | `materializedView` | `pgMaterializedView` |
 | `sequence` | `pgSequence` |
