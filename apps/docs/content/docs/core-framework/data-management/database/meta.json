@@ -1,5 +1,5 @@
 {
   "title": "Database",
   "icon": "Database",
-  "pages": ["tables", "migrations", "querying"]
+  "pages": ["tables", "migrations", "querying", "existing-schema"]
 }

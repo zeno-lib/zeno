@@ -68,6 +68,14 @@ schema files, generate SQL migration files, and apply them to the database. In
 Zeno, the normal workflow is codebase-first: update the TypeScript schema,
 generate migrations, review the generated SQL, and apply it.
 
+If you already have a database, the direction reverses: your schema files
+describe what Postgres already has. Drizzle's
+[Supabase with an existing database](https://orm.drizzle.team/docs/get-started/supabase-existing)
+guide covers `drizzle-kit pull`, and
+[Existing schema](/docs/core-framework/data-management/database/existing-schema)
+covers what Zeno adds — which helpers match what Supabase creates, what must
+stay out of your schema barrel, and how to prove the description still matches.
+
 Drizzle also supports
 [RLS policies](https://orm.drizzle.team/docs/rls), including Supabase's built-in
 roles and helpers.
@@ -218,3 +226,5 @@ Work through the package in the order you would build with it:
   configure Drizzle Kit, then generate, apply, and seed SQL migrations.
 - [Querying](/docs/core-framework/data-management/database/querying): create
   clients and run RLS-scoped, admin, and lower-level queries.
+- [Existing schema](/docs/core-framework/data-management/database/existing-schema):
+  describe a database you already have, and verify the description matches it.
