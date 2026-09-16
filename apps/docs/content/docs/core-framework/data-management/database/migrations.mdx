@@ -109,6 +109,15 @@ safe.
   the drift `--custom` avoids: use it rather than dropping a loose file in.
 </Callout>
 
+## Verify against a live database
+
+`drizzle-kit push --explain` introspects a database, prints the statements it
+would run to make it match your schema, and returns before running any of them.
+On a database your migrations built, it should print `[i] No changes detected`.
+It is the check worth having when the schema describes a database that already
+exists; see
+[Existing schema](/docs/core-framework/data-management/database/existing-schema).
+
 ## Generate migrations, day to day
 
 Author tables and RLS policies in your Drizzle schema, run `db:generate`
