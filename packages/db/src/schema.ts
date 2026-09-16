@@ -1,5 +1,5 @@
 // https://orm.drizzle.team/docs/rls#using-with-supabase  (re-exported roles, authUid, realtimeMessages)
-import { getColumnTable, getTableName, sql } from "drizzle-orm"
+import { Column, getColumnTable, getTableName, is, sql } from "drizzle-orm"
 import {
   type AnyPgColumn,
   bigint,
@@ -393,15 +393,18 @@ export const authenticatedAllPolicy = (
   config: AuthenticatedPolicyOptions = {}
 ) => allPolicy(name, { ...config, to: authenticatedRole })
 
-// Postgres takes the condition in a different clause per operation: `using`
-// filters the rows already there, `withCheck` vets the rows going in.
-const POLICY_CLAUSES = {
-  all: ["using", "withCheck"],
-  delete: ["using"],
-  insert: ["withCheck"],
-  select: ["using"],
-  update: ["using", "withCheck"],
-} as const satisfies Record<PolicyOperation, readonly ("using" | "withCheck")[]>
+// The clause each operation's condition belongs in: `using` filters the rows
+// already there, `withCheck` vets the rows going in. `update` and `all` accept
+// both, but Postgres reuses `using` for the check when `withCheck` is left out,
+// so one clause says the same thing and leaves the catalog matching the
+// `USING`-only policies `drizzle-kit pull` reads back from an existing database.
+const POLICY_CLAUSE = {
+  all: "using",
+  delete: "using",
+  insert: "withCheck",
+  select: "using",
+  update: "using",
+} as const satisfies Record<PolicyOperation, "using" | "withCheck">
 
 const POLICY_BUILDERS = {
   all: allPolicy,
@@ -418,13 +421,60 @@ const FUNCTION_POLICY_OPERATIONS = [
   "delete",
 ] as const
 
+type FunctionPolicyOperation = (typeof FUNCTION_POLICY_OPERATIONS)[number]
+
+/** Columns one function is called with. `null` calls it with none. */
+type FunctionArgument = AnyPgColumn | readonly AnyPgColumn[] | null
+
 type FunctionPoliciesOptions = {
-  /** Passed to each function, e.g. the row's id. Omit for a function that takes none. */
-  argument?: AnyPgColumn
+  /**
+   * Passed to each function, e.g. the row's id: one column, an array for a
+   * function taking several, or a record to vary them per operation. The
+   * common shape is that the row-scoped operations take the row and `insert`
+   * takes nothing, there being no row yet to authorise, only the caller. An
+   * operation missing from the record, or set to `null`, is called with no
+   * arguments; so is every operation when `argument` is omitted.
+   */
+  argument?:
+    | FunctionArgument
+    | Partial<Record<FunctionPolicyOperation, FunctionArgument>>
+  /**
+   * Schema the functions live in, e.g. `"billing"` for
+   * `billing.can_select_invoices`. Omit to emit the name unqualified and let
+   * the `search_path` in effect resolve it.
+   */
+  schema?: string
   /** Prefix for the default function and policy names. Default `"can"`. */
   prefix?: string
   /** Overrides the generated policy name. */
   name?: (operation: PolicyOperation, table: string) => string
+}
+
+// A column and an array of them are the whole-set form; anything else is the
+// per-operation record. `is` is how drizzle asks "is this one of mine", and a
+// column is the only entity either form can hold.
+const isWholeSetArgument = (
+  argument: NonNullable<FunctionPoliciesOptions["argument"]>
+): argument is NonNullable<FunctionArgument> =>
+  is(argument, Column) || Array.isArray(argument)
+
+const argumentsFor = (
+  argument: FunctionPoliciesOptions["argument"],
+  operation: FunctionPolicyOperation
+): AnyPgColumn[] => {
+  if (!argument) {
+    return []
+  }
+
+  const forOperation = isWholeSetArgument(argument)
+    ? argument
+    : argument[operation]
+
+  if (!forOperation) {
+    return []
+  }
+
+  return is(forOperation, Column) ? [forOperation] : [...forOperation]
 }
 
 // The columns object drizzle hands the extra-config callback. Taking it rather
@@ -450,10 +500,24 @@ type ExtraConfigColumns = Record<string, ExtraConfigColumn>
  * CREATE POLICY "can_select_posts" ON "posts" FOR SELECT TO "authenticated"
  *   USING ((select "can_select_posts"("posts"."id")));
  * ```
+ *
+ * `argument` also takes a record, for the usual shape where `insert` has no
+ * row to authorise yet:
+ *
+ * ```ts
+ * functionPolicies(t, {
+ *   argument: { delete: t.id, select: t.id, update: t.id },
+ * })
+ * ```
  */
 export const functionPolicies = (
   columns: ExtraConfigColumns,
-  { argument, name, prefix = "can" }: FunctionPoliciesOptions = {}
+  {
+    argument,
+    name,
+    prefix = "can",
+    schema: functionSchema,
+  }: FunctionPoliciesOptions = {}
 ) => {
   const [firstColumn] = Object.values(columns)
 
@@ -465,19 +529,20 @@ export const functionPolicies = (
 
   return FUNCTION_POLICY_OPERATIONS.map((operation) => {
     const functionName = `${prefix}_${operation}_${tableName}`
+    // Unqualified by default, so the name resolves through `search_path` the
+    // way a hand-written policy would; `schema` pins it to the functions that
+    // live beside their table instead.
+    const callee = functionSchema
+      ? sql`${sql.identifier(functionSchema)}.${sql.identifier(functionName)}`
+      : sql`${sql.identifier(functionName)}`
     // `select` wraps it so Postgres evaluates the call once per statement
     // rather than once per row, the same shape `authUid` uses.
-    const condition = argument
-      ? sql`(select ${sql.identifier(functionName)}(${argument}))`
-      : sql`(select ${sql.identifier(functionName)}())`
-    const clauses = POLICY_CLAUSES[operation]
+    const condition = sql`(select ${callee}(${sql.join(argumentsFor(argument, operation), sql`, `)}))`
+    const clause = { [POLICY_CLAUSE[operation]]: condition }
 
     return POLICY_BUILDERS[operation](
       name?.(operation, tableName) ?? functionName,
-      {
-        to: authenticatedRole,
-        ...Object.fromEntries(clauses.map((clause) => [clause, condition])),
-      }
+      { to: authenticatedRole, ...clause }
     )
   })
 }

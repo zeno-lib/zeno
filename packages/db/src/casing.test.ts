@@ -1,5 +1,6 @@
 import { getTableColumns, type SQL, sql } from "drizzle-orm"
 import {
+  bigint,
   getTableConfig,
   isPgEnum,
   isPgMaterializedView,
@@ -693,13 +694,16 @@ describe("default casing", () => {
     for (const rlsPolicy of policies) {
       expect(rlsPolicy.to).toBe(authenticatedRole)
     }
-    // using for select and delete, withCheck for insert, both for update.
+    // using for select, update and delete, withCheck for insert. update takes
+    // both clauses, but Postgres reuses using for the check, so spelling out a
+    // second identical expression would only add a polwithcheck that a
+    // hand-written USING-only policy does not have.
     expect(policies[0]?.using).toBeDefined()
     expect(policies[0]?.withCheck).toBeUndefined()
     expect(policies[1]?.using).toBeUndefined()
     expect(policies[1]?.withCheck).toBeDefined()
     expect(policies[2]?.using).toBeDefined()
-    expect(policies[2]?.withCheck).toBeDefined()
+    expect(policies[2]?.withCheck).toBeUndefined()
     expect(policies[3]?.using).toBeDefined()
     expect(policies[3]?.withCheck).toBeUndefined()
 
@@ -710,7 +714,7 @@ describe("default casing", () => {
     expect(dialect.sqlToQuery(policies[0]?.using as SQL).sql).toBe(
       '(select "can_select_posts"("posts"."id"))'
     )
-    expect(dialect.sqlToQuery(policies[2]?.withCheck as SQL).sql).toBe(
+    expect(dialect.sqlToQuery(policies[2]?.using as SQL).sql).toBe(
       '(select "can_update_posts"("posts"."id"))'
     )
 
@@ -744,5 +748,71 @@ describe("default casing", () => {
       "posts_update",
       "posts_delete",
     ])
+  })
+
+  it("varies the argument per operation, insert usually taking none", () => {
+    const deals = table(
+      "deals",
+      { id: primaryId("assigned"), ownerId: uuid() },
+      (t) => functionPolicies(t, { argument: { delete: t.id, select: t.id } })
+    )
+    const policies = getTableConfig(deals).policies
+    const dialect = new PgDialect()
+
+    // select and delete get the row; insert and update fall to no arguments,
+    // insert because a missing key means "called with none" and update because
+    // it was left out of the record too.
+    expect(dialect.sqlToQuery(policies[0]?.using as SQL).sql).toBe(
+      '(select "can_select_deals"("deals"."id"))'
+    )
+    expect(dialect.sqlToQuery(policies[1]?.withCheck as SQL).sql).toBe(
+      '(select "can_insert_deals"())'
+    )
+    expect(dialect.sqlToQuery(policies[2]?.using as SQL).sql).toBe(
+      '(select "can_update_deals"())'
+    )
+    expect(dialect.sqlToQuery(policies[3]?.using as SQL).sql).toBe(
+      '(select "can_delete_deals"("deals"."id"))'
+    )
+  })
+
+  it("reads an explicit null as a call with no arguments", () => {
+    const deals = table("deals", { id: primaryId("assigned") }, (t) =>
+      functionPolicies(t, { argument: { insert: null, select: t.id } })
+    )
+    const policies = getTableConfig(deals).policies
+
+    expect(new PgDialect().sqlToQuery(policies[1]?.withCheck as SQL).sql).toBe(
+      '(select "can_insert_deals"())'
+    )
+  })
+
+  it("passes several columns to a function that takes several", () => {
+    const investors = table(
+      "investors",
+      {
+        id: primaryId("uuid"),
+        organisationId: bigint({ mode: "number" }),
+        profileId: uuid(),
+      },
+      (t) => functionPolicies(t, { argument: [t.profileId, t.organisationId] })
+    )
+    const policies = getTableConfig(investors).policies
+
+    expect(new PgDialect().sqlToQuery(policies[0]?.using as SQL).sql).toBe(
+      '(select "can_select_investors"("investors"."profile_id", "investors"."organisation_id"))'
+    )
+  })
+
+  it("qualifies the function with a schema when one is given", () => {
+    const bexio = schema("bexio")
+    const bills = bexio.table("bexio_bills", { id: primaryId("uuid") }, (t) =>
+      functionPolicies(t, { schema: "bexio" })
+    )
+    const policies = getTableConfig(bills).policies
+
+    expect(new PgDialect().sqlToQuery(policies[0]?.using as SQL).sql).toBe(
+      '(select "bexio"."can_select_bexio_bills"())'
+    )
   })
 })
