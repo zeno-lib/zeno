@@ -28,7 +28,7 @@
     "@zeno-lib/typescript": "workspace:^",
     "drizzle-orm": "1.0.0-rc.3",
     "typescript": "7.0.2",
-    "vitest": "4.1.0",
+    "vitest": "4.1.11",
     "zod": "^4.4.3"
   }
 }
