@@ -15,10 +15,11 @@ async function updateSession(request, options) {
 		getAll() {
 			return request.cookies.getAll();
 		},
-		setAll(cookiesToSet) {
+		setAll(cookiesToSet, headers) {
 			for (const { name, value } of cookiesToSet) request.cookies.set(name, value);
 			supabaseResponse = NextResponse.next({ request });
 			for (const { name, options: cookieOptions, value } of cookiesToSet) supabaseResponse.cookies.set(name, value, cookieOptions);
+			for (const [key, value] of Object.entries(headers)) supabaseResponse.headers.set(key, value);
 		}
 	} }).auth.getUser();
 	const isPublicPath = publicPaths.some((path) => request.nextUrl.pathname.startsWith(path));

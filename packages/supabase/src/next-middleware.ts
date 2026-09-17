@@ -37,7 +37,7 @@ export async function updateSession(
       getAll() {
         return request.cookies.getAll()
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet, headers) {
         for (const { name, value } of cookiesToSet) {
           request.cookies.set(name, value)
         }
@@ -46,6 +46,10 @@ export async function updateSession(
         })
         for (const { name, options: cookieOptions, value } of cookiesToSet) {
           supabaseResponse.cookies.set(name, value, cookieOptions)
+        }
+        // Set the "do not cache" headers from `@supabase/ssr`: this response carries auth cookies.
+        for (const [key, value] of Object.entries(headers)) {
+          supabaseResponse.headers.set(key, value)
         }
       },
     },

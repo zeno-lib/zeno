@@ -64,12 +64,12 @@ export default {
 ## Anti-patterns
 
 - **Do not call `next-client/createClient` from server code or `next-server/createClient` from a client component.** Cookie state diverges; a misplaced call returns a usable object that silently loses auth state on navigation.
-- **Do not put any code between `createServerClient(...)` and `supabase.auth.getUser()` in middleware** (`next-middleware.ts:55-58`). The official Supabase guidance (and the comment in the file) is explicit: any extra logic there has caused production "users randomly logged out" incidents. Same rule for: do not delete the `auth.getUser()` call.
+- **Do not put any code between `createServerClient(...)` and `supabase.auth.getUser()` in middleware** (`next-middleware.ts:59-62`). The official Supabase guidance (and the comment in the file) is explicit: any extra logic there has caused production "users randomly logged out" incidents. Same rule for: do not delete the `auth.getUser()` call.
 - **Do not mutate the `supabaseResponse` object's cookies after `updateSession`**: return it as-is, or follow the four-step copy procedure in the file's trailing comment. Skipping this desyncs browser/server cookies.
 
 ## Dependencies & Edges
 
-Peer: `@supabase/ssr >=0`, `@supabase/supabase-js >=2`, `next >=16`. `next` is an **optional** peer, imported only by `next-server`/`next-middleware`. The `supabase` CLI is **not** a dependency (nothing imports it; it's a separate dev tool for generating the `Database` types). No workspace runtime deps.
+Peer: `@supabase/ssr >=0.10.0`, `@supabase/supabase-js >=2.56.0`, `next >=16`. `next` is an **optional** peer, imported only by `next-server`/`next-middleware`. The `supabase` CLI is **not** a dependency (nothing imports it; it's a separate dev tool for generating the `Database` types). No workspace runtime deps.
 
 Used by: `@zeno-lib/authentication` (client + server). Used directly by every app that needs auth.
 
