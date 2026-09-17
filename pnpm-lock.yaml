@@ -174,7 +174,10 @@ importers:
         version: 2.84.1
       tsdown:
         specifier: ^0.22.14
-        version: 0.22.14(tsx@4.20.6)(typescript@6.0.3)
+        version: 0.22.14(tsx@4.20.6)(typescript@7.0.2)
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
       vite:
         specifier: 8.0.16
         version: 8.0.16(@types/node@24.10.0)(esbuild@0.28.0)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.9.0)
@@ -1455,10 +1458,6 @@ packages:
     resolution: {integrity: sha512-OdWTEiVkY2PHwqkbBI8frFxQQFekHaSSkUIJkwzclWZe64O1X4UlUjqqqLaPbUpMOQk6FBu/HtlGXNblIs0huw==}
     engines: {node: ^18.17.0 || ^20.3.0 || >=21.0.0}
     cpu: [wasm32]
-
-  '@img/sharp-wasm32@0.35.4':
-    resolution: {integrity: sha512-zQnl4Kwp7Q6NHsENtU2T/00Zi+w3AQNwz3+UaTyVBy2FpXrzXzGjndpK61onhZjRtRpQXxCTeqw19bVyXOh7jA==}
-    engines: {node: '>=20.9.0'}
 
   '@img/sharp-webcontainers-wasm32@0.35.4':
     resolution: {integrity: sha512-ESfNkywmCfPNyaZjxooddJQiQ+l/nTpGEOGthxiLnIHXC/CmcBixnfwUleX9mCz9ovrUUvKMap/pm8RYbzfwaA==}
@@ -6737,7 +6736,7 @@ snapshots:
   '@changesets/format@0.1.2':
     dependencies:
       package-manager-detector: 1.8.0
-      tinyexec: 1.3.0
+      tinyexec: 1.3.1
 
   '@changesets/get-dependents-graph@3.0.0':
     dependencies:
@@ -7098,8 +7097,6 @@ snapshots:
     optional: true
 
   '@img/sharp-freebsd-wasm32@0.35.4':
-    dependencies:
-      '@img/sharp-wasm32': 0.35.4
     optional: true
 
   '@img/sharp-libvips-darwin-arm64@1.2.4':
@@ -7247,14 +7244,7 @@ snapshots:
       '@emnapi/runtime': 1.11.3
     optional: true
 
-  '@img/sharp-wasm32@0.35.4':
-    dependencies:
-      '@emnapi/runtime': 1.11.3
-    optional: true
-
   '@img/sharp-webcontainers-wasm32@0.35.4':
-    dependencies:
-      '@img/sharp-wasm32': 0.35.4
     optional: true
 
   '@img/sharp-win32-arm64@0.34.5':
@@ -11887,7 +11877,7 @@ snapshots:
       picomatch: 4.0.7
       rolldown: 1.2.6
       rolldown-plugin-dts: 0.27.14(rolldown@1.2.6)(typescript@7.0.2)
-      tinyexec: 1.3.0
+      tinyexec: 1.3.1
       tinyglobby: 0.2.17
       tree-kill: 1.2.2
       unconfig-core: 7.5.0
