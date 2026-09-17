@@ -1,4 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
+import { defineRelations, eq, inArray, sql } from "drizzle-orm"
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 import {
   createAdminClient,
   createAnonClient,
@@ -6,9 +8,7 @@ import {
   createServiceClient,
   createSupabaseClient,
   type SupabaseToken,
-} from "@zeno-lib/db"
-import { defineRelations, eq, inArray, sql } from "drizzle-orm"
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
+} from "../src/index"
 // biome-ignore lint/performance/noNamespaceImport: drizzle schema needs every table
 import * as schema from "./schema"
 import { posts } from "./schema"

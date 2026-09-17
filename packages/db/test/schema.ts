@@ -1,3 +1,4 @@
+import { text } from "drizzle-orm/pg-core"
 import {
   auditColumns,
   authenticatedOwnerInsertPolicy,
@@ -6,8 +7,7 @@ import {
   authUserId,
   primaryId,
   table,
-} from "@zeno-lib/db/schema"
-import { text } from "drizzle-orm/pg-core"
+} from "../src/schema"
 
 export const posts = table(
   "posts",

@@ -234,6 +234,12 @@ Every peer is listed in `external` so it stays a bare specifier — bundling a
 second copy of `drizzle-orm` would give schema entities a different identity
 from the ones the consumer's own Drizzle Kit sees.
 
+**The package's own files import relatively** (`../src/schema`, `./src/config`),
+never through `@zeno-lib/db/*`. `types:check` runs *before* `build`, so a
+self-reference resolves against a `dist/` that does not exist yet and the whole
+package fails to typecheck. `@zeno-lib/supabase` has the same rule; it just never
+had a reason to break it.
+
 This is not cosmetic. While the exports map pointed at `src/*.ts`, the package
 was unusable in three ordinary places at once: plain Node refused it
 (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`, which has no override for files

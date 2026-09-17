@@ -3,6 +3,6 @@
 // The schema lives under test/ (a fixture for the integration suite), not in
 // src/ which holds the package's own helper exports.
 import "dotenv/config"
-import { defineDrizzleConfig } from "@zeno-lib/db/config"
+import { defineDrizzleConfig } from "./src/config"
 
 export default defineDrizzleConfig({ schema: "./test/schema.ts" })
