@@ -222,9 +222,25 @@ export default defineDrizzleConfig({ schema: "./src/schema.ts" })
 Peer deps: `drizzle-orm 1.0.0-rc.3`, `drizzle-kit 1.0.0-rc.3`,
 `postgres >=3.4`. Dev deps: `@zeno-lib/typescript`, `@zeno-lib/test` (shared
 Vitest config, wired via `vitest.config.ts`), `@types/node`, `dotenv`,
-`supabase` (CLI for the local test stack), `vite`, `vitest`, plus local copies of
-the peer deps for tests and type-checking. Both configs load `.env.test`, so
-tests resolve `SUPABASE_DATABASE_URL` from there. No workspace runtime deps.
+`supabase` (CLI for the local test stack), `tsdown` (the build), `vite`,
+`vitest`, plus local copies of the peer deps for tests and type-checking. Both
+configs load `.env.test`, so tests resolve `SUPABASE_DATABASE_URL` from there.
+No workspace runtime deps.
+
+**The package ships compiled output**, like every other npm package here:
+`tsdown` emits `dist/*.mjs` + `dist/*.d.mts` from the five entries, the
+`exports` map points at `dist`, and `files` carries `dist` alongside `src`.
+Every peer is listed in `external` so it stays a bare specifier — bundling a
+second copy of `drizzle-orm` would give schema entities a different identity
+from the ones the consumer's own Drizzle Kit sees.
+
+This is not cosmetic. While the exports map pointed at `src/*.ts`, the package
+was unusable in three ordinary places at once: plain Node refused it
+(`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`, which has no override for files
+under `node_modules`), Turbopack rejected it (`Unknown module type`), and any
+consumer that emits — so cannot set `allowImportingTsExtensions` — failed to
+typecheck against it. A consumer could paper over the bundler with
+`transpilePackages`, but nothing fixes the first and third from outside.
 
 Tests run under a single Vitest config and fall into two kinds:
 

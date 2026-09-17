@@ -169,6 +169,9 @@ importers:
       supabase:
         specifier: 2.84.1
         version: 2.84.1
+      tsdown:
+        specifier: ^0.22.14
+        version: 0.22.14(tsx@4.20.6)(typescript@6.0.3)
       vite:
         specifier: 8.0.16
         version: 8.0.16(@types/node@24.10.0)(esbuild@0.28.0)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.9.0)

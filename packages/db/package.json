@@ -3,6 +3,7 @@
   "version": "0.3.0",
   "type": "module",
   "scripts": {
+    "build": "tsdown",
     "dev": "pnpm exec supabase start",
     "stop": "pnpm exec supabase stop",
     "reset": "pnpm exec supabase db reset",
@@ -15,13 +16,34 @@
     "types:check": "tsc --noEmit"
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./auth": "./src/auth-schema.ts",
-    "./config": "./src/config.ts",
-    "./schema": "./src/schema.ts",
-    "./triggers": "./src/triggers.ts"
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./auth": {
+      "types": "./dist/auth-schema.d.mts",
+      "import": "./dist/auth-schema.mjs",
+      "default": "./dist/auth-schema.mjs"
+    },
+    "./config": {
+      "types": "./dist/config.d.mts",
+      "import": "./dist/config.mjs",
+      "default": "./dist/config.mjs"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.mts",
+      "import": "./dist/schema.mjs",
+      "default": "./dist/schema.mjs"
+    },
+    "./triggers": {
+      "types": "./dist/triggers.d.mts",
+      "import": "./dist/triggers.mjs",
+      "default": "./dist/triggers.mjs"
+    }
   },
   "files": [
+    "dist",
     "src"
   ],
   "publishConfig": {
@@ -47,6 +69,7 @@
     "drizzle-orm": "1.0.0-rc.3",
     "postgres": "3.4.7",
     "supabase": "2.84.1",
+    "tsdown": "^0.22.14",
     "vite": "8.0.16",
     "vitest": "4.1.0"
   }
