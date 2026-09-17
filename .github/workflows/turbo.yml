@@ -37,6 +37,10 @@ jobs:
         cache: 'pnpm'
     - name: Install dependencies
       run: pnpm install
+    - name: Check registry manifests are in sync
+      run: |
+        pnpm registry:build
+        git diff --exit-code -- registry.json 'packages/*/registry.json'
     - name: Install Playwright Browsers
       run: pnpm --filter @zeno-lib/e2e exec playwright install --with-deps chromium
     - name: Setup Supabase CLI
