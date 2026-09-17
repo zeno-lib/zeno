@@ -49,7 +49,7 @@
     "@types/node": "25.6.0",
     "@zeno-lib/typescript": "workspace:^",
     "tsdown": "^0.22.14",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "vite": "8.0.16",
     "vitest": "4.1.0"
   }
