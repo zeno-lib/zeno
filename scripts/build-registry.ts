@@ -19,7 +19,11 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
-import ts from "typescript"
+// TypeScript 7 ships without a JavaScript API.
+// `@typescript/typescript6` is the compatibility package,
+// until TypeScript 7 will ship a JavaScript API in ~7.1
+// https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-60
+import ts from "@typescript/typescript6"
 import {
   ASSUMED_PRESENT,
   DEP_OVERRIDES,
