@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "tsdown",
+    "prepack": "tsdown",
     "dev": "pnpm exec supabase start",
     "stop": "pnpm exec supabase stop",
     "reset": "pnpm exec supabase db reset",
