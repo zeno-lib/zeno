@@ -21,16 +21,16 @@ export function DocsLayoutHeaderTabs() {
       className="fixed inset-x-0 top-20 hidden border-b bg-fd-background *:mx-auto *:max-w-(--fd-layout-width) md:top-[46px] md:block lg:top-[49px] xl:top-[51px]"
       id="nd-header-tabs"
     >
-      <div className="px-4 py-1.5">
+      <div className="px-4 pt-2">
         <Tabs>
-          <TabsList>
+          <TabsList className="h-auto gap-6 p-0" variant="line">
             {tabs.map((option, i) => (
               <TabsTrigger
                 className={cn(
-                  "text-fd-muted-foreground [&_svg]:size-4!",
+                  "zeno-label h-full gap-2 rounded-none px-0 pb-2 text-fd-muted-foreground after:-bottom-px! [&_svg]:size-3.5!",
                   option.unlisted && selected !== option && "hidden",
-                  selected === option && "border-fd-primary text-fd-primary",
-                  selected !== option && "hover:text-fd-accent-foreground"
+                  selected === option && "text-fd-foreground",
+                  selected !== option && "hover:text-fd-foreground"
                 )}
                 // biome-ignore lint/suspicious/noArrayIndexKey: can't do better
                 key={i}
