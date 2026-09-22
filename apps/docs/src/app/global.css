@@ -1,6 +1,7 @@
 @import "@zeno-lib/ui/styles/globals.css";
 @import "./theme.css";
 @import "fumadocs-ui/css/preset.css";
+@import "./design-system.css";
 
 #nd-nav {
   position: fixed;
