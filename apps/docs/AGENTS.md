@@ -51,6 +51,47 @@ import { Button } from "@zeno-lib/ui/button"
 <Button>Try it</Button>
 ```
 
+Composing the landing page:
+
+The `/` route is built in a Swiss editorial register: near-monochrome type on a faint 10px square
+texture, hairline rules, and a wide centred column (`Shell` in `src/components/home/section.tsx`).
+Every section below the fold uses `SectionHeader`: heading left with a mono all-caps label tucked
+underneath it, justified body right.
+
+Its signature is `PixelCanvas`, a `<canvas>` pixel field drawn from smooth value noise. It appears
+three times at different `seed` values so no two waves repeat. **Colour exists only inside those
+canvases and their legend swatches**; every other surface stays on the shared monochrome tokens, so
+the landing page never introduces a brand hue into `@zeno-lib/ui`'s registry-distributed theme. The
+`--zeno-*` colours and `.zeno-*` classes live in `src/app/(home)/home.css`, imported by the page.
+
+The canvases are interactive. `PixelFieldProvider` holds the highlighted domain; `PixelLegend` and
+the rows of `PackageIndex` set it on hover and focus, and every canvas dims the other three colours
+in response. Because the painter reads that value through a ref, a context change alone will not
+repaint: `PixelCanvas` keeps a `repaintRef` and an effect keyed on `active` to request the frame. If
+you refactor the painter, keep that link or hovering will silently stop working.
+
+Brand assets: `src/components/layout/zeno-mark.tsx` is the Zeno mark, a Z drawn on the same square
+module as the canvas, filled with `currentColor` so it works in both themes. It sits in the navbar
+through `baseOptions().nav.title`. The favicon is `src/app/icon.svg` and the touch icon
+`src/app/apple-icon.png` (rasterised from it); Next injects both from the App Router file
+conventions, so there is no `<link rel="icon">` to maintain.
+
+Site-wide type lives in `src/app/design-system.css`, imported by `global.css`: `.zeno-label` (the
+mono all-caps label used for nav items, section labels and docs wayfinding) and the heading tracking.
+Nav items get it through Fumadocs' `links` API in `src/lib/layout.shared.tsx`, not CSS selectors
+against Fumadocs' generated class names, which would not survive an upgrade.
+
+The 10px grid texture (`.zeno-page`) backs the canvases only, never type: behind hairline rules it
+fought the borders and greyed off the white.
+
+Technology marks live in `public/tech/` (TechIcons, MIT). The folder names describe the BACKGROUND
+they are drawn for, not the mark: `on-light/` holds dark tiles for the light theme, `on-dark/` holds
+light tiles for the dark theme. They are rasterised to 96px PNGs because the upstream SVGs embed
+raster images and run to ~1.2MB for ten marks; see `public/tech/README.md` before re-adding any.
+
+A `Button` whose `render` is a link needs `nativeButton={false}`, otherwise Base UI logs a
+button-semantics error at runtime.
+
 `mdx-components.tsx` is the central place to override default MDX renderers. The `Preview` wrapper (`src/components/preview.tsx`) is registered globally and used in the UI primitive pages to host live component examples: drop a `<Preview>...</Preview>` block in any MDX page.
 
 ## Anti-patterns
@@ -72,4 +113,10 @@ Consumed by: `@zeno-lib/e2e` lists this app as a workspace dep so `turbo run e2e
 - **Port 5002 is hardcoded** in the dev script and assumed by `packages/e2e/playwright.config.ts` (`webServer.command` runs `npm run start -- -p 5002`). Changing the port here also requires updating the e2e config.
 - **`postinstall` runs `fumadocs-mdx`**: every fresh `pnpm install` triggers codegen. If you see stale `.source` issues after pulling, re-run `pnpm install` or `pnpm exec fumadocs-mdx`.
 - **`types:check` chains three commands** (`next typegen && fumadocs-mdx && tsc --noEmit`). If type errors look like missing modules from `.source` or `.next/types`, you skipped one of the codegen steps or ran them in the wrong order.
+- **The TanStack devtools must stay browser-only.** `@tanstack/devtools-ui` imports `use` from
+  `solid-js/web`, and only the browser builds export it; Next's app-ssr layer resolves the node build
+  and the dev compile dies with `Export use doesn't exist in target module`. `src/components/devtools.tsx`
+  therefore pulls `src/components/devtools-panel.tsx` through `next/dynamic` with `ssr: false`. Do not
+  collapse those two files back into a static import; all three `@tanstack/devtools*` packages are
+  already at their latest versions, so there is no upgrade that fixes it.
 - **MDX components live in `src/mdx-components.tsx`** at the app root, not under `src/components/`: Fumadocs convention. Don't move it.
