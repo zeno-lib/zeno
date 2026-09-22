@@ -1,0 +1,88 @@
+/*
+ * Landing page styles.
+ *
+ * The page is a Swiss grid: near-monochrome type on a faint 10px square
+ * texture, with colour appearing ONLY inside the pixel canvases. Nothing here
+ * touches the shared tokens, so the registry-distributed theme in
+ * `@zeno-lib/ui` stays untouched.
+ */
+
+:root {
+  --zeno-rule: oklch(0 0 0 / 4%);
+
+  --zeno-data: oklch(0.55 0.2 260);
+  --zeno-users: oklch(0.74 0.16 66);
+  --zeno-interface: oklch(0.6 0.13 180);
+  --zeno-quality: oklch(0.56 0.21 300);
+}
+
+.dark {
+  --zeno-rule: oklch(1 0 0 / 5%);
+
+  --zeno-data: oklch(0.66 0.18 260);
+  --zeno-users: oklch(0.8 0.16 66);
+  --zeno-interface: oklch(0.72 0.13 180);
+  --zeno-quality: oklch(0.68 0.19 300);
+}
+
+/*
+ * The same 10px module the canvas draws its pixels on. It backs ONLY the
+ * canvases, so the pixels dissolve into their own grid. Everywhere else the
+ * page stays plain, because behind type and hairline rules the texture fought
+ * the borders and greyed off the white.
+ */
+.zeno-page {
+  background-image:
+    linear-gradient(to right, var(--zeno-rule) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--zeno-rule) 1px, transparent 1px);
+  background-size: 10px 10px;
+}
+
+/* Justified body copy, as the reference sets it. */
+/* The all-caps block in the hero, justified edge to edge like the reference. */
+.zeno-justify {
+  text-align: justify;
+  text-align-last: justify;
+}
+
+.zeno-prose p {
+  text-align: justify;
+  hyphens: auto;
+  text-wrap: pretty;
+}
+
+.zeno-prose p + p {
+  margin-top: 1.1em;
+}
+
+.zeno-swatch {
+  background-color: var(--zeno-pixel);
+}
+
+/* Icons that carry a domain take its colour, keeping the tie to the canvas. */
+.zeno-ink {
+  color: var(--zeno-pixel);
+}
+
+.zeno-d {
+  --zeno-pixel: var(--zeno-data);
+}
+.zeno-u {
+  --zeno-pixel: var(--zeno-users);
+}
+.zeno-i {
+  --zeno-pixel: var(--zeno-interface);
+}
+.zeno-q {
+  --zeno-pixel: var(--zeno-quality);
+}
+
+/* Placeholder hatching, on the same 10px module as the page texture. */
+.zeno-todo {
+  background-color: var(--zeno-surface);
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--border) 0 1px,
+    transparent 1px 10px
+  );
+}
