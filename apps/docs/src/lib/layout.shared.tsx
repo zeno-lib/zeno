@@ -7,6 +7,7 @@ import {
 import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared"
 import type { ReactNode } from "react"
 import { HeaderDocumentationItem } from "@/components/layout/header-documentation-item"
+import { ZenoLogo } from "@/components/layout/zeno-logo"
 import { source } from "./source"
 
 export interface SubMenuLinkProps {
@@ -34,7 +35,7 @@ export function baseOptions(): BaseLayoutProps {
   return {
     githubUrl: "https://github.com/zeno-lib/zeno",
     nav: {
-      title: "Zeno",
+      title: <ZenoLogo className="h-5 w-auto" />,
       transparentMode: "none",
     },
   }
@@ -47,7 +48,7 @@ export function homeOptions(): BaseLayoutProps {
     links: [
       {
         on: "nav",
-        text: "Discover",
+        text: <span className="zeno-label">Discover</span>,
         url: "/",
       },
       {
@@ -57,7 +58,7 @@ export function homeOptions(): BaseLayoutProps {
           url: item.href,
         })),
         on: "menu",
-        text: "Documentation",
+        text: <span className="zeno-label">Documentation</span>,
         type: "menu",
       },
       {
@@ -66,19 +67,19 @@ export function homeOptions(): BaseLayoutProps {
         type: "custom",
       },
       {
-        text: "Showcase",
+        text: <span className="zeno-label">Showcase</span>,
         url: "/showcase",
       },
       {
-        text: "About",
+        text: <span className="zeno-label">About</span>,
         url: "/about",
       },
       {
-        text: "Blog",
+        text: <span className="zeno-label">Blog</span>,
         url: "/blog",
       },
       {
-        text: "Changelog",
+        text: <span className="zeno-label">Changelog</span>,
         url: "/changelog",
       },
     ],
