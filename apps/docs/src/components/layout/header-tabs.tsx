@@ -22,8 +22,17 @@ export function DocsLayoutHeaderTabs() {
       id="nd-header-tabs"
     >
       <div className="px-4 pt-2">
-        <Tabs>
-          <TabsList className="h-auto gap-6 p-0" variant="line">
+        {/* Controlled: the triggers are links, so nothing sets the value on
+            click. It comes from the pathname, and without it no tab is active,
+            which loses both the underline and the roving tabindex. */}
+        <Tabs value={selected?.url ?? null}>
+          {/* The height has to carry the same variant as the base it replaces
+              (`group-data-horizontal/tabs:h-8`), or that one wins and the list
+              cannot grow to the trigger's padding. */}
+          <TabsList
+            className="gap-6 p-0 group-data-horizontal/tabs:h-auto"
+            variant="line"
+          >
             {tabs.map((option, i) => (
               <TabsTrigger
                 className={cn(

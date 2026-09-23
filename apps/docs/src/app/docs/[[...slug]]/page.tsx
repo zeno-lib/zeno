@@ -92,7 +92,7 @@ function DocsCategory({ url }: { url: string }) {
           href={item.url}
           key={item.url}
         >
-          {hasRuleJunction(index, items.length, CATEGORY_COLUMNS) && (
+          {hasRuleJunction(index, CATEGORY_COLUMNS) && (
             <RuleDot className="-top-[0.5px] -right-[0.5px] hidden translate-x-1/2 -translate-y-1/2 sm:block" />
           )}
           {item.icon ? (

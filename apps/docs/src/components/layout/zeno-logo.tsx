@@ -5,7 +5,9 @@ import type { SVGProps } from "react"
  * with `currentColor` and the page's own typeface, so it inverts with the theme
  * and never drifts from the surrounding type.
  *
- * Use {@link ZenoMark} on its own only where there is no room for the word.
+ * The word is pinned to the 41 units the viewBox leaves it. Set free it measures
+ * ~40 in Inter, so any fallback the browser paints before `next/font` swaps in
+ * would overrun the box and lose its last glyph to the edge.
  */
 export function ZenoLogo(props: SVGProps<SVGSVGElement>) {
   return (
@@ -34,7 +36,9 @@ export function ZenoLogo(props: SVGProps<SVGSVGElement>) {
         dominantBaseline="middle"
         fontSize="17"
         fontWeight="600"
+        lengthAdjust="spacingAndGlyphs"
         letterSpacing="-0.4"
+        textLength="41"
         x="28"
         y="10.75"
       >

@@ -68,7 +68,7 @@ function SubMenuLink({
       )}
       href={href}
     >
-      {hasRuleJunction(index, total, COLUMNS) && (
+      {hasRuleJunction(index, COLUMNS) && (
         <RuleDot className="-top-[0.5px] -right-[0.5px] translate-x-1/2 -translate-y-1/2" />
       )}
       <span className="flex size-12 shrink-0 items-center justify-center rounded-md border bg-fd-background text-fd-muted-foreground [&>svg]:size-5">

@@ -53,36 +53,39 @@ import { Button } from "@zeno-lib/ui/button"
 
 Composing the landing page:
 
-The `/` route is built in a Swiss editorial register: near-monochrome type on a faint 10px square
-texture, hairline rules, and a wide centred column (`Shell` in `src/components/home/section.tsx`).
-Every section below the fold uses `SectionHeader`: heading left with a mono all-caps label tucked
-underneath it, justified body right.
+The `/` route is built in a Swiss editorial register: near-monochrome type on hairline rules, set in a
+wide centred column (`Shell` in `src/components/home/section.tsx`). Every section below the fold uses
+`SectionHeader`: heading left with a mono all-caps label tucked underneath it, justified body right.
 
-Its signature is `PixelCanvas`, a `<canvas>` pixel field drawn from smooth value noise. It appears
-three times at different `seed` values so no two waves repeat. **Colour exists only inside those
-canvases and their legend swatches**; every other surface stays on the shared monochrome tokens, so
-the landing page never introduces a brand hue into `@zeno-lib/ui`'s registry-distributed theme. The
-`--zeno-*` colours and `.zeno-*` classes live in `src/app/(home)/home.css`, imported by the page.
+The three visual slots (hero, package diagram, closing) are `TodoBlock` placeholders
+(`src/components/home/todo-block.tsx`): a labelled hatch that admits the artwork is missing, rather
+than decoration that reads as finished. Whatever replaces them, the last block on the page keeps
+`closesPage`; see the rule markers below.
 
-The canvases are interactive. `PixelFieldProvider` holds the highlighted domain; `PixelLegend` and
-the rows of `PackageIndex` set it on hover and focus, and every canvas dims the other three colours
-in response. Because the painter reads that value through a ref, a context change alone will not
-repaint: `PixelCanvas` keeps a `repaintRef` and an effect keyed on `active` to request the frame. If
-you refactor the painter, keep that link or hovering will silently stop working.
+**Colour exists only on the `PackageIndex` domain icons** (`.zeno-ink` plus one of
+`.zeno-d`/`u`/`i`/`q`); every other surface stays on the shared monochrome tokens, so the landing page
+never introduces a brand hue into `@zeno-lib/ui`'s registry-distributed theme. The `--zeno-*` colours
+and `.zeno-*` classes live in `src/app/(home)/home.css`, imported by the page.
 
-Brand assets: `src/components/layout/zeno-mark.tsx` is the Zeno mark, a Z drawn on the same square
-module as the canvas, filled with `currentColor` so it works in both themes. It sits in the navbar
-through `baseOptions().nav.title`. The favicon is `src/app/icon.svg` and the touch icon
-`src/app/apple-icon.png` (rasterised from it); Next injects both from the App Router file
-conventions, so there is no `<link rel="icon">` to maintain.
+Brand assets: `src/components/layout/zeno-logo.tsx` is the lockup, a pixel mark plus the wordmark,
+filled with `currentColor` so it works in both themes. It is both the navbar and the sidebar title,
+through `baseOptions().nav.title`. The wordmark is an SVG `<text>` pinned with `textLength`, because
+set free it measures almost exactly the width the viewBox leaves it and a fallback font would push its
+last glyph past the edge, where the SVG clips. The favicon is `src/app/icon.svg` and the touch icon
+`src/app/apple-icon.png` (rasterised from it); Next injects both from the App Router file conventions,
+so there is no `<link rel="icon">` to maintain.
 
 Site-wide type lives in `src/app/design-system.css`, imported by `global.css`: `.zeno-label` (the
 mono all-caps label used for nav items, section labels and docs wayfinding) and the heading tracking.
-Nav items get it through Fumadocs' `links` API in `src/lib/layout.shared.tsx`, not CSS selectors
-against Fumadocs' generated class names, which would not survive an upgrade.
+Nav items get it through Fumadocs' `links` API in `src/lib/layout.shared.tsx`, not a selector against
+Fumadocs' generated class names. Where Fumadocs hardcodes a class and exposes no API for it
+(`rounded-full` on the search pills, `bg-fd-secondary/50` on the search fields) the CSS matches that
+class token exactly; those two rules are the first to check after a Fumadocs upgrade.
 
-The 10px grid texture (`.zeno-page`) backs the canvases only, never type: behind hairline rules it
-fought the borders and greyed off the white.
+`.zeno-*` classes that paint a surface sit in `@layer components`, so a utility on the same element
+still wins (`hover:bg-fd-muted/60` over `.zeno-surface`). `.zeno-label` is the deliberate exception:
+unlayered, because it has to beat the `text-sm` that `Button` and `TabsTrigger` set on themselves.
+That also means its size cannot be overridden, so never pair it with a font-size utility.
 
 Rule crossings are marked from `src/components/home/rule-dot.tsx`, which owns the one 3px square
 marker the whole page uses. `RuleDot` masks a square of clear space around itself and is only safe
@@ -93,10 +96,17 @@ by half a pixel (`-top-[0.5px]`, not `-top-px`) so the marker centres on the rul
 than its edge. And a junction's tick runs 68px past the rule, so the last one on the page needs
 `TodoBlock`'s `closesPage`, or it adds that much scroll below the block the page should end on.
 
+Those grids clear their own edge rules with `nth-child(Nn)` plus an index compared against the first
+cell of the last row, never a literal `nth-child(N)` or `nth-last-child(-n+N)`: the arrays behind them
+are meant to grow, and a literal index quietly starts marking the wrong cell one entry later.
+
 Technology marks live in `public/tech/` (TechIcons, MIT). The folder names describe the BACKGROUND
 they are drawn for, not the mark: `on-light/` holds dark tiles for the light theme, `on-dark/` holds
 light tiles for the dark theme. They are rasterised to 96px PNGs because the upstream SVGs embed
-raster images and run to ~1.2MB for ten marks; see `public/tech/README.md` before re-adding any.
+raster images and run to ~1.2MB for ten marks; see `public/tech/README.md` before re-adding any. They
+are painted as background images through `--zeno-mark-light` / `--zeno-mark-dark` rather than two
+`<img>` tags swapped with `dark:hidden`, because a browser fetches an image element even while it is
+`display: none` and the pair would download both variants for every visitor.
 
 A `Button` whose `render` is a link needs `nativeButton={false}`, otherwise Base UI logs a
 button-semantics error at runtime.
@@ -128,4 +138,9 @@ Consumed by: `@zeno-lib/e2e` lists this app as a workspace dep so `turbo run e2e
   therefore pulls `src/components/devtools-panel.tsx` through `next/dynamic` with `ssr: false`. Do not
   collapse those two files back into a static import; all three `@tanstack/devtools*` packages are
   already at their latest versions, so there is no upgrade that fixes it.
+- **`DocsLayoutHeaderTabs` has to stay controlled.** The `line` variant draws its underline from
+  `data-active`, which Base UI sets only on the tab matching `Tabs`' `value`. The triggers render as
+  links, so no click ever updates that value: it comes from the pathname. Drop the `value` prop and
+  no tab is active, which loses the underline *and* leaves every trigger at `tabindex="-1"`, putting
+  the section tabs out of reach of the keyboard.
 - **MDX components live in `src/mdx-components.tsx`** at the app root, not under `src/components/`: Fumadocs convention. Don't move it.

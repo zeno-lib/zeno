@@ -16,12 +16,12 @@ export default function HomePage() {
   // The corner dots straddle the column rules, so they hang 1.5px past the
   // viewport once the column runs full width. Clip rather than scroll.
   return (
-    <main className="flex flex-1 flex-col overflow-x-clip">
+    <div className="flex flex-1 flex-col overflow-x-clip">
       <Hero />
       <Ships />
       <Stack />
       <Principles />
       <ClosingCta />
-    </main>
+    </div>
   )
 }

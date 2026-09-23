@@ -2,7 +2,7 @@
 
 import { Check, Copy } from "@zeno-lib/ui/icons"
 import { cn } from "@zeno-lib/ui/lib/utils"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 const RESET_DELAY_MS = 2000
 
@@ -14,12 +14,27 @@ export function CopyCommand({
   command: string
 }) {
   const [copied, setCopied] = useState(false)
+  const resetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(
+    () => () => {
+      if (resetRef.current) {
+        clearTimeout(resetRef.current)
+      }
+    },
+    []
+  )
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(command)
       setCopied(true)
-      setTimeout(() => setCopied(false), RESET_DELAY_MS)
+      // Re-arm rather than stack: the pending timer belongs to the previous
+      // copy and would clear the check mark early on this one.
+      if (resetRef.current) {
+        clearTimeout(resetRef.current)
+      }
+      resetRef.current = setTimeout(() => setCopied(false), RESET_DELAY_MS)
     } catch {
       // Clipboard is unavailable (insecure context, denied permission).
       // The command stays selectable, so there is nothing to recover from.

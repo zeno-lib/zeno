@@ -95,20 +95,13 @@ export function RuleJunction({
 /**
  * Whether a junction sits at the top-right corner of cell `index`.
  *
- * A grid draws a column rule down every cell that is neither last in its row
- * nor the final cell, and a row rule above every cell past the first row. A
- * junction exists where those meet, which includes the case the obvious check
- * misses: a partial final row, where the column rule from above *terminates*
- * on the row rule rather than crossing it.
+ * A grid draws a row rule above every cell past the first row, and a column
+ * rule down every cell that is not last in its row. Wherever both hold, the
+ * cell above this one carries a column rule that reaches this corner, so the
+ * two meet. That covers a partial final row too, where the column rule from
+ * above terminates on the row rule rather than crossing it: the junction is
+ * drawn all the same.
  */
-export function hasRuleJunction(index: number, total: number, columns: number) {
-  const lastColumn = columns - 1
-  const hasColumnRule = (i: number) =>
-    i % columns !== lastColumn && i !== total - 1
-
-  return (
-    index >= columns &&
-    index % columns !== lastColumn &&
-    (hasColumnRule(index - columns) || hasColumnRule(index))
-  )
+export function hasRuleJunction(index: number, columns: number) {
+  return index >= columns && index % columns !== columns - 1
 }

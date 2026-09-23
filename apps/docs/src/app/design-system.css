@@ -1,7 +1,7 @@
 /*
  * Site-wide design system, shared by the landing page, the marketing pages and
- * the docs. Page-specific visuals (the pixel canvases) live in
- * `(home)/home.css`; anything that should read the same everywhere lives here.
+ * the docs. Page-specific visuals live in `(home)/home.css`; anything that
+ * should read the same everywhere lives here.
  */
 
 /*
@@ -15,7 +15,15 @@
   }
 }
 
-/* The mono all-caps label. Used for section labels, nav items and eyebrows. */
+/*
+ * The mono all-caps label. Used for section labels, nav items and eyebrows.
+ *
+ * Unlayered on purpose, unlike the surfaces below: it is applied to elements
+ * whose own component already sets `text-sm` (`Button`, `TabsTrigger`), and an
+ * unlayered rule beats every Tailwind utility whatever its specificity. The
+ * size is part of the label, so pairing it with a font-size utility does
+ * nothing; if you need another size, you want another class.
+ */
 .zeno-label {
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 0.6875rem;
@@ -37,9 +45,14 @@
   }
 }
 
-/* Docs wayfinding: sidebar group headings and the table-of-contents title. */
-#nd-sidebar [data-radix-collection-item] > span,
-#nd-sidebar p,
+/*
+ * Docs wayfinding: sidebar group headings and the table-of-contents title.
+ *
+ * The group headings are the only paragraphs in the sidebar's page tree. The
+ * two inside the section dropdown's trigger are a control's label rather than
+ * wayfinding, so they are excluded instead of restyled.
+ */
+#nd-sidebar p:not(button p),
 #nd-toc > div > p,
 #nd-toc h3 {
   font-family: var(--font-mono, ui-monospace, monospace);
@@ -94,13 +107,20 @@
   --input: oklch(1 0 0 / 15%);
 }
 
-.zeno-surface {
-  --zeno-dot-ring: var(--zeno-surface);
-  background-color: var(--zeno-surface);
-}
+/*
+ * In `components`, so a utility on the same element still wins: these paint a
+ * background, and `hover:bg-fd-muted/60` on a `.zeno-surface` button has to be
+ * able to override it. Unlayered, they would beat every utility silently.
+ */
+@layer components {
+  .zeno-surface {
+    --zeno-dot-ring: var(--zeno-surface);
+    background-color: var(--zeno-surface);
+  }
 
-.zeno-surface-strong {
-  background-color: var(--zeno-surface-strong);
+  .zeno-surface-strong {
+    background-color: var(--zeno-surface-strong);
+  }
 }
 
 /*

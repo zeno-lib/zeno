@@ -1,5 +1,3 @@
-"use client"
-
 import {
   ArrowUpRight,
   Braces,
@@ -12,7 +10,9 @@ import {
 } from "@zeno-lib/ui/icons"
 import Link from "next/link"
 import type { ComponentType, SVGProps } from "react"
-import type { DomainKey } from "@/components/home/pixel-field"
+
+/** The domain accents defined in `(home)/home.css`: data, interface, quality, users. */
+type DomainKey = "d" | "i" | "q" | "u"
 
 type Entry = {
   description: string
