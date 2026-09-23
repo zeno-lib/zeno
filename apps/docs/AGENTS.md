@@ -67,13 +67,16 @@ than decoration that reads as finished. Whatever replaces them, the last block o
 never introduces a brand hue into `@zeno-lib/ui`'s registry-distributed theme. The `--zeno-*` colours
 and `.zeno-*` classes live in `src/app/(home)/home.css`, imported by the page.
 
-Brand assets: `src/components/layout/zeno-logo.tsx` is the lockup, a pixel mark plus the wordmark,
-filled with `currentColor` so it works in both themes. It is both the navbar and the sidebar title,
-through `baseOptions().nav.title`. The wordmark is an SVG `<text>` pinned with `textLength`, because
-set free it measures almost exactly the width the viewBox leaves it and a fallback font would push its
-last glyph past the edge, where the SVG clips. The favicon is `src/app/icon.svg` and the touch icon
-`src/app/apple-icon.png` (rasterised from it); Next injects both from the App Router file conventions,
-so there is no `<link rel="icon">` to maintain.
+Brand assets: `src/components/layout/zeno-logo.tsx` is the lockup, the mark plus the wordmark, filled
+with `currentColor` so it works in both themes. It is both the navbar and the sidebar title, through
+`baseOptions().nav.title`. The mark is a Z on an 8x8 module (a seven-cell top bar flush left, two
+two-cell steps, a seven-cell bottom bar flush right), drawn as four solid rects on 2.5-unit cells;
+the same drawing fills `src/app/icon.svg`, so redraw both together. The wordmark is `ZENO` in caps on
+the label's 0.14em tracking, pinned with `textLength` because set free it measures almost exactly the
+width the viewBox leaves it and a fallback font would push its last glyph past the edge, where the SVG
+clips. The favicon is `src/app/icon.svg` and the touch icon `src/app/apple-icon.png` (rasterised from
+it at 180px); Next injects both from the App Router file conventions, so there is no `<link rel="icon">`
+to maintain.
 
 Site-wide type lives in `src/app/design-system.css`, imported by `global.css`: `.zeno-label` (the
 mono all-caps label used for nav items, section labels and docs wayfinding) and the heading tracking.
