@@ -72,7 +72,7 @@ export function Principles() {
             key={principle.title}
           >
             {hasRuleJunction(index, PRINCIPLES.length, COLUMNS) && (
-              <RuleDot className="-top-px -right-px hidden translate-x-1/2 -translate-y-1/2 md:block" />
+              <RuleDot className="-top-[0.5px] -right-[0.5px] hidden translate-x-1/2 -translate-y-1/2 md:block" />
             )}
             <span className="flex size-11 items-center justify-center rounded-xl border bg-fd-background text-fd-muted-foreground">
               <principle.icon className="size-5" />

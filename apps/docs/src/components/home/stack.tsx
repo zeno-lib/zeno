@@ -96,7 +96,7 @@ export function Stack() {
             key={item.name}
           >
             {hasRuleJunction(index, STACK.length, COLUMNS) && (
-              <RuleDot className="-top-px -right-px hidden translate-x-1/2 -translate-y-1/2 md:block" />
+              <RuleDot className="-top-[0.5px] -right-[0.5px] hidden translate-x-1/2 -translate-y-1/2 md:block" />
             )}
             <Mark icon={item.icon} name={item.name} />
             <span className="flex min-w-0 flex-col gap-0.5">
