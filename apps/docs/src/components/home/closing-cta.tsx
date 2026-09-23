@@ -7,7 +7,7 @@ import { TodoBlock } from "@/components/home/todo-block"
 export function ClosingCta() {
   return (
     <section className="zeno-surface border-t">
-      <Shell className="pt-[clamp(4.5rem,9vw,9rem)] pb-14">
+      <Shell className="py-14">
         <div className="grid gap-8 md:grid-cols-2 md:gap-16">
           <h2 className="max-w-lg text-balance font-medium text-3xl leading-[1.06] tracking-[-0.02em] sm:text-4xl md:text-[2.75rem]">
             Clone it, read it, keep it.
@@ -44,7 +44,9 @@ export function ClosingCta() {
         </div>
       </Shell>
       <TodoBlock
+        bleed
         className="h-[clamp(15rem,27vw,24rem)]"
+        closesPage
         label="Closing visual"
       />
     </section>

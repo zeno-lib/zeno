@@ -1,7 +1,7 @@
 import { Button } from "@zeno-lib/ui/button"
 import Link from "next/link"
 import { CopyCommand } from "@/components/home/copy-command"
-import { RuleDot } from "@/components/home/rule-dot"
+import { RuleJunction } from "@/components/home/rule-dot"
 import { Shell } from "@/components/home/section"
 import { TodoBlock } from "@/components/home/todo-block"
 
@@ -18,7 +18,12 @@ export function Hero() {
             The whole stack,
             <br />
             already wired.
-            <RuleDot className="-right-px -bottom-px hidden translate-x-1/2 translate-y-1/2 lg:block" />
+            {/* The rule ends on the visual block below, so the junction only
+                reaches back up into the hero. */}
+            <RuleJunction
+              className="-right-[0.5px] -bottom-[0.5px] translate-x-1/2 translate-y-1/2 max-lg:hidden"
+              side="above"
+            />
           </h1>
 
           <div className="mt-8 flex flex-col gap-6 pb-10 lg:mt-0 lg:py-10">
@@ -54,9 +59,13 @@ export function Hero() {
         </div>
       </Shell>
 
-      <TodoBlock className="h-[clamp(16rem,32vw,28rem)]" label="Hero visual" />
+      <TodoBlock
+        bleed
+        className="h-[clamp(16rem,32vw,28rem)]"
+        label="Hero visual"
+      />
 
-      <Shell className="pt-6 pb-16 md:pb-24">
+      <Shell className="pt-6 pb-10 md:pb-12">
         <div className="flex justify-end">
           <CopyCommand command={INSTALL_COMMAND} />
         </div>

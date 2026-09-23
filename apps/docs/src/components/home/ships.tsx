@@ -20,11 +20,11 @@ export function Ships() {
       />
 
       <TodoBlock
-        className="mt-8 h-[clamp(7rem,13vw,11rem)] md:mt-10"
+        className="mt-6 h-[clamp(7rem,13vw,11rem)]"
         label="Package diagram"
       />
 
-      <div className="mt-8 md:mt-10">
+      <div className="mt-6">
         <PackageIndex />
       </div>
     </Section>
