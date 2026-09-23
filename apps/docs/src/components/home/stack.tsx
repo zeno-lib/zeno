@@ -6,21 +6,30 @@ import { hasRuleJunction, RuleDot } from "@/components/home/rule-dot"
 import { Section, SectionHeader } from "@/components/home/section"
 
 /**
- * `icon` is the file stem under `public/tech`. Drizzle and Ultracite have no
- * mark upstream, so they fall back to a lettered tile rather than a gap.
+ * `icon` is the file stem under `public/tech`, and `darkIcon` flags the marks
+ * whose black element would vanish on a dark tile: those ship a `-dark` twin
+ * beside them. The two entries with no mark in the set fall back to a lettered
+ * tile rather than a gap.
  */
-const STACK = [
-  { icon: "Typescript", name: "TypeScript", role: "v5" },
-  { icon: "React", name: "React", role: "v19" },
-  { icon: "NextJS", name: "Next.js", role: "v16" },
-  { icon: "TailwindCSS", name: "Tailwind CSS", role: "v4" },
-  { icon: "Turborepo", name: "Turborepo", role: "monorepo" },
+type Tech = {
+  darkIcon?: boolean
+  icon: string | null
+  name: string
+  role: string
+}
+
+const STACK: Tech[] = [
+  { icon: "typescript", name: "TypeScript", role: "v5" },
+  { icon: "react", name: "React", role: "v19" },
+  { darkIcon: true, icon: "nextjs", name: "Next.js", role: "v16" },
+  { icon: "tailwindcss", name: "Tailwind CSS", role: "v4" },
+  { darkIcon: true, icon: "turborepo", name: "Turborepo", role: "monorepo" },
   { icon: null, name: "Drizzle", role: "orm" },
-  { icon: "Supabase", name: "Supabase", role: "postgres" },
-  { icon: "Vitest", name: "Vitest", role: "unit" },
-  { icon: "Playwright", name: "Playwright", role: "e2e" },
+  { icon: "supabase", name: "Supabase", role: "postgres" },
+  { icon: "vitest", name: "Vitest", role: "unit" },
+  { icon: "playwright", name: "Playwright", role: "e2e" },
   { icon: null, name: "Ultracite", role: "lint" },
-] as const
+]
 
 /** Columns at the two breakpoints where the grid changes shape. */
 const SM_COLUMNS = 2
@@ -34,16 +43,19 @@ const SM_LAST_ROW_START = lastRowStart(SM_COLUMNS)
 const LAST_ROW_START = lastRowStart(COLUMNS)
 
 /**
- * Every technology sits in the same outlined tile, so the two without an
- * upstream mark read as deliberate rather than missing. The marks themselves
- * are stripped of TechIcons' filled background; see public/tech/README.md.
+ * Every technology sits in the same outlined tile, so the two without a mark
+ * read as deliberate rather than missing.
  *
- * The mark is a background image rather than an `<img>`: both theme variants
- * are handed over as custom properties and only the resolved one is fetched.
- * A pair of `<img>` tags toggled with `dark:hidden` downloads both, since a
- * browser loads an image element even while it is `display: none`.
+ * The mark is a background image rather than an `<img>`: the URL comes in as a
+ * custom property, so only the file the theme resolves is ever fetched. A pair
+ * of `<img>` tags toggled with `dark:hidden` downloads both, since a browser
+ * loads an image element even while it is `display: none`.
  */
-function Mark({ icon, name }: { icon: string | null; name: string }) {
+function Mark({
+  darkIcon,
+  icon,
+  name,
+}: Pick<Tech, "darkIcon" | "icon" | "name">) {
   return (
     <span className="flex size-12 shrink-0 items-center justify-center rounded-md border bg-fd-background">
       {icon ? (
@@ -52,8 +64,10 @@ function Mark({ icon, name }: { icon: string | null; name: string }) {
           className="zeno-tech-mark size-[30px] bg-center bg-contain bg-no-repeat"
           style={
             {
-              "--zeno-mark-dark": `url("/tech/on-dark/${icon}.png")`,
-              "--zeno-mark-light": `url("/tech/on-light/${icon}.png")`,
+              "--zeno-mark": `url("/tech/${icon}.svg")`,
+              ...(darkIcon && {
+                "--zeno-mark-dark": `url("/tech/${icon}-dark.svg")`,
+              }),
             } as CSSProperties
           }
         />
@@ -101,7 +115,7 @@ export function Stack() {
             {hasRuleJunction(index, COLUMNS) && (
               <RuleDot className="-top-[0.5px] -right-[0.5px] hidden translate-x-1/2 -translate-y-1/2 md:block" />
             )}
-            <Mark icon={item.icon} name={item.name} />
+            <Mark darkIcon={item.darkIcon} icon={item.icon} name={item.name} />
             <span className="flex min-w-0 flex-col gap-0.5">
               <span className="font-medium text-sm">{item.name}</span>
               <span className="zeno-label text-fd-muted-foreground">

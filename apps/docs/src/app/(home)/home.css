@@ -61,16 +61,17 @@
   }
 
   /*
-   * A technology mark. Both theme variants come in as custom properties and
-   * only the one the theme resolves is ever fetched, which a pair of `<img>`
-   * tags cannot do: a browser loads an image element even while it is hidden.
+   * A technology mark. The file comes in as a custom property and only the one
+   * the theme resolves is ever fetched, which a pair of `<img>` tags cannot do:
+   * a browser loads an image element even while it is hidden. A mark that reads
+   * on both grounds sets no dark URL and falls back to the single file.
    */
   .zeno-tech-mark {
-    background-image: var(--zeno-mark-light);
+    background-image: var(--zeno-mark);
   }
 
   .dark .zeno-tech-mark {
-    background-image: var(--zeno-mark-dark);
+    background-image: var(--zeno-mark-dark, var(--zeno-mark));
   }
 
   /* Placeholder hatching, on a 10px module.

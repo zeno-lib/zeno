@@ -100,13 +100,15 @@ Those grids clear their own edge rules with `nth-child(Nn)` plus an index compar
 cell of the last row, never a literal `nth-child(N)` or `nth-last-child(-n+N)`: the arrays behind them
 are meant to grow, and a literal index quietly starts marking the wrong cell one entry later.
 
-Technology marks live in `public/tech/` (TechIcons, MIT). The folder names describe the BACKGROUND
-they are drawn for, not the mark: `on-light/` holds dark tiles for the light theme, `on-dark/` holds
-light tiles for the dark theme. They are rasterised to 96px PNGs because the upstream SVGs embed
-raster images and run to ~1.2MB for ten marks; see `public/tech/README.md` before re-adding any. They
-are painted as background images through `--zeno-mark-light` / `--zeno-mark-dark` rather than two
-`<img>` tags swapped with `dark:hidden`, because a browser fetches an image element even while it is
-`display: none` and the pair would download both variants for every visitor.
+Technology marks live in `public/tech/`, taken verbatim from [gilbarbara/logos](https://github.com/gilbarbara/logos)
+(CC0-1.0, the set behind Iconify's `logos:`) and renamed after the `STACK` entry that uses them. A mark
+whose black element would disappear on a dark tile ships a hand-recoloured `<stem>-dark.svg` twin
+beside it, flagged by `darkIcon` in `STACK`; only `nextjs` and `turborepo` need one. They are painted
+as background images through `--zeno-mark` / `--zeno-mark-dark` rather than `<img>` tags swapped with
+`dark:hidden`, because a browser fetches an image element even while it is `display: none` and the
+pair would download both variants for every visitor. **Don't go back to TechIcons**: seven of its
+eight marks are a base64 PNG inside an `<svg>` wrapper, so they are raster whatever the extension
+says, and this grid alone would carry ~0.9MB of them.
 
 A `Button` whose `render` is a link needs `nativeButton={false}`, otherwise Base UI logs a
 button-semantics error at runtime.
