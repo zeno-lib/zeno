@@ -84,6 +84,15 @@ against Fumadocs' generated class names, which would not survive an upgrade.
 The 10px grid texture (`.zeno-page`) backs the canvases only, never type: behind hairline rules it
 fought the borders and greyed off the white.
 
+Rule crossings are marked from `src/components/home/rule-dot.tsx`, which owns the one 3px square
+marker the whole page uses. `RuleDot` masks a square of clear space around itself and is only safe
+inside a single surface (a grid cell corner). `RuleJunction` is for a crossing on a seam, where no
+single mask colour is right on both sides: it clears the rules themselves, one pixel each, painted in
+`--zeno-dot-ring` (set by `.zeno-surface`, inherited otherwise). Two sharp edges. Call sites offset
+by half a pixel (`-top-[0.5px]`, not `-top-px`) so the marker centres on the rule's middle rather
+than its edge. And a junction's tick runs 68px past the rule, so the last one on the page needs
+`TodoBlock`'s `closesPage`, or it adds that much scroll below the block the page should end on.
+
 Technology marks live in `public/tech/` (TechIcons, MIT). The folder names describe the BACKGROUND
 they are drawn for, not the mark: `on-light/` holds dark tiles for the light theme, `on-dark/` holds
 light tiles for the dark theme. They are rasterised to 96px PNGs because the upstream SVGs embed
