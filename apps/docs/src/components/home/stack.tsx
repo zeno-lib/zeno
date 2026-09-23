@@ -10,10 +10,10 @@ import { Section, SectionHeader } from "@/components/home/section"
  * mark upstream, so they fall back to a lettered tile rather than a gap.
  */
 const STACK = [
-  { icon: "Typescript", name: "TypeScript", role: "5" },
-  { icon: "React", name: "React", role: "19" },
-  { icon: "NextJS", name: "Next.js", role: "16" },
-  { icon: "TailwindCSS", name: "Tailwind CSS", role: "4" },
+  { icon: "Typescript", name: "TypeScript", role: "v5" },
+  { icon: "React", name: "React", role: "v19" },
+  { icon: "NextJS", name: "Next.js", role: "v16" },
+  { icon: "TailwindCSS", name: "Tailwind CSS", role: "v4" },
   { icon: "Turborepo", name: "Turborepo", role: "monorepo" },
   { icon: null, name: "Drizzle", role: "orm" },
   { icon: "Supabase", name: "Supabase", role: "postgres" },
