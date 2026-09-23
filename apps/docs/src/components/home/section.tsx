@@ -1,13 +1,13 @@
 import { cn } from "@zeno-lib/ui/lib/utils"
 import type { ComponentProps, ComponentType, ReactNode, SVGProps } from "react"
-import { RuleDot } from "@/components/home/rule-dot"
+import { RuleJunction } from "@/components/home/rule-dot"
 
 /** The centred column every section shares. */
 export function Shell({ children, className }: ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "relative mx-auto w-full max-w-[90rem] border-x px-6 md:px-12 lg:px-16",
+        "relative mx-auto w-full max-w-[90rem] px-6 md:px-12 lg:px-16",
         className
       )}
     >
@@ -24,12 +24,16 @@ export function Section({
 }: ComponentProps<"section"> & { topRule?: boolean }) {
   return (
     <section className={cn(topRule && "border-t", className)} {...props}>
-      <Shell className="py-[clamp(4.5rem,9vw,9rem)]">
+      <Shell
+        className={cn(
+          "py-[clamp(4.5rem,9vw,9rem)]",
+          !topRule && "pt-[clamp(2rem,4vw,3.5rem)]"
+        )}
+      >
         {topRule && (
           <>
-            {/* The column rules meet the section rule here. */}
-            <RuleDot className="-top-px -left-px -translate-x-1/2 -translate-y-1/2" />
-            <RuleDot className="-top-px -right-px translate-x-1/2 -translate-y-1/2" />
+            <RuleJunction className="-top-[0.5px] -left-px -translate-x-1/2 -translate-y-1/2" />
+            <RuleJunction className="-top-[0.5px] -right-px translate-x-1/2 -translate-y-1/2" />
           </>
         )}
         {children}

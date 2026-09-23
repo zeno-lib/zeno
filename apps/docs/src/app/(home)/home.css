@@ -77,7 +77,10 @@
   --zeno-pixel: var(--zeno-quality);
 }
 
-/* Placeholder hatching, on the same 10px module as the page texture. */
+/* Placeholder hatching, on the same 10px module as the page texture.
+   No --zeno-dot-ring here: the junctions on this block's rules sit on the seam
+   and clear those rules towards the surface OUTSIDE it, so they want the
+   enclosing section's colour, which they inherit. */
 .zeno-todo {
   background-color: var(--zeno-surface);
   background-image: repeating-linear-gradient(
