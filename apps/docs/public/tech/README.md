@@ -15,3 +15,9 @@ it, which inverts the mapping:
 
 Regenerating: strip /<path d="M0 25C0 11.1929[^"]*" fill="#[0-9A-Fa-f]{6}"\/>/ from
 the source SVG, then rasterise the remainder at 96x96.
+
+Supabase needs one more step. Its mark's cut-outs are painted as rects filled with
+the TILE colour rather than left empty, so dropping the tile strands them as visible
+bars. Move every remaining element still filled with the tile colour into a mask
+(white 256x256 ground, those elements in black) applied to the rest, so the cut-outs
+erase to transparent. No other mark carries such rects.
