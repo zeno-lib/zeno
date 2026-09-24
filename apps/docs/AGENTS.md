@@ -137,12 +137,6 @@ Consumed by: `@zeno-lib/e2e` lists this app as a workspace dep so `turbo run e2e
 - **Port 5002 is hardcoded** in the dev script and assumed by `packages/e2e/playwright.config.ts` (`webServer.command` runs `npm run start -- -p 5002`). Changing the port here also requires updating the e2e config.
 - **`postinstall` runs `fumadocs-mdx`**: every fresh `pnpm install` triggers codegen. If you see stale `.source` issues after pulling, re-run `pnpm install` or `pnpm exec fumadocs-mdx`.
 - **`types:check` chains three commands** (`next typegen && fumadocs-mdx && tsc --noEmit`). If type errors look like missing modules from `.source` or `.next/types`, you skipped one of the codegen steps or ran them in the wrong order.
-- **The TanStack devtools must stay browser-only.** `@tanstack/devtools-ui` imports `use` from
-  `solid-js/web`, and only the browser builds export it; Next's app-ssr layer resolves the node build
-  and the dev compile dies with `Export use doesn't exist in target module`. `src/components/devtools.tsx`
-  therefore pulls `src/components/devtools-panel.tsx` through `next/dynamic` with `ssr: false`. Do not
-  collapse those two files back into a static import; all three `@tanstack/devtools*` packages are
-  already at their latest versions, so there is no upgrade that fixes it.
 - **`DocsLayoutHeaderTabs` has to stay controlled.** The `line` variant draws its underline from
   `data-active`, which Base UI sets only on the tab matching `Tabs`' `value`. The triggers render as
   links, so no click ever updates that value: it comes from the pathname. Drop the `value` prop and
