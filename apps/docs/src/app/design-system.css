@@ -1,0 +1,190 @@
+/*
+ * Site-wide design system, shared by the landing page, the marketing pages and
+ * the docs. Page-specific visuals live in `(home)/home.css`; anything that
+ * should read the same everywhere lives here.
+ */
+
+/*
+ * Body copy sits a weight lighter than the browser default. Headings and other
+ * elements that set their own weight are unaffected, since this only changes
+ * what everything else inherits.
+ */
+@layer base {
+  body {
+    font-weight: 300;
+  }
+}
+
+/*
+ * The mono all-caps label. Used for section labels, nav items and eyebrows.
+ *
+ * Unlayered on purpose, unlike the surfaces below: it is applied to elements
+ * whose own component already sets `text-sm` (`Button`, `TabsTrigger`), and an
+ * unlayered rule beats every Tailwind utility whatever its specificity. The
+ * size is part of the label, so pairing it with a font-size utility does
+ * nothing; if you need another size, you want another class.
+ */
+.zeno-label {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+/*
+ * Headings carry the same tight tracking as the landing page, so the docs and
+ * the marketing pages read as one typographic system.
+ */
+@layer base {
+  :where(h1, h2, h3) {
+    letter-spacing: -0.02em;
+  }
+
+  #nd-nav :where(h1, h2, h3) {
+    letter-spacing: normal;
+  }
+}
+
+/*
+ * Docs wayfinding: sidebar group headings and the table-of-contents title.
+ *
+ * The group headings are the only paragraphs in the sidebar's page tree. The
+ * two inside the section dropdown's trigger are a control's label rather than
+ * wayfinding, so they are excluded instead of restyled.
+ */
+#nd-sidebar p:not(button p),
+#nd-toc > div > p,
+#nd-toc h3 {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+/*
+ * Depth. One raised/recessed surface tone against the page, used for whole
+ * bands and for small inset controls. Kept as a site-wide token so the docs
+ * and the marketing pages layer the same way.
+ */
+:root {
+  /*
+   * A tighter corner radius than the shared default. Overridden here rather
+   * than in `@zeno-lib/ui` so the registry-distributed theme is unchanged for
+   * consumers. Everything on the site derives from it through the shadcn
+   * radius scale, including Fumadocs' code blocks, cards and tabs.
+   */
+  --radius: 0.3rem;
+
+  /*
+   * One warm neutral ramp, shared by the landing page and the docs. The shadcn
+   * neutrals are repointed at it so Fumadocs' own controls (search field, page
+   * actions, code blocks) sit on the same greys as the marketing surfaces
+   * instead of the slightly cooler stone defaults.
+   */
+  --zeno-surface: #f5f3f1;
+  --zeno-surface-strong: #ebe8e4;
+
+  --muted: #f5f3f1;
+  --secondary: #f5f3f1;
+  --accent: #ebe8e4;
+  --border: #ebe8e4;
+  --input: #ebe8e4;
+}
+
+.dark {
+  --zeno-surface: oklch(0.205 0.005 65);
+  --zeno-surface-strong: oklch(0.25 0.006 65);
+
+  /*
+   * The dark half of the ramp. Required, not optional: `:root` and `.dark` have
+   * the same specificity, and this file is imported after the base theme, so
+   * without these the light values above would win in dark mode too.
+   */
+  --muted: oklch(0.205 0.005 65);
+  --secondary: oklch(0.205 0.005 65);
+  --accent: oklch(0.25 0.006 65);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+}
+
+/*
+ * In `components`, so a utility on the same element still wins: these paint a
+ * background, and `hover:bg-fd-muted/60` on a `.zeno-surface` button has to be
+ * able to override it. Unlayered, they would beat every utility silently.
+ */
+@layer components {
+  .zeno-surface {
+    --zeno-dot-ring: var(--zeno-surface);
+    background-color: var(--zeno-surface);
+  }
+
+  .zeno-surface-strong {
+    background-color: var(--zeno-surface-strong);
+  }
+}
+
+/*
+ * Fumadocs ships the navbar search, the theme switch and the sidebar search as
+ * pills. They are hardcoded to `rounded-full`, so the radius scale cannot reach
+ * them; square them off to match everything else.
+ */
+#nd-nav .rounded-full,
+#nd-sidebar .rounded-full {
+  border-radius: var(--radius);
+}
+
+/*
+ * Docs content follows the landing page's type configuration: medium headings
+ * with tight leading rather than Fumadocs' semibold + 1.5, and body copy at the
+ * same size as the marketing pages.
+ */
+#nd-page :where(h1, h2, h3, h4, h5, h6) {
+  font-weight: 500;
+  line-height: 1.06;
+}
+
+#nd-page :where(p, li) {
+  font-size: 1rem;
+  line-height: 1.625;
+}
+
+/*
+ * Sidebar: the current page is marked with a rule on its right edge, beside the
+ * content it opens, rather than a filled pill. The bar is an inset shadow so it
+ * cannot shift the row.
+ */
+#nd-sidebar a[data-active="true"] {
+  font-weight: 500;
+  color: var(--foreground);
+  background-color: transparent;
+  border-radius: 0;
+  box-shadow: inset -2px 0 0 0 currentColor;
+}
+
+/*
+ * Inline links match the landing page: a hairline underline set 4px down that
+ * clears on hover, rather than Fumadocs' thicker, tighter rule. Scoped to text
+ * contexts so the category grids and other block links are untouched.
+ */
+#nd-page :where(p, li, td) a {
+  text-decoration-thickness: 1px;
+  text-decoration-color: currentColor;
+  text-underline-offset: 4px;
+}
+
+#nd-page :where(p, li, td) a:hover {
+  text-decoration-line: none;
+}
+
+/*
+ * Fumadocs renders the search fields at half-strength secondary, which lands a
+ * step lighter than every other control. Put them on the same surface tone.
+ *
+ * Matched on the exact class token, not a substring: the tab icons carry
+ * `max-md:bg-fd-secondary`, and a substring match would paint their background
+ * at every width instead of only on mobile.
+ */
+#nd-nav button[class~="bg-fd-secondary/50"],
+#nd-sidebar button[class~="bg-fd-secondary/50"] {
+  background-color: var(--zeno-surface);
+}

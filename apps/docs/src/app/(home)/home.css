@@ -1,0 +1,89 @@
+/*
+ * Landing page styles.
+ *
+ * The page is a Swiss grid: near-monochrome type on hairline rules, set in a
+ * wide centred column. The only colour is the domain accent carried by the
+ * package index icons. Nothing here touches the shared tokens, so the
+ * registry-distributed theme in `@zeno-lib/ui` stays untouched.
+ *
+ * Everything below sits in `@layer components` so a Tailwind utility on the
+ * same element still overrides it; see the note on `.zeno-label` in
+ * `design-system.css` for the one class that deliberately does not.
+ */
+
+:root {
+  --zeno-data: oklch(0.55 0.2 260);
+  --zeno-users: oklch(0.74 0.16 66);
+  --zeno-interface: oklch(0.6 0.13 180);
+  --zeno-quality: oklch(0.56 0.21 300);
+}
+
+.dark {
+  --zeno-data: oklch(0.66 0.18 260);
+  --zeno-users: oklch(0.8 0.16 66);
+  --zeno-interface: oklch(0.72 0.13 180);
+  --zeno-quality: oklch(0.68 0.19 300);
+}
+
+@layer components {
+  /* The all-caps block in the hero, justified edge to edge like the reference. */
+  .zeno-justify {
+    text-align: justify;
+    text-align-last: justify;
+  }
+
+  .zeno-prose p {
+    text-align: justify;
+    hyphens: auto;
+    text-wrap: pretty;
+  }
+
+  .zeno-prose p + p {
+    margin-top: 1.1em;
+  }
+
+  /* Icons that carry a domain take its colour. */
+  .zeno-ink {
+    color: var(--zeno-accent);
+  }
+
+  .zeno-d {
+    --zeno-accent: var(--zeno-data);
+  }
+  .zeno-u {
+    --zeno-accent: var(--zeno-users);
+  }
+  .zeno-i {
+    --zeno-accent: var(--zeno-interface);
+  }
+  .zeno-q {
+    --zeno-accent: var(--zeno-quality);
+  }
+
+  /*
+   * A technology mark. The file comes in as a custom property and only the one
+   * the theme resolves is ever fetched, which a pair of `<img>` tags cannot do:
+   * a browser loads an image element even while it is hidden. A mark that reads
+   * on both grounds sets no dark URL and falls back to the single file.
+   */
+  .zeno-tech-mark {
+    background-image: var(--zeno-mark);
+  }
+
+  .dark .zeno-tech-mark {
+    background-image: var(--zeno-mark-dark, var(--zeno-mark));
+  }
+
+  /* Placeholder hatching, on a 10px module.
+     No --zeno-dot-ring here: the junctions on this block's rules sit on the seam
+     and clear those rules towards the surface OUTSIDE it, so they want the
+     enclosing section's colour, which they inherit. */
+  .zeno-todo {
+    background-color: var(--zeno-surface);
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--border) 0 1px,
+      transparent 1px 10px
+    );
+  }
+}
