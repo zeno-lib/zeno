@@ -71,13 +71,13 @@ export function DialogExample() {
                   <InputField
                     label="Name"
                     name="name"
-                    placeholder="Resolve admin"
+                    placeholder="Acme admin"
                   />
                   <InputField
                     description="Used in URLs."
                     label="Slug"
                     name="slug"
-                    placeholder="resolve-admin"
+                    placeholder="acme-admin"
                   />
                 </FieldGroup>
               </Form>

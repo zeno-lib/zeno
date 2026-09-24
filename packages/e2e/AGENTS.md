@@ -1,6 +1,6 @@
 # `@zeno-lib/e2e` — Intent
 
-Playwright end-to-end tooling for the workspace, published as a reusable package so other monorepos (for example `resolve`) share the same Playwright preset and dependency verifier. This repo's own suite dogfoods the published exports.
+Playwright end-to-end tooling for the workspace, published as a reusable package so other monorepos share the same Playwright preset and dependency verifier. This repo's own suite dogfoods the published exports.
 
 ## Purpose & Scope
 

@@ -492,36 +492,36 @@ there being no row yet to authorise, only the caller. Pass a record for that,
 and for functions whose signatures differ in any other way:
 
 ```typescript
-export const deals = table("deals", { id: primaryId("assigned") }, (t) =>
+export const projects = table("projects", { id: primaryId("assigned") }, (t) =>
   functionPolicies(t, { argument: { delete: t.id, select: t.id, update: t.id } })
 )
 ```
 
 ```sql
-CREATE POLICY "can_insert_deals" ON "deals" AS PERMISSIVE FOR INSERT
-  TO "authenticated" WITH CHECK ((select "can_insert_deals"()));
+CREATE POLICY "can_insert_projects" ON "projects" AS PERMISSIVE FOR INSERT
+  TO "authenticated" WITH CHECK ((select "can_insert_projects"()));
 ```
 
 An operation left out of the record, or set to `null`, is called with no
 arguments. An array passes several: `argument: [t.profileId, t.organisationId]`
-emits `can_select_investors("investors"."profile_id",
-"investors"."organisation_id")`.
+emits `can_select_memberships("memberships"."profile_id",
+"memberships"."organisation_id")`.
 
 Helpers for a table outside `public` usually live in that schema beside it, and
 the bare name only resolves through whatever `search_path` is in effect when the
 `CREATE POLICY` runs. `schema` qualifies it:
 
 ```typescript
-const bexio = schema("bexio")
+const billing = schema("billing")
 
-export const bills = bexio.table("bills", { id: primaryId("uuid") }, (t) =>
-  functionPolicies(t, { schema: "bexio" })
+export const invoices = billing.table("invoices", { id: primaryId("uuid") }, (t) =>
+  functionPolicies(t, { schema: "billing" })
 )
 ```
 
 ```sql
-CREATE POLICY "can_select_bills" ON "bexio"."bills" AS PERMISSIVE FOR SELECT
-  TO "authenticated" USING ((select "bexio"."can_select_bills"()));
+CREATE POLICY "can_select_invoices" ON "billing"."invoices" AS PERMISSIVE FOR SELECT
+  TO "authenticated" USING ((select "billing"."can_select_invoices"()));
 ```
 
 It takes the columns object the extra callback gives you (`t`), not the table,
