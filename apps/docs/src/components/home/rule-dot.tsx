@@ -105,3 +105,27 @@ export function RuleJunction({
 export function hasRuleJunction(index: number, columns: number) {
   return index >= columns && index % columns !== columns - 1
 }
+
+/**
+ * Visibility classes for the {@link RuleDot} at cell `index` of a grid that is
+ * `base` columns wide below `md`, `md` columns wide from the `md` breakpoint
+ * and `lg` columns wide from `lg`, or `null` when no layout has a crossing
+ * there. A single-column layout never has one, so `base` defaults to 1.
+ */
+export function ruleJunctionVisibility(
+  index: number,
+  { base = 1, lg, md }: { base?: number; lg: number; md: number }
+) {
+  const atBase = hasRuleJunction(index, base)
+  const atMd = hasRuleJunction(index, md)
+  const atLg = hasRuleJunction(index, lg)
+  if (!(atBase || atMd || atLg)) {
+    return null
+  }
+  return cn(
+    "hidden",
+    atBase && "max-md:block",
+    atMd && "md:max-lg:block",
+    atLg && "lg:block"
+  )
+}

@@ -2,7 +2,7 @@ import { Layers } from "@zeno-lib/ui/icons"
 import { cn } from "@zeno-lib/ui/lib/utils"
 import Link from "next/link"
 import type { CSSProperties } from "react"
-import { hasRuleJunction, RuleDot } from "@/components/home/rule-dot"
+import { RuleDot, ruleJunctionVisibility } from "@/components/home/rule-dot"
 import { Section, SectionHeader } from "@/components/home/section"
 
 /**
@@ -31,16 +31,18 @@ const STACK: Tech[] = [
   { icon: null, name: "Ultracite", role: "lint" },
 ]
 
-/** Columns at the two breakpoints where the grid changes shape. */
-const SM_COLUMNS = 2
-const COLUMNS = 5
+/** Columns per breakpoint; every layout is divided by row and column rules. */
+const COLUMNS = { base: 2, lg: 5, md: 3 }
 
 /** First index of the final row, so its cells drop their bottom padding. */
 const lastRowStart = (columns: number) =>
   STACK.length - (STACK.length % columns || columns)
 
-const SM_LAST_ROW_START = lastRowStart(SM_COLUMNS)
-const LAST_ROW_START = lastRowStart(COLUMNS)
+const LAST_ROW_START = {
+  base: lastRowStart(COLUMNS.base),
+  lg: lastRowStart(COLUMNS.lg),
+  md: lastRowStart(COLUMNS.md),
+}
 
 /**
  * Every technology sits in the same outlined tile, so the two without a mark
@@ -102,28 +104,41 @@ export function Stack() {
         title="A stack picked on purpose."
       />
 
-      <ul className="mt-14 grid sm:grid-cols-2 md:mt-20 md:grid-cols-5">
-        {STACK.map((item, index) => (
-          <li
-            className={cn(
-              "relative flex items-center gap-4 border-t px-0 py-6 first:border-t-0 first:pt-0 last:pb-0 md:border-r md:px-4 md:last:border-r-0 sm:[&:nth-child(-n+2)]:border-t-0 sm:[&:nth-child(-n+2)]:pt-0 md:[&:nth-child(-n+5)]:border-t-0 md:[&:nth-child(-n+5)]:pt-0 md:[&:nth-child(5n)]:border-r-0 md:[&:nth-child(5n)]:pr-0 md:[&:nth-child(5n+1)]:pl-0",
-              index >= SM_LAST_ROW_START && "sm:pb-0",
-              index >= LAST_ROW_START && "md:pb-0"
-            )}
-            key={item.name}
-          >
-            {hasRuleJunction(index, COLUMNS) && (
-              <RuleDot className="-top-[0.5px] -right-[0.5px] hidden translate-x-1/2 -translate-y-1/2 md:block" />
-            )}
-            <Mark darkIcon={item.darkIcon} icon={item.icon} name={item.name} />
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="font-medium text-sm">{item.name}</span>
-              <span className="zeno-label text-fd-muted-foreground">
-                {item.role}
+      <ul className="mt-14 grid grid-cols-2 md:mt-20 md:grid-cols-3 lg:grid-cols-5">
+        {STACK.map((item, index) => {
+          const junction = ruleJunctionVisibility(index, COLUMNS)
+          return (
+            <li
+              className={cn(
+                "relative flex items-center gap-4 border-t border-r px-4 py-6 last:border-r-0 [&:nth-child(-n+2)]:border-t-0 [&:nth-child(-n+2)]:pt-0 md:[&:nth-child(-n+3)]:border-t-0 md:[&:nth-child(-n+3)]:pt-0 lg:[&:nth-child(-n+5)]:border-t-0 lg:[&:nth-child(-n+5)]:pt-0 max-md:[&:nth-child(2n)]:border-r-0 max-md:[&:nth-child(2n)]:pr-0 max-md:[&:nth-child(2n+1)]:pl-0 md:max-lg:[&:nth-child(3n)]:border-r-0 md:max-lg:[&:nth-child(3n)]:pr-0 md:max-lg:[&:nth-child(3n+1)]:pl-0 lg:[&:nth-child(5n)]:border-r-0 lg:[&:nth-child(5n)]:pr-0 lg:[&:nth-child(5n+1)]:pl-0",
+                index >= LAST_ROW_START.base && "max-md:pb-0",
+                index >= LAST_ROW_START.md && "md:max-lg:pb-0",
+                index >= LAST_ROW_START.lg && "lg:pb-0"
+              )}
+              key={item.name}
+            >
+              {junction && (
+                <RuleDot
+                  className={cn(
+                    "-top-[0.5px] -right-[0.5px] translate-x-1/2 -translate-y-1/2",
+                    junction
+                  )}
+                />
+              )}
+              <Mark
+                darkIcon={item.darkIcon}
+                icon={item.icon}
+                name={item.name}
+              />
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="font-medium text-sm">{item.name}</span>
+                <span className="zeno-label text-fd-muted-foreground">
+                  {item.role}
+                </span>
               </span>
-            </span>
-          </li>
-        ))}
+            </li>
+          )
+        })}
       </ul>
     </Section>
   )

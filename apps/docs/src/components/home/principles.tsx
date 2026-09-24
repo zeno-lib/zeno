@@ -1,6 +1,6 @@
 import { Bot, Code, Compass, Gauge, Layers, Sparkles } from "@zeno-lib/ui/icons"
 import { cn } from "@zeno-lib/ui/lib/utils"
-import { hasRuleJunction, RuleDot } from "@/components/home/rule-dot"
+import { RuleDot, ruleJunctionVisibility } from "@/components/home/rule-dot"
 import { Section, SectionHeader } from "@/components/home/section"
 
 const PRINCIPLES = [
@@ -36,12 +36,20 @@ const PRINCIPLES = [
   },
 ] as const
 
-/** Columns from the `md` breakpoint up, where the vertical rules exist. */
-const COLUMNS = 3
+/**
+ * Columns per breakpoint from `md` up, where the vertical rules exist; below
+ * that the principles stack in one column.
+ */
+const COLUMNS = { lg: 3, md: 2 }
 
 /** First index of the final row, so its cells drop their bottom padding. */
-const LAST_ROW_START =
-  PRINCIPLES.length - (PRINCIPLES.length % COLUMNS || COLUMNS)
+const lastRowStart = (columns: number) =>
+  PRINCIPLES.length - (PRINCIPLES.length % columns || columns)
+
+const LAST_ROW_START = {
+  lg: lastRowStart(COLUMNS.lg),
+  md: lastRowStart(COLUMNS.md),
+}
 
 export function Principles() {
   return (
@@ -62,29 +70,38 @@ export function Principles() {
       {/* Divided by hairlines rather than boxed into cards; the tile sits at
           the top and the text is pushed to the bottom, so a row shares one
           baseline. */}
-      <ul className="mt-14 grid md:mt-20 md:grid-cols-3">
-        {PRINCIPLES.map((principle, index) => (
-          <li
-            className={cn(
-              "relative flex min-h-56 flex-col justify-between gap-10 border-t px-0 py-8 first:border-t-0 first:pt-0 last:pb-0 md:border-r md:px-6 md:last:border-r-0 md:[&:nth-child(-n+3)]:border-t-0 md:[&:nth-child(-n+3)]:pt-0 md:[&:nth-child(3n)]:border-r-0 md:[&:nth-child(3n)]:pr-0 md:[&:nth-child(3n+1)]:pl-0",
-              index >= LAST_ROW_START && "md:pb-0"
-            )}
-            key={principle.title}
-          >
-            {hasRuleJunction(index, COLUMNS) && (
-              <RuleDot className="-top-[0.5px] -right-[0.5px] hidden translate-x-1/2 -translate-y-1/2 md:block" />
-            )}
-            <span className="flex size-11 items-center justify-center rounded-xl border bg-fd-background text-fd-muted-foreground">
-              <principle.icon className="size-5" />
-            </span>
-            <span className="flex flex-col gap-2">
-              <h3 className="text-fd-muted-foreground text-sm">
-                {principle.title}
-              </h3>
-              <p className="text-balance leading-relaxed">{principle.body}</p>
-            </span>
-          </li>
-        ))}
+      <ul className="mt-14 grid md:mt-20 md:grid-cols-2 lg:grid-cols-3">
+        {PRINCIPLES.map((principle, index) => {
+          const junction = ruleJunctionVisibility(index, COLUMNS)
+          return (
+            <li
+              className={cn(
+                "relative flex min-h-56 flex-col justify-between gap-10 border-t px-0 py-8 first:border-t-0 first:pt-0 last:pb-0 md:border-r md:px-6 md:last:border-r-0 md:[&:nth-child(-n+2)]:border-t-0 md:[&:nth-child(-n+2)]:pt-0 lg:[&:nth-child(-n+3)]:border-t-0 lg:[&:nth-child(-n+3)]:pt-0 md:max-lg:[&:nth-child(2n)]:border-r-0 md:max-lg:[&:nth-child(2n)]:pr-0 md:max-lg:[&:nth-child(2n+1)]:pl-0 lg:[&:nth-child(3n)]:border-r-0 lg:[&:nth-child(3n)]:pr-0 lg:[&:nth-child(3n+1)]:pl-0",
+                index >= LAST_ROW_START.md && "md:max-lg:pb-0",
+                index >= LAST_ROW_START.lg && "lg:pb-0"
+              )}
+              key={principle.title}
+            >
+              {junction && (
+                <RuleDot
+                  className={cn(
+                    "-top-[0.5px] -right-[0.5px] translate-x-1/2 -translate-y-1/2",
+                    junction
+                  )}
+                />
+              )}
+              <span className="flex size-11 items-center justify-center rounded-xl border bg-fd-background text-fd-muted-foreground">
+                <principle.icon className="size-5" />
+              </span>
+              <span className="flex flex-col gap-2">
+                <h3 className="text-fd-muted-foreground text-sm">
+                  {principle.title}
+                </h3>
+                <p className="text-balance leading-relaxed">{principle.body}</p>
+              </span>
+            </li>
+          )
+        })}
       </ul>
     </Section>
   )

@@ -102,6 +102,10 @@ than its edge. And a junction's tick runs 68px past the rule, so the last one on
 Those grids clear their own edge rules with `nth-child(Nn)` plus an index compared against the first
 cell of the last row, never a literal `nth-child(N)` or `nth-last-child(-n+N)`: the arrays behind them
 are meant to grow, and a literal index quietly starts marking the wrong cell one entry later.
+When a grid changes column count at more than one breakpoint, scope every edge rule to its own range
+(`md:max-lg:[&:nth-child(3n)]`, then `lg:[&:nth-child(5n)]`): a bare `md:` variant still fires at
+`lg` and clears the wrong column. The junction dots follow the same ranges through
+`ruleJunctionVisibility` in `rule-dot.tsx`.
 
 Technology marks live in `public/tech/`, taken verbatim from [gilbarbara/logos](https://github.com/gilbarbara/logos)
 (CC0-1.0, the set behind Iconify's `logos:`) and renamed after the `STACK` entry that uses them. A mark
