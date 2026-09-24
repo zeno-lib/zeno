@@ -59,14 +59,14 @@ export function MixedValidationExample() {
               <InputField
                 label="Workspace name"
                 name="name"
-                placeholder="Resolve"
+                placeholder="Acme"
               />
               <EmailField name="email" placeholder="you@zeno.dev" />
               <InputField
                 description={`Try "admin" or "api" to see the per-field check.`}
                 label="Slug"
                 name="slug"
-                placeholder="resolve"
+                placeholder="acme"
                 validators={{ onChange: slugAvailability }}
               />
             </FieldGroup>

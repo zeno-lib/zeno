@@ -751,45 +751,45 @@ describe("default casing", () => {
   })
 
   it("varies the argument per operation, insert usually taking none", () => {
-    const deals = table(
-      "deals",
+    const projects = table(
+      "projects",
       { id: primaryId("assigned"), ownerId: uuid() },
       (t) => functionPolicies(t, { argument: { delete: t.id, select: t.id } })
     )
-    const policies = getTableConfig(deals).policies
+    const policies = getTableConfig(projects).policies
     const dialect = new PgDialect()
 
     // select and delete get the row; insert and update fall to no arguments,
     // insert because a missing key means "called with none" and update because
     // it was left out of the record too.
     expect(dialect.sqlToQuery(policies[0]?.using as SQL).sql).toBe(
-      '(select "can_select_deals"("deals"."id"))'
+      '(select "can_select_projects"("projects"."id"))'
     )
     expect(dialect.sqlToQuery(policies[1]?.withCheck as SQL).sql).toBe(
-      '(select "can_insert_deals"())'
+      '(select "can_insert_projects"())'
     )
     expect(dialect.sqlToQuery(policies[2]?.using as SQL).sql).toBe(
-      '(select "can_update_deals"())'
+      '(select "can_update_projects"())'
     )
     expect(dialect.sqlToQuery(policies[3]?.using as SQL).sql).toBe(
-      '(select "can_delete_deals"("deals"."id"))'
+      '(select "can_delete_projects"("projects"."id"))'
     )
   })
 
   it("reads an explicit null as a call with no arguments", () => {
-    const deals = table("deals", { id: primaryId("assigned") }, (t) =>
+    const projects = table("projects", { id: primaryId("assigned") }, (t) =>
       functionPolicies(t, { argument: { insert: null, select: t.id } })
     )
-    const policies = getTableConfig(deals).policies
+    const policies = getTableConfig(projects).policies
 
     expect(new PgDialect().sqlToQuery(policies[1]?.withCheck as SQL).sql).toBe(
-      '(select "can_insert_deals"())'
+      '(select "can_insert_projects"())'
     )
   })
 
   it("passes several columns to a function that takes several", () => {
-    const investors = table(
-      "investors",
+    const memberships = table(
+      "memberships",
       {
         id: primaryId("uuid"),
         organisationId: bigint({ mode: "number" }),
@@ -797,22 +797,22 @@ describe("default casing", () => {
       },
       (t) => functionPolicies(t, { argument: [t.profileId, t.organisationId] })
     )
-    const policies = getTableConfig(investors).policies
+    const policies = getTableConfig(memberships).policies
 
     expect(new PgDialect().sqlToQuery(policies[0]?.using as SQL).sql).toBe(
-      '(select "can_select_investors"("investors"."profile_id", "investors"."organisation_id"))'
+      '(select "can_select_memberships"("memberships"."profile_id", "memberships"."organisation_id"))'
     )
   })
 
   it("qualifies the function with a schema when one is given", () => {
-    const bexio = schema("bexio")
-    const bills = bexio.table("bexio_bills", { id: primaryId("uuid") }, (t) =>
-      functionPolicies(t, { schema: "bexio" })
+    const billing = schema("billing")
+    const invoices = billing.table("invoices", { id: primaryId("uuid") }, (t) =>
+      functionPolicies(t, { schema: "billing" })
     )
-    const policies = getTableConfig(bills).policies
+    const policies = getTableConfig(invoices).policies
 
     expect(new PgDialect().sqlToQuery(policies[0]?.using as SQL).sql).toBe(
-      '(select "bexio"."can_select_bexio_bills"())'
+      '(select "billing"."can_select_invoices"())'
     )
   })
 })

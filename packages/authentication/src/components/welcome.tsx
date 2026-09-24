@@ -1,5 +1,4 @@
 import Image from "next/image"
-import Link from "next/link"
 import { cn } from "@/lib/utils"
 
 interface WelcomeProps {
@@ -35,11 +34,5 @@ export const Welcome = ({ className, imageUrl, title, Logo }: WelcomeProps) => (
       </div>
     </div>
     <div className="flex flex-col items-center gap-8 self-center text-center sm:max-w-md" />
-    <div className="z-10 text-center text-muted-foreground text-sm italic lg:text-left">
-      In partnership with&nbsp;
-      <Link className="link" href="https://resolve.ch">
-        Resolve
-      </Link>
-    </div>
   </div>
 )

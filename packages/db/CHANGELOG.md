@@ -64,13 +64,13 @@
   nothing, there being no row yet to authorise, only the caller:
 
   ```
-  can_select_deals(id character varying)
-  can_update_deals(id character varying)
-  can_delete_deals(id character varying)
-  can_insert_deals()
+  can_select_projects(id character varying)
+  can_update_projects(id character varying)
+  can_delete_projects(id character varying)
+  can_insert_projects()
   ```
 
-  `argument: t.id` emitted `can_insert_deals(deals.id)`, which does not exist;
+  `argument: t.id` emitted `can_insert_projects(projects.id)`, which does not exist;
   omitting it dropped the argument from the other three. It now takes a record as
   well, and an array for a function that takes several columns:
 
@@ -90,16 +90,16 @@
   ran, which left out every helper living in its table's own schema:
 
   ```ts
-  const bexio = schema("bexio");
+  const billing = schema("billing");
 
-  export const bills = bexio.table("bills", { id: primaryId("uuid") }, (t) =>
-    functionPolicies(t, { schema: "bexio" })
+  export const invoices = billing.table("invoices", { id: primaryId("uuid") }, (t) =>
+    functionPolicies(t, { schema: "billing" })
   );
   ```
 
   ```sql
-  CREATE POLICY "can_select_bills" ON "bexio"."bills" AS PERMISSIVE FOR SELECT
-    TO "authenticated" USING ((select "bexio"."can_select_bills"()));
+  CREATE POLICY "can_select_invoices" ON "billing"."invoices" AS PERMISSIVE FOR SELECT
+    TO "authenticated" USING ((select "billing"."can_select_invoices"()));
   ```
 
   The default stays unqualified.
