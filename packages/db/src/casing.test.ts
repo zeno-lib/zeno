@@ -1,4 +1,4 @@
-import { getTableColumns, type SQL, sql } from "drizzle-orm"
+import { getTableColumns, is, type SQL, sql } from "drizzle-orm"
 import {
   bigint,
   getTableConfig,
@@ -8,6 +8,7 @@ import {
   isPgSequence,
   isPgView,
   PgDialect,
+  PgTimestampString,
   pgEnum,
   pgMaterializedView,
   pgPolicy,
@@ -505,6 +506,28 @@ describe("default casing", () => {
     expect(getTableColumns(audited).createdAt.getSQLType()).toBe(
       "timestamp (0)"
     )
+  })
+
+  it("reads timestamps back as strings with mode: string, emitting the same type", () => {
+    const dated = getTableColumns(table("dated", { ...timestamps() }))
+    const stringly = getTableColumns(
+      table("stringly", { ...timestamps({ mode: "string", precision: 6 }) })
+    )
+    const audited = getTableColumns(
+      table("audited", { ...auditColumns({ mode: "string" }) })
+    )
+
+    expect(is(dated.createdAt, PgTimestampString)).toBe(false)
+    expect(is(stringly.createdAt, PgTimestampString)).toBe(true)
+    expect(is(stringly.updatedAt, PgTimestampString)).toBe(true)
+    expect(is(audited.createdAt, PgTimestampString)).toBe(true)
+    // drizzle spaces the precision differently per mode ("timestamp (6)" vs
+    // "timestamp(6)"); Postgres reads both as the same type.
+    expect(stringly.createdAt.getSQLType().replace(" (", "(")).toBe(
+      "timestamp(6) with time zone"
+    )
+    expect(stringly.updatedAt.notNull).toBe(true)
+    expect(stringly.updatedAt.default).toBeDefined()
   })
 
   it("exports grouped audit column mixins", () => {

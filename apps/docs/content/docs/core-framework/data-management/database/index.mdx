@@ -216,6 +216,19 @@ The runtime client sets `prepare: false` so the transaction-mode pooler works;
 see [Querying](/docs/core-framework/data-management/database/querying) for
 details.
 
+To make a deployed app fail fast on the wrong URL, pass `requirePooler: true` to
+the factories. It rejects any port other than `6543` and any local host, without
+echoing the URL (which carries the password):
+
+```typescript
+createServiceClient({
+  requirePooler: process.env.VERCEL_ENV === "production",
+})
+```
+
+`resolveDatabaseUrl({ connectionString?, requirePooler? })` from `@zeno-lib/db`
+runs the same resolution on its own.
+
 ## Next steps
 
 Work through the package in the order you would build with it:

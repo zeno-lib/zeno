@@ -7,6 +7,7 @@ import {
   primaryId,
   sequentialPrimaryId,
   table,
+  timestamps,
   userId,
   uuidPrimaryId,
 } from "./schema.ts"
@@ -118,4 +119,27 @@ test("userId narrows the same way against its own reference", () => {
 test("reference actions are rejected when there is no reference", () => {
   // @ts-expect-error actions are meaningless without a foreign key
   authUserId({ actions: { onDelete: "cascade" }, reference: null })
+})
+
+test("timestamps reads a Date by default and a string with mode: string", () => {
+  const dated = table("dated", { ...timestamps() })
+  const stringly = table("stringly", { ...timestamps({ mode: "string" }) })
+  const audited = table("audited_strings", {
+    ...auditColumns({ mode: "string" }),
+  })
+
+  expectTypeOf<
+    (typeof dated)["$inferSelect"]["createdAt"]
+  >().toEqualTypeOf<Date>()
+  expectTypeOf<
+    (typeof stringly)["$inferSelect"]["updatedAt"]
+  >().toEqualTypeOf<string>()
+  expectTypeOf<
+    (typeof audited)["$inferSelect"]["createdAt"]
+  >().toEqualTypeOf<string>()
+  // Both still have a default, so neither is required on insert.
+  expectTypeOf<(typeof stringly)["$inferInsert"]>().toEqualTypeOf<{
+    createdAt?: string | undefined
+    updatedAt?: string | undefined
+  }>()
 })

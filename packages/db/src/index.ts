@@ -7,5 +7,7 @@ export {
   createServiceClient,
   createSupabaseClient,
   type DrizzleClient,
+  type ResolveDatabaseUrlOptions,
+  resolveDatabaseUrl,
   type SupabaseToken,
 } from "./clients.ts"

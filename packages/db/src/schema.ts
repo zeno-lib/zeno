@@ -10,6 +10,8 @@ import {
   type PgBigInt64Builder,
   type PgIntegerBuilder,
   type PgPolicyConfig,
+  type PgTimestampBuilder,
+  type PgTimestampStringBuilder,
   type PgUUIDBuilder,
   type Precision,
   pgPolicy,
@@ -24,6 +26,12 @@ import {
 import { snakeCase } from "drizzle-orm/pg-core/casing"
 import { authenticatedRole, authUid } from "drizzle-orm/supabase"
 import { authUsers } from "./auth-schema.ts"
+import {
+  DEFAULT_FUNCTION_PREFIX,
+  FUNCTION_POLICY_OPERATIONS,
+  type FunctionPolicyOperation,
+  functionPolicyName,
+} from "./function-names.ts"
 
 // pg-core primitives without the `pg` prefix they repeat at every call site.
 // `table` is missing on purpose. Zeno's own is at the bottom of this file.
@@ -56,10 +64,32 @@ export {
   supabaseAuthAdminRole,
 } from "drizzle-orm/supabase"
 
-type TimestampsOptions = {
+/** How a timestamp column is read back: a `Date` (the default) or Postgres's own text. */
+export type TimestampMode = "date" | "string"
+
+export type TimestampsOptions<TMode extends TimestampMode = "date"> = {
+  /**
+   * `"date"` (the default) reads a `Date`; `"string"` keeps Postgres's text
+   * form, which also keeps the microseconds a `Date` truncates. A JavaScript
+   * mapping only: it emits no SQL.
+   */
+  mode?: TMode
   withTimezone?: boolean
   /** Fractional-second digits. Postgres allows 0 to 6. */
   precision?: Precision
+}
+
+// Mirrors drizzle's own `timestamp()` overload: only an exact `"string"` gives
+// the string builder.
+type TimestampColumn<TMode extends TimestampMode> = SetHasDefault<
+  SetNotNull<
+    [TMode] extends ["string"] ? PgTimestampStringBuilder : PgTimestampBuilder
+  >
+>
+
+export type TimestampColumns<TMode extends TimestampMode = "date"> = {
+  createdAt: TimestampColumn<TMode>
+  updatedAt: TimestampColumn<TMode>
 }
 
 // `created_at` is a column DEFAULT, so Postgres fills it for every writer.
@@ -74,16 +104,22 @@ type TimestampsOptions = {
 // than a shared object, because Drizzle's builder methods mutate `this` and
 // return it. One builder in two tables would leak `.notNull()`, `.references()`
 // and its name from whichever table customised it first.
-export const timestamps = ({
+export const timestamps = <TMode extends TimestampMode = "date">({
+  mode,
   precision,
   withTimezone = true,
-}: TimestampsOptions = {}) => {
-  const config = { precision, withTimezone }
+}: TimestampsOptions<TMode> = {}): TimestampColumns<TMode> => {
+  const column = (name: string) =>
+    mode === "string"
+      ? timestamp(name, { mode: "string", precision, withTimezone })
+          .notNull()
+          .defaultNow()
+      : timestamp(name, { precision, withTimezone }).notNull().defaultNow()
 
   return {
-    createdAt: timestamp("created_at", config).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", config).notNull().defaultNow(),
-  }
+    createdAt: column("created_at"),
+    updatedAt: column("updated_at"),
+  } as TimestampColumns<TMode>
 }
 
 type ReferenceActions = ReferenceConfig["config"]
@@ -208,10 +244,13 @@ export const authorship = <TNotNull extends boolean = false>(
 })
 
 // Takes both halves' options, since it builds both halves.
-export const auditColumns = <TNotNull extends boolean = false>(
-  options: AuthorshipOptions<TNotNull> & TimestampsOptions = {}
+export const auditColumns = <
+  TNotNull extends boolean = false,
+  TMode extends TimestampMode = "date",
+>(
+  options: AuthorshipOptions<TNotNull> & TimestampsOptions<TMode> = {}
 ) => ({
-  ...timestamps(options),
+  ...timestamps<TMode>(options),
   ...authorship<TNotNull>(options),
 })
 
@@ -414,15 +453,6 @@ const POLICY_BUILDERS = {
   update: updatePolicy,
 } as const satisfies Record<PolicyOperation, typeof selectPolicy>
 
-const FUNCTION_POLICY_OPERATIONS = [
-  "select",
-  "insert",
-  "update",
-  "delete",
-] as const
-
-type FunctionPolicyOperation = (typeof FUNCTION_POLICY_OPERATIONS)[number]
-
 /** Columns one function is called with. `null` calls it with none. */
 type FunctionArgument = AnyPgColumn | readonly AnyPgColumn[] | null
 
@@ -515,7 +545,7 @@ export const functionPolicies = (
   {
     argument,
     name,
-    prefix = "can",
+    prefix = DEFAULT_FUNCTION_PREFIX,
     schema: functionSchema,
   }: FunctionPoliciesOptions = {}
 ) => {
@@ -528,7 +558,7 @@ export const functionPolicies = (
   const tableName = getTableName(getColumnTable(firstColumn))
 
   return FUNCTION_POLICY_OPERATIONS.map((operation) => {
-    const functionName = `${prefix}_${operation}_${tableName}`
+    const functionName = functionPolicyName(prefix, operation, tableName)
     // Unqualified by default, so the name resolves through `search_path` the
     // way a hand-written policy would; `schema` pins it to the functions that
     // live beside their table instead.
