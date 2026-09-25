@@ -6,6 +6,7 @@ on:
     paths:
       - "packages/test/**"
       - "packages/supabase/**"
+      - "packages/query/**"
 
 permissions:
   contents: write
@@ -27,6 +28,9 @@ jobs:
           - name: supabase
             filter: "@zeno-lib/supabase"
             dist: packages/supabase/dist
+          - name: query
+            filter: "@zeno-lib/query"
+            dist: packages/query/dist
     steps:
       - name: Checkout code
         uses: actions/checkout@v7

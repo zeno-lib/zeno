@@ -1,0 +1,13 @@
+{
+  "extends": "@zeno-lib/typescript/react.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": ["node"],
+    "paths": {
+      "@/components/ui/*": ["../ui/src/components/*"],
+      "@/lib/*": ["../ui/src/lib/*"],
+      "@/hooks/*": ["../ui/src/hooks/*"],
+      "@zeno-lib/query/*": ["./src/*"]
+    }
+  }
+}

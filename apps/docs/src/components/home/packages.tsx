@@ -4,6 +4,7 @@ import {
   Component,
   Database,
   FlaskConical,
+  Hourglass,
   KeyRound,
   ListChecks,
   Rocket,
@@ -41,6 +42,15 @@ const PACKAGES: Entry[] = [
     icon: Braces,
     label: "@zeno-lib/schema",
     title: "Schemas",
+  },
+  {
+    description:
+      "Suspense boundaries, route prefetching and timing presets for TanStack Query, safe to server render.",
+    domain: "d",
+    href: "/docs/core-framework/data-management/queries",
+    icon: Hourglass,
+    label: "@zeno-lib/query",
+    title: "Queries",
   },
   {
     description:

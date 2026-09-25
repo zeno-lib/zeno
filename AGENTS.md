@@ -18,6 +18,7 @@ Linked entries below have a leaf node: open it before working in that area. Each
   - [`authentication/`](packages/authentication/AGENTS.md): `@zeno-lib/authentication` npm `confirm` handler + registry-distributed Supabase auth flows (read before touching `verify/` or `email-sent/`)
   - [`forms/`](packages/forms/AGENTS.md): `@zeno-lib/forms` headless form factory (npm) + registry-distributed field kit + `create-form`
   - [`supabase/`](packages/supabase/AGENTS.md): `@zeno-lib/supabase` SSR client + middleware
+  - [`query/`](packages/query/AGENTS.md): `@zeno-lib/query` TanStack Query suspense boundary, SSR prefetch boundary, timing presets (npm) + registry `query-error-fallback`
   - [`db/`](packages/db/AGENTS.md): `@zeno-lib/db` Drizzle ORM client + schema + migrations + RLS
   - [`e2e/`](packages/e2e/AGENTS.md): `@zeno-lib/e2e` Playwright suite
   - `typescript/`: shared `tsconfig` presets
@@ -40,8 +41,8 @@ Don't update the node for mechanical refactors, formatting, or implementation de
 Zeno ships UI two ways, split by a single rule: **a source file that renders shadcn primitives (imports `@/components/ui/*`) is UI-coupled and ships via the shadcn registry; UI-free code stays on npm.**
 
 - **Primitives** come from **shadcn directly**; Zeno does not re-publish them. `@zeno-lib/ui` is a private workspace mirror for internal use + tests, and the alias target the registry-source packages resolve `@/components/ui/*` / `@/lib/utils` to (via tsconfig `paths`).
-- **Registry** (`shadcn add zeno-lib/zeno/<item>`, no namespace, direct GitHub addresses): the `theme`, the auth flows, and the forms field kit + `create-form`. The registry-distributed source under `packages/*/src/**` is authored in the shadcn consumer dialect (`@/components/ui/*`, `@/lib/utils`, `@zeno-lib/forms/lib/*`, `sonner`) and served **verbatim** (GitHub serves each file straight from `src/`). `pnpm registry:build` only regenerates the manifests: `registry.json` (root) + `packages/*/registry.json`, which are excluded from Biome. There are no generated file copies.
-- **npm**: `@zeno-lib/supabase` (whole), `@zeno-lib/authentication` (`confirm` only), `@zeno-lib/forms` (headless factory + `lib/*` logic; `./create-form` is a batteries-included opt-in entry).
+- **Registry** (`shadcn add zeno-lib/zeno/<item>`, no namespace, direct GitHub addresses): the `theme`, the auth flows, the forms field kit + `create-form`, and `query-error-fallback`. The registry-distributed source under `packages/*/src/**` is authored in the shadcn consumer dialect (`@/components/ui/*`, `@/lib/utils`, `@zeno-lib/forms/lib/*`, `sonner`) and served **verbatim** (GitHub serves each file straight from `src/`). `pnpm registry:build` only regenerates the manifests: `registry.json` (root) + `packages/*/registry.json`, which are excluded from Biome. There are no generated file copies.
+- **npm**: `@zeno-lib/supabase` (whole), `@zeno-lib/authentication` (`confirm` only), `@zeno-lib/forms` (headless factory + `lib/*` logic; `./create-form` is a batteries-included opt-in entry), `@zeno-lib/query` (whole; its error fallback is the registry item).
 
 See [`apps/docs/.../building-ui/installation`](apps/docs/content/docs/core-framework/building-ui/installation.mdx) for the consumer-facing guide.
 
