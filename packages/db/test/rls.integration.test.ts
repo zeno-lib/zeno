@@ -268,10 +268,14 @@ describe("audit triggers", () => {
   // asserts it, because a trigger that silently stops firing looks exactly like
   // one that works.
   it("refreshes updated_at for a write Drizzle never sees", async () => {
+    // A fixed past value, not the insert's `now()`: the insert and the update
+    // can land in the same millisecond, and `updated_at` reads back at
+    // millisecond precision, so "later" would be flaky.
+    const seededAt = new Date("2000-01-01T00:00:00.000Z")
     const db = createAdminClient()
     const [created] = await db
       .insert(posts)
-      .values({ title: "trigger seed", userId: USER_A })
+      .values({ title: "trigger seed", updatedAt: seededAt, userId: USER_A })
       .returning({ id: posts.id, updatedAt: posts.updatedAt })
 
     if (!created) {
