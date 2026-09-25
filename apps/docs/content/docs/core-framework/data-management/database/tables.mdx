@@ -268,8 +268,16 @@ reach another table built from the same helper.
 "updated_at" timestamp with time zone DEFAULT now() NOT NULL
 ```
 
-It takes `withTimezone` (default `true`) and `precision` (0 to 6), and
-`auditColumns()` forwards them.
+It takes `withTimezone` (default `true`), `precision` (0 to 6) and `mode`, and
+`auditColumns()` forwards them. `mode: "date"` (the default) reads a `Date`;
+`mode: "string"` reads Postgres's own text form, which also keeps the
+microseconds a `Date` truncates. The mode is a JavaScript mapping and emits no
+SQL:
+
+```typescript
+...timestamps({ mode: "string" })
+// createdAt: string, updatedAt: string in $inferSelect
+```
 
 <Callout type="warn">
   **`updated_at` needs a trigger, and so does `updated_by`.** Both get a
@@ -530,6 +538,33 @@ table name comes from the columns, so it stays right through a rename.
 
 You write the functions themselves; Zeno only writes the policies that call
 them.
+
+To ask the same functions from application code (to show or hide an Edit
+button, say), `selectFunctionPermissions` from `@zeno-lib/db/query` calls all
+four in one statement. The table name is looked up in an allowlist built once
+from your schema, so a name from a request never reaches the SQL:
+
+```typescript
+import { functionPermissionTables, selectFunctionPermissions } from "@zeno-lib/db/query"
+import * as schema from "./schema"
+
+const tables = functionPermissionTables(schema, { schemas: ["public", "billing"] })
+
+await selectFunctionPermissions(db, { tables, table: "invoices", id })
+// { select: true, insert: false, update: true, delete: false }
+```
+
+```sql
+select "billing"."can_select_invoices"("id" => $1) as "select",
+  "billing"."can_insert_invoices"() as "insert",
+  "billing"."can_update_invoices"("id" => $2) as "update",
+  "billing"."can_delete_invoices"("id" => $3) as "delete"
+```
+
+The functions are qualified with the table's schema (override with
+`functionSchema`), `id` goes to every function but `insert` as a named argument
+(`argumentName`, default `"id"`), and `prefix` matches the one given to
+`functionPolicies`. A `null` answer counts as `false`.
 
 <Callout type="info">
   `drizzle-kit export --sql` compares text and never reads a database, so it

@@ -19,7 +19,7 @@ Linked entries below have a leaf node: open it before working in that area. Each
   - [`forms/`](packages/forms/AGENTS.md): `@zeno-lib/forms` headless form factory (npm) + registry-distributed field kit + `create-form`
   - [`supabase/`](packages/supabase/AGENTS.md): `@zeno-lib/supabase` SSR client + middleware
   - [`query/`](packages/query/AGENTS.md): `@zeno-lib/query` TanStack Query suspense boundary, SSR prefetch boundary, timing presets (npm) + registry `query-error-fallback`
-  - [`db/`](packages/db/AGENTS.md): `@zeno-lib/db` Drizzle ORM client + schema + migrations + RLS
+  - [`db/`](packages/db/AGENTS.md): `@zeno-lib/db` Drizzle ORM client + schema + migrations + RLS + query/error helpers
   - [`e2e/`](packages/e2e/AGENTS.md): `@zeno-lib/e2e` Playwright suite
   - `typescript/`: shared `tsconfig` presets
   - `test/`: shared Vitest config

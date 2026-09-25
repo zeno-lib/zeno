@@ -32,10 +32,20 @@
       "import": "./dist/config.mjs",
       "default": "./dist/config.mjs"
     },
+    "./errors": {
+      "types": "./dist/errors.d.mts",
+      "import": "./dist/errors.mjs",
+      "default": "./dist/errors.mjs"
+    },
     "./next": {
       "types": "./dist/next.d.mts",
       "import": "./dist/next.mjs",
       "default": "./dist/next.mjs"
+    },
+    "./query": {
+      "types": "./dist/query.d.mts",
+      "import": "./dist/query.mjs",
+      "default": "./dist/query.mjs"
     },
     "./schema": {
       "types": "./dist/schema.d.mts",

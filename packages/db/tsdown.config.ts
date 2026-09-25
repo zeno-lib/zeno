@@ -6,8 +6,10 @@ export default defineConfig({
   entry: {
     "auth-schema": "src/auth-schema.ts",
     config: "src/config.ts",
+    errors: "src/errors.ts",
     index: "src/index.ts",
     next: "src/next.ts",
+    query: "src/query.ts",
     schema: "src/schema.ts",
     triggers: "src/triggers.ts",
   },

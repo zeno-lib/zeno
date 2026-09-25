@@ -8,9 +8,9 @@ status: in progress
 ## Clients
 
 `@zeno-lib/db` exports five client factories. Each takes an optional Drizzle
-config (`{ relations?, logger?, casing? }`) plus an optional `connectionString`,
-and reads `SUPABASE_DATABASE_URL` from the environment unless you pass that
-override. For local and deployed connection strings, see
+config (`{ relations?, logger?, casing? }`) plus an optional `connectionString`
+and `requirePooler`, and reads `SUPABASE_DATABASE_URL` from the environment
+unless you pass that override. For local and deployed connection strings, see
 [Environment](/docs/core-framework/data-management/database#environment).
 
 | Factory | Runs as | Use for |
@@ -218,6 +218,68 @@ await db.select().from(schema.posts)
 
 Both are appropriate for seed scripts, webhooks, cron jobs, admin tools, and
 background jobs. Neither should be used for user-scoped reads or writes.
+
+## Query helpers
+
+`@zeno-lib/db/query` covers the PostgREST conveniences Drizzle has no
+equivalent for.
+
+`one(rows)` is `.single()`: exactly one row, or it throws. `maybeOne(rows)` is
+`.maybeSingle()`: the row, `undefined` for none, and a throw for several.
+
+```typescript
+import { maybeOne, one } from "@zeno-lib/db/query"
+
+const post = one(await db.insert(posts).values(input).returning())
+const draft = maybeOne(await db.select().from(posts).where(eq(posts.id, id)))
+```
+
+`excludedSet(table, values, { target? })` is the `set` that makes
+`onConflictDoUpdate` behave like `.upsert()`: every column the caller supplied
+is written back from `excluded`, under its database name.
+
+```typescript
+import { definedValues, excludedSet } from "@zeno-lib/db/query"
+
+const values = definedValues(input)
+await db
+  .insert(contacts)
+  .values(values)
+  .onConflictDoUpdate({ target: contacts.id, set: excludedSet(contacts, values) })
+```
+
+A key holding `undefined` is skipped, because Drizzle leaves it out of the
+insert and `excluded.<col>` would be the column default, overwriting the stored
+value. The conflict target (`"id"` unless `target` names other column keys) is
+never written back, and when nothing else was supplied the set falls back to
+`id = excluded.id`, since Drizzle refuses an empty set while building the
+statement. A table without that column (a junction keyed by its foreign keys)
+gets an empty set; use `onConflictDoNothing` there.
+
+## Errors
+
+Drizzle wraps every driver error in a `DrizzleQueryError` whose own `code` is
+`undefined`, so `error.code === "23505"` is always false. `@zeno-lib/db/errors`
+digs out the postgres.js error:
+
+```typescript
+import { isConstraintViolation, SqlState, toPostgresError } from "@zeno-lib/db/errors"
+
+try {
+  await db.insert(contacts).values(row)
+} catch (error) {
+  if (isConstraintViolation(error, ["contacts_email_key"], { code: SqlState.uniqueViolation })) {
+    return { error: "That email is already a contact" }
+  }
+  throw error
+}
+```
+
+`toPostgresError(error)` returns the `PostgresError` (with `code`,
+`constraint_name`, `detail`, …) or `undefined`. `isConstraintViolation(error,
+constraints?, { code? })` returns it only for an integrity-constraint violation
+(any class `23` code unless `code` narrows it), optionally one of the named
+constraints. `SqlState` names the codes an application usually branches on.
 
 ## Pitfalls
 

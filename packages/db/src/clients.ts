@@ -21,6 +21,64 @@ export type CreateClientConfig<
 > = DrizzlePgConfig<TRelations> & {
   /** Overrides `process.env.SUPABASE_DATABASE_URL`. */
   connectionString?: string
+  /**
+   * Require the Supabase transaction pooler: port 6543 on a non-local host.
+   * Pass `true` in production (e.g. `process.env.VERCEL_ENV === "production"`)
+   * to fail at client creation rather than exhaust connections under load.
+   * Default `false`, which checks only that a URL is present.
+   */
+  requirePooler?: boolean
+}
+
+export type ResolveDatabaseUrlOptions = Pick<
+  CreateClientConfig,
+  "connectionString" | "requirePooler"
+>
+
+const POOLER_PORT = "6543"
+const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "0.0.0.0"])
+
+/**
+ * The connection string every factory uses: `connectionString`, else
+ * `SUPABASE_DATABASE_URL`. Throws when neither is set, and with
+ * `requirePooler` also when the URL is not the transaction pooler. Read per
+ * call, never at import, so a build without server secrets does not fail.
+ * Errors never echo the URL, which carries the password.
+ */
+export function resolveDatabaseUrl({
+  connectionString,
+  requirePooler = false,
+}: ResolveDatabaseUrlOptions = {}): string {
+  const url = connectionString ?? process.env.SUPABASE_DATABASE_URL ?? ""
+  if (!url) {
+    throw new Error("Missing SUPABASE_DATABASE_URL environment variable")
+  }
+  if (!requirePooler) {
+    return url
+  }
+
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    throw new Error("SUPABASE_DATABASE_URL is not a valid URL")
+  }
+  if (parsed.protocol !== "postgresql:" && parsed.protocol !== "postgres:") {
+    throw new Error(
+      `SUPABASE_DATABASE_URL must be a postgresql:// URL, got ${parsed.protocol}//`
+    )
+  }
+  if (LOCAL_HOSTS.has(parsed.hostname)) {
+    throw new Error(
+      "SUPABASE_DATABASE_URL points at a local database, but the transaction pooler is required"
+    )
+  }
+  if (parsed.port !== POOLER_PORT) {
+    throw new Error(
+      `SUPABASE_DATABASE_URL must use the transaction pooler (port ${POOLER_PORT}), got port ${parsed.port || "(default)"}. Session mode holds one connection per instance for its whole lifetime.`
+    )
+  }
+  return url
 }
 
 // A directly-queryable Drizzle client plus a reference-counted `close()`.
@@ -108,11 +166,8 @@ function buildDrizzle<TRelations extends AnyRelations>(
   kind: PoolKind,
   config?: CreateClientConfig<TRelations>
 ): { close: CloseFn; db: PostgresJsDatabase<TRelations> } {
-  const { connectionString, ...drizzleConfig } = config ?? {}
-  const url = connectionString ?? process.env.SUPABASE_DATABASE_URL ?? ""
-  if (!url) {
-    throw new Error("Missing SUPABASE_DATABASE_URL environment variable")
-  }
+  const { connectionString, requirePooler, ...drizzleConfig } = config ?? {}
+  const url = resolveDatabaseUrl({ connectionString, requirePooler })
   const entry = acquirePool(url, kind)
   const db = drizzle<TRelations>({
     client: entry.client,
