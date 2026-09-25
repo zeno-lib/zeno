@@ -1,0 +1,24 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "items": [
+    {
+      "dependencies": [
+        "@zeno-lib/query"
+      ],
+      "description": "Error UI for @zeno-lib/query's QuerySuspense `errorFallback`: the error message plus a retry button.",
+      "files": [
+        {
+          "path": "src/query-error-fallback.tsx",
+          "target": "@components/query/query-error-fallback.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "name": "query-error-fallback",
+      "registryDependencies": [
+        "button"
+      ],
+      "title": "Query error fallback",
+      "type": "registry:component"
+    }
+  ]
+}

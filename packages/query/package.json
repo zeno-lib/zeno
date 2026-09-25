@@ -1,0 +1,67 @@
+{
+  "name": "@zeno-lib/query",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./prefetched-queries": {
+      "types": "./dist/prefetched-queries.d.mts",
+      "import": "./dist/prefetched-queries.mjs",
+      "default": "./dist/prefetched-queries.mjs"
+    },
+    "./query-defaults": {
+      "types": "./dist/query-defaults.d.mts",
+      "import": "./dist/query-defaults.mjs",
+      "default": "./dist/query-defaults.mjs"
+    },
+    "./query-hydration-boundary": {
+      "types": "./dist/query-hydration-boundary.d.mts",
+      "import": "./dist/query-hydration-boundary.mjs",
+      "default": "./dist/query-hydration-boundary.mjs"
+    },
+    "./query-suspense": {
+      "types": "./dist/query-suspense.d.mts",
+      "import": "./dist/query-suspense.mjs",
+      "default": "./dist/query-suspense.mjs"
+    },
+    "./query-suspense-loading": {
+      "types": "./dist/query-suspense-loading.d.mts",
+      "import": "./dist/query-suspense-loading.mjs",
+      "default": "./dist/query-suspense-loading.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/query"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest --run",
+    "test:watch": "vitest watch",
+    "types:check": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": ">=5",
+    "react": ">=19"
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "^5.103.2",
+    "@types/node": "25.6.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@zeno-lib/test": "workspace:^",
+    "@zeno-lib/typescript": "workspace:^",
+    "@zeno-lib/ui": "workspace:^",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "tsdown": "^0.22.14",
+    "typescript": "7.0.2",
+    "vite": "8.0.16",
+    "vitest": "4.1.11"
+  }
+}

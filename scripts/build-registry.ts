@@ -425,6 +425,19 @@ const FORM_BLOCK: BlockConfig = {
   title: "Create form",
 }
 
+// packages/query: the error fallback renders a shadcn `Button`, so it ships via the registry. The
+// suspense/hydration components it pairs with are UI-free and stay on npm (`@zeno-lib/query`),
+// which the fallback imports its props type from.
+const QUERY_ERROR_FALLBACK_BLOCK: BlockConfig = {
+  description:
+    "Error UI for @zeno-lib/query's QuerySuspense `errorFallback`: the error message plus a retry button.",
+  entry: "query-error-fallback.tsx",
+  name: "query-error-fallback",
+  targetPrefix: "query",
+  title: "Query error fallback",
+  type: "registry:component",
+}
+
 function main(): void {
   // packages/ui: no primitives (all vanilla shadcn — installed from shadcn directly). Ships the theme.
   writeRegistry("packages/ui", [buildThemeItem()])
@@ -437,6 +450,11 @@ function main(): void {
 
   // packages/forms: field components + create-form wiring (UI). Headless core stays on npm.
   writeRegistry("packages/forms", [buildBlock("packages/forms", FORM_BLOCK)])
+
+  // packages/query: the error fallback (UI). The suspense/hydration components stay on npm.
+  writeRegistry("packages/query", [
+    buildBlock("packages/query", QUERY_ERROR_FALLBACK_BLOCK),
+  ])
 }
 
 main()

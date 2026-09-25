@@ -1,0 +1,158 @@
+---
+title: Queries
+description: Suspense boundaries, server prefetching and timing presets for TanStack Query
+icon: Hourglass
+---
+
+`@zeno-lib/query` is a small layer over [TanStack Query](https://tanstack.com/query) for
+suspense queries in a server-rendered React app. It gives you one boundary that handles loading,
+errors and retry, a server component that prefetches a route's data into the page, and a set of
+timing presets so freshness stays consistent. The package is UI-free; the error card that pairs
+with it comes from the registry, so you own and restyle it.
+
+## Installation
+
+```npm
+pnpm add @zeno-lib/query @tanstack/react-query
+pnpm dlx shadcn@latest add zeno-lib/zeno/query-error-fallback
+```
+
+The registry item drops `QueryErrorFallback` into `components/query/` and pulls in shadcn's
+`Button`. Your app still needs its own `QueryClientProvider`.
+
+## Suspense boundaries
+
+Wrap every component that calls `useSuspenseQuery` in a `QuerySuspense`. It stacks TanStack's
+recommended `QueryErrorResetBoundary`, an error boundary and `Suspense`, so `fallback` shows while
+the query loads and `errorFallback` shows when it fails, with an `onRetry` that resets the query.
+
+```tsx
+"use client"
+
+import { QuerySuspense } from "@zeno-lib/query/query-suspense"
+import { QuerySuspenseLoading } from "@zeno-lib/query/query-suspense-loading"
+import { useSuspenseQuery } from "@tanstack/react-query"
+import { QueryErrorFallback } from "@/components/query/query-error-fallback"
+import { Skeleton } from "@/components/ui/skeleton"
+
+function Notes({ dealId }: { dealId: string }) {
+  const { data: notes } = useSuspenseQuery(notesQueryOptions(dealId))
+  return (
+    <ul>
+      {notes.map((note) => (
+        <li key={note.id}>{note.content}</li>
+      ))}
+    </ul>
+  )
+}
+
+export function NotesCard({ dealId }: { dealId: string }) {
+  return (
+    <QuerySuspense
+      fallback={
+        <QuerySuspenseLoading className="flex flex-col gap-2 p-4">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-4/5" />
+        </QuerySuspenseLoading>
+      }
+      errorFallback={(props) => (
+        <QueryErrorFallback {...props} fallbackMessage="Could not load notes." />
+      )}
+    >
+      <Notes dealId={dealId} />
+    </QuerySuspense>
+  )
+}
+```
+
+`QuerySuspenseLoading` is a plain `div` that sets `aria-busy` and `aria-live` for you, so the
+skeleton is announced without an extra wrapper.
+
+### Why the boundary waits for hydration
+
+A Server Function cannot run during the initial server render: React throws _"Server Functions
+cannot be called during initial render"_ there. So a `useSuspenseQuery` whose `queryFn` calls one
+would render its error into the HTML, while the browser suspends instead, and the mismatch makes
+React re-render the whole subtree on the client.
+
+To keep both passes identical, `QuerySuspense` renders only its `fallback` on the server and
+through hydration, then runs the query in the browser. That is safe, but it means the route
+arrives as a skeleton. Prefetching buys real server HTML back.
+
+## Prefetching a route
+
+`QueryHydrationBoundary` is an async server component. It hands a fresh `QueryClient` to your
+`prefetch`, awaits it, and dehydrates the cache into the page:
+
+```tsx
+// app/deals/page.tsx
+import { QueryHydrationBoundary } from "@zeno-lib/query/query-hydration-boundary"
+
+export default function DealsPage() {
+  return (
+    <QueryHydrationBoundary
+      prefetch={(queryClient) =>
+        Promise.all([
+          queryClient.fetchQuery(dealsQueryOptions(defaultFilters)),
+          queryClient.prefetchQuery(advisorsQueryOptions()),
+        ])
+      }
+    >
+      <DealsBoard />
+    </QueryHydrationBoundary>
+  )
+}
+```
+
+Inside it, every `QuerySuspense` renders on the server too, and the queries resolve from the
+cache in both passes. Three rules keep that working:
+
+- **Prefetch through the same `queryOptions` factory the browser uses, unchanged.** The cache
+  entry needs the exact key and value the client would build, or the client refetches and the
+  prefetch bought nothing. Don't spread the options and swap the `queryFn`.
+- **Prefetch every suspense query the server pass reaches.** The boundary opens the gate for the
+  whole subtree, so one you left out runs its `queryFn` during the server render and fails there.
+  A component the server does not render (an inactive tab, a closed dialog) doesn't count.
+- **Use `fetchQuery` for the read the page cannot render without.** `prefetchQuery` swallows
+  failures, so a failed prefetch would quietly send an error card the browser then throws away.
+  `fetchQuery` fails the page loudly instead.
+
+The opt-in cannot be faked: the flag `QuerySuspense` reads is derived from the dehydrated payload,
+so a prefetch that produced nothing keeps the client-only behaviour.
+
+To build the server `QueryClient` yourself (for example with shared `defaultOptions`), pass
+`createQueryClient`. `dehydrateOptions` is forwarded to TanStack's `dehydrate`.
+
+If you already have a dehydrated state from elsewhere, render `PrefetchedQueries` from
+`@zeno-lib/query/prefetched-queries` directly: it is TanStack's `HydrationBoundary` plus the flag.
+
+## Timing presets
+
+Spread a preset as the first property of `queryOptions` instead of inventing a `staleTime`:
+
+```ts
+import { cachedQueryDefaults } from "@zeno-lib/query/query-defaults"
+import { queryOptions } from "@tanstack/react-query"
+
+export const countriesQueryOptions = () =>
+  queryOptions({
+    ...cachedQueryDefaults,
+    queryFn: fetchCountries,
+    queryKey: ["countries"],
+  })
+```
+
+| Export | `staleTime` | `refetchInterval` | Typical use |
+| --- | --- | --- | --- |
+| `liveBackgroundQueryDefaults` | 15 s | 15 s, also in the background | Fast-moving data that keeps updating while the tab is hidden |
+| `liveQueryDefaults` | 30 s | 30 s | Fast-moving data refreshed while it is on screen |
+| `shortLivedQueryDefaults` | 1 min | none | Data that can be slightly stale |
+| `longLivedQueryDefaults` | 2 min | none | Slower-changing detail data |
+| `cachedQueryDefaults` | 5 min | none | Reference data; also keeps it cached for 30 min (`gcTime`) |
+| `staticQueryDefaults` | never stale | none | Effectively immutable data |
+
+## Screenshots of loading and error states
+
+In development and tests, `debugState="loading"` or `debugState="error"` on a `QuerySuspense`
+forces that UI without running the query, which helps when capturing screenshots. It is ignored
+when `NODE_ENV` is `"production"`, but remove it from source once you're done.
