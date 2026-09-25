@@ -5,8 +5,10 @@ import type { ReactNode } from "react"
 import { Component, Suspense, useSyncExternalStore } from "react"
 import { useHasPrefetchedQueries } from "./prefetched-queries"
 
-const debugStateEnabled =
-  typeof process !== "undefined" && process.env.NODE_ENV !== "production"
+// A bare `process.env.NODE_ENV` read, so bundlers replace it with a literal and
+// drop the debug branch from production builds. A `typeof process` guard would
+// keep it: the bundler cannot fold that.
+const debugStateEnabled = process.env.NODE_ENV !== "production"
 
 const subscribeToNothing = () => () => {
   /* the value never changes after mount, so there is nothing to unsubscribe */
