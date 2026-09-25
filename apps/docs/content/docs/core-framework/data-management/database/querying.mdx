@@ -101,6 +101,58 @@ const created = await db.transaction(async (tx) => {
 Reach for `db.transaction` only when a single statement is not enough; one
 direct statement is the common case.
 
+## Request-scoped client for Next.js
+
+`@zeno-lib/db/next` wraps `createSupabaseClient` for the App Router. Create one
+module per app (not a `"use server"` file) that binds it to your Supabase server
+client and relations:
+
+```typescript title="{project}-db/src/server-db.ts"
+import { createRequestDb } from "@zeno-lib/db/next"
+import { createClient } from "@zeno-lib/supabase/next-server"
+import { relations } from "./relations"
+
+export const { defineAction, getRequestContext, getRequestDb } =
+  createRequestDb({ relations, supabase: () => createClient() })
+export { UnauthenticatedError } from "@zeno-lib/db/next"
+```
+
+`getRequestContext()` verifies the cookie session with `auth.getClaims()` once
+per server render (it is wrapped in React's `cache`) and returns
+`{ claims, db }`, where `db` runs as the caller with the **whole** verified
+claims object installed. There is no fallback to `anon`: without a verified
+`sub` it throws `UnauthenticatedError`. `getRequestDb()` returns just the `db`.
+
+`defineAction(schema, handler)` turns each server action into one line. The
+returned async function parses its argument with `schema.parse`, then calls
+`handler(db, input, context)`:
+
+```typescript title="app/posts/actions.ts"
+"use server"
+
+import { defineAction } from "{project}-db/server-db"
+import { z } from "zod"
+import { deletePost, insertPost } from "./queries"
+
+export const deletePostAction = defineAction(z.number().int(), deletePost)
+
+// Stamp authorship from the verified claims, never from an argument.
+export const createPostAction = defineAction(
+  z.object({ title: z.string().min(1) }),
+  (db, input, { claims }) => insertPost(db, { ...input, userId: claims.sub })
+)
+```
+
+When signed-out has a legitimate answer (a permission check, say), catch the
+named error instead:
+
+```typescript
+const db = await getRequestDb().catch((error: unknown) => {
+  if (error instanceof UnauthenticatedError) return null
+  throw error
+})
+```
+
 ## Other RLS clients
 
 When you already hold the verified, decoded claims (for example from a prior
@@ -179,5 +231,8 @@ background jobs. Neither should be used for user-scoped reads or writes.
   `createAuthClient(...)`, which verifies claims itself.
 - Do not feed a user-supplied token to `createServiceClient(...)`. It clamps
   nothing and grants `service_role`; it is a trusted backend decision.
+- Do not put `"use server"` in the module that calls `createRequestDb`, and do
+  not export `getRequestDb` from a `"use server"` file: every export there is a
+  public endpoint.
 - Do not build a fresh `relations` object literal per request. Pass a stable
   `relations` object, or a cached client built without relations may be reused.

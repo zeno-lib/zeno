@@ -32,6 +32,11 @@
       "import": "./dist/config.mjs",
       "default": "./dist/config.mjs"
     },
+    "./next": {
+      "types": "./dist/next.d.mts",
+      "import": "./dist/next.mjs",
+      "default": "./dist/next.mjs"
+    },
     "./schema": {
       "types": "./dist/schema.d.mts",
       "import": "./dist/schema.mjs",
@@ -58,21 +63,30 @@
     "@supabase/supabase-js": ">=2",
     "drizzle-kit": "1.0.0-rc.3",
     "drizzle-orm": "1.0.0-rc.3",
-    "postgres": ">=3.4"
+    "postgres": ">=3.4",
+    "react": ">=19"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@supabase/supabase-js": "2.116.0",
     "@types/node": "24.10.0",
+    "@types/react": "19.2.14",
     "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
     "dotenv": "17.4.2",
     "drizzle-kit": "1.0.0-rc.3",
     "drizzle-orm": "1.0.0-rc.3",
     "postgres": "3.4.7",
+    "react": "^19.2.5",
     "supabase": "2.84.1",
     "tsdown": "^0.22.14",
     "typescript": "7.0.2",
     "vite": "8.0.16",
-    "vitest": "4.1.11"
+    "vitest": "4.1.11",
+    "zod": "^4.4.3"
   }
 }

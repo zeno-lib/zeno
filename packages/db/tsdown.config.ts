@@ -7,6 +7,7 @@ export default defineConfig({
     "auth-schema": "src/auth-schema.ts",
     config: "src/config.ts",
     index: "src/index.ts",
+    next: "src/next.ts",
     schema: "src/schema.ts",
     triggers: "src/triggers.ts",
   },
@@ -19,5 +20,6 @@ export default defineConfig({
     /^drizzle-kit(\/|$)/,
     /^drizzle-orm(\/|$)/,
     /^postgres(\/|$)/,
+    /^react(\/|$)/,
   ],
 })

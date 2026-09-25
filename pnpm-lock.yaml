@@ -145,6 +145,9 @@ importers:
       '@types/node':
         specifier: 24.10.0
         version: 24.10.0
+      '@types/react':
+        specifier: 19.2.14
+        version: 19.2.14
       '@zeno-lib/test':
         specifier: workspace:*
         version: link:../test
@@ -163,6 +166,9 @@ importers:
       postgres:
         specifier: 3.4.7
         version: 3.4.7
+      react:
+        specifier: ^19.2.5
+        version: 19.2.5
       supabase:
         specifier: 2.84.1
         version: 2.84.1
@@ -178,6 +184,9 @@ importers:
       vitest:
         specifier: 4.1.11
         version: 4.1.11(@types/node@24.10.0)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.14.3(@types/node@24.10.0)(typescript@7.0.2))(vite@8.0.16(@types/node@24.10.0)(esbuild@0.28.0)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.9.0))
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   packages/e2e:
     devDependencies:

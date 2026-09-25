@@ -1,8 +1,9 @@
 # `@zeno-lib/db` — Intent
 
 Supabase Postgres helpers built on Drizzle. Source files cover the root package
-entrypoint, five client factories (admin + four RLS-scoped), a Drizzle Kit
-config preset, and curated Supabase schema primitives. This package owns Zeno's
+entrypoint, five client factories (admin + four RLS-scoped), a Next.js
+request-scoped client + server-action helper, a Drizzle Kit config preset, and
+curated Supabase schema primitives. This package owns Zeno's
 DB integration contracts; consuming apps own their Drizzle, Drizzle Kit, and
 `postgres-js` installations through peer dependencies.
 
@@ -13,7 +14,8 @@ four RLS-scoped client factories, a `drizzle-kit` config preset pre-tuned for
 Supabase, selected Supabase role/helper exports, RLS-by-default table helpers,
 and typed runtime queries.
 
-**Owns:** RLS-aware runtime factories, the Supabase Drizzle config preset,
+**Owns:** RLS-aware runtime factories, the per-request RLS context and
+`defineAction` for Next.js (`/next`), the Supabase Drizzle config preset,
 selected Supabase role/helper conveniences, curated `pg-core` aliases,
 `table` / `unsecureTable`, common ID/audit column helpers and mixins, and
 policy helpers.
@@ -27,6 +29,7 @@ policy helpers.
 | Import | Use from | Returns / does |
 |---|---|---|
 | `@zeno-lib/db` | Server code (Server Components, Route Handlers, Server Actions, cron, scripts) | Five factories, each `(…, config?: CreateClientConfig)` where `config` is a Drizzle config (`{ relations?, logger?, casing? }`) plus an optional `connectionString` (defaults to `SUPABASE_DATABASE_URL`). **`createAdminClient(config?)`** -> a client that **bypasses RLS** (webhooks, admin tasks, background jobs, seeding); queried directly (`db.select().from(t)`, `db.transaction(cb)`). **`createAuthClient(supabase, config?)`** -> RLS client bound to a Supabase client; verified claims are resolved via `supabase.auth.getClaims()` on **every** query (always reflects the live session). **`createSupabaseClient(accessToken, config?)`** -> RLS client scoped to an already-verified, **decoded** token (`SupabaseToken` = the `role` + `sub` claims, e.g. from `getClaims()`). **`createAnonClient(config?)`** -> RLS client that runs every query as `anon`. **`createServiceClient(config?)`** -> client that runs every query as `service_role` (bypasses RLS via Supabase's BYPASSRLS grant) — the only path to `service_role`. All four RLS clients are **queried directly**: each awaited single statement (`db.select().from(t)`, `db.query.t.findMany()`) is recorded and replayed inside its own RLS transaction with the claims set and the role switched; `db.transaction(async (tx) => { … })` runs several statements under one atomic RLS transaction. `relations` (from `defineRelations`) enables the relational query API. Postgres pools are cached per `(kind, connectionString)` — the `admin` and `rls` kinds get separate pools so the admin connection is never role-switched. `close()` is reference-counted: it releases this handle's share of the pool and only ends it once the last handle closes. |
+| `@zeno-lib/db/next` | A server-only module in a Next.js app (the one its `"use server"` files import) | **`createRequestDb({ supabase, relations?, connectionString?, logger?, casing? })`** -> `{ getRequestContext, getRequestDb, defineAction }`. `supabase` builds the request's Supabase client (e.g. `createClient` from `@zeno-lib/supabase/next-server`); only its `auth.getClaims()` is read. `connectionString` may be a function, resolved per request rather than at import. **`getRequestContext()`** is React-`cache`d: it verifies the session with `getClaims()`, throws the verification error as is, throws **`UnauthenticatedError`** (exported, `instanceof`-checkable) when there is no verified `sub`, and never falls back to `anon`; otherwise it returns `{ claims, db }`, where `db` is `createSupabaseClient(claims, …)` over the **whole** claims object (custom claims reach `auth.jwt()`). **`getRequestDb()`** is its `db`. **`defineAction(schema, (db, input, context) => …)`** returns an async `(input) => Promise<result>`: it runs `schema.parse(input)` first (a throwing parse, so a rejection never resolves the session), then resolves the context and calls the handler; `context.claims.sub` is the author to stamp. `schema` is any Standard Schema with `parse` (Zod 4); the action's parameter type is the schema's **input**. |
 | `@zeno-lib/db/config` | `drizzle.config.ts` in each consuming package/app | `defineDrizzleConfig({ schema, ...overrides })`, a preset that defaults `out` to `./supabase/migrations`, dialect to `postgresql`, reads `SUPABASE_DATABASE_URL` from env, sets `entities.roles.provider: "supabase"` plus `entities.roles.exclude` from the exported `supabaseManagedRoles` (the 18 Supabase roles `provider` misses), and defaults `schemaFilter` to `["public"]`. Also exports `supabaseManagedRoles`. |
 | `@zeno-lib/db/auth` | Queries and foreign keys against `auth.users` | `authUsers` (the full 35 columns, `drizzle-kit pull`-generated, pinned to Supabase CLI 2.84.1 / GoTrue v2.188.1) and `authSchema` (`pgSchema("auth").existing()`). Deliberately a separate entrypoint, and deliberately absent from `@zeno-lib/db/schema`: see the pitfall below. |
 | `@zeno-lib/db/triggers` | Custom SQL migrations | `auditTriggers(table, options?)`, `updatedAtTrigger(...)`, `updatedByTrigger(...)` and `moddatetimeExtension(schema?)`, which return SQL text for `drizzle-kit generate --custom`. Not Drizzle entities, so they never reach a snapshot. **Required** alongside `timestamps()` / `authorship()` / `auditColumns()`. |
@@ -145,6 +148,16 @@ export default defineDrizzleConfig({ schema: "./src/schema.ts" })
 
 ## Anti-patterns
 
+- **Do not put `"use server"` in the module that calls `createRequestDb`**, and
+  never export `getRequestDb` / `getRequestContext` from a `"use server"` file:
+  every export there is a public endpoint. The app's `"use server"` files
+  export only `defineAction(...)` results (Next accepts a non-literal export as
+  long as it is an async function at runtime).
+- **Do not accept a `db` or a user id as a server-action argument.** Build the
+  handle from the request (`defineAction` / `getRequestDb`) and take authorship
+  from `context.claims.sub`; a caller can pass any id.
+- **Do not `close()` a `/next` handle.** It shares the reference-counted
+  `rls` pool; closing it per request forces a cold reconnect for everyone.
 - **Do not import `@zeno-lib/db` factories from a Client Component.**
   `postgres-js` opens a TCP socket — server-only. Browser code should call your
   Server Actions/Route Handlers for application data; direct browser Supabase
@@ -220,15 +233,17 @@ export default defineDrizzleConfig({ schema: "./src/schema.ts" })
 ## Dependencies & Edges
 
 Peer deps: `drizzle-orm 1.0.0-rc.3`, `drizzle-kit 1.0.0-rc.3`,
-`postgres >=3.4`. Dev deps: `@zeno-lib/typescript`, `@zeno-lib/test` (shared
-Vitest config, wired via `vitest.config.ts`), `@types/node`, `dotenv`,
+`postgres >=3.4`, `@supabase/supabase-js >=2`, and `react >=19` (optional, only
+`/next` imports it, for `cache`). Dev deps: `@zeno-lib/typescript`,
+`@zeno-lib/test` (shared Vitest config, wired via `vitest.config.ts`),
+`@types/node`, `@types/react`, `react`, `zod` (the `/next` tests), `dotenv`,
 `supabase` (CLI for the local test stack), `tsdown` (the build), `vite`,
 `vitest`, plus local copies of the peer deps for tests and type-checking. Both
 configs load `.env.test`, so tests resolve `SUPABASE_DATABASE_URL` from there.
 No workspace runtime deps.
 
 **The package ships compiled output**, like every other npm package here:
-`tsdown` emits `dist/*.mjs` + `dist/*.d.mts` from the five entries, the
+`tsdown` emits `dist/*.mjs` + `dist/*.d.mts` from the six entries, the
 `exports` map points at `dist`, and `files` carries `dist` alongside `src`.
 Every peer is listed in `external` so it stays a bare specifier — bundling a
 second copy of `drizzle-orm` would give schema entities a different identity
@@ -254,6 +269,9 @@ Tests run under a single Vitest config and fall into two kinds:
   pool lifecycle (caching + reference-counted `close()`) using the **real**
   `postgres` driver via a counting passthrough — `postgres-js` connects lazily,
   so pools build and `end()` without a server. No `drizzle` mock.
+  `next.test.ts` is the exception: it stubs `createSupabaseClient` and feeds a
+  fake `getClaims()`, so `/next` is tested without a pool;
+  `next.test-d.ts` pins `defineAction`'s inferred input/result types.
 - **Integration** (`test/rls.integration.test.ts`): connects to a **real local
   Supabase** (`pnpm dev` → `supabase start`, Postgres on `54322`) and verifies RLS
   enforcement, role/claims clamping, transaction-local context, and the relational
@@ -404,6 +422,15 @@ assertion in `src/auth-schema.test.ts` tell you whether the shape moved.
 - **Each awaited single-statement `db` query is its own transaction.** It cannot
   span multiple statements; reach for `db.transaction(...)` when several
   statements must be atomic.
+- **`getRequestContext` memoises only inside a server render.** React `cache`
+  has a store only while rendering, so one page render shares one `getClaims()`
+  and one handle, but a server action posted from the browser resolves afresh
+  on every call, and the render after it starts empty (so rewritten cookies are
+  read fresh). Don't rely on it to dedupe across actions.
+- **`defineAction` parses before it authenticates.** A signed-out caller with a
+  malformed payload gets the schema error, not `UnauthenticatedError`. A caller
+  that maps signed-out to a default (e.g. "no permissions") should call
+  `getRequestDb().catch(...)` itself rather than go through `defineAction`.
 - **`test` needs the local Supabase stack running.** Unit specs
   (`src/*.test.ts`) never connect, but the integration spec
   (`test/rls.integration.test.ts`) runs in the same `pnpm test` pass and connects
