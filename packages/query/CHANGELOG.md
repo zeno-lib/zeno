@@ -1,5 +1,11 @@
 # @zeno-lib/query
 
+## 0.0.2
+
+### Patch Changes
+
+- 3dad51e: `QuerySuspense`'s `debugState` gate reads `process.env.NODE_ENV` bare, so bundlers fold it and drop the debug branch from production builds. The previous `typeof process` guard kept it in client bundles.
+
 ## 0.0.1
 
 ### Patch Changes
