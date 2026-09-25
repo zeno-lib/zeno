@@ -1,6 +1,6 @@
 {
   "name": "@zeno-lib/authentication",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "scripts": {
     "types:check": "tsc --noEmit"
   },
