@@ -284,7 +284,9 @@ Tests run under a single Vitest config and fall into two kinds:
   enforcement, role/claims clamping, transaction-local context, and the relational
   query API end-to-end. The fixture lives under `test/` (schema) + `supabase/`
   (config + migrations) so it stays out of the published surface (`files: ["src"]`);
-  the `dev`/`stop`/`reset`/`db:*` scripts drive the stack.
+  the `dev`/`stop`/`reset`/`db:*` scripts drive the stack. It creates, signs in and
+  deletes its Auth users through `createRlsTestHarness` from `@zeno-lib/test/supabase`,
+  which dogfoods the harness consumers use for their own RLS suites.
 
 Both kinds run together under `pnpm test`, so **`test` requires the local Supabase
 stack to be up** (CI starts it before `pnpm run ci`; locally run `pnpm dev` first,

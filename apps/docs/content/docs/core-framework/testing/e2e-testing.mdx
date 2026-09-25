@@ -17,6 +17,7 @@ Adding `@zeno-lib/e2e` (with its `@playwright/test` peer dependency) gives you a
 |---|---|
 | `@zeno-lib/e2e/config` | The [`baseConfig`](#the-config-preset) preset you spread into your own Playwright config |
 | `@zeno-lib/e2e/verify-deps` | [`verifyAppDeps()`](#checking-from-a-script), the dependency check as a function |
+| `@zeno-lib/e2e/auth` | [`signInViaApi()`](#signing-in-through-the-api), which signs a Supabase user in without driving the sign-in form |
 | `zeno-e2e` (bin) | The [`zeno-e2e verify-deps`](#keeping-app-dependencies-in-sync) command |
 
 ## Installation
@@ -221,6 +222,36 @@ const { ok, checked, missing } = verifyAppDeps({
 ```
 
 `ok` is true when nothing is missing, `checked` counts the apps it looked at, and `missing` lists the package names to add, sorted. Exiting is the CLI's job, so the function never calls `process.exit`. It throws only when a `package.json` can't be read or parsed, or when a tested app has no `name` field to depend on.
+
+## Signing in through the API
+
+Most specs need a signed-in user, not a test of the sign-in form. Mount a test-only route in the app with `createTestSignInRoute` from `@zeno-lib/supabase/next-test-sign-in`, gated on your own environment variable:
+
+```ts title="apps/webapp/app/api/test/sign-in/route.ts"
+import { createTestSignInRoute } from "@zeno-lib/supabase/next-test-sign-in"
+
+export const POST = createTestSignInRoute({
+  isEnabled: () => ["development", "test"].includes(process.env.NEXT_PUBLIC_ENVIRONMENT ?? ""),
+})
+```
+
+Then sign in from the spec. `signInViaApi` posts the credentials, installs the Supabase SSR auth cookie the route's response describes, and tells any open browser client about it:
+
+```ts title="packages/e2e/tests/webapp/dashboard.spec.ts"
+import { expect, test } from "@playwright/test"
+import { signInViaApi } from "@zeno-lib/e2e/auth"
+
+test.beforeEach(async ({ page }) => {
+  await signInViaApi({
+    email: "admin@example.test",
+    page,
+    password: process.env.TEST_USER_PASSWORD ?? "",
+    url: "http://localhost:3000/api/test/sign-in",
+  })
+})
+```
+
+The user must already exist: seed it with your fixtures. When the route is disabled it answers `404`, and `signInViaApi` throws with that status. Exempt the route's path from your middleware's auth redirect (`publicPaths`), since it is called without a session.
 
 ## Commands
 

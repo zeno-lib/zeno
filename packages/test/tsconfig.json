@@ -1,3 +1,4 @@
 {
-  "extends": "@zeno-lib/typescript/base.json"
+  "extends": "@zeno-lib/typescript/node.json",
+  "include": ["src/**/*", "vitest.config.ts"]
 }

@@ -16,6 +16,7 @@ Adding `@zeno-lib/test` (with `vitest` and `vite`) gives you shared configs and 
 | `@zeno-lib/test/configs` | The `defaultConfig` and `reactConfig` presets, plus `defineConfig` / `mergeConfig` |
 | `@zeno-lib/test/testing-library` | Re-exports [`@testing-library/react`](https://testing-library.com/docs/react-testing-library/intro) (`render`, `screen`, …) |
 | `@zeno-lib/test/user-event` | Re-exports [`@testing-library/user-event`](https://testing-library.com/docs/user-event/intro) for simulating real user interactions |
+| `@zeno-lib/test/supabase` | [`createRlsTestHarness`](#testing-row-level-security), `signInAs` and `idsSeen` for RLS suites against a local Supabase |
 
 ## Installation
 
@@ -221,6 +222,47 @@ describe("API client", () => {
   })
 })
 ```
+
+## Testing Row Level Security
+
+`@zeno-lib/test/supabase` runs a suite as real Supabase users: it creates them through the Auth admin API, signs them in on one publishable-key client, and gives you a database handle bound to that client. It needs `@supabase/supabase-js` and a running local Supabase; the database client is yours to pass (typically `createAuthClient` from `@zeno-lib/db`).
+
+```ts title="tests/deals.rls.test.ts"
+import { createClient } from "@supabase/supabase-js"
+import { createAuthClient } from "@zeno-lib/db"
+import { createRlsTestHarness, idsSeen, signInAs } from "@zeno-lib/test/supabase"
+import { afterAll, expect, it } from "vitest"
+
+const harness = createRlsTestHarness({
+  admin: createClient(url, secretKey),
+  client: createClient(url, publishableKey),
+  createDb: (client) => createAuthClient(client, { relations }),
+  // Your domain's setup for each new user, e.g. role rows.
+  onCreateUser: async (user, options: { roles?: string[] } | undefined, { admin }) => {
+    for (const role of options?.roles ?? []) {
+      const { error } = await admin.from("users_roles").insert({ role, user_id: user.id })
+      if (error) throw error
+    }
+  },
+})
+
+afterAll(() => harness.cleanUp())
+
+it("anon sees nothing", async () => {
+  await signInAs(harness, null)
+  expect(await idsSeen(() => harness.db.select().from(deals))).toEqual(new Set())
+})
+
+it("admins see every deal", async () => {
+  await signInAs(harness, { roles: ["ADMIN"] })
+  expect(await idsSeen(() => harness.db.select().from(deals))).toEqual(new Set([1, 2]))
+})
+```
+
+- `harness.db` is built once and follows whoever is signed in, so capture it anywhere.
+- `signInAs` always signs in a **fresh** user: claims such as roles are usually minted into the token at sign-in.
+- Assert the exact set `idsSeen` returns. An empty set is also what a broken claims setup looks like.
+- `cleanUp()` deletes every user it created, retrying transient Auth errors and ignoring users that are already gone, then signs out and closes `db`. Delete rows that reference those users first.
 
 ## Type testing
 

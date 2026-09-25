@@ -27,6 +27,11 @@
       "types": "./dist/next-image-loader.d.mts",
       "import": "./dist/next-image-loader.mjs",
       "default": "./dist/next-image-loader.mjs"
+    },
+    "./next-test-sign-in": {
+      "types": "./dist/next-test-sign-in.d.mts",
+      "import": "./dist/next-test-sign-in.mjs",
+      "default": "./dist/next-test-sign-in.mjs"
     }
   },
   "files": [
@@ -42,7 +47,8 @@
   },
   "scripts": {
     "build": "tsdown",
-    "types:check": "tsc --noEmit"
+    "types:check": "tsc --noEmit",
+    "test": "vitest --run"
   },
   "peerDependencies": {
     "@supabase/ssr": ">=0.10.0",
@@ -58,9 +64,12 @@
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "@types/node": "25.6.0",
+    "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
     "next": "^16.3.3",
     "tsdown": "^0.22.14",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vite": "8.0.16",
+    "vitest": "4.1.11"
   }
 }
