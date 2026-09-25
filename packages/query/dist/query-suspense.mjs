@@ -4,7 +4,7 @@ import { QueryErrorResetBoundary } from "@tanstack/react-query";
 import { Component, Suspense, useSyncExternalStore } from "react";
 import { Fragment, jsx } from "react/jsx-runtime";
 //#region src/query-suspense.tsx
-const debugStateEnabled = typeof process !== "undefined" && process.env.NODE_ENV !== "production";
+const debugStateEnabled = process.env.NODE_ENV !== "production";
 const subscribeToNothing = () => () => {};
 const useIsHydrated = () => useSyncExternalStore(subscribeToNothing, () => true, () => false);
 const debugError = Object.freeze(/* @__PURE__ */ new Error("QuerySuspense: debugState=\"error\" (development / test only; for screenshots)"));
