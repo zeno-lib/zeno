@@ -64,7 +64,9 @@ export default {
 ## Anti-patterns
 
 - **Do not call `next-client/createClient` from server code or `next-server/createClient` from a client component.** Cookie state diverges; a misplaced call returns a usable object that silently loses auth state on navigation.
-- **Do not put any code between `createServerClient(...)` and `supabase.auth.getUser()` in middleware** (`next-middleware.ts:59-62`). The official Supabase guidance (and the comment in the file) is explicit: any extra logic there has caused production "users randomly logged out" incidents. Same rule for: do not delete the `auth.getUser()` call.
+- **Do not put any code between `createServerClient(...)` and `supabase.auth.getClaims()` in middleware.** The official Supabase guidance (and the comment in the file) is explicit: any extra logic there has caused production "users randomly logged out" incidents. Same rule for: do not delete the `auth.getClaims()` call — it is also what refreshes the session.
+- **`getClaims()`, never `getUser()`, in the middleware.** `getUser()` is an Auth round trip on every request, and a slow or failed one reads as "signed out": the request is redirected, and a Server Action in flight is silently dropped. With asymmetric signing keys `getClaims()` verifies locally.
+- **An unauthenticated Server Action gets a `401`, not a redirect** (detected by the `Next-Action` header). A redirect makes the action resolve without running, so the write is lost with no error; the `401` rejects the call so the app can report it. Page navigations still redirect to `signInPath`.
 - **Do not mutate the `supabaseResponse` object's cookies after `updateSession`**: return it as-is, or follow the four-step copy procedure in the file's trailing comment. Skipping this desyncs browser/server cookies.
 
 ## Dependencies & Edges
