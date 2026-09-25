@@ -3,6 +3,11 @@
   "version": "0.0.2",
   "type": "module",
   "exports": {
+    "./auth": {
+      "types": "./dist/auth.d.mts",
+      "import": "./dist/auth.mjs",
+      "default": "./dist/auth.mjs"
+    },
     "./config": {
       "types": "./dist/config.d.mts",
       "import": "./dist/config.mjs",
@@ -33,6 +38,7 @@
     "e2e": "playwright test",
     "e2e:watch": "playwright test --ui",
     "prepack": "tsdown",
+    "test": "vitest --run",
     "types:check": "tsc --noEmit",
     "verify-deps": "node ./dist/cli.mjs verify-deps"
   },
@@ -43,8 +49,11 @@
     "@playwright/test": "1.60.0",
     "@types/node": "^25.6.0",
     "@zeno-lib/docs": "workspace:*",
+    "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
     "tsdown": "^0.22.14",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vite": "8.0.16",
+    "vitest": "4.1.11"
   }
 }

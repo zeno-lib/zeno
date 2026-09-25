@@ -8,7 +8,7 @@ Zeno is a Turborepo monorepo containing shared packages and applications for bui
 
 This file is the **root of an [Intent Layer](https://intent-systems.com/blog/intent-layer)**: a hierarchy of small `AGENTS.md` files placed at semantic boundaries so agents load high-signal local context (purpose, contracts, anti-patterns, sharp edges) before touching code. This file holds workspace-wide conventions and inherits *down* into every package; per-package nodes hold their own invariants and inherit conventions *up* from here. Don't duplicate facts across nodes: put them at the shallowest node that covers all relevant paths.
 
-Linked entries below have a leaf node: open it before working in that area. Each leaf uses the same six sections (Purpose & Scope, Entry Points & Contracts, Usage Patterns, Anti-patterns, Dependencies & Edges, Pitfalls) so you can pattern-match across the workspace; copy that template when adding a new package with non-trivial invariants. Config-only packages (`typescript/`, `test/`) deliberately have no node; their config files are self-documenting and a node would only repeat them.
+Linked entries below have a leaf node: open it before working in that area. Each leaf uses the same six sections (Purpose & Scope, Entry Points & Contracts, Usage Patterns, Anti-patterns, Dependencies & Edges, Pitfalls) so you can pattern-match across the workspace; copy that template when adding a new package with non-trivial invariants. The config-only package (`typescript/`) deliberately has no node; its config files are self-documenting and a node would only repeat them.
 
 - `apps/`
   - [`docs/`](apps/docs/AGENTS.md): Documentation site (Next.js + Fumadocs) on port 5002
@@ -20,9 +20,9 @@ Linked entries below have a leaf node: open it before working in that area. Each
   - [`supabase/`](packages/supabase/AGENTS.md): `@zeno-lib/supabase` SSR client + middleware
   - [`query/`](packages/query/AGENTS.md): `@zeno-lib/query` TanStack Query suspense boundary, SSR prefetch boundary, timing presets (npm) + registry `query-error-fallback`
   - [`db/`](packages/db/AGENTS.md): `@zeno-lib/db` Drizzle ORM client + schema + migrations + RLS + query/error helpers
-  - [`e2e/`](packages/e2e/AGENTS.md): `@zeno-lib/e2e` Playwright suite
+  - [`e2e/`](packages/e2e/AGENTS.md): `@zeno-lib/e2e` Playwright preset, dependency verifier and API sign-in helper
+  - [`test/`](packages/test/AGENTS.md): `@zeno-lib/test` shared Vitest config + Supabase RLS test harness
   - `typescript/`: shared `tsconfig` presets
-  - `test/`: shared Vitest config
 
 ### Keeping the Intent Layer current
 
@@ -42,7 +42,7 @@ Zeno ships UI two ways, split by a single rule: **a source file that renders sha
 
 - **Primitives** come from **shadcn directly**; Zeno does not re-publish them. `@zeno-lib/ui` is a private workspace mirror for internal use + tests, and the alias target the registry-source packages resolve `@/components/ui/*` / `@/lib/utils` to (via tsconfig `paths`).
 - **Registry** (`shadcn add zeno-lib/zeno/<item>`, no namespace, direct GitHub addresses): the `theme`, the auth flows, the forms field kit + `create-form`, and `query-error-fallback`. The registry-distributed source under `packages/*/src/**` is authored in the shadcn consumer dialect (`@/components/ui/*`, `@/lib/utils`, `@zeno-lib/forms/lib/*`, `sonner`) and served **verbatim** (GitHub serves each file straight from `src/`). `pnpm registry:build` only regenerates the manifests: `registry.json` (root) + `packages/*/registry.json`, which are excluded from Biome. There are no generated file copies.
-- **npm**: `@zeno-lib/supabase` (whole), `@zeno-lib/authentication` (`confirm` only), `@zeno-lib/forms` (headless factory + `lib/*` logic; `./create-form` is a batteries-included opt-in entry), `@zeno-lib/query` (whole; its error fallback is the registry item).
+- **npm**: `@zeno-lib/supabase` (whole), `@zeno-lib/test` (Vitest presets + RLS harness), `@zeno-lib/e2e` (Playwright preset + helpers), `@zeno-lib/authentication` (`confirm` only), `@zeno-lib/forms` (headless factory + `lib/*` logic; `./create-form` is a batteries-included opt-in entry), `@zeno-lib/query` (whole; its error fallback is the registry item).
 
 See [`apps/docs/.../building-ui/installation`](apps/docs/content/docs/core-framework/building-ui/installation.mdx) for the consumer-facing guide.
 

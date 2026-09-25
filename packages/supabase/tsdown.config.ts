@@ -9,6 +9,7 @@ export default defineConfig({
     "next-image-loader": "src/next-image-loader.ts",
     "next-middleware": "src/next-middleware.ts",
     "next-server": "src/next-server.ts",
+    "next-test-sign-in": "src/next-test-sign-in.ts",
   },
   // Keep peer imports as bare specifiers. `next` ships no exports map, so without
   // this tsdown resolves `next/headers` to a file and emits `next/headers.js`,

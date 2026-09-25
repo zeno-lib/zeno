@@ -1,6 +1,6 @@
 # `@zeno-lib/supabase` — Intent
 
-Wraps `@supabase/ssr` for the Next.js App Router. Five entry points, each with a specific role (over a small shared `env` helper); the value of this package is in keeping the client/server/middleware split honest.
+Wraps `@supabase/ssr` for the Next.js App Router. Six entry points (one of them test-only), each with a specific role (over a small shared `env` helper); the value of this package is in keeping the client/server/middleware split honest.
 
 ## Purpose & Scope
 
@@ -19,6 +19,7 @@ Provides factories for Supabase clients (browser, server, middleware), a plain `
 | `@zeno-lib/supabase/client` | Non-SSR backend / API / scripts | `createClient` (explicit url/key), `createAnonClient` (publishable key), `createAdminClient` (secret key); plain `@supabase/supabase-js` clients, no cookies |
 | `@zeno-lib/supabase/next-middleware` | App `middleware.ts` / custom middleware | `middleware` + static `config.matcher`, `createMiddleware(options)`, and `updateSession(request, options?)` (options: `signInPath`, `publicPaths`, `supabaseUrl`, `supabaseKey`) |
 | `@zeno-lib/supabase/next-image-loader` | `next.config.mjs` `images.loaderFile` | Supabase Storage transformation URL builder |
+| `@zeno-lib/supabase/next-test-sign-in` | A **test-only** Route Handler file | `createTestSignInRoute({ isEnabled, supabaseUrl?, supabaseKey? })` -> `(request) => Promise<Response>`. POST `{ email, password }` signs in through the `next-server` client (which also sets the auth cookies) and answers `{ session, storageKey }`. `isEnabled` is required and evaluated per request; `false` answers `404`. `400` bad body, `401` rejected credentials, `500` unexpected, all `Cache-Control: private, no-store`. Pairs with `signInViaApi` from `@zeno-lib/e2e/auth`. |
 
 The `next-client` and `next-server` factories accept optional `(supabaseUrl, supabaseKey)` and fall back to `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. They throw `"Missing Supabase URL environment variable"` or `"Missing Supabase key environment variable"` if a value is missing. This is the only error path the factories own. `updateSession(request, options?)` takes the same `supabaseUrl`/`supabaseKey` overrides plus `signInPath` (redirect target, default `/sign-in`) and `publicPaths` (auth-exempt prefixes, default `["/sign-in"]`).
 
@@ -38,6 +39,17 @@ Server Component / Route Handler:
 ```ts
 import { createClient } from "@zeno-lib/supabase/next-server"
 const supabase = await createClient<Database>()
+```
+
+Test sign-in route (dev/test only; `@zeno-lib/e2e/auth` calls it):
+
+```ts
+// app/api/test/sign-in/route.ts
+import { createTestSignInRoute } from "@zeno-lib/supabase/next-test-sign-in"
+
+export const POST = createTestSignInRoute({
+  isEnabled: () => ["development", "test"].includes(process.env.NEXT_PUBLIC_ENVIRONMENT ?? ""),
+})
 ```
 
 Middleware (default):
@@ -69,9 +81,11 @@ export default {
 - **An unauthenticated Server Action gets a `401`, not a redirect** (detected by the `Next-Action` header). A redirect makes the action resolve without running, so the write is lost with no error; the `401` rejects the call so the app can report it. Page navigations still redirect to `signInPath`.
 - **Do not mutate the `supabaseResponse` object's cookies after `updateSession`**: return it as-is, or follow the four-step copy procedure in the file's trailing comment. Skipping this desyncs browser/server cookies.
 
+- **Do not gate `createTestSignInRoute` on `NODE_ENV`.** `next start` runs with `production`, which is also how CI often drives Playwright; gate on your own environment variable, and make sure it is unset in deployed environments. It lives here, not in `@zeno-lib/e2e`, because it needs `next` and the cookie-backed server client.
+
 ## Dependencies & Edges
 
-Peer: `@supabase/ssr >=0.10.0`, `@supabase/supabase-js >=2.56.0`, `next >=16`. `next` is an **optional** peer, imported only by `next-server`/`next-middleware`. The `supabase` CLI is **not** a dependency (nothing imports it; it's a separate dev tool for generating the `Database` types). No workspace runtime deps.
+Peer: `@supabase/ssr >=0.10.0`, `@supabase/supabase-js >=2.56.0`, `next >=16`. `next` is an **optional** peer, imported only by `next-server`/`next-middleware`/`next-test-sign-in`. Dev: `@zeno-lib/test` + `vitest` for the unit tests (`src/*.test.ts`, which mock `./next-server` rather than a Next request scope). The `supabase` CLI is **not** a dependency (nothing imports it; it's a separate dev tool for generating the `Database` types). No workspace runtime deps.
 
 Used by: `@zeno-lib/authentication` (client + server). Used directly by every app that needs auth.
 
@@ -81,6 +95,7 @@ Used by: `@zeno-lib/authentication` (client + server). Used directly by every ap
 - **Auth-exempt prefixes default to `/sign-in` only** (configurable via `publicPaths`). Sign-up, password recovery, and the OTP confirm route are not exempt by default, so unauthenticated users get bounced from e.g. `/recover-password` → `/sign-in`. Pass `publicPaths` to match your route structure.
 - **Server `createClient` is async** and uses `await cookies()`. Next 15+ requires this. Forgetting `await` returns a `Promise<SupabaseClient>`, which TypeScript will catch but runtime will not (every method call resolves to `undefined`).
 - **`createAdminClient` bypasses RLS**: it defaults to `SUPABASE_SECRET_KEY`, returning a service-role client that can read or write any row. Use `createAnonClient` (publishable key, honors RLS) for untrusted contexts, keep `createAdminClient` server-side, and scope `SUPABASE_SECRET_KEY` to where admin access is intended. The base `createClient` takes an explicit url and key with no environment fallback.
+- **The test sign-in route is called without a session**, so `updateSession` redirects it to `signInPath` unless its path is in `publicPaths` (e.g. `"/api/test"`) or outside the middleware matcher. Only exempt it where `isEnabled` can return `true`.
 - **Image loader throws at request time**, not at config time, if `NEXT_PUBLIC_SUPABASE_STORAGE_PROJECT_ID` is missing. The error surfaces as a broken image, not a build failure.
 - **`next-image-loader` is the only `next/image` integration point** and it exposes a *named* export (`supabaseImageLoader`), not a default. Next's `loaderFile` needs a default-exporting, project-relative file, so consumers must add the one-line re-export wrapper shown above. Pointing `loaderFile` straight at the package will silently fail.
 - **Bundled with tsdown**: ships compiled `dist/*.mjs` + `.d.mts` (committed; un-ignored in `.gitignore`). After editing `src/`, run `pnpm --filter @zeno-lib/supabase build`; CI (`bundle-packages.yml`) also rebuilds and commits `dist` on PRs. The tsdown config's `external` list keeps `next/*` imports bare; `next` ships no exports map, so otherwise they'd emit as `next/headers.js` and break on stricter `next` versions.
