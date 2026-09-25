@@ -55,16 +55,30 @@ export async function updateSession(
     },
   })
   // Do not run code between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
+  // supabase.auth.getClaims(). A simple mistake could make it very hard to debug
   // issues with users being randomly logged out.
-  // IMPORTANT: DO NOT REMOVE auth.getUser()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // IMPORTANT: DO NOT REMOVE auth.getClaims() — it is also what refreshes the
+  // session and writes the new cookies through `setAll` above.
+  //
+  // `getClaims()`, not `getUser()`, as the Supabase guide now does: with
+  // asymmetric signing keys (the default for new projects) it verifies the JWT
+  // locally against cached public keys, so the proxy no longer makes an Auth
+  // round trip on every request. `getUser()` did, and a slow or failed Auth
+  // call read as "signed out" — which redirected, and so silently dropped,
+  // whatever request was in flight. Symmetric-key projects still fall back to
+  // the Auth server inside `getClaims()`.
+  const { data } = await supabase.auth.getClaims()
+  const isSignedIn = Boolean(data?.claims?.sub)
   const isPublicPath = publicPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   )
-  if (!(user || isPublicPath)) {
+  if (!(isSignedIn || isPublicPath)) {
+    // A Server Action is a POST the browser expects an action result from. A
+    // redirect makes it resolve without running, so the write is lost with no
+    // error; a 401 rejects the call, and the caller can say the save failed.
+    if (request.headers.has("next-action")) {
+      return new NextResponse(null, { status: 401 })
+    }
     // no user, potentially respond by redirecting the user to the sign-in page
     const url = request.nextUrl.clone()
     url.pathname = signInPath

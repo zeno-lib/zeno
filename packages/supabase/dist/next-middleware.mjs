@@ -11,7 +11,7 @@ async function updateSession(request, options) {
 	const { url: supabaseUrl, key: supabaseKey } = requireSupabaseEnv(options?.supabaseUrl ?? process.env.NEXT_PUBLIC_SUPABASE_URL, options?.supabaseKey ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
 	const signInPath = options?.signInPath ?? "/sign-in";
 	const publicPaths = options?.publicPaths ?? ["/sign-in"];
-	const { data: { user } } = await createServerClient(supabaseUrl, supabaseKey, { cookies: {
+	const { data } = await createServerClient(supabaseUrl, supabaseKey, { cookies: {
 		getAll() {
 			return request.cookies.getAll();
 		},
@@ -21,9 +21,11 @@ async function updateSession(request, options) {
 			for (const { name, options: cookieOptions, value } of cookiesToSet) supabaseResponse.cookies.set(name, value, cookieOptions);
 			for (const [key, value] of Object.entries(headers)) supabaseResponse.headers.set(key, value);
 		}
-	} }).auth.getUser();
+	} }).auth.getClaims();
+	const isSignedIn = Boolean(data?.claims?.sub);
 	const isPublicPath = publicPaths.some((path) => request.nextUrl.pathname.startsWith(path));
-	if (!(user || isPublicPath)) {
+	if (!(isSignedIn || isPublicPath)) {
+		if (request.headers.has("next-action")) return new NextResponse(null, { status: 401 });
 		const url = request.nextUrl.clone();
 		url.pathname = signInPath;
 		return NextResponse.redirect(url);
