@@ -326,6 +326,9 @@ importers:
       drizzle-orm:
         specifier: 1.0.0-rc.3
         version: 1.0.0-rc.3(postgres@3.4.7)(zod@4.4.3)
+      tsdown:
+        specifier: ^0.22.14
+        version: 0.22.14(tsx@4.20.6)(typescript@7.0.2)
       typescript:
         specifier: 7.0.2
         version: 7.0.2

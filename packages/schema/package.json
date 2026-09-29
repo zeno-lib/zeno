@@ -3,9 +3,14 @@
   "version": "0.2.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    }
   },
   "files": [
+    "dist",
     "src"
   ],
   "publishConfig": {
@@ -16,6 +21,8 @@
     "directory": "packages/schema"
   },
   "scripts": {
+    "build": "tsdown",
+    "prepack": "tsdown",
     "test": "vitest --run",
     "test:watch": "vitest watch",
     "types:check": "tsc --noEmit"
@@ -27,6 +34,7 @@
   "devDependencies": {
     "@zeno-lib/typescript": "workspace:^",
     "drizzle-orm": "1.0.0-rc.3",
+    "tsdown": "^0.22.14",
     "typescript": "7.0.2",
     "vitest": "4.1.11",
     "zod": "^4.4.3"

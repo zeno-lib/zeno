@@ -100,7 +100,11 @@ export const createPostFormSchema = postSchema.insert
 ## Dependencies & Edges
 
 Peer deps: `drizzle-orm 1.0.0-rc.3`, `zod >=4`. Dev deps:
-`@zeno-lib/typescript`, `drizzle-orm`, `typescript`, `vitest`, `zod`.
+`@zeno-lib/typescript`, `drizzle-orm`, `tsdown`, `typescript`, `vitest`, `zod`.
+
+Build: `tsdown` bundles `src/index.ts` to `dist/`, with both peers kept
+external. `dist/` is gitignored and built by `prepack`, like `@zeno-lib/db`,
+because nothing imports this package during `pnpm dev`.
 
 Used by: apps and packages that want a single Zod schema lineage from Drizzle
 tables to server validation and `@zeno-lib/forms`.
@@ -109,6 +113,10 @@ Coexists with `@zeno-lib/db`: `@zeno-lib/db` owns database runtime helpers and
 the Drizzle Kit config preset; `@zeno-lib/schema` owns pure validation helpers.
 
 ## Pitfalls
+
+- **Never point `exports` back at `src/`.** Vitest and `tsc` load TypeScript
+  source fine, but a consumer's Next.js build does not transpile
+  `node_modules` and fails with "Unknown module type".
 
 - **The audit key list mirrors `@zeno-lib/db/schema`.** Renaming a key there
   must change `AUDIT_COLUMN_KEYS` in `src/index.ts`; `db/src/schema-zod.test.ts`
