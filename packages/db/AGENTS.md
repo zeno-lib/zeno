@@ -302,7 +302,7 @@ consumer's responsibility.
 a framework that auto-loads `.env` (Next.js).
 
 Used by: any package or app that needs to read/write Supabase Postgres with
-typed schemas. Reads no other `@zeno-lib/*` package.
+typed schemas. Reads no other `@zeno-lib/*` package at runtime.
 
 Coexists with `@zeno-lib/supabase`: consumers typically import `createClient`
 from `@zeno-lib/supabase/server` for auth and import `createAuthClient`
@@ -314,6 +314,10 @@ Coexists with `@zeno-lib/schema`: consumers define Drizzle tables with
 domain-specific columns. They call `defineTableSchema(...)` from
 `@zeno-lib/schema`, and keep DB clients out of modules that need to be imported
 by Client Components for validation.
+`defineTableSchema` drops the audit mixins' keys (`createdAt`, `updatedAt`,
+`createdBy`, `updatedBy`) from `insert` / `update` by name, so renaming a key
+those mixins emit is a breaking change there too; `src/schema-zod.test.ts`
+(the one dev-only import of `@zeno-lib/schema`) pins it.
 
 ## Regenerating auth.users
 

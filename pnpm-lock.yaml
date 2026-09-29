@@ -148,6 +148,9 @@ importers:
       '@types/react':
         specifier: 19.2.14
         version: 19.2.14
+      '@zeno-lib/schema':
+        specifier: workspace:*
+        version: link:../schema
       '@zeno-lib/test':
         specifier: workspace:*
         version: link:../test
