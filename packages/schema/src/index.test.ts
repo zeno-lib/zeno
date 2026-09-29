@@ -210,4 +210,23 @@ describe("defineTableSchema", () => {
     expect(schemas.insert.safeParse({ id: 11 }).success).toBe(false)
     expect(schemas.insert.safeParse({ id: 5 }).success).toBe(true)
   })
+
+  it("keeps a function-refined nullable insert column optional", () => {
+    const drafts = pgTable("drafts", {
+      note: text("note"),
+      title: text("title").notNull(),
+    })
+    const schemas = defineTableSchema(drafts, {
+      insert: { note: (schema) => schema.min(1) },
+    })
+
+    expect(schemas.insert.parse({ title: "x" })).toEqual({ title: "x" })
+    expect(schemas.insert.parse({ note: null, title: "x" })).toEqual({
+      note: null,
+      title: "x",
+    })
+    expect(schemas.insert.safeParse({ note: "", title: "x" }).success).toBe(
+      false
+    )
+  })
 })

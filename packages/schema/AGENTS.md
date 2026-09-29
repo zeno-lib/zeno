@@ -124,6 +124,10 @@ the Drizzle Kit config preset; `@zeno-lib/schema` owns pure validation helpers.
 
 - **Generated columns are omitted, not strict-rejected.** Drizzle's Zod helpers
   build normal `z.object(...)` schemas, so unknown keys are stripped by default.
+- **Drizzle types a function refinement on an insert column as required.**
+  `OptionalRefinedInsert` in `src/index.ts` restores `.optional()` for a
+  nullable or defaulted column, matching the runtime. Keep it until Drizzle's
+  `HandleRefinement` does the same.
 - **Refinements are per variant.** A refinement under `insert` does not affect
   `select` or `update`; repeat a rule when the same validation belongs in more
   than one variant.
