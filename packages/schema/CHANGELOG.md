@@ -1,5 +1,14 @@
 # @zeno-lib/schema
 
+## 0.2.1
+
+### Patch Changes
+
+- aca6029: The package now ships compiled `dist/index.mjs` and `dist/index.d.mts`, and
+  `exports` points at them. It used to export `src/index.ts`, which bundlers that
+  do not transpile `node_modules`, Next.js included, fail to load with "Unknown
+  module type".
+
 ## 0.2.0
 
 ### Minor Changes
