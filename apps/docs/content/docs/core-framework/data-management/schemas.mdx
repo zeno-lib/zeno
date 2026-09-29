@@ -83,9 +83,27 @@ export const postSchema = defineTableSchema(posts)
 
 | Schema | Use it for |
 |---|---|
-| `postSchema.select` | Data read from the database. Generated columns are present. Nullable columns accept `null`. |
-| `postSchema.insert` | Data accepted before an insert. Generated/defaulted columns are omitted or optional according to Drizzle metadata. |
-| `postSchema.update` | Data accepted before an update. Updatable fields are optional; generated columns are omitted. |
+| `postSchema.select` | Data read from the database. Generated and audit columns are present. Nullable columns accept `null`. |
+| `postSchema.insert` | Data accepted before an insert. Generated and audit columns are omitted; defaulted columns are optional according to Drizzle metadata. |
+| `postSchema.update` | Data accepted before an update. Updatable fields are optional; generated and audit columns are omitted. |
+
+### Audit columns stay out of writes
+
+`createdAt`, `updatedAt`, `createdBy` and `updatedBy` are the keys
+`auditColumns()`, `timestamps()` and `authorship()` emit. The database fills
+them, through a column default and the triggers from `@zeno-lib/db/triggers`, so
+`insert` and `update` leave them out: a caller who sends `createdBy` has it
+stripped rather than written. The match is by key **and** default, so a
+`createdAt` column without a default stays writable. When a trusted path really
+needs to set one (a data import, say), build that schema with
+`createInsertSchema(...)` instead.
+
+### Identity ids are positive
+
+A column from `sequentialPrimaryId()` (or any identity column whose sequence
+counts up from 1, which is Postgres's default) only accepts positive numbers, in
+every variant. A function refinement on that column runs on top of the check; a
+schema passed as the refinement replaces it.
 
 These are plain Zod schemas. You can parse payloads in a Server Action or Route
 Handler before querying through `createAuthClient(...)` (RLS-scoped) or
@@ -172,10 +190,8 @@ import { z } from "zod"
 
 export const createPostFormSchema = postSchema.insert
   .omit({
-    createdAt: true,
     id: true,
     slug: true,
-    updatedAt: true,
   })
   .extend({
     publishNow: z.boolean().default(false),

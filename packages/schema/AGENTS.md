@@ -25,8 +25,16 @@ Forms remain in `@zeno-lib/forms`.
 |---|---|---|
 | `@zeno-lib/schema` | Shared schema modules, Server Actions, Route Handlers, Client Components that need validation | `defineTableSchema(table, options?)` returns Zod `select`, `insert`, and `update` schemas for a Drizzle table. Also re-exports `createSelectSchema`, `createInsertSchema`, `createUpdateSchema`, and `createSchemaFactory` from `drizzle-orm/zod`. |
 
+`insert` and `update` omit the audit columns: a key in `createdAt`,
+`updatedAt`, `createdBy`, `updatedBy` whose column has a default. Runtime and
+types apply the same key-and-default rule, so they never disagree. Identity
+columns counting up from 1 (every `sequentialPrimaryId()`) get `.positive()` in
+all three variants.
+
 `options.select`, `options.insert`, and `options.update` are the same refinement
-maps accepted by Drizzle's first-party Zod helpers. `options.factory` passes
+maps accepted by Drizzle's first-party Zod helpers, minus the omitted audit
+keys. A function refinement on an identity column receives the positive
+schema; a schema value replaces it. `options.factory` passes
 through to `createSchemaFactory(...)` for advanced coercion/custom Zod-instance
 cases.
 
@@ -83,6 +91,12 @@ export const createPostFormSchema = postSchema.insert
   insert/update schemas omit generated columns; plain Zod object parsing strips
   unknown keys unless the user opts into stricter behavior themselves.
 
+- **Do not detect audit columns by a runtime marker.** Drizzle's
+  `MakeColumnConfig` copies a fixed set of builder fields, so a brand set by
+  `@zeno-lib/db` never reaches the table's column types. A marker-based omit
+  would strip a key the inferred type still offers. The key-and-default rule is
+  the one both sides can see.
+
 ## Dependencies & Edges
 
 Peer deps: `drizzle-orm 1.0.0-rc.3`, `zod >=4`. Dev deps:
@@ -95,6 +109,10 @@ Coexists with `@zeno-lib/db`: `@zeno-lib/db` owns database runtime helpers and
 the Drizzle Kit config preset; `@zeno-lib/schema` owns pure validation helpers.
 
 ## Pitfalls
+
+- **The audit key list mirrors `@zeno-lib/db/schema`.** Renaming a key there
+  must change `AUDIT_COLUMN_KEYS` in `src/index.ts`; `db/src/schema-zod.test.ts`
+  runs the real helpers through `defineTableSchema` and fails if they drift.
 
 - **Generated columns are omitted, not strict-rejected.** Drizzle's Zod helpers
   build normal `z.object(...)` schemas, so unknown keys are stripped by default.
