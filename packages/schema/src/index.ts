@@ -99,17 +99,54 @@ type OmitKeys<TSchema, TKeys extends PropertyKey> =
       >
     : never
 
+// Drizzle types a function refinement on an insert column as required, even
+// when the column is nullable or defaulted and the runtime wraps it in
+// `.optional()`. This puts the wrapper back into the type.
+type IsInsertOptional<TColumn> = TColumn extends Column
+  ? TColumn["_"]["notNull"] extends true
+    ? TColumn["_"]["hasDefault"] extends true
+      ? true
+      : false
+    : true
+  : false
+
+type OptionalRefinedInsert<TSchema, TTable extends Table, TRefine> =
+  TSchema extends z.ZodObject<infer TShape, infer TConfig>
+    ? z.ZodObject<
+        {
+          [K in keyof TShape]: K extends keyof TRefine
+            ? TRefine[K] extends (schema: never) => unknown
+              ? (
+                  K extends keyof TableColumns<TTable>
+                    ? IsInsertOptional<TableColumns<TTable>[K]>
+                    : false
+                ) extends true
+                ? TShape[K] extends z.ZodOptional
+                  ? TShape[K]
+                  : z.ZodOptional<TShape[K]>
+                : TShape[K]
+              : TShape[K]
+            : TShape[K]
+        },
+        TConfig
+      >
+    : never
+
 type DefineTableSchemaResult<
   TTable extends Table,
   TCoerce extends CoerceOptions,
   TOptions,
 > = {
   insert: OmitKeys<
-    BuildSchema<
-      "insert",
-      TableColumns<TTable>,
-      RefineFromOptions<TOptions, "insert">,
-      TCoerce
+    OptionalRefinedInsert<
+      BuildSchema<
+        "insert",
+        TableColumns<TTable>,
+        RefineFromOptions<TOptions, "insert">,
+        TCoerce
+      >,
+      TTable,
+      RefineFromOptions<TOptions, "insert">
     >,
     AuditKeys<TTable>
   >

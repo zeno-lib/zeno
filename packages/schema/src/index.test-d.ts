@@ -80,3 +80,29 @@ test("defaulted audit columns leave the insert and update types", () => {
     insert: { createdBy: (schema) => schema },
   })
 })
+
+test("a function refinement keeps a nullable or defaulted insert column optional", () => {
+  const drafts = pgTable("drafts", {
+    note: text("note"),
+    status: text("status").notNull().default("open"),
+    title: text("title").notNull(),
+  })
+  const schemas = defineTableSchema(drafts, {
+    insert: {
+      note: (schema) => schema.min(1),
+      status: (schema) => schema.min(1),
+      title: (schema) => schema.min(1),
+    },
+  })
+
+  expectTypeOf<z.infer<typeof schemas.insert>>().toEqualTypeOf<{
+    note?: string | null | undefined
+    status?: string | undefined
+    title: string
+  }>()
+  expectTypeOf<z.input<typeof schemas.insert>>().toEqualTypeOf<{
+    note?: string | null | undefined
+    status?: string | undefined
+    title: string
+  }>()
+})
