@@ -1,6 +1,6 @@
 "use client"
 
-import { type AnyFormApi, useStore } from "@tanstack/react-form"
+import { type AnyFormApi, useSelector } from "@tanstack/react-form"
 import { useEffect } from "react"
 
 type UnsavedChangesMode = "if-changed" | "if-touched"
@@ -34,10 +34,10 @@ function useUnsavedChangesWarning(
   } else {
     mode = enabled
   }
-  const dirty = useStore(form.store, (state) =>
+  const dirty = useSelector(form.store, (state) =>
     mode === "if-touched" ? state.isDirty : !state.isDefaultValue
   )
-  const isSubmitting = useStore(form.store, (state) => state.isSubmitting)
+  const isSubmitting = useSelector(form.store, (state) => state.isSubmitting)
   const active = mode !== null && dirty && !isSubmitting
 
   useEffect(() => {

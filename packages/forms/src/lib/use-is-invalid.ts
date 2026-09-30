@@ -1,6 +1,6 @@
 "use client"
 
-import { type AnyFieldApi, useStore } from "@tanstack/react-form"
+import { type AnyFieldApi, useSelector } from "@tanstack/react-form"
 
 import {
   getFormHideFieldErrors,
@@ -15,7 +15,7 @@ const FIELD_LEVEL_CAUSES = ["onChange", "onBlur", "onSubmit"] as const
 
 // Has the user explicitly opted into a `validators={{ onChange | onBlur |
 // onSubmit }}` cause on this field? If yes, we honour the cause directly —
-// the form's `validation` mode does not gate per-field validators (a user
+// the form's `validators` mode does not gate per-field validators (a user
 // who wrote `onChange` expects live feedback, even if the form is in
 // `blur-then-change` mode).
 function hasFieldLevelError(
@@ -46,7 +46,7 @@ function modeAllowsDisplay(
 }
 
 // Returns the "should we display errors?" gate for a field. The gate matches
-// the form's `validation` mode (set via `useForm({ validation })`):
+// the form's `validators` mode (set via `useForm({ validators })`):
 //
 //   - `change`           → show as soon as the user has typed (live)
 //   - `blur`             → show after first blur
@@ -60,7 +60,7 @@ function modeAllowsDisplay(
 // `validators={{ onChange }}` shows live (after first keystroke) regardless
 // of the form's gating, because the user explicitly opted into that cause.
 function useIsInvalid(field: AnyFieldApi): boolean {
-  const wasSubmitted = useStore(
+  const wasSubmitted = useSelector(
     field.form.store,
     (state) => state.submissionAttempts > 0
   )
