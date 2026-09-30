@@ -209,7 +209,7 @@ Then pass the derived schema to `@zeno-lib/forms`:
 ```tsx lineNumbers title="{project}-forms/src/posts/forms.tsx"
 "use client"
 
-import { Form, FormProvider, useForm } from "@zeno-lib/forms"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import { createPostFormSchema } from "./schemas"
 
 export function CreatePostForm() {
@@ -225,14 +225,15 @@ export function CreatePostForm() {
     },
     schema: createPostFormSchema,
   })
+  const { CheckboxField, InputField, SubmitButton, TextAreaField } = form
 
   return (
     <FormProvider form={form}>
       <Form>
-        <form.InputField label="Title" name="title" />
-        <form.TextAreaField label="Body" name="body" />
-        <form.CheckboxField label="Publish now" name="publishNow" />
-        <form.SubmitButton>Save</form.SubmitButton>
+        <InputField label="Title" name="title" />
+        <TextAreaField label="Body" name="body" />
+        <CheckboxField label="Publish now" name="publishNow" />
+        <SubmitButton>Save</SubmitButton>
       </Form>
     </FormProvider>
   )

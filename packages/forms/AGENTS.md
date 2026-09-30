@@ -11,7 +11,8 @@ indicator; field wrappers give type-safe `name`s; a submit button wires loading 
 shadcn primitives (`@/components/ui/*`) → registry; UI-free → npm":
 
 - **npm (`.` + `./lib/*` + `./tanstack`)**: the headless core: `createZenoForm` (the factory),
-  the `lib/*` logic (validation, schema, contexts, aria, `use-is-invalid`), `Form`/`FormProvider`.
+  the `lib/*` logic (validation, schema, contexts, aria, `use-is-invalid`, `form-dom`),
+  `Form`/`FormProvider`.
   None import shadcn primitives.
 - **Registry (`shadcn add zeno-lib/zeno/create-form`)**: the 15 shadcn-based field components,
   the button fields, `validation-spinner`, `required-indicator`, and the `create-form` composition
@@ -33,6 +34,20 @@ shadcn primitives (`@/components/ui/*`) → registry; UI-free → npm":
 `useAppFields` (per-field prop types are inferred from the injected components) + the schema-aware
 `useForm`, and returns them. `create-form.tsx` is the composition root: it injects the dropped-in
 fields and is what the registry ships.
+
+Behavioural contracts the factory and fields share:
+
+- **Field-name syntax is TanStack's** (`members[0].name`). `lib/schema-required.ts` records
+  required paths in that syntax with indices normalised to `[0]`, and `isFieldRequired` normalises
+  the looked-up name via `toRequiredPathKey`, so one entry covers every array row. The probe
+  descends into required objects/arrays using `issue.expected` (`"object"`/`"array"`).
+- **Submit-invalid focus** (`focusOnSubmitInvalid`, default `true`): the factory chains after any
+  user `onSubmitInvalid` and focuses the first `[aria-invalid="true"]` inside the form's own DOM
+  node. `<Form>` registers that node (`lib/form-dom.ts`, keyed by `form.store`); without `<Form>`
+  nothing is focused. Focus is deferred a macrotask so fields have re-rendered.
+- **Every registry field** puts `data-field={field.name}` + `data-invalid` on its `<Field>` root and
+  `aria-invalid={isInvalid || undefined}` on its focusable control (or the group root, whose first
+  focusable child then gets focus). Keep both on any new field.
 
 ## Usage Patterns
 
@@ -61,8 +76,12 @@ const { EmailField, SubmitButton } = form
 
 ## Dependencies & Edges
 
-npm deps: `@tanstack/react-form`, `@tanstack/react-form-nextjs`. Peers: `next`, `react`, `react-dom`,
-`zod`. `@zeno-lib/ui` is a devDependency (the `@/components/ui/*` / `@/lib/utils` alias target that
+npm deps: `@tanstack/react-form`, `@tanstack/react-form-nextjs` (pinned to the same 1.33.x; subscribe
+with `useSelector`, `useStore` is deprecated). Peers: `next`, `react`, `react-dom`, `zod`, plus the
+devtools pair (`@tanstack/react-devtools`, `@tanstack/react-form-devtools`) marked optional in
+`peerDependenciesMeta`: no source imports them, the docs just suggest them. `@zeno-lib/ui` is a
+devDependency only (never a peer: it's private, so a `workspace:^` peer would publish as a bogus
+unresolvable range) (the `@/components/ui/*` / `@/lib/utils` alias target that
 tsconfig `paths` resolve to `packages/ui/src` for in-workspace typecheck/tests); no published entry
 imports it directly anymore. Consumers of `./create-form` (npm) or the registry drop-in supply their
 own `@/components/ui/*` primitives instead.

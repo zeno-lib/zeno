@@ -124,7 +124,7 @@ const form = useForm({
 })
 ```
 
-A second prop, `validation`, controls when errors appear:
+A second prop, `validators`, controls when errors appear:
 `'blur-then-change'` (default), `'change'`, `'blur'`, or `'submit'`. The
 default keeps pristine fields quiet, errors land on first blur, then
 update live. Full breakdown in
@@ -167,6 +167,24 @@ This Zod-only behaviour degrades gracefully: pass a Valibot or ArkType
 schema and the hook simply skips extraction, leaving your
 `defaultValues` untouched.
 
+## Focus on submit
+
+When a submit fails validation, focus moves to the first control with
+`aria-invalid="true"` **inside that form's own `<Form>` element**. It is
+never a document-wide lookup, so a form in a dialog doesn't reach into the
+page behind it. Controls that aren't focusable themselves (a radio group
+root, a slider root) hand focus to their first focusable child. The lookup
+needs the form to be rendered through `<Form>`, which registers its DOM node.
+
+```tsx lineNumbers
+const form = useForm({
+  schema,
+  // Still called, before focus moves.
+  onSubmitInvalid: ({ value }) => track("form_invalid", value),
+  // focusOnSubmitInvalid: false, // opt out
+})
+```
+
 ## Custom fields
 
 When the shipped gallery doesn't cover what you need, `AppField` and
@@ -177,7 +195,7 @@ constraints. See
 ## Devtools
 
 Install `@tanstack/react-devtools` and `@tanstack/react-form-devtools`
-(both declared as peer deps), then drop the panel near your app root:
+(both declared as optional peer deps), then drop the panel near your app root:
 
 ```tsx
 import { TanStackDevtools } from "@tanstack/react-devtools"
