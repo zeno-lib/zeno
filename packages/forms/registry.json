@@ -3,7 +3,8 @@
   "items": [
     {
       "dependencies": [
-        "@zeno-lib/forms"
+        "@zeno-lib/forms",
+        "lucide-react"
       ],
       "description": "The shadcn-based field components + the create-form composition root. Wires your dropped-in fields into @zeno-lib/forms' headless factory.",
       "files": [
@@ -20,6 +21,11 @@
         {
           "path": "src/fields/checkbox-field.tsx",
           "target": "@components/form/fields/checkbox-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/checkbox-group-field.tsx",
+          "target": "@components/form/fields/checkbox-group-field.tsx",
           "type": "registry:component"
         },
         {
@@ -43,6 +49,16 @@
           "type": "registry:component"
         },
         {
+          "path": "src/fields/money-field.tsx",
+          "target": "@components/form/fields/money-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/multi-select-field.tsx",
+          "target": "@components/form/fields/multi-select-field.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/fields/number-field.tsx",
           "target": "@components/form/fields/number-field.tsx",
           "type": "registry:component"
@@ -55,6 +71,11 @@
         {
           "path": "src/fields/password-field.tsx",
           "target": "@components/form/fields/password-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/percentage-field.tsx",
+          "target": "@components/form/fields/percentage-field.tsx",
           "type": "registry:component"
         },
         {
@@ -93,6 +114,11 @@
           "type": "registry:component"
         },
         {
+          "path": "src/fields/year-field.tsx",
+          "target": "@components/form/fields/year-field.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/lib/required-indicator.tsx",
           "target": "@components/form/lib/required-indicator.tsx",
           "type": "registry:component"
@@ -118,6 +144,28 @@
       ],
       "title": "Create form",
       "type": "registry:block"
+    },
+    {
+      "dependencies": [
+        "@zeno-lib/forms"
+      ],
+      "description": "A dialog-hosted form: per-session defaults and focus, submit from the footer, close on success, and a discard prompt for unsaved changes. Pair with useFormDialog from @zeno-lib/forms.",
+      "files": [
+        {
+          "path": "src/form-dialog.tsx",
+          "target": "@components/form/form-dialog.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "name": "form-dialog",
+      "registryDependencies": [
+        "alert-dialog",
+        "button",
+        "dialog",
+        "spinner"
+      ],
+      "title": "Form dialog",
+      "type": "registry:component"
     }
   ]
 }

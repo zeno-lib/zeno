@@ -304,3 +304,139 @@ export function ComboboxFieldPreview() {
     </FormProvider>
   )
 }
+
+export function MoneyFieldPreview() {
+  const form = useForm({
+    schema: z.object({
+      budget: z.number("Enter an amount").positive("Must be positive"),
+    }),
+  })
+  const { MoneyField } = form
+  return (
+    <FormProvider form={form}>
+      <Form className={wrapperClass}>
+        <FieldGroup>
+          <MoneyField
+            currency="CHF"
+            description="Try pasting 1.234,50 or CHF 12'000."
+            label="Budget"
+            locale="de-CH"
+            name="budget"
+          />
+        </FieldGroup>
+      </Form>
+    </FormProvider>
+  )
+}
+
+export function PercentageFieldPreview() {
+  const form = useForm({
+    defaultValues: { rate: 0.025 },
+    schema: z.object({
+      rate: z.number("Enter a rate").max(1, "At most 100 %"),
+    }),
+  })
+  const { PercentageField } = form
+  return (
+    <FormProvider form={form}>
+      <Form className={wrapperClass}>
+        <FieldGroup>
+          <PercentageField
+            description="Stored as a 0–1 ratio (scale='fraction')."
+            label="Interest rate"
+            name="rate"
+            scale="fraction"
+          />
+        </FieldGroup>
+      </Form>
+    </FormProvider>
+  )
+}
+
+export function YearFieldPreview() {
+  const form = useForm({
+    schema: z.object({
+      founded: z.number("Enter a year").int(),
+    }),
+  })
+  const { YearField } = form
+  return (
+    <FormProvider form={form}>
+      <Form className={wrapperClass}>
+        <FieldGroup>
+          <YearField
+            description="Clamped to 1900–2100 on blur."
+            label="Founded"
+            max={2100}
+            min={1900}
+            name="founded"
+          />
+        </FieldGroup>
+      </Form>
+    </FormProvider>
+  )
+}
+
+const LANGUAGES = [
+  { label: "English", value: "en" },
+  { label: "French", value: "fr" },
+  { label: "German", value: "de" },
+  { label: "Italian", value: "it" },
+  { label: "Spanish", value: "es" },
+]
+
+export function MultiSelectFieldPreview() {
+  const form = useForm({
+    schema: z.object({
+      languages: z.array(z.string()).min(1, "Pick at least one language"),
+    }),
+  })
+  const { MultiSelectField } = form
+  return (
+    <FormProvider form={form}>
+      <Form className={wrapperClass}>
+        <FieldGroup>
+          <MultiSelectField
+            description="Stored as an array of values."
+            items={LANGUAGES}
+            label="Languages"
+            name="languages"
+            placeholder="Search languages…"
+          />
+        </FieldGroup>
+      </Form>
+    </FormProvider>
+  )
+}
+
+export function CheckboxGroupFieldPreview() {
+  const form = useForm({
+    schema: z.object({
+      channels: z.array(z.string()).min(1, "Pick at least one channel"),
+    }),
+  })
+  const { CheckboxGroupField } = form
+  return (
+    <FormProvider form={form}>
+      <Form className={wrapperClass}>
+        <FieldGroup>
+          <CheckboxGroupField
+            description="Where should we reach you?"
+            items={[
+              { label: "Email", value: "email" },
+              { label: "SMS", value: "sms" },
+              {
+                description: "Coming soon.",
+                disabled: true,
+                label: "Push",
+                value: "push",
+              },
+            ]}
+            label="Notification channels"
+            name="channels"
+          />
+        </FieldGroup>
+      </Form>
+    </FormProvider>
+  )
+}

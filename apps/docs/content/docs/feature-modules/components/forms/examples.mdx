@@ -11,6 +11,7 @@ import { FormInCardExample } from "@/components/forms/card-preview"
 import { ConditionalExample } from "@/components/forms/conditional-preview"
 import { DialogExample } from "@/components/forms/dialog-preview"
 import { DynamicExample } from "@/components/forms/dynamic-preview"
+import { FormDialogExample } from "@/components/forms/form-dialog-preview"
 import { LoginExample } from "@/components/forms/login-preview"
 import { OutsideFormExample } from "@/components/forms/outside-form-preview"
 import { ServerActionExample } from "@/components/forms/server-action-preview"
@@ -176,6 +177,107 @@ export function CreateProjectDialog() {
 ```
 
 </Preview>
+
+## Form dialog
+
+For create/edit dialogs, the `form-dialog` registry item packages the
+details the hand-rolled version above leaves out:
+
+- **One session per `open()`**: open blank, or with a row's values and a
+  field to focus: `dialog.open({ defaultValues: row, focus: "email" })`.
+- **Unsaved-changes guard**: Cancel, ×, Escape and outside presses ask
+  before discarding, and the page warns on unload while the dialog is open.
+  "Changed" means the values differ from the session's defaults
+  (`!form.state.isDefaultValue`), so reverting an edit by hand counts as
+  unchanged. The form resets once the close animation ends.
+- **Footer submit**: the Save button sits outside the `<form>` (it targets
+  it with `form="id"`), shows a spinner while submitting, and the dialog
+  closes when the submit succeeds (`closeOnSubmit`, default `true`). A
+  failed validation, a thrown error, or a
+  [`ValidationError`](/docs/feature-modules/components/forms/examples#server-side-error-handler)
+  keeps it open.
+
+```bash
+pnpm dlx shadcn@latest add zeno-lib/zeno/form-dialog
+```
+
+<Preview>
+  <FormDialogExample />
+
+```tsx lineNumbers
+"use client"
+
+import { FormDialog } from "@/components/form/form-dialog"
+import { useForm } from "@/components/form/create-form"
+import { useFormDialog } from "@zeno-lib/forms/lib/use-form-dialog"
+
+const BLANK = { email: "", name: "" }
+
+export function Members({ members }: { members: Member[] }) {
+  const dialog = useFormDialog({ defaultValues: BLANK })
+  const form = useForm({
+    // Let the dialog own the defaults: see the pitfall below.
+    defaultValues: dialog.defaultValues,
+    onSubmit: ({ value }) => saveMember(value),
+    schema: memberSchema,
+  })
+  const { EmailField, InputField } = form
+
+  return (
+    <>
+      {members.map((member) => (
+        <Button
+          key={member.id}
+          onClick={() => dialog.open({ defaultValues: member, focus: "email" })}
+        >
+          Edit {member.name}
+        </Button>
+      ))}
+      <FormDialog
+        dialog={dialog}
+        form={form}
+        title="Member"
+        trigger={<Button>Add member</Button>}
+      >
+        <FieldGroup>
+          <InputField label="Name" name="name" />
+          <EmailField label="Email" name="email" />
+        </FieldGroup>
+      </FormDialog>
+    </>
+  )
+}
+```
+
+</Preview>
+
+| `FormDialog` prop | Type | What it does |
+|---|---|---|
+| `dialog` | `FormDialogController` | The controller from `useFormDialog()`. |
+| `form` | the `useForm()` result | Its `onSubmit` runs on Save. |
+| `title` / `description` | `ReactNode` | Dialog header. |
+| `trigger` | `ReactElement` | Opens a session with the hook's defaults. |
+| `submitLabel` / `cancelLabel` | `ReactNode` | Default to `"Save"` / `"Cancel"`. |
+| `footer` | `ReactNode` | Extra footer content, before the buttons. |
+| `closeOnSubmit` | `boolean` | Close after a successful submit. Defaults to `true`. |
+| `guard` | `boolean` | The unsaved-changes prompt + unload warning. Defaults to `true`. |
+| `discardPrompt` | `{ title?, description?, confirmLabel?, cancelLabel? }` | Copy for the discard prompt. |
+| `className` / `formClassName` | `string` | Classes for the popup / the `<form>`. |
+
+`useFormDialog({ defaultValues? })` returns `{ isOpen, open, close,
+defaultValues, focus, session }`. `close()` skips the guard (use it after
+an out-of-band save). The same package exports `useLeaveGuard` for your
+own editors: `requestLeave(proceed)` runs `proceed` right away when there's
+nothing to lose, or holds it until `confirmLeave()` / `cancelLeave()`.
+
+> **Pitfall: let the dialog own `defaultValues`.** TanStack Form ignores new
+> `defaultValues` once a form is touched, and a `form.reset(values)` is
+> undone on the next render if `useForm` still receives the old defaults
+> (the reset leaves the form untouched, so TanStack re-applies its
+> options). Passing `dialog.defaultValues` to `useForm` keeps both in step,
+> and `FormDialog` calls `form.reset(defaults)` at the start of each
+> session. For the same reason, don't `reset` inside `onSubmit`; the dialog
+> resets itself after closing.
 
 ## Simple login
 

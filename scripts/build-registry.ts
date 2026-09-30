@@ -425,6 +425,18 @@ const FORM_BLOCK: BlockConfig = {
   title: "Create form",
 }
 
+// packages/forms: the dialog-hosted form. Renders shadcn dialog primitives, so it ships via the
+// registry; its session/leave-guard logic (`lib/use-form-dialog.ts`) stays on npm.
+const FORM_DIALOG_BLOCK: BlockConfig = {
+  description:
+    "A dialog-hosted form: per-session defaults and focus, submit from the footer, close on success, and a discard prompt for unsaved changes. Pair with useFormDialog from @zeno-lib/forms.",
+  entry: "form-dialog.tsx",
+  name: "form-dialog",
+  targetPrefix: "form",
+  title: "Form dialog",
+  type: "registry:component",
+}
+
 // packages/query: the error fallback renders a shadcn `Button`, so it ships via the registry. The
 // suspense/hydration components it pairs with are UI-free and stay on npm (`@zeno-lib/query`),
 // which the fallback imports its props type from.
@@ -449,7 +461,10 @@ function main(): void {
   )
 
   // packages/forms: field components + create-form wiring (UI). Headless core stays on npm.
-  writeRegistry("packages/forms", [buildBlock("packages/forms", FORM_BLOCK)])
+  writeRegistry("packages/forms", [
+    buildBlock("packages/forms", FORM_BLOCK),
+    buildBlock("packages/forms", FORM_DIALOG_BLOCK),
+  ])
 
   // packages/query: the error fallback (UI). The suspense/hydration components stay on npm.
   writeRegistry("packages/query", [

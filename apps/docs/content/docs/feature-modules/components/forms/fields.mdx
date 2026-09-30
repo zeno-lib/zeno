@@ -14,18 +14,23 @@ import {
 import { CustomFieldPreview } from "@/components/forms/custom-field-preview"
 import {
   CheckboxFieldPreview,
+  CheckboxGroupFieldPreview,
   ComboboxFieldPreview,
   DatePickerFieldPreview,
   EmailFieldPreview,
   InputFieldPreview,
+  MoneyFieldPreview,
+  MultiSelectFieldPreview,
   NumberFieldPreview,
   OtpFieldPreview,
   PasswordFieldPreview,
+  PercentageFieldPreview,
   RadioGroupFieldPreview,
   SelectFieldPreview,
   SliderFieldPreview,
   SwitchFieldPreview,
   TextAreaFieldPreview,
+  YearFieldPreview,
 } from "@/components/forms/field-previews"
 
 Every shipped field handles its own label, description, error message, and
@@ -143,6 +148,98 @@ state stays typed without manual coercion.
 ```
 
 </Preview>
+
+## Money Field
+
+A text input with locale-aware thousands separators, re-inserted as the
+user types (the caret stays put), and the currency as an add-on. The form
+value is `number | null` (empty → `null`). Pasted text is parsed leniently:
+`CHF 1'234.50`, `1.234,50 €` and `1,234.50` all land as `1234.5`, whatever
+the input's locale. On blur a non-integer amount is padded to the
+currency's minor units (`12.5` → `12.50`); integers stay bare.
+
+<Preview>
+  <MoneyFieldPreview />
+
+```tsx
+<MoneyField currency="CHF" label="Budget" locale="de-CH" name="budget" />
+```
+
+</Preview>
+
+| Prop | Type | What it does |
+|---|---|---|
+| `currency` | `string` | ISO 4217 code for the add-on (`"CHF"`, `"EUR"`). Omit for a bare amount. |
+| `currencyDisplay` | `"symbol" \| "narrowSymbol" \| "code" \| "name"` | How the add-on reads. Defaults to `"symbol"`. |
+| `currencyPosition` | `"start" \| "end"` | Add-on side. Defaults to the locale's convention (`CHF 1’234` in `de-CH`, `1.234 €` in `de-DE`). |
+| `locale` | `string` | BCP 47 locale for the separators. Defaults to the runtime locale. |
+| `fractionDigits` | `number` | Decimals allowed. Defaults to the currency's minor units (2 for CHF, 0 for JPY), else 2. |
+| `allowNegative` | `boolean` | Accept a leading minus. Defaults to `false`. |
+| `min` / `max` | `number` | Clamp on blur. For an error message instead, validate in the schema. |
+
+Only the locale's decimal separator starts the fraction while typing
+(`.` in `de-CH`, `,` in `de-DE`); every other character is dropped.
+
+## Percentage Field
+
+Same formatting engine as `MoneyField`, with a `%` add-on. Pick what the
+form value means with `scale`:
+
+- `scale="percent"` (default): the value is the number shown, `12.5` ↔ `12.5 %`.
+- `scale="fraction"`: the value is a ratio, `0.125` ↔ `12.5 %`, which is what
+  most APIs and databases store.
+
+<Preview>
+  <PercentageFieldPreview />
+
+```tsx
+<PercentageField label="Interest rate" name="rate" scale="fraction" />
+```
+
+</Preview>
+
+`fractionDigits` (default `2`) counts decimals of the shown percentage.
+`min`/`max` clamp on blur, in the form value's scale. `allowNegative`
+defaults to `false`.
+
+## Year Field
+
+A four-digit integer year (`number | null`): digits only, no thousands
+separator, `inputMode="numeric"`. `min`/`max` clamp the value on blur.
+
+<Preview>
+  <YearFieldPreview />
+
+```tsx
+<YearField label="Founded" max={2100} min={1900} name="founded" />
+```
+
+</Preview>
+
+### Formatting your own inputs
+
+The three fields above are thin wrappers over a headless hook that ships on
+npm. Spread its result on any `<input>`:
+
+```tsx
+import { useFormattedNumber } from "@zeno-lib/forms/lib/use-formatted-number"
+
+const inputProps = useFormattedNumber({
+  locale: "de-CH",
+  maximumFractionDigits: 3,
+  onBlur: field.handleBlur,
+  onValueChange: field.handleChange,
+  value: field.state.value,
+})
+<InputGroupInput {...inputProps} />
+```
+
+It returns `value`, `onChange`, `onBlur`, `onPaste`, `inputMode` and
+`type="text"`. Options: `padFraction`, `useGrouping`, `allowNegative`,
+`maxIntegerDigits`, `min`/`max`, and a `toDisplay`/`fromDisplay` pair to map
+the stored value (that's how `scale="fraction"` works). The pure helpers
+(`parseLocaleNumber`, `formatNumber`, …) live in
+`@zeno-lib/forms/lib/formatted-number`.
 
 ## Composing addons (input groups)
 
@@ -299,6 +396,33 @@ import { SelectItem } from "@zeno-lib/ui/select"
 
 </Preview>
 
+## Checkbox Group Field
+
+A set of checkboxes bound to one array value (`[]` when none is checked),
+rendered as a `<fieldset>` with the label as its legend. Pass strings or
+numbers, or `{ value, label, description?, disabled? }` objects. The stored
+array follows the order of `items`, not click order.
+
+<Preview>
+  <CheckboxGroupFieldPreview />
+
+```tsx
+<CheckboxGroupField
+  items={[
+    { label: "Email", value: "email" },
+    { label: "SMS", value: "sms" },
+    { description: "Coming soon.", disabled: true, label: "Push", value: "push" },
+  ]}
+  label="Notification channels"
+  name="channels"
+/>
+```
+
+</Preview>
+
+`orientation="horizontal"` wraps the options in a row; `disabled` disables
+the whole group.
+
 ## Switch Field
 
 <Preview>
@@ -437,6 +561,47 @@ const FRAMEWORKS = ["Next.js", "Remix", "SvelteKit", "Nuxt.js", "Astro"]
 
 For server-driven search with debouncing, see
 [Async-search Combobox](/docs/feature-modules/components/forms/examples#async-search-combobox).
+
+## Multi-select Field
+
+A multi-value combobox. The selection renders as removable chips inside the
+input, and the form value is an array (`[]` when empty) of the selected
+values: the items themselves for strings and numbers, `item.value` for
+`{ value, label }` objects (so numeric IDs stay numbers). A clear button
+empties the selection.
+
+<Preview>
+  <MultiSelectFieldPreview />
+
+```tsx
+const LANGUAGES = [
+  { label: "English", value: "en" },
+  { label: "French", value: "fr" },
+  { label: "German", value: "de" },
+]
+
+<MultiSelectField
+  items={LANGUAGES}
+  label="Languages"
+  name="languages"
+  placeholder="Search languages…"
+/>
+```
+
+</Preview>
+
+| Prop | Type | What it does |
+|---|---|---|
+| `items` | `T[]` (`string`, `number` or `{ value, label }`) | Options, filtered client-side as the user types. |
+| `renderItem` | `(item: T) => ReactNode` | Override per-row rendering. |
+| `emptyMessage` | `ReactNode` | Shown when filtering produces zero matches. |
+| `placeholder` | `string` | Shown while nothing is selected. |
+| `showClear` | `boolean` | Show the clear-all button. Defaults to `true`. |
+| `clearLabel` | `string` | Accessible label of the clear button. Defaults to `"Clear"`. |
+| `disabled` | `boolean` | Disable the whole control. |
+
+For grouped options or on-the-fly creation, compose your own; see
+[Combobox: multi-select, grouped, creatable](/docs/feature-modules/components/forms/examples#combobox-multi-select-grouped-creatable).
 
 ## Custom fields
 
