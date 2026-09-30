@@ -13,8 +13,15 @@ function makeFormStub() {
     (_name: string, _updater: FieldMetaUpdater) => undefined
   )
   const setErrorMap = vi.fn((_map: unknown) => undefined)
+  const store = { subscribe: vi.fn(() => ({ unsubscribe: vi.fn() })) }
   return {
-    api: { setErrorMap, setFieldMeta } as unknown as AnyFormApi,
+    api: {
+      getFieldMeta: vi.fn(() => undefined),
+      getFieldValue: vi.fn(() => undefined),
+      setErrorMap,
+      setFieldMeta,
+      store,
+    } as unknown as AnyFormApi,
     setErrorMap,
     setFieldMeta,
   }
@@ -40,7 +47,7 @@ describe("applyValidationError", () => {
     expect(next.isValid).toBe(false)
   })
 
-  test("array of messages forwards all entries; errorMap.onChange gets first", () => {
+  test("array of messages forwards all entries, errorMap.onChange included", () => {
     const { api, setFieldMeta } = makeFormStub()
     applyValidationError(
       api,
@@ -49,10 +56,14 @@ describe("applyValidationError", () => {
     const updater = setFieldMeta.mock.calls[0]?.[1] as FieldMetaUpdater
     const next = updater({}) as {
       errors: { message: string }[]
-      errorMap: { onChange: { message: string } }
+      errorMap: { onChange: { message: string }[] }
     }
     expect(next.errors).toEqual([{ message: "short" }, { message: "no digit" }])
-    expect(next.errorMap.onChange).toEqual({ message: "short" })
+    // TanStack flattens an array entry into `meta.errors`, so every message shows.
+    expect(next.errorMap.onChange).toEqual([
+      { message: "short" },
+      { message: "no digit" },
+    ])
   })
 
   test("preserves existing errorMap keys via spread", () => {
