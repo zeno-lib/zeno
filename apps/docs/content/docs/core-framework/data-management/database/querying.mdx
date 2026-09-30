@@ -112,8 +112,12 @@ import { createRequestDb } from "@zeno-lib/db/next"
 import { createClient } from "@zeno-lib/supabase/next-server"
 import { relations } from "./relations"
 
-export const { defineAction, getRequestContext, getRequestDb } =
-  createRequestDb({ relations, supabase: () => createClient() })
+export const {
+  defineAction,
+  defineFormAction,
+  getRequestContext,
+  getRequestDb,
+} = createRequestDb({ relations, supabase: () => createClient() })
 export { UnauthenticatedError } from "@zeno-lib/db/next"
 ```
 
@@ -152,6 +156,66 @@ const db = await getRequestDb().catch((error: unknown) => {
   throw error
 })
 ```
+
+### Returning validation errors to a form
+
+In production, Next.js replaces a thrown server-action error's message with a
+generic one, so the `ZodError` that `defineAction` throws on bad input reaches
+the browser without its issues. For an action a form submits, use
+`defineFormAction`, which `createRequestDb` returns next to `defineAction`. It
+takes the same arguments and runs in the same order (validate, then resolve
+the session, then call the handler), but it resolves to an `ActionResult`
+instead of throwing on invalid input:
+
+```typescript
+type ActionResult<T> =
+  | { ok: true; data: T }
+  | {
+      ok: false
+      error: {
+        fieldErrors: Record<string, string[]> // "address.city", "owners[0].share"
+        formErrors: string[] // issues with no path
+      }
+    }
+```
+
+Field keys are the names TanStack Form registers fields under: object keys
+joined with `.`, array indices in brackets. Schema issues come back this way,
+and so does a `FieldValidationError` thrown from the handler, for a check only
+the database can make:
+
+```typescript title="app/teams/actions.ts"
+"use server"
+
+import { isConstraintViolation } from "@zeno-lib/db/errors"
+import { FieldValidationError } from "@zeno-lib/db/next"
+import { defineFormAction } from "{project}-db/server-db"
+import { z } from "zod"
+import { insertTeam } from "./queries"
+
+export const createTeamAction = defineFormAction(
+  z.object({ name: z.string().min(2), slug: z.string().min(3) }),
+  async (db, input, { claims }) => {
+    try {
+      return await insertTeam(db, { ...input, userId: claims.sub })
+    } catch (error) {
+      if (isConstraintViolation(error, ["teams_slug_key"])) {
+        throw new FieldValidationError({ slug: "That slug is taken" })
+      }
+      throw error
+    }
+  }
+)
+```
+
+Everything else still throws: `UnauthenticatedError`, a database error, a bug.
+A `FieldValidationError` thrown inside `db.transaction(...)` rolls the
+transaction back before it is converted. On the client, `submitAction` from
+`@zeno-lib/forms` writes the result onto the form; see
+[Server actions](/docs/feature-modules/components/forms/examples#server-actions).
+
+`defineAction` is unchanged and keeps throwing. It stays the right choice for
+an action no form renders errors for (a delete button, a toggle).
 
 ## Other RLS clients
 

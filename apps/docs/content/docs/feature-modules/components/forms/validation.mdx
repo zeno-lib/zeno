@@ -308,6 +308,11 @@ For an async server-side check (uniqueness against the database), swap to
 `onChangeAsync` and use `onChangeAsyncDebounceMs` to throttle the
 request.
 
+For errors the server only reports on submit (a Next.js server action
+rejecting the payload), return them from the action and apply them with
+`submitAction`; see
+[Server actions](/docs/feature-modules/components/forms/examples#server-actions).
+
 ## Required-field indicator
 
 Every shipped field appends a `*` to its label when the schema treats
