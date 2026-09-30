@@ -25,7 +25,7 @@ shadcn primitives (`@/components/ui/*`) → registry; UI-free → npm":
 
 | Import | Provides |
 |---|---|
-| `@zeno-lib/forms` | `createZenoForm`, `Form`, `FormProvider`, `useFieldContext`/`useFormContext`, `useIsInvalid`, `ValidationError`, `applyValidationError`, `blurThenChangeLogic`: all UI-free |
+| `@zeno-lib/forms` | `createZenoForm`, `Form`, `FormProvider`, `useFieldContext`/`useFormContext`, `useIsInvalid`, `ValidationError`, `applyValidationError`, `submitAction`, `applyActionError`, `ActionResult`/`ActionError` (types), `toActionError`, `toFieldName`, `blurThenChangeLogic`: all UI-free |
 | `@zeno-lib/forms/lib/*` | the individual headless modules (fields resolve `contexts`/`aria`/`use-is-invalid` here) |
 | `@zeno-lib/forms/tanstack` | re-export of `@tanstack/react-form` |
 | `@zeno-lib/forms/create-form` | **batteries-included opt-in**: the pre-wired `useForm`/`useAppForm`/`withForm`/fields. Its source is registry-shaped: it imports primitives as `@/components/ui/*` (not `@zeno-lib/ui`), so a consumer needs those aliases + local shadcn primitives. The docs app imports from here (backed by tsconfig `paths`); end users normally own this file via the registry. |
@@ -70,6 +70,16 @@ const { EmailField, SubmitButton } = form
 // <EmailField name="email" /> (see Anti-patterns re: name)
 ```
 
+Server actions: `submitAction(submit, action, { schema?, reset? })` takes `onSubmit`'s own
+argument, optionally `safeParse`s the input values with `schema` (the action gets the output),
+calls the action, and on `{ ok: false }` applies the errors via `applyActionError`; it returns the
+`ActionResult`, typed from the action. `reset: true | "values" | (data) => values` rebases the form
+after a success (`true` only type-checks when the data has the form's shape).
+
+```tsx
+onSubmit: (submit) => submitAction(submit, saveTeamAction, { reset: true })
+```
+
 ## Anti-patterns
 
 - **`name` is required on every field wrapper**, including `EmailField`/`PasswordField`. The old
@@ -82,6 +92,14 @@ const { EmailField, SubmitButton } = form
   `paths` to `packages/ui/src`.
 - **Don't import field impls into the npm `.` entry.** It must stay UI-free: pulling a field (which
   imports `@zeno-lib/ui`) into `index.ts` would drag the primitives into the headless bundle.
+
+- **Don't import `@zeno-lib/db` (or any server package) for the action result.** `ActionResult` is
+  declared in `lib/action-result.ts` and matched structurally by `defineFormAction` in
+  `@zeno-lib/db/next`; `lib/submit-action.test-d.ts` restates the server shape to pin
+  assignability. Change both sides together.
+- **Don't write server errors to `errorMap.onServer`.** `blurThenChangeLogic` never clears it on an
+  edit, and TanStack's `defaultValidationLogic` clears every field's `onServer` on any edit.
+  `applyValidationError` writes `errorMap.onChange` instead and clears it per field (below).
 
 ## Dependencies & Edges
 
@@ -109,3 +127,15 @@ Consumed by: `@zeno-lib/docs` (via `./create-form`); end users via the registry.
   importing the public entry, not relative paths into the factory/lib.
 - **Type tests (`*.test-d.ts`) pin the field DX** (name required, per-field prop inference). Update
   them in lockstep with any factory type change.
+- **A server error only clears on edit because `applyValidationError` subscribes to the store.**
+  TanStack Form alone keeps it: a field with no validators of its own runs nothing on change, and
+  the form-level pass keeps an error whose source it did not write. `clearWhenEdited` clears the
+  entry the first time that field's value moves (only that field, only while the entry is still
+  the one it wrote). While it stands, `canSubmit` is `false`, so resubmitting unchanged is a no-op.
+- **A message keyed by a name no mounted field registered goes to the form-level error.** Written
+  onto an unregistered name it would render nowhere yet still make the form invalid.
+- **`formApi.reset(values)` does not survive a re-render with fixed `defaultValues`.** TanStack's
+  `useForm` calls `formApi.update(options)` every render and re-applies `defaultValues` that differ
+  from the current ones while the form is untouched, which it is right after a reset. `reset` in
+  `submitAction` sticks when `defaultValues` follows the saved record (a server component
+  re-rendered by `revalidatePath`, or state); `submit-action.test.tsx` covers that path.
