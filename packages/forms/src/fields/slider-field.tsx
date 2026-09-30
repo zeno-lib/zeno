@@ -55,7 +55,7 @@ function SliderField({
   const readout = formatValue && value !== undefined ? formatValue(value) : null
 
   return (
-    <Field data-invalid={isInvalid}>
+    <Field data-field={field.name} data-invalid={isInvalid}>
       {(label || readout) && (
         <FieldContent className="flex-row items-center justify-between">
           {label && (

@@ -44,7 +44,11 @@ function CheckboxField({
   const isRequired = required ?? schemaRequired
 
   return (
-    <Field data-invalid={isInvalid} orientation="horizontal">
+    <Field
+      data-field={field.name}
+      data-invalid={isInvalid}
+      orientation="horizontal"
+    >
       <Checkbox
         aria-describedby={describedBy(
           [description, descriptionId],
