@@ -4,6 +4,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./create-form": "./src/create-form.tsx",
+    "./form-dialog": "./src/form-dialog.tsx",
     "./lib/*": "./src/lib/*.ts",
     "./tanstack": "./src/tanstack.ts"
   },

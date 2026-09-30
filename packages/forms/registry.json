@@ -144,6 +144,28 @@
       ],
       "title": "Create form",
       "type": "registry:block"
+    },
+    {
+      "dependencies": [
+        "@zeno-lib/forms"
+      ],
+      "description": "A dialog-hosted form: per-session defaults and focus, submit from the footer, close on success, and a discard prompt for unsaved changes. Pair with useFormDialog from @zeno-lib/forms.",
+      "files": [
+        {
+          "path": "src/form-dialog.tsx",
+          "target": "@components/form/form-dialog.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "name": "form-dialog",
+      "registryDependencies": [
+        "alert-dialog",
+        "button",
+        "dialog",
+        "spinner"
+      ],
+      "title": "Form dialog",
+      "type": "registry:component"
     }
   ]
 }
