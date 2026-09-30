@@ -11,7 +11,7 @@ indicator; field wrappers give type-safe `name`s; a submit button wires loading 
 shadcn primitives (`@/components/ui/*`) → registry; UI-free → npm":
 
 - **npm (`.` + `./lib/*` + `./tanstack`)**: the headless core: `createZenoForm` (the factory),
-  the `lib/*` logic (validation, schema, contexts, aria, `use-is-invalid`, `form-dom`),
+  the `lib/*` logic (validation, schema, contexts, aria, `use-is-invalid`),
   `Form`/`FormProvider`.
   None import shadcn primitives.
 - **Registry (`shadcn add zeno-lib/zeno/create-form`)**: the 15 shadcn-based field components,
@@ -41,10 +41,13 @@ Behavioural contracts the factory and fields share:
   required paths in that syntax with indices normalised to `[0]`, and `isFieldRequired` normalises
   the looked-up name via `toRequiredPathKey`, so one entry covers every array row. The probe
   descends into required objects/arrays using `issue.expected` (`"object"`/`"array"`).
-- **Submit-invalid focus** (`focusOnSubmitInvalid`, default `true`): the factory chains after any
-  user `onSubmitInvalid` and focuses the first `[aria-invalid="true"]` inside the form's own DOM
-  node. `<Form>` registers that node (`lib/form-dom.ts`, keyed by `form.store`); without `<Form>`
-  nothing is focused. Focus is deferred a macrotask so fields have re-rendered.
+- **Submit-invalid focus lives in `<Form>`'s `onSubmit`** (`form-element.tsx`): after
+  `await form.handleSubmit()`, if the form is invalid it focuses the first `[aria-invalid="true"]`
+  under `event.currentTarget` (or that element's first tabbable descendant). Scoping comes from
+  the submit event, so there's no registry and no option; `onSubmitInvalid` is not wrapped. It
+  relies on fields having re-rendered `aria-invalid` by the time `handleSubmit` resolves, which
+  holds because TanStack's store updates reach React through `useSyncExternalStore`, whose sync
+  re-render flushes in a microtask before that continuation. Don't add a timer.
 - **`reset(values)` rebases defaults and sticks.** TanStack's `useForm` calls `update(options)`
   every render and, while untouched, re-applies `defaultValues` that deep-differ from the live ones,
   which would undo a reset when the caller passes a fixed literal. `lib/use-rebased-default-values.ts`

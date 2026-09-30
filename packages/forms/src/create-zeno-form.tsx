@@ -12,7 +12,6 @@ import { createFormHook } from "@tanstack/react-form"
 import { type ComponentProps, type ReactNode, useMemo } from "react"
 import { applyValidationError } from "./lib/apply-validation-error"
 import { fieldContext, formContext } from "./lib/contexts"
-import { scheduleFocusFirstInvalid } from "./lib/form-dom"
 import { deepMergeDefaults, extractZodDefaults } from "./lib/schema-defaults"
 import { getRequiredPaths } from "./lib/schema-required"
 import { useRebasedDefaultValues } from "./lib/use-rebased-default-values"
@@ -53,13 +52,6 @@ type ZenoFormExtras<TFormData> = {
    * message. Fields still flip `data-invalid` / `aria-invalid`.
    */
   hideFieldErrors?: boolean
-  /**
-   * After a submit fails validation, move focus to the first
-   * `[aria-invalid="true"]` control inside this form's `<Form>` element (never
-   * document-wide, so forms in dialogs stay self-contained). Defaults to
-   * `true`. A user `onSubmitInvalid` is still called, before focus moves.
-   */
-  focusOnSubmitInvalid?: boolean
   /**
    * Show a `*` next to the label of every field the schema treats as required.
    * Defaults to `true`. Required-ness is detected by probing the schema.
@@ -211,26 +203,6 @@ function buildValidatorsFromSchema<TFormData>(
       return { onSubmit: schema }
     default:
       return { onChange: schema }
-  }
-}
-
-// Chain the default "focus the first invalid control" behaviour after the
-// caller's own `onSubmitInvalid` (if any).
-function wrapOnSubmitInvalid(
-  userOnSubmitInvalid: unknown,
-  focusOnSubmitInvalid: boolean
-): ((props: { formApi: AnyFormApi }) => void) | undefined {
-  const user = userOnSubmitInvalid as
-    | ((props: { formApi: AnyFormApi }) => void)
-    | undefined
-  if (!(focusOnSubmitInvalid || user)) {
-    return
-  }
-  return (props) => {
-    user?.(props)
-    if (focusOnSubmitInvalid) {
-      scheduleFocusFirstInvalid(props.formApi)
-    }
   }
 }
 
@@ -422,16 +394,13 @@ export function createZenoForm<
       requiredIndicator = true,
       unsavedChangesWarning = false,
       defaultValues: userDefaultValues,
-      focusOnSubmitInvalid = true,
       onSubmit: userOnSubmit,
-      onSubmitInvalid: userOnSubmitInvalid,
       ...rest
     } = options as Omit<NativeFormOptions, "defaultValues"> & {
       schema?: StandardSchema<TFormData>
       validators?: ValidationMode | NativeValidators
       validationLogic?: NativeValidationLogic
       defaultValues?: PartialFormData<TFormData>
-      focusOnSubmitInvalid?: boolean
       hideFieldErrors?: boolean
       requiredIndicator?: boolean
       unsavedChangesWarning?: boolean | "if-changed" | "if-touched"
@@ -481,11 +450,6 @@ export function createZenoForm<
           }
         }) as typeof userOnSubmit)
       : undefined
-
-    const wrappedOnSubmitInvalid = wrapOnSubmitInvalid(
-      userOnSubmitInvalid,
-      focusOnSubmitInvalid
-    ) as typeof userOnSubmitInvalid
 
     const requiredFields = useMemo(
       () =>
@@ -541,9 +505,6 @@ export function createZenoForm<
         ? {}
         : { defaultValues: rebased.defaultValues }),
       ...(wrappedOnSubmit ? { onSubmit: wrappedOnSubmit } : {}),
-      ...(wrappedOnSubmitInvalid
-        ? { onSubmitInvalid: wrappedOnSubmitInvalid }
-        : {}),
       ...(resolvedValidators ? { validators: resolvedValidators } : {}),
       ...(resolvedValidationLogic
         ? { validationLogic: resolvedValidationLogic }

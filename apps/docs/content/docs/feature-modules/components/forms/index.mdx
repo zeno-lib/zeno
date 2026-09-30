@@ -169,21 +169,17 @@ schema and the hook simply skips extraction, leaving your
 
 ## Focus on submit
 
-When a submit fails validation, focus moves to the first control with
-`aria-invalid="true"` **inside that form's own `<Form>` element**. It is
-never a document-wide lookup, so a form in a dialog doesn't reach into the
-page behind it. Controls that aren't focusable themselves (a radio group
-root, a slider root) hand focus to their first focusable child. The lookup
-needs the form to be rendered through `<Form>`, which registers its DOM node.
-
-```tsx lineNumbers
-const form = useForm({
-  schema,
-  // Still called, before focus moves.
-  onSubmitInvalid: ({ value }) => track("form_invalid", value),
-  // focusOnSubmitInvalid: false, // opt out
-})
-```
+When a submit fails validation, `<Form>` moves focus to the first control
+with `aria-invalid="true"` **inside that same `<form>` element**, the
+pattern from TanStack Form's
+[focus management guide](https://tanstack.com/form/latest/docs/framework/react/guides/focus-management).
+The lookup is scoped to the submitted form node, so a form in a dialog
+never reaches into the page behind it, and an external
+`<button form="…">` submit works the same way. A group root that isn't
+focusable itself (radio group, slider) hands focus to its first tabbable
+child. Your own `onSubmitInvalid` passes straight through to TanStack Form.
+Forms rendered without `<Form>` (your own `<form>` calling
+`handleSubmit`) don't get this behaviour.
 
 ## Custom fields
 

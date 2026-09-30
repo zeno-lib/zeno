@@ -5,73 +5,74 @@ import {
   waitFor,
 } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
+import type { ReactNode } from "react"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
-import { Form, FormProvider, useForm } from "./create-form"
-
-const PROFILE_NAME = /Profile name/
-const PROFILE_EMAIL = /Profile email/
+import { Form, FormProvider, RadioGroupFieldItem, useForm } from "./create-form"
 
 afterEach(() => {
   cleanup()
 })
-
-// Both forms reuse the same field names (and so the same ids), so look inputs
-// up inside their own form rather than through label association.
-function nameInput(form: string) {
-  return screen
-    .getByRole("form", { name: form })
-    .querySelector<HTMLInputElement>('input[name="name"]')
-}
 
 const schema = z.object({
   email: z.email("Enter a valid email"),
   name: z.string().min(1, "Required"),
 })
 
+// Forms in these tests reuse field names (and so ids), so look controls up
+// inside their own form rather than through label association.
+function control(form: string, name: string) {
+  return screen
+    .getByRole("form", { name: form })
+    .querySelector<HTMLElement>(`[name="${name}"]`)
+}
+
 function ProfileForm({
-  focusOnSubmitInvalid,
+  id,
   label,
   onSubmitInvalid,
+  outsideSubmit,
 }: {
-  focusOnSubmitInvalid?: boolean
+  id?: string
   label: string
   onSubmitInvalid?: () => void
+  outsideSubmit?: boolean
 }) {
   const form = useForm({
-    ...(focusOnSubmitInvalid === undefined ? {} : { focusOnSubmitInvalid }),
     ...(onSubmitInvalid ? { onSubmitInvalid } : {}),
     defaultValues: { email: "valid@example.com" },
     onSubmit: vi.fn(),
     schema,
-    validators: "submit",
   })
   const { EmailField, InputField, SubmitButton } = form
+  const submit: ReactNode = (
+    <SubmitButton form={id}>{`${label} submit`}</SubmitButton>
+  )
   return (
     <FormProvider form={form}>
-      <Form aria-label={label}>
-        <EmailField label={`${label} email`} name="email" />
-        <InputField label={`${label} name`} name="name" />
-        <SubmitButton>{`${label} submit`}</SubmitButton>
+      <Form aria-label={label} id={id}>
+        <EmailField name="email" />
+        <InputField label="Name" name="name" />
+        {outsideSubmit ? null : submit}
       </Form>
+      {outsideSubmit ? submit : null}
     </FormProvider>
   )
 }
 
-describe("useForm — focus on submit invalid", () => {
-  test("focuses the first aria-invalid control by default", async () => {
+describe("<Form> — focus the first invalid field on a failed submit", () => {
+  test("focuses the first invalid field; onSubmitInvalid passes through", async () => {
     const user = userEvent.setup()
-    render(<ProfileForm label="Profile" />)
+    const onSubmitInvalid = vi.fn()
+    render(<ProfileForm label="Profile" onSubmitInvalid={onSubmitInvalid} />)
     await user.click(screen.getByRole("button", { name: "Profile submit" }))
-    const name = screen.getByLabelText(PROFILE_NAME)
-    await waitFor(() => expect(document.activeElement).toBe(name))
-    expect(name?.getAttribute("aria-invalid")).toBe("true")
-    expect(
-      screen.getByLabelText(PROFILE_EMAIL).hasAttribute("aria-invalid")
-    ).toBe(false)
+    await waitFor(() =>
+      expect(document.activeElement).toBe(control("Profile", "name"))
+    )
+    expect(onSubmitInvalid).toHaveBeenCalledTimes(1)
   })
 
-  test("stays scoped to the submitted form's own DOM node", async () => {
+  test("only the submitted form's field gets focus", async () => {
     const user = userEvent.setup()
     render(
       <>
@@ -81,44 +82,70 @@ describe("useForm — focus on submit invalid", () => {
         </div>
       </>
     )
-    // Make the page form invalid first, then move focus away from it.
     await user.click(screen.getByRole("button", { name: "Page submit" }))
-    await waitFor(() => expect(document.activeElement).toBe(nameInput("Page")))
-
+    await waitFor(() =>
+      expect(document.activeElement).toBe(control("Page", "name"))
+    )
+    // The page form is still invalid, but the dialog's submit must stay in
+    // the dialog.
     await user.click(screen.getByRole("button", { name: "Dialog submit" }))
     await waitFor(() =>
-      expect(document.activeElement).toBe(nameInput("Dialog"))
+      expect(document.activeElement).toBe(control("Dialog", "name"))
     )
   })
 
-  test("user onSubmitInvalid is still called", async () => {
+  test("works for an external <button form={id}> submit", async () => {
     const user = userEvent.setup()
-    const onSubmitInvalid = vi.fn()
-    render(<ProfileForm label="Profile" onSubmitInvalid={onSubmitInvalid} />)
+    render(<ProfileForm id="profile-form" label="Profile" outsideSubmit />)
     await user.click(screen.getByRole("button", { name: "Profile submit" }))
-    await waitFor(() => expect(onSubmitInvalid).toHaveBeenCalledTimes(1))
     await waitFor(() =>
-      expect(document.activeElement).toBe(screen.getByLabelText(PROFILE_NAME))
+      expect(document.activeElement).toBe(control("Profile", "name"))
     )
   })
 
-  test("focusOnSubmitInvalid: false opts out", async () => {
+  test("a radio group or slider root hands focus to its tabbable child", async () => {
     const user = userEvent.setup()
-    const onSubmitInvalid = vi.fn()
-    render(
-      <ProfileForm
-        focusOnSubmitInvalid={false}
-        label="Profile"
-        onSubmitInvalid={onSubmitInvalid}
-      />
+    function Harness({ sliderFirst }: { sliderFirst: boolean }) {
+      const form = useForm({
+        defaultValues: { volume: 10 },
+        onSubmit: vi.fn(),
+        schema: z.object({
+          plan: z.enum(["basic", "pro"]),
+          volume: z.number().min(50),
+        }),
+      })
+      const { RadioGroupField, SliderField, SubmitButton } = form
+      const radio = (
+        <RadioGroupField key="plan" label="Plan" name="plan">
+          <RadioGroupFieldItem value="basic">Basic</RadioGroupFieldItem>
+          <RadioGroupFieldItem value="pro">Pro</RadioGroupFieldItem>
+        </RadioGroupField>
+      )
+      const slider = <SliderField key="volume" label="Volume" name="volume" />
+      return (
+        <FormProvider form={form}>
+          <Form aria-label="Settings">
+            {sliderFirst ? [slider, radio] : [radio, slider]}
+            <SubmitButton>Save</SubmitButton>
+          </Form>
+        </FormProvider>
+      )
+    }
+
+    const { unmount } = render(<Harness sliderFirst={false} />)
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() =>
+      expect(document.activeElement?.getAttribute("role")).toBe("radio")
     )
-    const submit = screen.getByRole("button", { name: "Profile submit" })
-    await user.click(submit)
-    await waitFor(() => expect(onSubmitInvalid).toHaveBeenCalledTimes(1))
-    const name = screen.getByLabelText(PROFILE_NAME)
-    await waitFor(() => expect(name?.getAttribute("aria-invalid")).toBe("true"))
-    await new Promise((resolve) => setTimeout(resolve, 10))
-    expect(document.activeElement).not.toBe(name)
+    unmount()
+
+    render(<Harness sliderFirst />)
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() =>
+      expect(document.activeElement?.closest('[data-field="volume"]')).not.toBe(
+        null
+      )
+    )
   })
 })
 
