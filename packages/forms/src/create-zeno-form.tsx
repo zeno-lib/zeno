@@ -14,6 +14,7 @@ import { applyValidationError } from "./lib/apply-validation-error"
 import { fieldContext, formContext } from "./lib/contexts"
 import { deepMergeDefaults, extractZodDefaults } from "./lib/schema-defaults"
 import { getRequiredPaths } from "./lib/schema-required"
+import { useRebasedDefaultValues } from "./lib/use-rebased-default-values"
 import { useUnsavedChangesWarning } from "./lib/use-unsaved-changes-warning"
 import { ValidationError } from "./lib/validation-error"
 import { blurThenChangeLogic } from "./lib/validation-logic"
@@ -203,6 +204,23 @@ function buildValidatorsFromSchema<TFormData>(
     default:
       return { onChange: schema }
   }
+}
+
+// Chain an internal form-level `onMount` listener after the caller's.
+function withMountListener<L extends { onMount?: unknown } | undefined>(
+  listeners: L,
+  onMount: (props: { formApi: AnyFormApi }) => void
+): NonNullable<L> {
+  const user = listeners?.onMount as
+    | ((props: { formApi: AnyFormApi }) => void)
+    | undefined
+  return {
+    ...listeners,
+    onMount: (props: { formApi: AnyFormApi }) => {
+      onMount(props)
+      user?.(props)
+    },
+  } as NonNullable<L>
 }
 
 // --- typed field wrappers (generic over the injected field components) --------
@@ -462,6 +480,11 @@ export function createZenoForm<
       [schemaDefaults, userDefaultValues]
     )
 
+    // Keep `formApi.reset(values)` from being undone by the next render; see
+    // `lib/use-rebased-default-values.ts`.
+    const rebased = useRebasedDefaultValues(mergedDefaultValues)
+    const listeners = withMountListener(rest.listeners, rebased.onMount)
+
     const form = useAppForm<
       TFormData,
       TOnMount,
@@ -477,9 +500,10 @@ export function createZenoForm<
       TSubmitMeta
     >({
       ...rest,
-      ...(mergedDefaultValues === undefined
+      listeners,
+      ...(rebased.defaultValues === undefined
         ? {}
-        : { defaultValues: mergedDefaultValues }),
+        : { defaultValues: rebased.defaultValues }),
       ...(wrappedOnSubmit ? { onSubmit: wrappedOnSubmit } : {}),
       ...(resolvedValidators ? { validators: resolvedValidators } : {}),
       ...(resolvedValidationLogic

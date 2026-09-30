@@ -362,7 +362,9 @@ export function SignUp() {
 </Preview>
 
 Fields wrapped in `.optional()`, `.nullable()`, or `.default(...)` stay
-silent; everything else gets the `*`. Async schemas can't be detected
+silent; everything else gets the `*`. Required children of nested objects
+and array rows are detected too: `members[0].name`, `members[3].name`, …
+all get the `*` when the row schema requires `name`. Async schemas can't be detected
 this way, so pass `required` on the field to set it explicitly:
 
 ```tsx

@@ -1045,7 +1045,10 @@ Pass `unsavedChangesWarning: "if-changed"` (or shorthand `true`) to
 form's current values differ from its defaults. After a successful save,
 call `formApi.reset(value)` to rebase defaults to the saved values: the
 warning clears, and any further edits are diffed against the new
-baseline.
+baseline. The rebase sticks across re-renders even though the component
+keeps passing the same `defaultValues`; `useForm` only re-applies
+`defaultValues` when they deeply change (a refetched record, say), and,
+as in TanStack Form, only while the form is untouched.
 
 Two trigger modes:
 

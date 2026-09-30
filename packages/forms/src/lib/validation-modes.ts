@@ -2,6 +2,8 @@
 
 import type { AnyFormApi } from "@tanstack/react-form"
 
+import { toRequiredPathKey } from "./schema-required"
+
 type ValidationMode = "change" | "blur" | "submit" | "blur-then-change"
 
 const DEFAULT_VALIDATION_MODE: ValidationMode = "blur-then-change"
@@ -60,7 +62,7 @@ function isFieldRequired(form: AnyFormApi, name: string): boolean {
   if (!state.requiredIndicator) {
     return false
   }
-  return state.requiredFields.has(name)
+  return state.requiredFields.has(toRequiredPathKey(name))
 }
 
 export {

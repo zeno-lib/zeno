@@ -45,7 +45,7 @@ function RadioGroupField({
   const isRequired = required ?? schemaRequired
 
   return (
-    <Field data-invalid={isInvalid}>
+    <Field data-field={field.name} data-invalid={isInvalid}>
       {label && (
         <FieldLabel>
           {label}

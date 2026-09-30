@@ -44,7 +44,11 @@ function SwitchField({
   const isRequired = required ?? schemaRequired
 
   return (
-    <Field data-invalid={isInvalid} orientation="horizontal">
+    <Field
+      data-field={field.name}
+      data-invalid={isInvalid}
+      orientation="horizontal"
+    >
       <FieldContent>
         {label && (
           <FieldLabel htmlFor={field.name}>
