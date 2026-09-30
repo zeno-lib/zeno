@@ -17,6 +17,10 @@ shadcn primitives (`@/components/ui/*`) → registry; UI-free → npm":
 - **Registry (`shadcn add zeno-lib/zeno/create-form`)**: the 20 shadcn-based field components,
   the button fields, `validation-spinner`, `required-indicator`, and the `create-form` composition
   root. These drop into the user's repo under `@/components/form/*`.
+- **Registry (`shadcn add zeno-lib/zeno/form-dialog`)**: `form-dialog.tsx`, a dialog-hosted form
+  (Base UI `Dialog` + nested `AlertDialog` discard prompt). Its session state and leave guard
+  (`lib/use-form-dialog.ts`: `useFormDialog`, `useLeaveGuard`, `findFieldElement`) are UI-free and
+  stay on npm.
 
 **Owns:** the form factory + validation logic (npm), the field components + `create-form` wiring
 (registry). **Does NOT own:** the primitives the fields render (shadcn), the app's routes/layout.
@@ -28,6 +32,7 @@ shadcn primitives (`@/components/ui/*`) → registry; UI-free → npm":
 | `@zeno-lib/forms` | `createZenoForm`, `Form`, `FormProvider`, `useFieldContext`/`useFormContext`, `useIsInvalid`, `ValidationError`, `applyValidationError`, `blurThenChangeLogic`: all UI-free |
 | `@zeno-lib/forms/lib/*` | the individual headless modules (fields resolve `contexts`/`aria`/`use-is-invalid` here) |
 | `@zeno-lib/forms/tanstack` | re-export of `@tanstack/react-form` |
+| `@zeno-lib/forms/form-dialog` | the registry-shaped `FormDialog` (same opt-in model as `./create-form`; the docs app imports it from here) |
 | `@zeno-lib/forms/create-form` | **batteries-included opt-in**: the pre-wired `useForm`/`useAppForm`/`withForm`/fields. Its source is registry-shaped: it imports primitives as `@/components/ui/*` (not `@zeno-lib/ui`), so a consumer needs those aliases + local shadcn primitives. The docs app imports from here (backed by tsconfig `paths`); end users normally own this file via the registry. |
 
 `createZenoForm({ fieldComponents, formComponents })` runs `createFormHook` + builds a **generic**
@@ -78,6 +83,18 @@ Consumed by: `@zeno-lib/docs` (via `./create-form`); end users via the registry.
   parsed. Their value is `number | null` (empty → `null`), unlike `NumberField`'s `undefined`. Swiss
   grouping is an apostrophe whose code point (`’` vs `'`) depends on the runtime's CLDR data; tests
   derive it from `getNumberSeparators("de-CH")` instead of hard-coding it.
+- **`form.reset(values)` is undone on the next render when `useForm` still gets other
+  `defaultValues`.** `reset` rebases `options.defaultValues`, leaves the form untouched, and
+  TanStack's per-render `update(options)` then re-applies the (deep-different) option defaults. To
+  change a mounted form's baseline, change the `defaultValues` you pass to `useForm` (as
+  `useFormDialog` does), or edit values with `setFieldValue`.
+
+- **`FormDialog` detects "unsaved" with `!state.isDefaultValue`, never `isDirty`.** `isDirty` is
+  sticky (true after an edit is reverted by hand). It resets the form in `onOpenChangeComplete`
+  (after the exit animation) rather than on close, so the fields don't snap back while fading out;
+  don't `reset` inside the consumer's `onSubmit` either (see the pitfall above). Success = the
+  awaited `handleSubmit()` left `isSubmitSuccessful && isValid`, so a caught `ValidationError`
+  keeps the dialog open.
 - **`lib/required-indicator.tsx` (visual) is bundled into the registry block**, so the fields import
   it with a *relative* path (`../lib/required-indicator`), whereas the headless `lib/*.ts` modules
   are imported as `@zeno-lib/forms/lib/*` to keep them on npm. That relative-vs-bare split in the
