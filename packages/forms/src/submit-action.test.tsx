@@ -16,6 +16,8 @@ afterEach(() => {
 const SUBMIT = { name: "Submit" }
 const EMAIL_LABEL = /Email/
 const NAME_LABEL = /Name/
+const OWNER_1_SHARE_LABEL = /^Owner 1 share/
+const OWNER_2_SHARE_LABEL = /^Owner 2 share/
 
 function failure(
   fieldErrors: Record<string, string[]>,
@@ -150,10 +152,10 @@ describe("submitAction — field errors from the action", () => {
     await user.click(screen.getByRole("button", SUBMIT))
 
     const message = await screen.findByText("Exceeds the remaining share")
-    const second = screen.getByLabelText("Owner 2 share")
+    const second = screen.getByLabelText(OWNER_2_SHARE_LABEL)
     expect(second.getAttribute("aria-invalid")).toBe("true")
     expect(
-      screen.getByLabelText("Owner 1 share").getAttribute("aria-invalid")
+      screen.getByLabelText(OWNER_1_SHARE_LABEL).getAttribute("aria-invalid")
     ).not.toBe("true")
     expect(message).not.toBeNull()
   })
