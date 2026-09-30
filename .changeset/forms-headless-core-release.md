@@ -7,6 +7,7 @@ First release of the headless split. `@zeno-lib/forms` on npm is now the UI-free
 Also in this release:
 
 - The required-field indicator now works on nested objects and array rows. Required paths use TanStack Form's field-name syntax (`members[0].name`, not `members.0.name`) and match every row index.
+- `formApi.reset(values)` now sticks: it rebases the defaults until the caller passes deeply different `defaultValues`. Before, TanStack re-applied the caller's original defaults on the next render, which undid a reset-after-save whenever `defaultValues` stayed fixed.
 - After a failed submit, focus moves to the first `[aria-invalid="true"]` control inside the form's own `<Form>` element (never document-wide). A user `onSubmitInvalid` is still called; pass `focusOnSubmitInvalid: false` to opt out.
 - Every registry field renders `data-field={name}` on its `<Field>` root, a stable hook for end-to-end tests. Re-add the fields from the registry to pick it up.
 - `@tanstack/react-form` and `@tanstack/react-form-nextjs` bumped to 1.33.5; internal subscriptions use `useSelector` instead of the deprecated `useStore`.

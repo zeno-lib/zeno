@@ -45,6 +45,12 @@ Behavioural contracts the factory and fields share:
   user `onSubmitInvalid` and focuses the first `[aria-invalid="true"]` inside the form's own DOM
   node. `<Form>` registers that node (`lib/form-dom.ts`, keyed by `form.store`); without `<Form>`
   nothing is focused. Focus is deferred a macrotask so fields have re-rendered.
+- **`reset(values)` rebases defaults and sticks.** TanStack's `useForm` calls `update(options)`
+  every render and, while untouched, re-applies `defaultValues` that deep-differ from the live ones,
+  which would undo a reset when the caller passes a fixed literal. `lib/use-rebased-default-values.ts`
+  forwards the caller's defaults only when they deep-change (TanStack's `evaluate`), else the live
+  instance's `options.defaultValues`. The live instance comes from a chained form-level
+  `listeners.onMount`, because the object `useForm` returns is a spread whose `options` is stale.
 - **Every registry field** puts `data-field={field.name}` + `data-invalid` on its `<Field>` root and
   `aria-invalid={isInvalid || undefined}` on its focusable control (or the group root, whose first
   focusable child then gets focus). Keep both on any new field.
