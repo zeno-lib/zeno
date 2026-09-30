@@ -2,8 +2,21 @@
 
 export { createZenoForm } from "./create-zeno-form"
 export { Form, FormProvider } from "./form-element"
+export {
+  type ActionError,
+  type ActionIssue,
+  type ActionResult,
+  toActionError,
+  toFieldName,
+} from "./lib/action-result"
 export { applyValidationError } from "./lib/apply-validation-error"
 export { useFieldContext, useFormContext } from "./lib/contexts"
+export {
+  applyActionError,
+  type SubmitActionOptions,
+  type SubmitActionSchema,
+  submitAction,
+} from "./lib/submit-action"
 export {
   useHideFieldErrors,
   useIsFieldRequired,

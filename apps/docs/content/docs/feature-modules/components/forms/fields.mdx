@@ -56,6 +56,23 @@ Every field accepts an optional `validators` prop forwarded to TanStack
 Form's `<Field>` for per-field overrides. See
 [Validation modes](/docs/feature-modules/components/forms/validation#per-field-validators).
 
+`name` is required on every field, presets included. Array rows use
+TanStack Form's bracket syntax (`name="members[0].name"`).
+
+### Test hooks
+
+Every field's root `<Field>` element renders `data-field={name}`, a stable
+hook for end-to-end tests that doesn't depend on labels or copy:
+
+```ts
+const email = page.locator('[data-field="email"]')
+await expect(email.getByRole("textbox")).toHaveAttribute("aria-invalid", "true")
+await expect(page.locator('[data-field="members[1].name"]')).toBeVisible()
+```
+
+The root also carries `data-invalid`, and the control inside carries
+`aria-invalid="true"` while its error is shown.
+
 ## Input Field
 
 <Preview>
@@ -75,8 +92,8 @@ Form's `<Field>` for per-field overrides. See
 ## Email Field
 
 Preset over `InputField` with `type="email"`, `inputMode="email"`, and
-`autoComplete="email"`. Defaults `label` to `"Email"` and `name` to
-`"email"` (when your form has that key).
+`autoComplete="email"`. Defaults `label` to `"Email"`; `name` is required
+like on every other field.
 
 <Preview>
   <EmailFieldPreview />
@@ -91,7 +108,7 @@ Preset over `InputField` with `type="email"`, `inputMode="email"`, and
 
 Preset over `InputField` with `type="password"` and
 `autoComplete="current-password"`. Pass `autoComplete="new-password"` on
-signup. Defaults `label` to `"Password"` and `name` to `"password"`.
+signup. Defaults `label` to `"Password"`; `name` is required.
 
 <Preview>
   <PasswordFieldPreview />

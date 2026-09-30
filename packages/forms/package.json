@@ -1,6 +1,6 @@
 {
   "name": "@zeno-lib/forms",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "exports": {
     ".": "./src/index.ts",
     "./create-form": "./src/create-form.tsx",
@@ -26,14 +26,16 @@
   "peerDependencies": {
     "@tanstack/react-devtools": ">=0.10",
     "@tanstack/react-form-devtools": ">=0.2",
-    "@zeno-lib/ui": "workspace:^",
     "next": ">=16",
     "react": ">=19",
     "react-dom": ">=19",
     "zod": ">=4"
   },
   "peerDependenciesMeta": {
-    "@zeno-lib/ui": {
+    "@tanstack/react-devtools": {
+      "optional": true
+    },
+    "@tanstack/react-form-devtools": {
       "optional": true
     }
   },

@@ -14,6 +14,7 @@ import { DynamicExample } from "@/components/forms/dynamic-preview"
 import { FormDialogExample } from "@/components/forms/form-dialog-preview"
 import { LoginExample } from "@/components/forms/login-preview"
 import { OutsideFormExample } from "@/components/forms/outside-form-preview"
+import { ServerActionExample } from "@/components/forms/server-action-preview"
 import { ServerErrorExample } from "@/components/forms/server-error-preview"
 import { SignupExample } from "@/components/forms/signup-preview"
 import { SubmittingExample } from "@/components/forms/submitting-preview"
@@ -1140,6 +1141,133 @@ throw new ValidationError(
 If you need a server message that persists until the next submit instead
 of clearing on the next keystroke, call `formApi.setFieldMeta` directly.
 
+## Server actions
+
+A Next.js server action should *return* its validation failure rather than
+throw it: in production, Next.js replaces a thrown error's message before it
+reaches the browser. `defineFormAction` from `@zeno-lib/db/next` returns an
+`ActionResult` (`{ ok: true, data }` or `{ ok: false, error: { fieldErrors,
+formErrors } }`), and `submitAction` routes it back into the form. Pass
+`onSubmit`'s own argument straight through:
+
+```tsx lineNumbers
+"use client"
+
+import { Form, FormProvider, submitAction, useForm } from "@zeno-lib/forms/create-form"
+import { FieldGroup } from "@zeno-lib/ui/field"
+import { z } from "zod"
+import { updateTeamAction } from "./actions" // a defineFormAction export
+
+const schema = z.object({
+  members: z.array(z.object({ email: z.email(), share: z.string() })),
+  name: z.string().min(2),
+})
+
+export function EditTeam({ team }: { team: z.input<typeof schema> }) {
+  const form = useForm({
+    defaultValues: team,
+    onSubmit: (submit) => submitAction(submit, updateTeamAction, { reset: true }),
+    schema,
+  })
+  // …fields named "name", "members[0].email", "members[0].share", …
+}
+```
+
+What `submitAction(submit, action, options?)` does:
+
+- **Field errors land on their fields**, array paths included: an error keyed
+  `members[1].email` shows under the field registered with that name. Each
+  message clears the first time the user edits *that* field; the others stay.
+  A key no mounted field registered is folded into the form-level message
+  instead, so it can't silently block the submit button.
+- **`formErrors`** become the form-level error, at `form.state.errorMap.onSubmit`
+  (one message per line).
+- **`schema`** (optional): `onSubmit` receives the form's *input* values. Pass
+  a schema to `safeParse` them on the client and hand its *output* to the
+  action, for a schema that transforms (`z.string().transform(Number)`). A
+  failure is applied to the form and the action is not called.
+- **`reset`** (optional): after a success, `true` calls `formApi.reset(data)`
+  so the returned record becomes the pristine baseline (only offered when the
+  data has the form's shape), `"values"` rebases on the submitted values, and a
+  function maps the data to the next values.
+- **It returns the result**, typed from the action, so you can redirect or
+  toast on `result.ok`. A thrown error (network, auth, a bug) propagates as is.
+
+<Preview>
+  <ServerActionExample />
+
+```tsx lineNumbers
+"use client"
+
+import { type ActionResult, Form, FormProvider, submitAction, useForm } from "@zeno-lib/forms/create-form"
+import { FieldGroup } from "@zeno-lib/ui/field"
+import { z } from "zod"
+
+const schema = z.object({
+  members: z.array(z.object({ email: z.email("Enter a valid email") })),
+  team: z.string().min(2, "At least 2 characters"),
+})
+type Team = z.infer<typeof schema>
+
+// Stand-in for a defineFormAction server action.
+async function inviteTeam(input: Team): Promise<ActionResult<Team>> {
+  const fieldErrors: Record<string, string[]> = {}
+  for (const [index, member] of input.members.entries()) {
+    if (member.email === "taken@example.com") {
+      fieldErrors[`members[${index}].email`] = ["Already on another team."]
+    }
+  }
+  const formErrors = input.team === "admin" ? ["That team name is reserved."] : []
+  if (Object.keys(fieldErrors).length > 0 || formErrors.length > 0) {
+    return { error: { fieldErrors, formErrors }, ok: false }
+  }
+  return { data: input, ok: true }
+}
+
+export function InviteTeam() {
+  const form = useForm({
+    defaultValues: {
+      members: [{ email: "ada@example.com" }, { email: "taken@example.com" }],
+      team: "Analytical engines",
+    },
+    onSubmit: (submit) => submitAction(submit, inviteTeam),
+    schema,
+  })
+  const { EmailField, InputField, SubmitButton, Subscribe } = form
+
+  return (
+    <FormProvider form={form}>
+      <Form>
+        <FieldGroup>
+          <InputField label="Team" name="team" />
+          <EmailField label="Member 1" name="members[0].email" />
+          <EmailField label="Member 2" name="members[1].email" />
+          <Subscribe selector={(state) => state.errorMap.onSubmit}>
+            {(formError) =>
+              typeof formError === "string" ? <p role="alert">{formError}</p> : null
+            }
+          </Subscribe>
+        </FieldGroup>
+        <SubmitButton>Invite</SubmitButton>
+      </Form>
+    </FormProvider>
+  )
+}
+```
+
+</Preview>
+
+The result type is structural: `@zeno-lib/forms` declares `ActionResult` itself
+and does not depend on `@zeno-lib/db`, so any action resolving to that shape
+works, hand-written ones included. `applyActionError(formApi, error)` is the
+same write without the call, for a result you already hold.
+
+`reset` rebases the form, but TanStack Form re-applies `defaultValues` on the
+next render while the form is untouched. It sticks when `defaultValues`
+follows the saved record, which is what happens when the action calls
+`revalidatePath` and the page passes the fresh record down. With
+`defaultValues` fixed in the component, the next render restores them.
+
 ## Unsaved-changes warning
 
 Pass `unsavedChangesWarning: "if-changed"` (or shorthand `true`) to
@@ -1147,7 +1275,10 @@ Pass `unsavedChangesWarning: "if-changed"` (or shorthand `true`) to
 form's current values differ from its defaults. After a successful save,
 call `formApi.reset(value)` to rebase defaults to the saved values: the
 warning clears, and any further edits are diffed against the new
-baseline.
+baseline. The rebase sticks across re-renders even though the component
+keeps passing the same `defaultValues`; `useForm` only re-applies
+`defaultValues` when they deeply change (a refetched record, say), and,
+as in TanStack Form, only while the form is untouched.
 
 Two trigger modes:
 

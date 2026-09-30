@@ -24,10 +24,22 @@ function Form({ children, className, ...props }: FormProps) {
     <form
       className={className}
       noValidate
-      onSubmit={(event: FormEvent<HTMLFormElement>) => {
+      onSubmit={async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault()
         event.stopPropagation()
-        Promise.resolve(form.handleSubmit()).catch(() => undefined)
+        const node = event.currentTarget
+        await Promise.resolve(form.handleSubmit()).catch(() => undefined)
+        if (!form.state.isValid) {
+          // First invalid control in *this* form; a group root (radio group,
+          // slider) hands focus to its first tabbable child.
+          const invalid = node.querySelector<HTMLElement>(
+            '[aria-invalid="true"]'
+          )
+          const targets = invalid
+            ? [invalid, ...invalid.querySelectorAll<HTMLElement>("*")]
+            : []
+          targets.find((el) => el.tabIndex >= 0)?.focus()
+        }
       }}
       {...props}
     >

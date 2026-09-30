@@ -49,6 +49,17 @@ describe("validation-modes WeakMap state", () => {
     expect(isFieldRequired(form, "email")).toBe(false)
   })
 
+  test("isFieldRequired matches array rows by TanStack field name", () => {
+    const form = makeFormStub()
+    setFormZenoState(form, {
+      requiredFields: new Set(["members[0].name"]),
+      requiredIndicator: true,
+    })
+    expect(isFieldRequired(form, "members[0].name")).toBe(true)
+    expect(isFieldRequired(form, "members[4].name")).toBe(true)
+    expect(isFieldRequired(form, "members[4].note")).toBe(false)
+  })
+
   test("two forms keyed on different store references are independent", () => {
     const a = makeFormStub()
     const b = makeFormStub()
