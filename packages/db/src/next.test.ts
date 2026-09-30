@@ -1,7 +1,8 @@
 import { AuthError, type JwtPayload } from "@supabase/supabase-js"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
-import { createDefineAction } from "./define-action.ts"
+import { FieldValidationError } from "./action-result.ts"
+import { createDefineAction, createDefineFormAction } from "./define-action.ts"
 
 // No database: the RLS client factory is replaced by a stub that returns a
 // marker object, so nothing here builds a pool or opens a connection. What
@@ -112,6 +113,108 @@ describe("defineAction", () => {
   })
 })
 
+describe("defineFormAction", () => {
+  const schema = z.object({
+    owners: z.array(
+      z.object({ percentage: z.number().max(100, "At most 100") })
+    ),
+  })
+  const context = { claims: { sub: "user-1" }, db: { name: "db" } }
+
+  it("resolves to { ok: true, data } with the handler's result", async () => {
+    const handler = vi.fn(
+      (_db: { name: string }, input: z.output<typeof schema>) =>
+        Promise.resolve(input.owners.length)
+    )
+    const action = createDefineFormAction(() => Promise.resolve(context))(
+      schema,
+      handler
+    )
+
+    await expect(action({ owners: [{ percentage: 50 }] })).resolves.toEqual({
+      data: 1,
+      ok: true,
+    })
+    expect(handler).toHaveBeenCalledWith(
+      context.db,
+      { owners: [{ percentage: 50 }] },
+      context
+    )
+  })
+
+  it("returns schema issues keyed by field name, before resolving the context", async () => {
+    const getContext = vi.fn(() => Promise.resolve(context))
+    const handler = vi.fn()
+    const action = createDefineFormAction(getContext)(schema, handler)
+
+    await expect(
+      action({ owners: [{ percentage: 10 }, { percentage: 150 }] })
+    ).resolves.toEqual({
+      error: {
+        fieldErrors: { "owners[1].percentage": ["At most 100"] },
+        formErrors: [],
+      },
+      ok: false,
+    })
+    expect(getContext).not.toHaveBeenCalled()
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it("returns a FieldValidationError thrown by the handler in the same shape", async () => {
+    const action = createDefineFormAction(() => Promise.resolve(context))(
+      schema,
+      () => {
+        throw new FieldValidationError(
+          { "owners[0].percentage": "Already allocated" },
+          { formErrors: "Record is locked" }
+        )
+      }
+    )
+
+    await expect(action({ owners: [{ percentage: 1 }] })).resolves.toEqual({
+      error: {
+        fieldErrors: { "owners[0].percentage": ["Already allocated"] },
+        formErrors: ["Record is locked"],
+      },
+      ok: false,
+    })
+  })
+
+  it("keeps a failure that is not a validation error throwing", async () => {
+    const boom = new Error("connection reset")
+    const action = createDefineFormAction(() => Promise.resolve(context))(
+      schema,
+      () => Promise.reject(boom)
+    )
+
+    await expect(action({ owners: [] })).rejects.toBe(boom)
+  })
+
+  it("keeps a context failure throwing", async () => {
+    const handler = vi.fn()
+    const action = createDefineFormAction(() =>
+      Promise.reject(new UnauthenticatedError())
+    )(schema, handler)
+
+    await expect(action({ owners: [] })).rejects.toBeInstanceOf(
+      UnauthenticatedError
+    )
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it("returns a result that survives a JSON round trip unchanged", async () => {
+    const action = createDefineFormAction(() => Promise.resolve(context))(
+      schema,
+      () => ({ id: 1 })
+    )
+    const failure = await action({ owners: [{ percentage: 101 }] })
+    const success = await action({ owners: [] })
+
+    expect(JSON.parse(JSON.stringify(failure))).toEqual(failure)
+    expect(JSON.parse(JSON.stringify(success))).toEqual(success)
+  })
+})
+
 describe("createRequestDb", () => {
   it("builds the RLS client from the whole verified claims object", async () => {
     const { getRequestContext, getRequestDb } = createRequestDb({
@@ -173,6 +276,21 @@ describe("createRequestDb", () => {
       db: { claims, fake: true },
       input: "hello",
       sub: claims.sub,
+    })
+  })
+
+  it("binds defineFormAction to the request context", async () => {
+    const { defineFormAction } = createRequestDb({
+      supabase: supabaseReturning(getClaimsResult(claims, null)),
+    })
+    const action = defineFormAction(z.string(), (_db, input, context) => ({
+      input,
+      sub: context.claims.sub,
+    }))
+
+    await expect(action("hello")).resolves.toEqual({
+      data: { input: "hello", sub: claims.sub },
+      ok: true,
     })
   })
 })

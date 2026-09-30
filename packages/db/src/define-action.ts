@@ -1,3 +1,10 @@
+import {
+  type ActionIssue,
+  type ActionResult,
+  FieldValidationError,
+  toActionError,
+} from "./action-result.ts"
+
 /**
  * The slice of a schema `defineAction` needs: a throwing `parse`, plus the
  * Standard Schema `types` marker it reads the caller-facing input type from.
@@ -59,5 +66,72 @@ export function createDefineAction<TContext extends ActionContext<unknown>>(
     const context = await getContext()
 
     return await handler(context.db, parsed, context)
+  }
+}
+
+/**
+ * The schema `defineFormAction` needs: the Standard Schema `validate`, which
+ * reports failures as issues with paths instead of throwing. Zod 4 schemas
+ * satisfy it as they are.
+ */
+export interface FormActionSchema<TInput, TOutput> {
+  readonly "~standard": {
+    readonly types?:
+      | { readonly input: TInput; readonly output: TOutput }
+      | undefined
+    readonly validate: (
+      value: unknown
+    ) =>
+      | FormActionSchemaResult<TOutput>
+      | Promise<FormActionSchemaResult<TOutput>>
+  }
+}
+
+type FormActionSchemaResult<TOutput> =
+  | { readonly value: TOutput; readonly issues?: undefined }
+  | { readonly issues: readonly ActionIssue[] }
+
+/**
+ * `defineFormAction(schema, handler)` is `defineAction` for a form: the action
+ * resolves to an `ActionResult` instead of throwing on invalid input, so field
+ * errors survive Next.js's production redaction of thrown messages.
+ */
+export type DefineFormAction<TContext extends ActionContext<unknown>> = <
+  TInput,
+  TOutput,
+  TResult,
+>(
+  schema: FormActionSchema<TInput, TOutput>,
+  handler: ActionHandler<TContext, TOutput, TResult>
+) => (input: TInput) => Promise<ActionResult<Awaited<TResult>>>
+
+/**
+ * Binds `defineFormAction` to a request-context resolver. Same order as
+ * `createDefineAction` (validate, then resolve the context, then run the
+ * handler), but two failures come back as `{ ok: false, error }`: schema
+ * issues, and a `FieldValidationError` thrown by the handler. Everything else
+ * (an `UnauthenticatedError`, a database error) still throws.
+ */
+export function createDefineFormAction<TContext extends ActionContext<unknown>>(
+  getContext: () => Promise<TContext>
+): DefineFormAction<TContext> {
+  return (schema, handler) => async (input) => {
+    const parsed = await schema["~standard"].validate(input)
+    if (parsed.issues) {
+      return { error: toActionError(parsed.issues), ok: false }
+    }
+    const context = await getContext()
+
+    try {
+      return {
+        data: await handler(context.db, parsed.value, context),
+        ok: true,
+      }
+    } catch (error) {
+      if (error instanceof FieldValidationError) {
+        return { error: error.toActionError(), ok: false }
+      }
+      throw error
+    }
   }
 }

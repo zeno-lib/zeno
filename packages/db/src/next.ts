@@ -6,13 +6,29 @@ import {
   createSupabaseClient,
   type DrizzleClient,
 } from "./clients.ts"
-import { createDefineAction, type DefineAction } from "./define-action.ts"
+import {
+  createDefineAction,
+  createDefineFormAction,
+  type DefineAction,
+  type DefineFormAction,
+} from "./define-action.ts"
 
+// biome-ignore lint/performance/noBarrelFile: `/next` is the one entry server actions import; the result types and error class belong on it.
+export {
+  type ActionError,
+  type ActionIssue,
+  type ActionResult,
+  FieldValidationError,
+  toActionError,
+  toFieldName,
+} from "./action-result.ts"
 export type {
   ActionContext,
   ActionHandler,
   ActionSchema,
   DefineAction,
+  DefineFormAction,
+  FormActionSchema,
 } from "./define-action.ts"
 
 /**
@@ -58,6 +74,11 @@ export type RequestDb<TRelations extends AnyRelations = EmptyRelations> = {
   getRequestDb: () => Promise<DrizzleClient<TRelations>>
   /** Wraps a handler into a `"use server"` export; see `DefineAction`. */
   defineAction: DefineAction<RequestContext<TRelations>>
+  /**
+   * `defineAction` for forms: resolves to an `ActionResult` instead of
+   * throwing on invalid input; see `DefineFormAction`.
+   */
+  defineFormAction: DefineFormAction<RequestContext<TRelations>>
 }
 
 /**
@@ -106,6 +127,7 @@ export function createRequestDb<
 
   return {
     defineAction: createDefineAction(getRequestContext),
+    defineFormAction: createDefineFormAction(getRequestContext),
     getRequestContext,
     getRequestDb: async () => (await getRequestContext()).db,
   }

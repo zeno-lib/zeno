@@ -2,9 +2,9 @@ import type { JwtPayload } from "@supabase/supabase-js"
 import { expectTypeOf, test } from "vitest"
 import { z } from "zod"
 import type { DrizzleClient } from "./clients.ts"
-import { createRequestDb } from "./next.ts"
+import { type ActionError, type ActionResult, createRequestDb } from "./next.ts"
 
-const { defineAction } = createRequestDb({
+const { defineAction, defineFormAction } = createRequestDb({
   supabase: () => ({
     auth: {
       getClaims: () => Promise.resolve({ data: null, error: null }),
@@ -29,4 +29,32 @@ test("a synchronous handler still yields an async action", () => {
   const action = defineAction(z.number(), (_db, input) => input > 0)
 
   expectTypeOf(action).returns.toEqualTypeOf<Promise<boolean>>()
+})
+
+test("defineFormAction takes the schema's input and resolves to an ActionResult", () => {
+  const schema = z.object({ id: z.string().transform(Number) })
+  const action = defineFormAction(schema, (db, input) => {
+    expectTypeOf(db).toEqualTypeOf<DrizzleClient>()
+    expectTypeOf(input).toEqualTypeOf<{ id: number }>()
+    return Promise.resolve({ saved: input.id })
+  })
+
+  expectTypeOf(action).parameter(0).toEqualTypeOf<{ id: string }>()
+  expectTypeOf(action).returns.toEqualTypeOf<
+    Promise<ActionResult<{ saved: number }>>
+  >()
+})
+
+test("an ActionResult narrows on ok", async () => {
+  const action = defineFormAction(z.number(), (_db, input) => input > 0)
+  const result = await action(1)
+
+  if (result.ok) {
+    expectTypeOf(result.data).toEqualTypeOf<boolean>()
+  } else {
+    expectTypeOf(result.error).toEqualTypeOf<ActionError>()
+    expectTypeOf(result.error.fieldErrors).toEqualTypeOf<
+      Record<string, string[]>
+    >()
+  }
 })
