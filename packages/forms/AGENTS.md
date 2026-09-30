@@ -11,9 +11,10 @@ indicator; field wrappers give type-safe `name`s; a submit button wires loading 
 shadcn primitives (`@/components/ui/*`) → registry; UI-free → npm":
 
 - **npm (`.` + `./lib/*` + `./tanstack`)**: the headless core: `createZenoForm` (the factory),
-  the `lib/*` logic (validation, schema, contexts, aria, `use-is-invalid`), `Form`/`FormProvider`.
+  the `lib/*` logic (validation, schema, contexts, aria, `use-is-invalid`, the locale-aware number
+  engine `formatted-number` + `use-formatted-number`), `Form`/`FormProvider`.
   None import shadcn primitives.
-- **Registry (`shadcn add zeno-lib/zeno/create-form`)**: the 15 shadcn-based field components,
+- **Registry (`shadcn add zeno-lib/zeno/create-form`)**: the 20 shadcn-based field components,
   the button fields, `validation-spinner`, `required-indicator`, and the `create-form` composition
   root. These drop into the user's repo under `@/components/form/*`.
 
@@ -71,6 +72,12 @@ Consumed by: `@zeno-lib/docs` (via `./create-form`); end users via the registry.
 
 ## Pitfalls
 
+- **Formatted number fields keep their own text state.** `MoneyField`, `PercentageField` and
+  `YearField` are thin wrappers over `lib/use-formatted-number.ts`, which holds the input text
+  locally (so `"12."` survives typing) and re-syncs only when the form value drifts from what it last
+  parsed. Their value is `number | null` (empty → `null`), unlike `NumberField`'s `undefined`. Swiss
+  grouping is an apostrophe whose code point (`’` vs `'`) depends on the runtime's CLDR data; tests
+  derive it from `getNumberSeparators("de-CH")` instead of hard-coding it.
 - **`lib/required-indicator.tsx` (visual) is bundled into the registry block**, so the fields import
   it with a *relative* path (`../lib/required-indicator`), whereas the headless `lib/*.ts` modules
   are imported as `@zeno-lib/forms/lib/*` to keep them on npm. That relative-vs-bare split in the

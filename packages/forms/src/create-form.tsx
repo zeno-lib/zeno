@@ -4,13 +4,17 @@
 import { createZenoForm } from "@zeno-lib/forms"
 
 import { CheckboxField } from "./fields/checkbox-field"
+import { CheckboxGroupField } from "./fields/checkbox-group-field"
 import { ComboboxField } from "./fields/combobox-field"
 import { DatePickerField } from "./fields/date-picker-field"
 import { EmailField } from "./fields/email-field"
 import { InputField } from "./fields/input-field"
+import { MoneyField } from "./fields/money-field"
+import { MultiSelectField } from "./fields/multi-select-field"
 import { NumberField } from "./fields/number-field"
 import { OtpField } from "./fields/otp-field"
 import { PasswordField } from "./fields/password-field"
+import { PercentageField } from "./fields/percentage-field"
 import { RadioGroupField } from "./fields/radio-group-field"
 import { ResetButton } from "./fields/reset-button"
 import { SelectField } from "./fields/select-field"
@@ -18,24 +22,30 @@ import { SliderField } from "./fields/slider-field"
 import { SubmitButton } from "./fields/submit-button"
 import { SwitchField } from "./fields/switch-field"
 import { TextAreaField } from "./fields/textarea-field"
+import { YearField } from "./fields/year-field"
 
 // Wire the dropped-in field components into the headless factory. Edit the
 // field files under `./fields` freely — they use your own shadcn primitives.
 const { useAppForm, useForm, withFieldGroup, withForm } = createZenoForm({
   fieldComponents: {
     CheckboxField,
+    CheckboxGroupField,
     ComboboxField,
     DatePickerField,
     EmailField,
     InputField,
+    MoneyField,
+    MultiSelectField,
     NumberField,
     OtpField,
     PasswordField,
+    PercentageField,
     RadioGroupField,
     SelectField,
     SliderField,
     SwitchField,
     TextAreaField,
+    YearField,
   },
   formComponents: {
     ResetButton,
