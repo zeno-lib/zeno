@@ -147,6 +147,11 @@ export const createPostAction = defineAction(
 )
 ```
 
+An action never resolves to `undefined`: when the handler does, as a
+`findFirst` that matches no row does, the action resolves to `null`. TanStack
+Query rejects a query whose function resolves to `undefined`, so a read action
+can back a query as it is, and its type says `T | null`.
+
 When signed-out has a legitimate answer (a permission check, say), catch the
 named error instead:
 
