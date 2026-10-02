@@ -31,6 +31,22 @@ test("a synchronous handler still yields an async action", () => {
   expectTypeOf(action).returns.toEqualTypeOf<Promise<boolean>>()
 })
 
+test("a result that may be undefined resolves to null instead", () => {
+  const action = defineAction(z.number(), (_db, input) =>
+    Promise.resolve(input > 0 ? { id: input } : undefined)
+  )
+
+  expectTypeOf(action).returns.toEqualTypeOf<Promise<{ id: number } | null>>()
+})
+
+test("a handler with no result resolves to null", () => {
+  const action = defineAction(z.number(), async () => {
+    await Promise.resolve()
+  })
+
+  expectTypeOf(action).returns.toEqualTypeOf<Promise<null>>()
+})
+
 test("defineFormAction takes the schema's input and resolves to an ActionResult", () => {
   const schema = z.object({ id: z.string().transform(Number) })
   const action = defineFormAction(schema, (db, input) => {

@@ -79,6 +79,23 @@ describe("defineAction", () => {
     expect(handler).toHaveBeenCalledWith(context.db, { id: 7 }, context)
   })
 
+  it("resolves to null when the handler resolves to undefined", async () => {
+    const action = createDefineAction(() => Promise.resolve({ db: {} }))(
+      schema,
+      () => Promise.resolve(undefined)
+    )
+
+    await expect(action({ id: 1 })).resolves.toBeNull()
+  })
+
+  it("keeps a falsy result other than undefined", async () => {
+    const define = createDefineAction(() => Promise.resolve({ db: {} }))
+
+    await expect(define(schema, () => 0)({ id: 1 })).resolves.toBe(0)
+    await expect(define(schema, () => false)({ id: 1 })).resolves.toBe(false)
+    await expect(define(schema, () => "")({ id: 1 })).resolves.toBe("")
+  })
+
   it("hands the handler the claims for authorship", async () => {
     const context = { claims: { sub: "user-1" }, db: {} }
     const action = createDefineAction(() => Promise.resolve(context))(

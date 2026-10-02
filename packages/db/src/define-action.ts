@@ -37,9 +37,20 @@ export type ActionHandler<
 ) => TResult | Promise<TResult>
 
 /**
+ * What an action resolves to: the handler's result, with `undefined` (and
+ * `void`) replaced by `null`.
+ */
+export type ActionValue<TResult> = undefined extends TResult
+  ? Exclude<Exclude<TResult, undefined>, void> | null
+  : TResult
+
+/**
  * `defineAction(schema, handler)` returns the server action itself: an async
  * function that parses its argument, resolves the request context, then calls
- * `handler(db, input, context)`.
+ * `handler(db, input, context)`. A handler that resolves to `undefined`, such
+ * as a Drizzle `findFirst` that matched no row, makes the action resolve to
+ * `null`, because TanStack Query rejects a query whose function resolves to
+ * `undefined`.
  */
 export type DefineAction<TContext extends ActionContext<unknown>> = <
   TInput,
@@ -48,7 +59,7 @@ export type DefineAction<TContext extends ActionContext<unknown>> = <
 >(
   schema: ActionSchema<TInput, TOutput>,
   handler: ActionHandler<TContext, TOutput, TResult>
-) => (input: TInput) => Promise<TResult>
+) => (input: TInput) => Promise<ActionValue<TResult>>
 
 /**
  * Binds `defineAction` to a request-context resolver. Deliberately not a
@@ -61,12 +72,17 @@ export type DefineAction<TContext extends ActionContext<unknown>> = <
 export function createDefineAction<TContext extends ActionContext<unknown>>(
   getContext: () => Promise<TContext>
 ): DefineAction<TContext> {
-  return (schema, handler) => async (input) => {
-    const parsed = schema.parse(input)
-    const context = await getContext()
+  return <TInput, TOutput, TResult>(
+    schema: ActionSchema<TInput, TOutput>,
+    handler: ActionHandler<TContext, TOutput, TResult>
+  ) =>
+    async (input: TInput) => {
+      const parsed = schema.parse(input)
+      const context = await getContext()
+      const result = await handler(context.db, parsed, context)
 
-    return await handler(context.db, parsed, context)
-  }
+      return (result ?? null) as ActionValue<TResult>
+    }
 }
 
 /**

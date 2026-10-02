@@ -26,6 +26,7 @@ export type {
   ActionContext,
   ActionHandler,
   ActionSchema,
+  ActionValue,
   DefineAction,
   DefineFormAction,
   FormActionSchema,
