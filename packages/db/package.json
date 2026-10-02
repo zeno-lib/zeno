@@ -88,7 +88,7 @@
     "@zeno-lib/schema": "workspace:*",
     "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
-    "dotenv": "17.4.2",
+    "dotenv": "18.0.4",
     "drizzle-kit": "1.0.0-rc.5-5935859",
     "drizzle-orm": "1.0.0-rc.3",
     "postgres": "3.4.7",
