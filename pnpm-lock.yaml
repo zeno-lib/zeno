@@ -158,8 +158,8 @@ importers:
         specifier: workspace:^
         version: link:../typescript
       dotenv:
-        specifier: 17.4.2
-        version: 17.4.2
+        specifier: 18.0.4
+        version: 18.0.4
       drizzle-kit:
         specifier: 1.0.0-rc.5-5935859
         version: 1.0.0-rc.5-5935859
@@ -3910,6 +3910,11 @@ packages:
   dotenv@17.4.2:
     resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
+
+  dotenv@18.0.4:
+    resolution: {integrity: sha512-jGt9uI5BIxpVO15kvy+iEFqNAwxYClKWnkptLjSNPnFLC003Imd0ofr3aEVsbpHdSBdSsbcApNIlz4nbyGMwdA==}
+    engines: {node: '>=12'}
+    hasBin: true
 
   drizzle-kit@1.0.0-rc.5-5935859:
     resolution: {integrity: sha512-p//MvJbSeDFxa3pODv0ebNVJmk/5aAHHaCyQTtDGFlCYX4e7eY9rrSX/liBJ7098Ei9WUi9VT65JQkSFDuG1ng==}
@@ -9385,6 +9390,8 @@ snapshots:
   dom-accessibility-api@0.5.16: {}
 
   dotenv@17.4.2: {}
+
+  dotenv@18.0.4: {}
 
   drizzle-kit@1.0.0-rc.5-5935859:
     dependencies:
