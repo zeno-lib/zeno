@@ -1,6 +1,7 @@
 // https://orm.drizzle.team/docs/drizzle-config-file
 // https://orm.drizzle.team/docs/rls#migrations  (entities.roles.provider: "supabase")
 import { type Config, defineConfig } from "drizzle-kit"
+import { moveGeneratedSqlAfterGenerate } from "./move-generated-sql.ts"
 
 /**
  * Roles a Supabase project ships that drizzle-kit's `provider: "supabase"` does
@@ -54,7 +55,7 @@ export function defineDrizzleConfig(
   const roleOverrides =
     typeof entities?.roles === "object" ? entities.roles : {}
 
-  return defineConfig({
+  const config = defineConfig({
     dbCredentials: { url: process.env.SUPABASE_DATABASE_URL ?? "" },
     dialect: "postgresql",
     // Tells drizzle-kit that Supabase's built-in roles (anon, authenticated,
@@ -74,4 +75,10 @@ export function defineDrizzleConfig(
     schemaFilter: DEFAULT_SCHEMA_FILTER,
     ...configOverrides,
   } as Config)
+
+  if (config.out) {
+    moveGeneratedSqlAfterGenerate({ migrationsDir: config.out })
+  }
+
+  return config
 }

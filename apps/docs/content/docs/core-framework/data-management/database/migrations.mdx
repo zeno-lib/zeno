@@ -80,16 +80,50 @@ export default defineDrizzleConfig({
 
 With the [package scripts](/docs/core-framework/data-management/database#package-scripts)
 from installation in place, `db:generate` reads your TypeScript schema and writes
-a SQL migration under `supabase/migrations`, and `db:migrate` applies generated
-migrations to a database and records them in Drizzle Kit's migration table.
+a migration under `supabase/migrations`:
+
+```bash
+pnpm db:generate --name=posts
+```
+
+```text
+supabase/migrations/
+├── 20260915144041_posts.sql
+└── 20260915144041_posts/
+    └── snapshot.json
+```
+
+The `.sql` file is the migration. `snapshot.json` is Drizzle Kit's record of
+your schema after that migration. The next `db:generate` compares your schema
+files with the newest snapshot and writes only the difference. Commit the
+snapshot together with the SQL, and do not edit it by hand.
+
+### Why the SQL is next to the folder
+
+Drizzle Kit writes both files into the folder, the SQL as `migration.sql`.
+The Supabase CLI only reads `.sql` files directly in `supabase/migrations`.
+So `defineDrizzleConfig()` moves `migration.sql` up one level and names it after the folder.
+
+## Apply migrations
+
+The Supabase CLI applies migrations. It runs the `.sql` files in
+`supabase/migrations` in name order, which is the order you created them in,
+and records each one in `supabase_migrations.schema_migrations`.
+
+- `supabase db reset` rebuilds your local database from every file.
+- [`supabase db push`](https://supabase.com/docs/reference/cli/supabase-db-push)
+  runs the files a deployed project does not have yet.
+
+<Callout type="warn">
+  Do not use `drizzle-kit migrate`. We rely on supabase for running the migrations.
+</Callout>
 
 ## Custom SQL migrations
 
 Some objects have no Drizzle representation: triggers are the common case, since
 Drizzle Kit emits no trigger DDL and they are not part of its snapshot format.
 `drizzle-kit generate --custom` writes an **empty but tracked** migration for
-you to fill in; its snapshot links into the chain like any generated one, so
-`db:migrate` applies it in order and records it.
+you to fill in; its snapshot links into the chain like any generated one.
 
 ```bash
 pnpm db:generate --custom --name=posts_updated_at_trigger
@@ -100,14 +134,6 @@ Put your SQL in the generated file. For the `updated_at` case,
 prints exactly what goes in it. Write re-runnable SQL (`if not exists`,
 `drop ... if exists`) so re-applying a migration against an existing database is
 safe.
-
-<Callout type="warn">
-  `supabase db reset` applies every `.sql` file in `supabase/migrations`
-  alphabetically, while `drizzle-kit migrate` tracks state in
-  `__drizzle_migrations`. A hand-written `.sql` file that Drizzle Kit did not
-  generate works for a reset but is invisible to `db:migrate`, which is exactly
-  the drift `--custom` avoids: use it rather than dropping a loose file in.
-</Callout>
 
 ## Verify against a live database
 
@@ -121,7 +147,6 @@ exists; see
 ## Generate migrations, day to day
 
 Author tables and RLS policies in your Drizzle schema, run `db:generate`
-(`drizzle-kit generate`), review the generated SQL, and commit it under
-`supabase/migrations`. Apply generated migrations with `db:migrate`
-(`drizzle-kit migrate`) in environments where the database is not reset from
-scratch.
+(`drizzle-kit generate`), review the generated SQL, and commit it together
+with its snapshot. To apply it, run `supabase db reset` for your local database
+or `supabase db push` for a deployed project.
