@@ -1,5 +1,19 @@
 # @zeno-lib/db
 
+## 0.7.0
+
+### Minor Changes
+
+- d11a7cd: `defineDrizzleConfig` now moves each generated migration to where the Supabase CLI reads it.
+  Set `moveGeneratedSql: false` to keep Drizzle Kit's layout.
+  
+  Apply migrations with the Supabase CLI.
+  
+  Switching from `drizzle-kit migrate`:
+  
+  1. Run `db:generate` once. It moves the existing migrations.
+  2. Run `supabase migration repair --status applied <version...>` on each database that already has them. Otherwise `supabase db push` runs them all again.
+
 ## 0.6.0
 
 ### Minor Changes
