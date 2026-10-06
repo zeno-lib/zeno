@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src"],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/*.test-d.ts",
+    "src/addons",
+    "src/create-form.tsx",
+    "src/fields",
+    "src/form-dialog.tsx",
+    "src/lib/required-indicator.tsx"
+  ]
+}

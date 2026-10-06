@@ -1,10 +1,14 @@
 {
   "extends": "@zeno-lib/typescript/react.json",
   "compilerOptions": {
+    "jsx": "react-jsx",
     "paths": {
       "@/components/ui/*": ["../ui/src/components/*"],
       "@/lib/*": ["../ui/src/lib/*"],
-      "@/hooks/*": ["../ui/src/hooks/*"]
+      "@/hooks/*": ["../ui/src/hooks/*"],
+      "@zeno-lib/forms": ["./src/index.ts"],
+      "@zeno-lib/forms/lib/*": ["./src/lib/*"],
+      "@zeno-lib/forms/tanstack": ["./src/tanstack.ts"]
     }
   }
 }

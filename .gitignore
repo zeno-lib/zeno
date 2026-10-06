@@ -57,3 +57,7 @@ playwright/.cache/
 # Committed bundle for @zeno-lib/query
 !packages/query/dist/
 !packages/query/dist/**
+
+# Committed bundle for @zeno-lib/forms
+!packages/forms/dist/
+!packages/forms/dist/**
