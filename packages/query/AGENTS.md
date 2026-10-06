@@ -34,4 +34,3 @@ is in [`data-management/queries`](../../apps/docs/content/docs/core-framework/da
 - **Build with `tsconfig.build.json`.** The main `tsconfig.json` includes the registry file and the
   tests, which reach `packages/ui` through `paths`, and tsdown would emit `.d.ts` files into
   `packages/ui/src`.
-- **`dist/` is committed** (`bundle-packages.yml`).

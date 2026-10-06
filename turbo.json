@@ -34,6 +34,7 @@
       "dependsOn": ["^lint:fix"]
     },
     "dev": {
+      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     },
@@ -42,6 +43,7 @@
       "passThroughEnv": ["SUPABASE_DATABASE_URL"]
     },
     "test:watch": {
+      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     }
