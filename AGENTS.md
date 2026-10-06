@@ -1,74 +1,79 @@
 # AGENTS.md
 
-## Project Overview
+Zeno is a Turborepo monorepo of shared packages and applications for building web applications with
+React, Next.js and TypeScript.
 
-Zeno is a Turborepo monorepo containing shared packages and applications for building modern web applications with React, Next.js, and TypeScript.
+## Nodes
 
-## Workspace
-
-This file is the **root of an [Intent Layer](https://intent-systems.com/blog/intent-layer)**: a hierarchy of small `AGENTS.md` files placed at semantic boundaries so agents load high-signal local context (purpose, contracts, anti-patterns, sharp edges) before touching code. This file holds workspace-wide conventions and inherits *down* into every package; per-package nodes hold their own invariants and inherit conventions *up* from here. Don't duplicate facts across nodes: put them at the shallowest node that covers all relevant paths.
-
-Linked entries below have a leaf node: open it before working in that area. Each leaf uses the same six sections (Purpose & Scope, Entry Points & Contracts, Usage Patterns, Anti-patterns, Dependencies & Edges, Pitfalls) so you can pattern-match across the workspace; copy that template when adding a new package with non-trivial invariants. The config-only package (`typescript/`) deliberately has no node; its config files are self-documenting and a node would only repeat them.
+Each `AGENTS.md` holds the rules and traps for its folder, and nothing else. Your tool may not load
+the folder nodes on its own, so **before you change code in a folder, read each `AGENTS.md` between
+it and the root.** How to use each package is documented for users in the docs app, under
+[`apps/docs/content/docs/`](apps/docs/content/docs/).
 
 - `apps/`
-  - [`docs/`](apps/docs/AGENTS.md): Documentation site (Next.js + Fumadocs) on port 5002
+  - [`docs/`](apps/docs/AGENTS.md): the Fumadocs documentation site, on port 5002
 - `packages/`
-  - [`ui/`](packages/ui/AGENTS.md): `@zeno-lib/ui` **private** workspace mirror of shadcn `base-nova` primitives (end users get these from shadcn directly)
-  - [`schema/`](packages/schema/AGENTS.md): `@zeno-lib/schema` pure Drizzle table → Zod schema helpers
-  - [`authentication/`](packages/authentication/AGENTS.md): `@zeno-lib/authentication` npm `confirm` handler + registry-distributed Supabase auth flows (read before touching `verify/` or `email-sent/`)
-  - [`forms/`](packages/forms/AGENTS.md): `@zeno-lib/forms` headless form factory (npm) + registry-distributed field kit + `create-form` + `form-dialog`
-  - [`supabase/`](packages/supabase/AGENTS.md): `@zeno-lib/supabase` SSR client + middleware
-  - [`query/`](packages/query/AGENTS.md): `@zeno-lib/query` TanStack Query suspense boundary, SSR prefetch boundary, timing presets (npm) + registry `query-error-fallback`
-  - [`db/`](packages/db/AGENTS.md): `@zeno-lib/db` Drizzle ORM client + schema + migrations + RLS + query/error helpers
-  - [`e2e/`](packages/e2e/AGENTS.md): `@zeno-lib/e2e` Playwright preset, dependency verifier and API sign-in helper
-  - [`test/`](packages/test/AGENTS.md): `@zeno-lib/test` shared Vitest config + Supabase RLS test harness
-  - `typescript/`: shared `tsconfig` presets
+  - [`ui/`](packages/ui/AGENTS.md): `@zeno-lib/ui`, the **private** workspace mirror of shadcn `base-nova` primitives
+  - [`schema/`](packages/schema/AGENTS.md): `@zeno-lib/schema`, Drizzle table to Zod schema helpers
+  - [`authentication/`](packages/authentication/AGENTS.md): `@zeno-lib/authentication`, the npm `confirm` handler and the registry auth flows
+  - [`forms/`](packages/forms/AGENTS.md): `@zeno-lib/forms`, the headless form factory (npm) and the registry field kit
+  - [`supabase/`](packages/supabase/AGENTS.md): `@zeno-lib/supabase`, the SSR clients and middleware
+  - [`query/`](packages/query/AGENTS.md): `@zeno-lib/query`, the suspense and SSR prefetch boundaries and timing presets
+  - [`db/`](packages/db/AGENTS.md): `@zeno-lib/db`, Drizzle clients, schema helpers, the config preset and RLS
+  - [`e2e/`](packages/e2e/AGENTS.md): `@zeno-lib/e2e`, the Playwright preset, dependency verifier and API sign-in
+  - [`test/`](packages/test/AGENTS.md): `@zeno-lib/test`, the Vitest presets and the Supabase RLS test harness
+  - `typescript/`: shared `tsconfig` presets, with no node
 
-### Keeping the Intent Layer current
-
-Update the relevant `AGENTS.md` in the same change as the code when you:
-
-- add, remove, or rename a public export, route, env var, or workspace dep that the node documents
-- change an invariant, contract, or anti-pattern (e.g. relax a guard, alter a redirect path, change a hook's behaviour)
-- discover a pitfall the node doesn't yet capture
-- add a package with non-trivial invariants → create a new leaf using the six-section template and add a downlink to the tree above
-- delete or merge a package → remove its node and its downlink
-
-Don't update the node for mechanical refactors, formatting, or implementation details that don't affect contracts. If you're unsure whether a change crosses the line, err on the side of updating; stale nodes are worse than verbose ones. A node entry that names a specific file path, export, or flag is a *claim* that it exists; if you broke that claim, fix the node.
+**Edit an `AGENTS.md` only for a rule an agent would otherwise get wrong.** That means a trap, an
+invariant the code can't express, or a file to copy. Never describe what the code or the docs
+already show (exports, signatures, usage), and never record what changed or why a design moved: the
+commit, the PR and the changeset hold that. When a change makes a line false, fix or delete the
+line. A new package gets a node only once it has traps: a short intro that links its docs page, then
+its rules and traps.
 
 ## Distribution
 
-Zeno ships UI two ways, split by a single rule: **a source file that renders shadcn primitives (imports `@/components/ui/*`) is UI-coupled and ships via the shadcn registry; UI-free code stays on npm.**
+Zeno ships UI two ways, split by a single rule: **a source file that renders shadcn primitives
+(imports `@/components/ui/*`) is UI-coupled and ships via the shadcn registry; UI-free code stays on
+npm.**
 
-- **Primitives** come from **shadcn directly**; Zeno does not re-publish them. `@zeno-lib/ui` is a private workspace mirror for internal use + tests, and the alias target the registry-source packages resolve `@/components/ui/*` / `@/lib/utils` to (via tsconfig `paths`).
-- **Registry** (`shadcn add zeno-lib/zeno/<item>`, no namespace, direct GitHub addresses): the `theme`, the auth flows, the forms field kit + `create-form`, `form-dialog`, and `query-error-fallback`. The registry-distributed source under `packages/*/src/**` is authored in the shadcn consumer dialect (`@/components/ui/*`, `@/lib/utils`, `@zeno-lib/forms/lib/*`, `sonner`) and served **verbatim** (GitHub serves each file straight from `src/`). `pnpm registry:build` only regenerates the manifests: `registry.json` (root) + `packages/*/registry.json`, which are excluded from Biome. There are no generated file copies.
-- **npm**: `@zeno-lib/supabase` (whole), `@zeno-lib/test` (Vitest presets + RLS harness), `@zeno-lib/e2e` (Playwright preset + helpers), `@zeno-lib/authentication` (`confirm` only), `@zeno-lib/forms` (headless factory + `lib/*` logic; `./create-form` and `./form-dialog` are batteries-included opt-in entries), `@zeno-lib/query` (whole; its error fallback is the registry item).
+- **Primitives** come from **shadcn directly**; Zeno does not re-publish them. `@zeno-lib/ui` is a
+  private workspace mirror for internal use and tests, and the alias target the registry-source
+  packages resolve `@/components/ui/*` / `@/lib/utils` to (via tsconfig `paths`).
+- **Registry** (`shadcn add zeno-lib/zeno/<item>`): the `theme`, the auth flows, the forms field kit
+  and `create-form`, `form-dialog`, and `query-error-fallback`. Their source under `packages/*/src/**`
+  is written in the shadcn consumer dialect (`@/components/ui/*`, `@/lib/utils`,
+  `@zeno-lib/forms/lib/*`, `sonner`) and served **verbatim** from `src/`. `pnpm registry:build`
+  only regenerates the manifests (`registry.json` and `packages/*/registry.json`, excluded from
+  Biome); there are no generated file copies.
+- **npm**: `@zeno-lib/supabase`, `@zeno-lib/test`, `@zeno-lib/e2e`, `@zeno-lib/authentication`
+  (`confirm` only), `@zeno-lib/forms` (headless factory and `lib/*`; `./create-form` and
+  `./form-dialog` are opt-in entries), `@zeno-lib/query` (its error fallback is the registry item),
+  `@zeno-lib/db` and `@zeno-lib/schema`.
 
-See [`apps/docs/.../building-ui/installation`](apps/docs/content/docs/core-framework/building-ui/installation.mdx) for the consumer-facing guide.
+The consumer-facing guide is
+[`building-ui/installation`](apps/docs/content/docs/core-framework/building-ui/installation.mdx).
 
 ## Commands
 
-| Command | What it does |
-|---|---|
-| `pnpm install` | Install workspace deps. Triggers `fumadocs-mdx` codegen via `apps/docs` postinstall. |
-| `pnpm dev` | Run every package's dev task in parallel (docs serves on port 5002). |
-| `pnpm build` | Build everything (`turbo build`). |
-| `pnpm types:check` | Run `tsc --noEmit` across the graph (the docs app runs `next typegen` + `fumadocs-mdx` first). |
-| `pnpm test` / `pnpm test:watch` | Run / watch Vitest. `test` depends on `build` and `lint`. Some specs (e.g. `@zeno-lib/db`'s RLS integration test) connect to a real local Supabase, so start it first (`pnpm --filter @zeno-lib/db dev`). |
-| `pnpm e2e` / `pnpm e2e:watch` | Run / watch Playwright. Requires `pnpm exec playwright install --with-deps` once in `packages/e2e/`. |
-| `pnpm lint` / `pnpm lint:fix` | Ultracite check / autofix. |
-| `pnpm changeset` | Create a release note for publishable packages under `packages/`. |
-| `pnpm registry:build` | Regenerate the shadcn registry manifests (`registry.json` + `packages/*/registry.json`) from source via `scripts/build-registry.ts`. Run after editing any registry-distributed source; CI checks it's in sync. |
-| `pnpm prerelease:beta:enter` / `pnpm prerelease:beta:exit` | Enter or leave Changesets beta prerelease mode for test publishes. |
-| `pnpm version-packages` | Apply pending Changesets and update package versions/changelogs (with commit links via `@changesets/changelog-git`). |
-| `pnpm release` | Publish the pending package releases to npm. |
-| `pnpm ci` | Full pre-PR pipeline: `lint → types:check → build → test → e2e` (CI starts local Supabase before running, since `test` includes DB-backed specs). |
+The full list is in [package.json](package.json). The ones with a catch:
 
-Scope a command to one package with `pnpm turbo run <task> --filter <pkg-name>` (e.g. `--filter @zeno-lib/docs`).
+| Command | Catch |
+|---|---|
+| `pnpm install` | Triggers `fumadocs-mdx` codegen through the docs app's `postinstall`. |
+| `pnpm test` | Depends on `build` and `lint`. Some specs (such as `@zeno-lib/db`'s RLS integration test) need a local Supabase, so start it first (`pnpm --filter @zeno-lib/db dev`). |
+| `pnpm e2e` | Needs `pnpm exec playwright install --with-deps` once in `packages/e2e/`. |
+| `pnpm registry:build` | Run after editing any registry-distributed source. CI checks the manifests are in sync. |
+| `pnpm changeset` | Add a release note for any change to a publishable package. |
+| `pnpm ci` | The full pre-PR pipeline: `lint → types:check → build → test → e2e`. |
+
+Scope a command to one package with `pnpm turbo run <task> --filter <pkg-name>`.
 
 ## Formatting
 
-Ultracite (Biome under the hood) enforces formatting and most lint rules. **Don't hand-format**; `pnpm lint:fix` autofixes. In Cursor, `.cursor/hooks.json` runs `pnpm dlx ultracite fix` automatically after every file edit, so file content visible right after a write may already differ from what was written.
+Ultracite (Biome) enforces formatting and most lint rules. **Don't hand-format**; `pnpm lint:fix`
+autofixes. In Cursor, `.cursor/hooks.json` runs `pnpm dlx ultracite fix` after every file edit, so a
+file can differ from what was just written.
 
 ## Security
 

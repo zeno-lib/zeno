@@ -1,176 +1,63 @@
-# `@zeno-lib/forms`: Intent
+# `@zeno-lib/forms`
 
-A thin, type-safe layer over [TanStack Form](https://tanstack.com/form) + Zod. Inherits root conventions; this file documents the npm/registry split and the invariants you can't infer from one file.
+A typed layer over [TanStack Form](https://tanstack.com/form) and Zod. The user guide is in
+[`components/forms`](../../apps/docs/content/docs/feature-modules/components/forms/index.mdx).
 
-## Purpose & Scope
+## Distribution rules
 
-Typed form composition: a `schema` prop drives validation, default values, and the required
-indicator; field wrappers give type-safe `name`s; a submit button wires loading state.
+- **The npm `.` entry must stay UI-free.** The headless core (`createZenoForm`, `lib/*`, `Form`,
+  `FormProvider`) is on npm; the shadcn-based fields, `create-form` and `form-dialog` ship through
+  the registry. Importing a field into `index.ts` drags the primitives into the headless bundle.
+- **Registry sources ship verbatim, so their imports are the consumer's**: `@/components/ui/*`,
+  `@/lib/utils`, and `@zeno-lib/forms/lib/*` for the headless core. Keep new fields in that
+  dialect.
+- **The import style decides what gets bundled.** `lib/required-indicator.tsx` is visual, so the
+  fields import it relatively and the generator bundles it into the block; headless `lib/*.ts`
+  modules are imported as `@zeno-lib/forms/lib/*` and stay on npm.
+- **`create-form.tsx` and the fields import the public entry** (`@zeno-lib/forms`,
+  `@zeno-lib/forms/lib/*`), never relative paths into the factory or `lib/`. `tsc` and Vitest
+  resolve them to `src/` through tsconfig `paths`; consumers get `dist/`.
+- **Never point an npm entry in `exports` back at `src/`.** The docs app still works, but an
+  installed copy fails the consumer's Next build with "Unknown module type".
+- **`dist/` is committed** (`bundle-packages.yml`), because the docs app reads it during
+  `pnpm dev`. Rebuild after editing an npm entry.
+- **Keep `"jsx": "react-jsx"` in `tsconfig.json`.** The shared preset's `preserve` leaves raw JSX in
+  the `.mjs` files, and Turbopack fails to parse the client chunk.
+- **`@zeno-lib/ui` is a devDependency, never a peer.** It is private, so a `workspace:^` peer would
+  publish as an unresolvable range.
+- **Keep `@tanstack/react-form` and `@tanstack/react-form-nextjs` on the same version**, and
+  subscribe with `useSelector` (`useStore` is deprecated).
 
-**Distribution split (the key invariant).** The package is cut by the workspace rule "renders
-shadcn primitives (`@/components/ui/*`) → registry; UI-free → npm":
+## Contracts every field keeps
 
-- **npm (`.` + `./lib/*` + `./tanstack`)**: the headless core: `createZenoForm` (the factory),
-  the `lib/*` logic (validation, schema, contexts, aria, `use-is-invalid`, the locale-aware number
-  engine `formatted-number` + `use-formatted-number`), `Form`/`FormProvider`.
-  None import shadcn primitives.
-- **Registry (`shadcn add zeno-lib/zeno/create-form`)**: the 20 shadcn-based field components,
-  the button fields, `validation-spinner`, `required-indicator`, and the `create-form` composition
-  root. These drop into the user's repo under `@/components/form/*`.
-- **Registry (`shadcn add zeno-lib/zeno/form-dialog`)**: `form-dialog.tsx`, a dialog-hosted form
-  (Base UI `Dialog` + nested `AlertDialog` discard prompt). Its session state and leave guard
-  (`lib/use-form-dialog.ts`: `useFormDialog`, `useLeaveGuard`, `findFieldElement`) are UI-free and
-  stay on npm.
+- **Every registry field puts `data-field={field.name}` and `data-invalid` on its `<Field>` root, and
+  `aria-invalid={isInvalid || undefined}` on its focusable control** (or on the group root, whose
+  first focusable child then gets focus). Submit-invalid focus depends on it.
+- **Submit-invalid focus lives in `<Form>`'s `onSubmit`** (`form-element.tsx`), after
+  `await form.handleSubmit()`. It relies on `useSyncExternalStore` flushing `aria-invalid` before
+  that continuation. Don't add a timer.
+- **Field names use TanStack's syntax** (`members[0].name`). Required paths are stored with indices
+  normalised to `[0]`, so one entry covers every array row.
+- **Type tests (`*.test-d.ts`) pin the field DX.** Update them with any factory type change.
 
-**Owns:** the form factory + validation logic (npm), the field components + `create-form` wiring
-(registry). **Does NOT own:** the primitives the fields render (shadcn), the app's routes/layout.
+## Traps
 
-## Entry Points & Contracts
-
-| Import | Provides |
-|---|---|
-| `@zeno-lib/forms` | `createZenoForm`, `Form`, `FormProvider`, `useFieldContext`/`useFormContext`, `useIsInvalid`, `ValidationError`, `applyValidationError`, `submitAction`, `applyActionError`, `ActionResult`/`ActionError` (types), `toActionError`, `toFieldName`, `blurThenChangeLogic`: all UI-free |
-| `@zeno-lib/forms/lib/*` | the individual headless modules (fields resolve `contexts`/`aria`/`use-is-invalid` here) |
-| `@zeno-lib/forms/tanstack` | re-export of `@tanstack/react-form` |
-| `@zeno-lib/forms/form-dialog` | the registry-shaped `FormDialog` (same opt-in model as `./create-form`; the docs app imports it from here) |
-| `@zeno-lib/forms/create-form` | **batteries-included opt-in**: the pre-wired `useForm`/`useAppForm`/`withForm`/fields. Its source is registry-shaped: it imports primitives as `@/components/ui/*` (not `@zeno-lib/ui`), so a consumer needs those aliases + local shadcn primitives. The docs app imports from here (backed by tsconfig `paths`); end users normally own this file via the registry. |
-
-`createZenoForm({ fieldComponents, formComponents })` runs `createFormHook` + builds a **generic**
-`useAppFields` (per-field prop types are inferred from the injected components) + the schema-aware
-`useForm`, and returns them. `create-form.tsx` is the composition root: it injects the dropped-in
-fields and is what the registry ships.
-
-Behavioural contracts the factory and fields share:
-
-- **Field-name syntax is TanStack's** (`members[0].name`). `lib/schema-required.ts` records
-  required paths in that syntax with indices normalised to `[0]`, and `isFieldRequired` normalises
-  the looked-up name via `toRequiredPathKey`, so one entry covers every array row. The probe
-  descends into required objects/arrays using `issue.expected` (`"object"`/`"array"`).
-- **Submit-invalid focus lives in `<Form>`'s `onSubmit`** (`form-element.tsx`): after
-  `await form.handleSubmit()`, if the form is invalid it focuses the first `[aria-invalid="true"]`
-  under `event.currentTarget` (or that element's first tabbable descendant). Scoping comes from
-  the submit event, so there's no registry and no option; `onSubmitInvalid` is not wrapped. It
-  relies on fields having re-rendered `aria-invalid` by the time `handleSubmit` resolves, which
-  holds because TanStack's store updates reach React through `useSyncExternalStore`, whose sync
-  re-render flushes in a microtask before that continuation. Don't add a timer.
-- **`reset(values)` rebases defaults and sticks.** TanStack's `useForm` calls `update(options)`
-  every render and, while untouched, re-applies `defaultValues` that deep-differ from the live ones,
-  which would undo a reset when the caller passes a fixed literal. `lib/use-rebased-default-values.ts`
-  forwards the caller's defaults only when they deep-change (TanStack's `evaluate`), else the live
-  instance's `options.defaultValues`. The live instance comes from a chained form-level
-  `listeners.onMount`, because the object `useForm` returns is a spread whose `options` is stale.
-- **Every registry field** puts `data-field={field.name}` + `data-invalid` on its `<Field>` root and
-  `aria-invalid={isInvalid || undefined}` on its focusable control (or the group root, whose first
-  focusable child then gets focus). Keep both on any new field.
-
-## Usage Patterns
-
-```tsx
-"use client"
-import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form" // or your ejected copy
-import { z } from "zod"
-
-const form = useForm({ schema: z.object({ email: z.email() }), onSubmit })
-const { EmailField, SubmitButton } = form
-// <EmailField name="email" /> (see Anti-patterns re: name)
-```
-
-Server actions: `submitAction(submit, action, { schema?, reset? })` takes `onSubmit`'s own
-argument, optionally `safeParse`s the input values with `schema` (the action gets the output),
-calls the action, and on `{ ok: false }` applies the errors via `applyActionError`; it returns the
-`ActionResult`, typed from the action. `reset: true | "values" | (data) => values` rebases the form
-after a success (`true` only type-checks when the data has the form's shape).
-
-```tsx
-onSubmit: (submit) => submitAction(submit, saveTeamAction, { reset: true })
-```
-
-## Anti-patterns
-
-- **`name` is required on every field wrapper**, including `EmailField`/`PasswordField`. The old
-  auto-default (`name` defaulting to `"email"`/`"password"`) was dropped when the factory became
-  generic; the generic `useAppFields` can't know per-field default names. Always pass `name`.
-- **The registry-source fields ship verbatim**, so their imports are the consumer's:
-  `@/components/ui/*` for primitives, `@/lib/utils`, and `@zeno-lib/forms/lib/*` for the headless
-  core (which stays on npm). `pnpm registry:build` only regenerates the `registry.json` manifest,
-  not file copies. Keep new field imports in this dialect; `@/*` resolves in-workspace via tsconfig
-  `paths` to `packages/ui/src`.
-- **Don't import field impls into the npm `.` entry.** It must stay UI-free: pulling a field (which
-  imports `@zeno-lib/ui`) into `index.ts` would drag the primitives into the headless bundle.
-
-- **Don't import `@zeno-lib/db` (or any server package) for the action result.** `ActionResult` is
-  declared in `lib/action-result.ts` and matched structurally by `defineFormAction` in
-  `@zeno-lib/db/next`; `lib/submit-action.test-d.ts` restates the server shape to pin
+- **`reset(values)` is undone on the next render when `useForm` still gets other
+  `defaultValues`.** TanStack re-applies deep-different option defaults on every render while the
+  form is untouched. `lib/use-rebased-default-values.ts` handles the plain case; to change a
+  mounted form's baseline, change the `defaultValues` you pass (as `useFormDialog` does).
+- **`FormDialog` detects unsaved changes with `!state.isDefaultValue`, never `isDirty`**, which stays
+  true after an edit is reverted. It resets in `onOpenChangeComplete`, after the exit animation;
+  don't `reset` inside the consumer's `onSubmit` either.
+- **Never write server errors to `errorMap.onServer`.** `blurThenChangeLogic` never clears it.
+  `applyValidationError` writes `errorMap.onChange` and subscribes to the store to clear each entry
+  when that field's value first moves.
+- **A server message keyed by a name no mounted field registered goes to the form-level error.**
+  Otherwise it would render nowhere and still block submit.
+- **Don't import `@zeno-lib/db` for `ActionResult`.** It is declared in `lib/action-result.ts` and
+  matched structurally by `defineFormAction`; `lib/submit-action.test-d.ts` pins the
   assignability. Change both sides together.
-- **Don't write server errors to `errorMap.onServer`.** `blurThenChangeLogic` never clears it on an
-  edit, and TanStack's `defaultValidationLogic` clears every field's `onServer` on any edit.
-  `applyValidationError` writes `errorMap.onChange` instead and clears it per field (below).
-
-## Dependencies & Edges
-
-npm deps: `@tanstack/react-form`, `@tanstack/react-form-nextjs` (pinned to the same 1.33.x; subscribe
-with `useSelector`, `useStore` is deprecated). Peers: `next`, `react`, `react-dom`, `zod`, plus the
-devtools pair (`@tanstack/react-devtools`, `@tanstack/react-form-devtools`) marked optional in
-`peerDependenciesMeta`: no source imports them, the docs just suggest them. `@zeno-lib/ui` is a
-devDependency only (never a peer: it's private, so a `workspace:^` peer would publish as a bogus
-unresolvable range) (the `@/components/ui/*` / `@/lib/utils` alias target that
-tsconfig `paths` resolve to `packages/ui/src` for in-workspace typecheck/tests); no published entry
-imports it directly anymore. Consumers of `./create-form` (npm) or the registry drop-in supply their
-own `@/components/ui/*` primitives instead.
-
-Build: `tsdown` compiles the npm entries (`.`, `./lib/*`, `./tanstack`) to `dist/` in `unbundle`
-mode, so each source module becomes one `.mjs` that keeps its own `"use client"`, and
-`lib/contexts` exists once however many entries reach it. `./create-form` and `./form-dialog` still
-export TypeScript source, because they import the consumer's `@/components/ui/*`. `dist/` is
-committed (see `.gitignore` and `.github/workflows/bundle-packages.yml`), since the docs app reads
-it during `pnpm dev`.
-
-Consumed by: `@zeno-lib/docs` (via `./create-form`); end users via the registry.
-
-## Pitfalls
-
-- **Formatted number fields keep their own text state.** `MoneyField`, `PercentageField` and
-  `YearField` are thin wrappers over `lib/use-formatted-number.ts`, which holds the input text
-  locally (so `"12."` survives typing) and re-syncs only when the form value drifts from what it last
-  parsed. Their value is `number | null` (empty → `null`), unlike `NumberField`'s `undefined`. Swiss
-  grouping is an apostrophe whose code point (`’` vs `'`) depends on the runtime's CLDR data; tests
-  derive it from `getNumberSeparators("de-CH")` instead of hard-coding it.
-- **`form.reset(values)` is undone on the next render when `useForm` still gets other
-  `defaultValues`.** `reset` rebases `options.defaultValues`, leaves the form untouched, and
-  TanStack's per-render `update(options)` then re-applies the (deep-different) option defaults. To
-  change a mounted form's baseline, change the `defaultValues` you pass to `useForm` (as
-  `useFormDialog` does), or edit values with `setFieldValue`.
-
-- **`FormDialog` detects "unsaved" with `!state.isDefaultValue`, never `isDirty`.** `isDirty` is
-  sticky (true after an edit is reverted by hand). It resets the form in `onOpenChangeComplete`
-  (after the exit animation) rather than on close, so the fields don't snap back while fading out;
-  don't `reset` inside the consumer's `onSubmit` either (see the pitfall above). Success = the
-  awaited `handleSubmit()` left `isSubmitSuccessful && isValid`, so a caught `ValidationError`
-  keeps the dialog open.
-- **`lib/required-indicator.tsx` (visual) is bundled into the registry block**, so the fields import
-  it with a *relative* path (`../lib/required-indicator`), whereas the headless `lib/*.ts` modules
-  are imported as `@zeno-lib/forms/lib/*` to keep them on npm. That relative-vs-bare split in the
-  source is what decides bundled-vs-npm; the generator just follows the relative imports.
-- **`create-form.tsx` self-imports `@zeno-lib/forms`** (for `createZenoForm`) and the fields
-  self-import `@zeno-lib/forms/lib/*` (for the headless core). `tsc` and Vitest resolve them to
-  `src/` through tsconfig `paths`; the docs app and the registry drop-in get `dist/` through
-  `exports`. Keep them importing the public entry, not relative paths into the factory/lib.
-- **Never point an npm entry in `exports` back at `src/`.** The docs app still works, because Next
-  compiles symlinked workspace source, but an installed copy under `node_modules` fails the
-  consumer's Next build with "Unknown module type".
-- **Keep `"jsx": "react-jsx"` in `tsconfig.json`.** The shared react preset says `preserve`, which
-  leaves raw JSX in the `.mjs` files, and Turbopack then fails to parse the client chunk.
-- **Type tests (`*.test-d.ts`) pin the field DX** (name required, per-field prop inference). Update
-  them in lockstep with any factory type change.
-- **A server error only clears on edit because `applyValidationError` subscribes to the store.**
-  TanStack Form alone keeps it: a field with no validators of its own runs nothing on change, and
-  the form-level pass keeps an error whose source it did not write. `clearWhenEdited` clears the
-  entry the first time that field's value moves (only that field, only while the entry is still
-  the one it wrote). While it stands, `canSubmit` is `false`, so resubmitting unchanged is a no-op.
-- **A message keyed by a name no mounted field registered goes to the form-level error.** Written
-  onto an unregistered name it would render nowhere yet still make the form invalid.
-- **`formApi.reset(values)` does not survive a re-render with fixed `defaultValues`.** TanStack's
-  `useForm` calls `formApi.update(options)` every render and re-applies `defaultValues` that differ
-  from the current ones while the form is untouched, which it is right after a reset. `reset` in
-  `submitAction` sticks when `defaultValues` follows the saved record (a server component
-  re-rendered by `revalidatePath`, or state); `submit-action.test.tsx` covers that path.
+- **The formatted number fields keep their own text state** (`lib/use-formatted-number.ts`), so
+  `"12."` survives typing. Their value is `number | null`, unlike `NumberField`'s `undefined`. Tests
+  read the Swiss grouping character from `getNumberSeparators("de-CH")`, because the code point
+  depends on the runtime's CLDR data.
