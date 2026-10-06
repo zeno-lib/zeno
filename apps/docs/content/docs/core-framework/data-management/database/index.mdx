@@ -168,7 +168,6 @@ migrations, and seeding:
     "stop": "pnpm exec supabase stop",
     "reset": "pnpm exec supabase db reset && pnpm db:seed",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
     "db:seed": "node src/seed.ts"
   }
 }
@@ -182,8 +181,6 @@ What each script does:
   script.
 - `db:generate` reads your TypeScript schema and writes a SQL migration under
   `supabase/migrations`.
-- `db:migrate` applies generated migrations to a database and records them in
-  Drizzle Kit's migration table.
 - `db:seed` runs your project-owned seed script.
 
 ## Environment

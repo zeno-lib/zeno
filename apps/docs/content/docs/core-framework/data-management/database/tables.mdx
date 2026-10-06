@@ -300,9 +300,8 @@ right only when you happen to write through Drizzle is worse than one you know
 needs a trigger.
 
 Drizzle Kit generates no trigger DDL, but `drizzle-kit generate --custom` writes
-an **empty but tracked** migration (its snapshot links into the chain, so
-`db:migrate` applies and records it like any generated one), and
-`@zeno-lib/db/triggers` gives you the SQL to put in it.
+an **empty but tracked** migration (its snapshot links into the chain like any
+generated one), and `@zeno-lib/db/triggers` gives you the SQL to put in it.
 
 ```bash
 pnpm db:generate --custom --name=posts_audit_triggers
