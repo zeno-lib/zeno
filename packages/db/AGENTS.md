@@ -348,9 +348,10 @@ assertion in `src/auth-schema.test.ts` tell you whether the shape moved.
 
 ## Pitfalls
 
-- **Do not use `drizzle-kit migrate`.**
-  It only reads `<name>/migration.sql`, and `defineDrizzleConfig` moves that file to `<name>.sql` for the Supabase CLI.
-  So it applies nothing and still reports success.
+- **Do not use `drizzle-kit migrate` or drizzle-orm's `migrate()`.**
+  They only read `<name>/migration.sql`, and `defineDrizzleConfig` moves that file to `<name>.sql` for the Supabase CLI.
+  So they apply nothing and still report success.
+  Set `moveGeneratedSql: false` to keep the folder layout for them.
 - **The move runs when the drizzle-kit process exits.**
   `defineDrizzleConfig` adds a `process.once("exit")` listener when the command is `generate`.
   It relies on drizzle-kit loading the config in the process that writes the migration.

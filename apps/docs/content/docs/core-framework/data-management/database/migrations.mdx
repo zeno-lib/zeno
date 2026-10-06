@@ -103,6 +103,7 @@ snapshot together with the SQL, and do not edit it by hand.
 Drizzle Kit writes both files into the folder, the SQL as `migration.sql`.
 The Supabase CLI only reads `.sql` files directly in `supabase/migrations`.
 So `defineDrizzleConfig()` moves `migration.sql` up one level and names it after the folder.
+Set `moveGeneratedSql: false` to keep Drizzle Kit's layout for `drizzle-kit migrate`.
 
 ## Apply migrations
 
@@ -115,7 +116,7 @@ and records each one in `supabase_migrations.schema_migrations`.
   runs the files a deployed project does not have yet.
 
 <Callout type="warn">
-  Do not use `drizzle-kit migrate`. We rely on supabase for running the migrations.
+  Do not use `drizzle-kit migrate` or drizzle-orm's `migrate()`. The Supabase CLI applies migrations.
 </Callout>
 
 ## Custom SQL migrations

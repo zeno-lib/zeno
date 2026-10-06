@@ -45,10 +45,15 @@ export const supabaseManagedRoles = [
  */
 const DEFAULT_SCHEMA_FILTER = ["public"]
 
+/**
+ * Drizzle Kit config for migrations the Supabase CLI applies.
+ * Moves each generated `<name>/migration.sql` to `<name>.sql` when `drizzle-kit generate` exits.
+ * Set `moveGeneratedSql: false` if `drizzle-kit migrate` applies them instead.
+ */
 export function defineDrizzleConfig(
-  overrides: Partial<Config> = {}
+  overrides: Partial<Config> & { moveGeneratedSql?: boolean } = {}
 ): ReturnType<typeof defineConfig> {
-  const { entities, ...configOverrides } = overrides
+  const { entities, moveGeneratedSql = true, ...configOverrides } = overrides
   // `entities.roles` may be a boolean (`true`) in drizzle-kit config; in that
   // form there are no role options to preserve, so we only merge the object
   // form. The `provider: "supabase"` flag below is always enforced regardless.
@@ -76,7 +81,7 @@ export function defineDrizzleConfig(
     ...configOverrides,
   } as Config)
 
-  if (config.out) {
+  if (moveGeneratedSql && config.out) {
     moveGeneratedSqlAfterGenerate({ migrationsDir: config.out })
   }
 
