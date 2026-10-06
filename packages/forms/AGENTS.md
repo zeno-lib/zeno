@@ -19,8 +19,8 @@ A typed layer over [TanStack Form](https://tanstack.com/form) and Zod. The user 
   resolve them to `src/` through tsconfig `paths`; consumers get `dist/`.
 - **Never point an npm entry in `exports` back at `src/`.** The docs app still works, but an
   installed copy fails the consumer's Next build with "Unknown module type".
-- **`dist/` is committed** (`bundle-packages.yml`), because the docs app reads it during
-  `pnpm dev`. Rebuild after editing an npm entry.
+- **The docs app reads `dist/`, not `src/`.** `pnpm dev` keeps it fresh with `tsdown --watch`;
+  outside `pnpm dev`, rebuild after editing an npm entry.
 - **Keep `"jsx": "react-jsx"` in `tsconfig.json`.** The shared preset's `preserve` leaves raw JSX in
   the `.mjs` files, and Turbopack fails to parse the client chunk.
 - **`@zeno-lib/ui` is a devDependency, never a peer.** It is private, so a `workspace:^` peer would

@@ -30,5 +30,6 @@ in [`testing/unit-testing`](../../apps/docs/content/docs/core-framework/testing/
   `auth.users` without `on delete cascade` makes GoTrue answer 500, which isn't retried.
 - **Use one harness per suite**, never `admin` for the reads under test, and call
   `refreshCurrentUser()` when something else changed the session.
-- **`dist/` is committed** (`bundle-packages.yml`). The package's own `vitest.config.ts` imports
-  `./src/configs/default.ts` relatively, because `@zeno-lib/test/configs` resolves to its `dist/`.
+- **`@zeno-lib/test/configs` resolves to `dist/`.** The package's own `vitest.config.ts` imports
+  `./src/configs/default.ts` relatively, and every other package's Vitest config needs this package
+  built first (Turbo's `test` and `test:watch` do it).

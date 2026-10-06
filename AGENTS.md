@@ -51,6 +51,14 @@ npm.**
   `./form-dialog` are opt-in entries), `@zeno-lib/query` (its error fallback is the registry item),
   `@zeno-lib/db` and `@zeno-lib/schema`.
 
+**Never commit `dist/`.** Every compiled npm package gitignores it and builds it in `prepack`, which
+`changeset publish` and `pnpm pack` both run. In the workspace, Turbo's `dev`, `test:watch`,
+`types:check` and `build` depend on `^build`; a package script run outside Turbo
+(`pnpm --filter <pkg> test`) on a fresh clone needs `pnpm build` first. `forms`, `query`,
+`supabase` and `test` run `tsdown --watch --no-clean` as `dev`. Keep `--no-clean`: their configs set
+`clean: true`, which empties `dist/` on every watch rebuild, so the docs app briefly can't resolve
+the package.
+
 The consumer-facing guide is
 [`building-ui/installation`](apps/docs/content/docs/core-framework/building-ui/installation.mdx).
 

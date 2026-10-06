@@ -20,8 +20,6 @@ The user guide is in
 - **Never hardcode the auth cookie name.** It derives from the Supabase URL, and the sign-in route
   reports it.
 - **New apps pick a non-default port.** The docs app is on 5002.
-- **`dist/` is gitignored and built at publish by `prepack`**, unlike `@zeno-lib/test` and
-  `@zeno-lib/supabase`, whose `dist/` is committed. Nothing imports this package during `pnpm dev`.
 
 ## Traps
 

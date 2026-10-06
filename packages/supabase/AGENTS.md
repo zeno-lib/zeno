@@ -41,6 +41,5 @@ middleware split honest. The user guide is in
   package fails silently.
 - **The image loader throws at request time** when the project id env var is missing, which shows up
   as a broken image, not a build failure.
-- **`dist/` is committed.** Run `pnpm --filter @zeno-lib/supabase build` after editing `src/`
-  (`bundle-packages.yml` also rebuilds it on PRs). Keep `next/*` in tsdown's `external`: `next` has no
-  exports map, so bundled imports would emit as `next/headers.js`.
+- **Keep `next/*` in tsdown's `external`.** `next` has no exports map, so bundled imports would emit
+  as `next/headers.js`.

@@ -34,6 +34,8 @@
   },
   "scripts": {
     "build": "tsdown",
+    "dev": "tsdown --watch --no-clean",
+    "prepack": "tsdown",
     "test": "vitest --run",
     "test:watch": "vitest watch",
     "types:check": "tsc --noEmit"
