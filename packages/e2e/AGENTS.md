@@ -1,125 +1,37 @@
-# `@zeno-lib/e2e` — Intent
+# `@zeno-lib/e2e`
 
-Playwright end-to-end tooling for the workspace, published as a reusable package so other monorepos share the same Playwright preset and dependency verifier. This repo's own suite dogfoods the published exports.
+The published Playwright preset (`./config`), dependency verifier (`./verify-deps` and the
+`zeno-e2e` bin) and API sign-in helpers (`./auth`), plus this repo's own specs, which dogfood them.
+The user guide is in
+[`testing/e2e-testing`](../../apps/docs/content/docs/core-framework/testing/e2e-testing.mdx).
 
-## Purpose & Scope
+## Rules
 
-Three published pieces, plus this repo's per-app specs that consume them:
+- **`tests/<dir>/` must match an app directory, `apps/<dir>`.** `verifyAppDeps` only matches folders
+  with a sibling `apps/<dir>/package.json`.
+- **Apps under test stay in `devDependencies`**, never `dependencies`, so they never ship in the
+  package. Turbo's `^build` still builds them. If one is missing, Turbo runs e2e against a stale
+  build and the failure is not obvious, so run `pnpm turbo run verify-deps --filter @zeno-lib/e2e`
+  after restructuring.
+- **Adding a tested app takes three changes:** `tests/<app-dir>/` with a spec, the app as a
+  workspace `devDependency`, and its server in the `webServer` array of `playwright.config.ts`.
+- **`baseConfig` never gets a `webServer`**, which is app-specific, and never loses `forbidOnly` in
+  CI, which would ship a stray `test.only` green.
+- **Never hardcode the auth cookie name.** It derives from the Supabase URL, and the sign-in route
+  reports it.
+- **New apps pick a non-default port.** The docs app is on 5002.
+- **`dist/` is gitignored and built at publish by `prepack`**, unlike `@zeno-lib/test` and
+  `@zeno-lib/supabase`, whose `dist/` is committed. Nothing imports this package during `pnpm dev`.
 
-- `@zeno-lib/e2e/config`: a `baseConfig` Playwright preset (browsers, reporter, retries, timeout, trace, and a `testDir` default of `./tests`) with no `webServer`.
-- `@zeno-lib/e2e/verify-deps`: `verifyAppDeps()` and the `zeno-e2e verify-deps` command, a parameterized checker that keeps a Turborepo `^build` graph honest.
-- `@zeno-lib/e2e/auth`: `signInViaApi()` and friends, which sign a user in through an env-gated test route and install the Supabase SSR cookie, so specs skip the sign-in UI.
+## Traps
 
-**Owns:** the shared Playwright defaults, the dependency-verification tool, the browser half of API sign-in (cookie + broadcast), this repo's specs.
-
-**Does NOT own:** unit tests (Vitest, alongside source), staging/prod smoke tests, test data seeding (signing in an existing user is not seeding; creating one is), the server half of API sign-in (`createTestSignInRoute` lives in `@zeno-lib/supabase/next-test-sign-in`, because it needs `next` and the cookie-backed server client), and the app-specific `webServer` (the consumer supplies that).
-
-## Entry Points & Contracts
-
-Layout:
-
-```
-packages/e2e/
-├── src/
-│   ├── auth.ts                      # published: @zeno-lib/e2e/auth
-│   ├── config.ts                    # published: @zeno-lib/e2e/config
-│   ├── verify-deps.ts               # published: @zeno-lib/e2e/verify-deps
-│   ├── cli.ts                       # published: zeno-e2e bin (dispatcher)
-│   └── commands/verify-deps.ts      # zeno-e2e verify-deps subcommand
-├── dist/                            # tsdown output (published)
-├── tsdown.config.ts
-├── playwright.config.ts             # repo-only: consumes @zeno-lib/e2e/config
-└── tests/<app-dir-name>/*.spec.ts   # repo-only; <dir> must match apps/<dir>
-```
-
-Published surface:
-
-| Import | Provides |
-|---|---|
-| `@zeno-lib/e2e/config` | `baseConfig` Playwright preset (import `defineConfig`/`devices` directly from `@playwright/test`) |
-| `@zeno-lib/e2e/verify-deps` | `verifyAppDeps({ appsDir, testsDir, packageJsonPath }) -> { ok, checked, missing }` |
-| `@zeno-lib/e2e/auth` | `signInViaApi({ page, url, email, password, request?, storageKey? }) -> ApiSession`: POSTs to the route at `url` (default `request` is `page.request`), clears the context's cookies, installs the `base64-` session cookie (chunked `<key>.N` past 3180 chars, like `@supabase/ssr`) for the route's host, and broadcasts `SIGNED_IN`. The storage key comes from the route's `storageKey` response field unless passed. Also `signOut({ page, storageKey })`, `broadcastAuthEvent(...)`, `supabaseStorageKey(supabaseUrl)` (`sb-<first hostname label>-auth-token`), `sessionCookieValues(key, session)`. |
-| `zeno-e2e` (bin) | CLI dispatcher; `zeno-e2e verify-deps` runs the checker (`--apps-dir` default `../../apps`, `--tests-dir` default `./tests`, `--package-json` default `./package.json`) |
-
-`baseConfig` omits `webServer` on purpose (only the consumer knows how to start their apps) but defaults `testDir` to `./tests`. Consumers spread it, add a `webServer`, and override `testDir` only if their specs live elsewhere. It reads `process.env.CI` at run time for `forbidOnly`/`retries`/`timeout`/`reporter`.
-
-`verifyAppDeps` checks the union of `dependencies` and `devDependencies`, so an app can be listed under either field.
-
-Scripts (`package.json`): `build` (tsdown), `types:check` (`tsc --noEmit`), `test` (Vitest unit tests in `src/*.test.ts`, no browser), `e2e` (`playwright test`), `e2e:watch` (`playwright test --ui`), `prepack` (`tsdown`, builds `dist/` at publish), `verify-deps` (runs `node ./dist/cli.mjs verify-deps` directly, since pnpm does not link this leaf package's own bin; external consumers invoke it as `zeno-e2e verify-deps`).
-
-Turbo wiring: `build` produces `dist/` before `verify-deps` and `e2e` (both depend on `build`), and `e2e` also depends on `^build` so the tested apps are built first.
-
-Adding a new tested app: (1) create `tests/<app-dir-name>/` with at least one spec, (2) add the app as a `devDependency` (workspace protocol), (3) add its server to the `webServer` array in `playwright.config.ts`.
-
-## Usage Patterns
-
-Run the repo suite locally (reuses an existing dev server on port 5002 if one is up):
-
-```bash
-pnpm exec playwright install --with-deps   # one-time, in this package
-pnpm turbo run e2e --filter @zeno-lib/e2e
-```
-
-Consume the preset elsewhere:
-
-```ts
-import { defineConfig } from "@playwright/test"
-import { baseConfig } from "@zeno-lib/e2e/config"
-
-export default defineConfig({
-  ...baseConfig,
-  webServer: { command: "pnpm --filter @yourorg/webapp start", url: "http://localhost:3000" },
-})
-```
-
-Author a spec (the tests folder name must match the app directory name under `apps/`):
-
-```ts
-import { expect, test } from "@playwright/test"
-
-test("description", async ({ page }) => {
-  const response = await page.goto("http://localhost:5002/<path>", {
-    waitUntil: "networkidle",
-  })
-  expect(response?.status()).toBe(200)
-})
-```
-
-Sign in through the API instead of the UI (the app mounts `createTestSignInRoute` at that path):
-
-```ts
-import { signInViaApi } from "@zeno-lib/e2e/auth"
-
-test.beforeEach(async ({ page }) => {
-  await signInViaApi({ page, url: "http://localhost:3100/api/test/sign-in", email, password })
-})
-```
-
-## Anti-patterns
-
-- **Don't hard-code the auth cookie name.** It is derived from the Supabase URL (`sb-127-auth-token` locally, `sb-<ref>-auth-token` hosted); the route reports it.
-
-- **Don't bake a `webServer` into `baseConfig`.** It is app-specific and belongs in the consumer's config. (`testDir` defaults to `./tests` but stays overridable.)
-- **Don't add a spec under `tests/<dir>/` whose `<dir>` doesn't match an actual app directory name.** `verifyAppDeps` only matches folders that have a sibling `apps/<dir>` with a `package.json`.
-- **Don't hardcode `localhost:3000`.** The docs app runs on `5002`; new apps should pick non-default ports too.
-- **Don't disable `forbidOnly`.** `baseConfig` enables it only in CI; flipping that ships a stray `test.only` green.
-- **Don't move an app under test into `dependencies`.** Apps stay in `devDependencies` so they never ship in the published package; Turbo's `^build` still builds them because its graph includes devDependencies.
-
-## Dependencies & Edges
-
-- **Dev:** `@zeno-lib/test` + `vitest` for the unit tests (`vitest.config.ts`); Playwright's `tests/` specs are `*.spec.ts`, so the two suites never pick up each other's files.
-- **Peer:** `@playwright/test` (`>=1`). Consumers install it; the repo also keeps it as a devDependency for its own tests and for dts generation.
-- **Apps under test** are listed in `devDependencies` (workspace protocol). `verifyAppDeps` enforces this and prints the exact JSON snippet to add when one is missing.
-- **Build:** `tsdown` bundles `src/` to `dist/`; `@playwright/test` (a peer dependency) is left external automatically, so it stays a bare specifier in the output.
-- **Publish:** `dist/` is gitignored and built at publish time by the `prepack` script, so it is never committed. This differs from `@zeno-lib/test`/`@zeno-lib/supabase`, whose committed `dist/` is kept in sync by `bundle-packages.yml`; e2e opts out because nothing imports it during `pnpm dev` (its `dist/` is only needed to publish, and the repo's own e2e run builds it via Turbo).
-- After `pnpm install`, run `pnpm exec playwright install --with-deps` once in this package to download browser binaries.
-
-## Pitfalls
-
-- **The repo's `playwright.config.ts` and `verify-deps` script consume the built `dist/`,** so `build` must run first. Turbo handles this (`verify-deps` and `e2e` depend on `build`); if you invoke Playwright directly, run `pnpm turbo run build --filter @zeno-lib/e2e` beforehand.
-- **`verifyAppDeps` is the contract enforcement point** for Turbo's `^build`. If an app under test is not a workspace dep, Turbo runs e2e against a stale build and the failure is non-obvious. Run `pnpm turbo run verify-deps --filter @zeno-lib/e2e` after restructuring.
-- **`webServer.reuseExistingServer: !process.env.CI`** means locally Playwright reuses a dev server already on the port (HMR, not the production build), which can mask production-only bugs. Kill the dev server for a trustworthy local run.
-- **CI test timeout is 30s, local is 120s** (from `baseConfig`). A test that slowly polls a network-idle page can pass locally and time out in CI.
-- **`broadcastAuthEvent` only reaches clients on the page's current origin.** On a fresh `about:blank` page it is a no-op; the cookie still signs the next navigation in.
-- **The session cookie lives 400 days** (the `@supabase/ssr` default), not until the access token expires, so the browser client can still refresh it mid-suite.
-- **`reporter` is `html` in CI**, writing to `playwright-report/`, which should stay in `.gitignore`.
+- **The repo's `playwright.config.ts` and `verify-deps` script read the built `dist/`.** Turbo builds
+  it first; if you run Playwright directly, run `pnpm turbo run build --filter @zeno-lib/e2e`
+  before.
+- **The `verify-deps` script runs `node ./dist/cli.mjs verify-deps`**, because pnpm doesn't link a
+  package's own bin. External consumers run `zeno-e2e verify-deps`.
+- **Locally, Playwright reuses a dev server already on the port** (`reuseExistingServer`), which can
+  hide production-only bugs. Kill the dev server for a trustworthy run.
+- **The test timeout is 30s in CI and 120s locally**, so slow polling can pass locally and fail in CI.
+- **`broadcastAuthEvent` only reaches the page's current origin.** On `about:blank` it does nothing,
+  and the cookie still signs the next navigation in.
