@@ -7,6 +7,7 @@ on:
       - "packages/test/**"
       - "packages/supabase/**"
       - "packages/query/**"
+      - "packages/forms/**"
 
 permissions:
   contents: write
@@ -31,6 +32,9 @@ jobs:
           - name: query
             filter: "@zeno-lib/query"
             dist: packages/query/dist
+          - name: forms
+            filter: "@zeno-lib/forms"
+            dist: packages/forms/dist
     steps:
       - name: Checkout code
         uses: actions/checkout@v7

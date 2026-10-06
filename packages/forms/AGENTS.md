@@ -118,6 +118,13 @@ tsconfig `paths` resolve to `packages/ui/src` for in-workspace typecheck/tests);
 imports it directly anymore. Consumers of `./create-form` (npm) or the registry drop-in supply their
 own `@/components/ui/*` primitives instead.
 
+Build: `tsdown` compiles the npm entries (`.`, `./lib/*`, `./tanstack`) to `dist/` in `unbundle`
+mode, so each source module becomes one `.mjs` that keeps its own `"use client"`, and
+`lib/contexts` exists once however many entries reach it. `./create-form` and `./form-dialog` still
+export TypeScript source, because they import the consumer's `@/components/ui/*`. `dist/` is
+committed (see `.gitignore` and `.github/workflows/bundle-packages.yml`), since the docs app reads
+it during `pnpm dev`.
+
 Consumed by: `@zeno-lib/docs` (via `./create-form`); end users via the registry.
 
 ## Pitfalls
@@ -145,9 +152,14 @@ Consumed by: `@zeno-lib/docs` (via `./create-form`); end users via the registry.
   are imported as `@zeno-lib/forms/lib/*` to keep them on npm. That relative-vs-bare split in the
   source is what decides bundled-vs-npm; the generator just follows the relative imports.
 - **`create-form.tsx` self-imports `@zeno-lib/forms`** (for `createZenoForm`) and the fields
-  self-import `@zeno-lib/forms/lib/*` (for the headless core). In-workspace these resolve via the
-  package `exports` map to `src/**`; in the registry drop-in they're the npm package. Keep them
-  importing the public entry, not relative paths into the factory/lib.
+  self-import `@zeno-lib/forms/lib/*` (for the headless core). `tsc` and Vitest resolve them to
+  `src/` through tsconfig `paths`; the docs app and the registry drop-in get `dist/` through
+  `exports`. Keep them importing the public entry, not relative paths into the factory/lib.
+- **Never point an npm entry in `exports` back at `src/`.** The docs app still works, because Next
+  compiles symlinked workspace source, but an installed copy under `node_modules` fails the
+  consumer's Next build with "Unknown module type".
+- **Keep `"jsx": "react-jsx"` in `tsconfig.json`.** The shared react preset says `preserve`, which
+  leaves raw JSX in the `.mjs` files, and Turbopack then fails to parse the client chunk.
 - **Type tests (`*.test-d.ts`) pin the field DX** (name required, per-field prop inference). Update
   them in lockstep with any factory type change.
 - **A server error only clears on edit because `applyValidationError` subscribes to the store.**

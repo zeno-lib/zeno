@@ -266,6 +266,9 @@ importers:
       lucide-react:
         specifier: ^1.23.0
         version: 1.46.0(react@19.2.5)
+      tsdown:
+        specifier: ^0.22.14
+        version: 0.22.14(tsx@4.20.6)(typescript@7.0.2)
       typescript:
         specifier: 7.0.2
         version: 7.0.2

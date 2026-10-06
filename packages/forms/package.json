@@ -1,14 +1,28 @@
 {
   "name": "@zeno-lib/forms",
   "version": "0.2.0",
+  "type": "module",
   "exports": {
-    ".": "./src/index.ts",
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
     "./create-form": "./src/create-form.tsx",
     "./form-dialog": "./src/form-dialog.tsx",
-    "./lib/*": "./src/lib/*.ts",
-    "./tanstack": "./src/tanstack.ts"
+    "./lib/*": {
+      "types": "./dist/lib/*.d.mts",
+      "import": "./dist/lib/*.mjs",
+      "default": "./dist/lib/*.mjs"
+    },
+    "./tanstack": {
+      "types": "./dist/tanstack.d.mts",
+      "import": "./dist/tanstack.mjs",
+      "default": "./dist/tanstack.mjs"
+    }
   },
   "files": [
+    "dist",
     "src"
   ],
   "publishConfig": {
@@ -19,6 +33,7 @@
     "directory": "packages/forms"
   },
   "scripts": {
+    "build": "tsdown",
     "test": "vitest --run",
     "test:watch": "vitest watch",
     "types:check": "tsc --noEmit"
@@ -51,6 +66,7 @@
     "@zeno-lib/typescript": "workspace:^",
     "@zeno-lib/ui": "workspace:^",
     "lucide-react": "^1.23.0",
+    "tsdown": "^0.22.14",
     "typescript": "7.0.2",
     "vite": "8.0.16",
     "vitest": "5.0.2",
