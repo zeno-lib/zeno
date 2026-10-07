@@ -92,8 +92,8 @@ export type SupabaseToken = Pick<JwtPayload, "role" | "sub">
 type RlsContext = { claims: string; role: string; sub: string }
 
 // Clamps a token's role to the allowlist and re-serializes the claims so a
-// policy reading auth.jwt()->>'role' can never disagree with the role we
-// `set local role` to.
+// policy reading auth.jwt()->>'role' can never disagree with the role the
+// transaction switches to.
 function clampClaims(token: Partial<SupabaseToken>): RlsContext {
   const role =
     token.role && ALLOWED_RLS_ROLES.has(token.role) ? token.role : "anon"
@@ -178,8 +178,10 @@ function buildDrizzle<TRelations extends AnyRelations>(
 
 // Wraps a drizzle instance in the lazy RLS query proxy. Claims are resolved
 // before each transaction opens (so `createAuthClient` re-checks the live
-// session per query), then installed transaction-locally via
-// `set_config(..., true)` + `set local role`, which auto-reset at commit.
+// session per query), then installed transaction-locally with
+// `set_config(..., true)`, which auto-resets at commit. The role goes through
+// `set_config('role', ...)`, which is what `set local role` does, so claims and
+// role cost one round trip, and the role is a bound parameter.
 function buildRlsClient<TRelations extends AnyRelations>(
   resolveContext: () => Promise<RlsContext>,
   config?: CreateClientConfig<TRelations>
@@ -189,9 +191,8 @@ function buildRlsClient<TRelations extends AnyRelations>(
     const { claims, role, sub } = await resolveContext()
     return db.transaction(async (tx) => {
       await tx.execute(
-        sql`select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true)`
+        sql`select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true), set_config('role', ${role}, true)`
       )
-      await tx.execute(sql`set local role ${sql.raw(role)}`)
       return transaction(tx)
     })
   }
