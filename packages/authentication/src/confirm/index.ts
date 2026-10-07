@@ -16,7 +16,7 @@ export async function getRoute(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const token_hash = searchParams.get("token_hash")
   const type = searchParams.get("type") as EmailOtpType | null
-  const next = searchParams.get("next") ?? (type ? defaultNexts[type] : "/")
+  const next = searchParams.get("next") ?? (type && defaultNexts[type]) ?? "/"
 
   if (token_hash && type) {
     const supabase = await createClient()

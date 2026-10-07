@@ -46,14 +46,14 @@
     "@playwright/test": ">=1"
   },
   "devDependencies": {
-    "@playwright/test": "1.60.0",
+    "@playwright/test": "1.63.0",
     "@types/node": "^25.6.0",
     "@zeno-lib/docs": "workspace:*",
     "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
     "tsdown": "^0.22.14",
     "typescript": "7.0.2",
-    "vite": "8.0.16",
+    "vite": "8.3.3",
     "vitest": "5.0.2"
   }
 }

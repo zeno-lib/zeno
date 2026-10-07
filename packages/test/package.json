@@ -43,9 +43,9 @@
     "test": "vitest --run"
   },
   "dependencies": {
-    "@testing-library/react": "16.3.2",
-    "@testing-library/user-event": "14.6.1",
-    "@vitejs/plugin-react": "6.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.7",
+    "@vitejs/plugin-react": "6.1.2",
     "jsdom": "29.1.1",
     "vite-tsconfig-paths": "6.1.1"
   },
@@ -55,12 +55,12 @@
     "vitest": "^4.1.0"
   },
   "devDependencies": {
-    "@supabase/supabase-js": "2.116.0",
+    "@supabase/supabase-js": "2.117.2",
     "@types/node": "25.6.0",
     "@zeno-lib/typescript": "workspace:^",
     "tsdown": "^0.22.14",
     "typescript": "7.0.2",
-    "vite": "8.0.16",
+    "vite": "8.3.3",
     "vitest": "5.0.2"
   },
   "peerDependenciesMeta": {
