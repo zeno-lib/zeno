@@ -68,7 +68,7 @@
     "@types/node": "26.6.4",
     "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
-    "next": "^16.3.3",
+    "next": "^16.4.0",
     "tsdown": "^0.23.0",
     "typescript": "7.0.2",
     "vite": "8.3.3",
