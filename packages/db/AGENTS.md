@@ -9,8 +9,8 @@ This node holds what the code and the guide don't make obvious.
 - **Import the package's own files relatively** (`../src/schema`, `./src/config`), never through
   `@zeno-lib/db/*`. `types:check` runs before `build`, so a self-reference resolves against a
   `dist/` that doesn't exist yet.
-- **Keep every peer in tsdown's `external`.** A bundled second copy of `drizzle-orm` gives schema
-  entities a different identity from the ones the consumer's Drizzle Kit sees.
+- **Keep every peer in tsdown's `deps.neverBundle`.** A bundled second copy of `drizzle-orm` gives
+  schema entities a different identity from the ones the consumer's Drizzle Kit sees.
 - **Never point `exports` back at `src/`.** Plain Node, Turbopack and any consumer that emits all
   reject TypeScript under `node_modules`, and nothing fixes that from outside.
 - **Export only Zeno-owned helpers and curated `pg-core` aliases.** Consumers import `drizzle-orm`

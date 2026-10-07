@@ -17,7 +17,8 @@ is in [`data-management/queries`](../../apps/docs/content/docs/core-framework/da
   re-renders the subtree.
 - **Before hydration, return `fallback` alone**, never a swapped child. A suspending update keeps the
   old children mounted beside the fallback, which doubles the skeleton.
-- **Keep `@tanstack/*` and `react*` in tsdown's `external`.** A bundled copy splits the contexts.
+- **Keep `@tanstack/*` and `react*` in tsdown's `deps.neverBundle`.** A bundled copy splits the
+  contexts.
 
 ## Traps
 

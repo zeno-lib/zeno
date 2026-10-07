@@ -61,7 +61,7 @@
     "@zeno-lib/ui": "workspace:^",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "tsdown": "^0.22.14",
+    "tsdown": "^0.23.0",
     "typescript": "7.0.2",
     "vite": "8.3.3",
     "vitest": "5.0.2"

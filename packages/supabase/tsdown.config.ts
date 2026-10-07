@@ -2,6 +2,10 @@ import { defineConfig } from "tsdown"
 
 export default defineConfig({
   clean: true,
+  // Keep peer imports as bare specifiers. `next` ships no exports map, so a
+  // `next/headers` resolved to a file is emitted as `next/headers.js`, which
+  // breaks on any consumer whose `next` adds a strict exports map.
+  deps: { neverBundle: [/^@supabase\//, /^next(\/|$)/] },
   dts: true,
   entry: {
     client: "src/client.ts",
@@ -11,8 +15,4 @@ export default defineConfig({
     "next-server": "src/next-server.ts",
     "next-test-sign-in": "src/next-test-sign-in.ts",
   },
-  // Keep peer imports as bare specifiers. `next` ships no exports map, so without
-  // this tsdown resolves `next/headers` to a file and emits `next/headers.js`,
-  // which breaks on any consumer whose `next` adds a strict exports map.
-  external: [/^@supabase\//, /^next(\/|$)/],
 })
