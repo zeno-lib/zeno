@@ -71,7 +71,7 @@
   "peerDependencies": {
     "@supabase/supabase-js": ">=2",
     "drizzle-kit": "1.0.0-rc.5-5935859",
-    "drizzle-orm": "1.0.0-rc.3",
+    "drizzle-orm": "1.0.0-rc.5-5935859",
     "postgres": ">=3.4",
     "react": ">=19"
   },
@@ -89,7 +89,7 @@
     "@zeno-lib/typescript": "workspace:^",
     "dotenv": "18.0.5",
     "drizzle-kit": "1.0.0-rc.5-5935859",
-    "drizzle-orm": "1.0.0-rc.3",
+    "drizzle-orm": "1.0.0-rc.5-5935859",
     "postgres": "3.4.9",
     "react": "^19.3.0",
     "supabase": "2.120.0",

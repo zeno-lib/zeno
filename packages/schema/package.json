@@ -28,12 +28,12 @@
     "types:check": "tsc --noEmit"
   },
   "peerDependencies": {
-    "drizzle-orm": "1.0.0-rc.3",
+    "drizzle-orm": "1.0.0-rc.5-5935859",
     "zod": ">=4"
   },
   "devDependencies": {
     "@zeno-lib/typescript": "workspace:^",
-    "drizzle-orm": "1.0.0-rc.3",
+    "drizzle-orm": "1.0.0-rc.5-5935859",
     "tsdown": "^0.23.0",
     "typescript": "7.0.2",
     "vitest": "5.0.3",
