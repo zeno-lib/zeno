@@ -56,7 +56,7 @@
   },
   "devDependencies": {
     "@supabase/supabase-js": "2.117.2",
-    "@types/node": "25.6.0",
+    "@types/node": "26.6.4",
     "@zeno-lib/typescript": "workspace:^",
     "tsdown": "^0.23.0",
     "typescript": "7.0.2",
