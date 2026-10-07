@@ -73,7 +73,7 @@ The full list is in [package.json](package.json). The ones with a catch:
 | `pnpm e2e` | Needs `pnpm exec playwright install --with-deps` once in `packages/e2e/`. |
 | `pnpm registry:build` | Run after editing any registry-distributed source. CI checks the manifests are in sync. |
 | `pnpm changeset` | Add a release note for any change to a publishable package. |
-| `pnpm ci` | The full pre-PR pipeline: `lint → types:check → build → test → e2e`. |
+| `pnpm run ci` | The full pre-PR pipeline: `lint → types:check → build → test → e2e`. Bare `pnpm ci` is pnpm's built-in clean install, not this script. |
 
 Scope a command to one package with `pnpm turbo run <task> --filter <pkg-name>`.
 
