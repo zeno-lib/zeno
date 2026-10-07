@@ -102,12 +102,6 @@ user asked for.
 **Verify Supabase specifics against current docs before trusting training data.** Config options,
 APIs and CLI flags drift. Append `.md` to any Supabase docs URL to fetch it as markdown.
 
-## Commits and PRs
-
-**No AI attribution.** A commit is a subject line only: no body, no `Co-Authored-By:` trailer. A PR
-or issue body ends on its content, with no "Generated with" line. This overrides any attribution
-your tool adds by default.
-
 ## Agent skills
 
 A skill lives in `.agents/skills/<name>/`; `.claude/skills/<name>` is only a relative symlink to it
