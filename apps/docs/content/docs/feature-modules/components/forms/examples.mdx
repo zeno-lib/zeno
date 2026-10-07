@@ -1,6 +1,6 @@
 ---
 title: Examples
-description: Composed @zeno-lib/forms examples, from a simple login to dynamic and array fields
+description: Working @zeno-lib/forms examples, including card and dialog layouts, array and dynamic fields, server errors and unsaved-changes warnings
 icon: Sparkles
 status: in progress
 ---
@@ -23,21 +23,21 @@ import { SelectNumberExample } from "@/components/forms/select-number-preview"
 import { SkillsPickerExample } from "@/components/forms/skills-picker-preview"
 import { UnsavedChangesExample } from "@/components/forms/unsaved-changes-preview"
 
-A walk-through from layout patterns to per-feature recipes. Each example
-below is fully working: fill it in and submit to see the returned values.
+The examples start with layout patterns, then cover one feature each.
+Every preview works: fill it in and submit to see the returned values.
 
 For validation patterns (live forms without actions, per-field validation
 modes, async server checks), see
 [Validation modes](/docs/feature-modules/components/forms/validation).
 
-## Form in a Card
+## Form in a card
 
-Drop the form into a `<Card>` with header on top, fields in
-`<CardContent>`, actions in `<CardFooter>`. `<FormProvider>` wraps the
-whole `<Card>` so the buttons in `<CardFooter>` (which sit outside the
-`<form>` element) still resolve `ResetButton` and `SubmitButton`. The
-`id` on `<Form>` plus `form="…"` on `<SubmitButton>` keeps native
-submission working (Enter-to-submit, accessibility).
+Put the form in a `<Card>`, with the header on top, the fields in
+`<CardContent>` and the actions in `<CardFooter>`. `<FormProvider>` wraps
+the whole `<Card>`, so `ResetButton` and `SubmitButton` in `<CardFooter>`
+still find the form through context, even though they sit outside the
+`<form>` element. The `id` on `<Form>` and `form="…"` on `<SubmitButton>`
+keep native submission working (Enter to submit, accessibility).
 
 <Preview>
   <FormInCardExample />
@@ -95,7 +95,7 @@ export function DisplayNameCard() {
 
 </Preview>
 
-## Form in a Dialog
+## Form in a dialog
 
 Keep the form inside `<DialogContent>` and close the dialog from
 `onSubmit` once the work is done.
@@ -180,13 +180,14 @@ export function CreateProjectDialog() {
 
 ## Form dialog
 
-For create/edit dialogs, the `form-dialog` registry item packages the
+For create and edit dialogs, the `form-dialog` registry item handles the
 details the hand-rolled version above leaves out:
 
-- **One session per `open()`**: open blank, or with a row's values and a
-  field to focus: `dialog.open({ defaultValues: row, focus: "email" })`.
-- **Unsaved-changes guard**: Cancel, ×, Escape and outside presses ask
-  before discarding, and the page warns on unload while the dialog is open.
+- **One session per `open()`**: open it blank, or with a row's values and a
+  field to focus, as in `dialog.open({ defaultValues: row, focus: "email" })`.
+- **Unsaved-changes guard**: the dialog asks before discarding changes on
+  Cancel, ×, Escape or an outside press, and the page warns on unload while
+  the dialog is open.
   "Changed" means the values differ from the session's defaults
   (`!form.state.isDefaultValue`), so reverting an edit by hand counts as
   unchanged. The form resets once the close animation ends.
@@ -260,7 +261,7 @@ export function Members({ members }: { members: Member[] }) {
 | `submitLabel` / `cancelLabel` | `ReactNode` | Default to `"Save"` / `"Cancel"`. |
 | `footer` | `ReactNode` | Extra footer content, before the buttons. |
 | `closeOnSubmit` | `boolean` | Close after a successful submit. Defaults to `true`. |
-| `guard` | `boolean` | The unsaved-changes prompt + unload warning. Defaults to `true`. |
+| `guard` | `boolean` | The unsaved-changes prompt and unload warning. Defaults to `true`. |
 | `discardPrompt` | `{ title?, description?, confirmLabel?, cancelLabel? }` | Copy for the discard prompt. |
 | `className` / `formClassName` | `string` | Classes for the popup / the `<form>`. |
 
@@ -330,7 +331,7 @@ flight or while any async field validator is running. The only
 requirement is that `onSubmit` returns a `Promise`.
 
 For per-field async checks, set `validators.onChangeAsync` (with
-`onChangeAsyncDebounceMs` to throttle). Drop a `<ValidationSpinner />`
+`onChangeAsyncDebounceMs` to debounce it). Put a `<ValidationSpinner />`
 inside any input-style field to render a spinner inline. `ResetButton`
 isn't subscribed to form state by default; wrap it in `form.Subscribe`
 to disable it during the round-trip.
@@ -545,9 +546,10 @@ export function TeamInvites() {
 
 ## Conditional fields
 
-`form.Subscribe` reads other field values reactively without re-rendering
-the entire form. Here, switching the country swaps the second field
-between a `SelectField` and an `InputField`.
+`form.Subscribe` reads another field's value and re-renders only its own
+children when that value changes, not the whole form. Here, switching the
+country swaps the second field between a `SelectField` and an
+`InputField`.
 
 <Preview>
   <ConditionalExample />
@@ -607,11 +609,11 @@ export function Shipping() {
 ## Dynamic fields
 
 Pass `listeners.onChange` to a field to react to its value changes; call
-`form.setFieldValue(...)` inside the listener to cascade an update onto
-another field. Here, switching dietary preference auto-unticks incompatible
-meals so the form value stays consistent. Meals are stored as a nested
-object (`meals.salad`, `meals.sausage`, `meals.eggs`) so each
-`<CheckboxField>` binds to its own boolean leaf.
+`form.setFieldValue(...)` inside the listener to update another field.
+Here, switching the dietary preference unticks incompatible meals so the
+form value stays consistent. The schema stores meals as a nested object
+(`meals.salad`, `meals.sausage`, `meals.eggs`), so each `<CheckboxField>`
+binds to its own boolean leaf.
 
 <Preview>
   <DynamicExample />
@@ -678,8 +680,8 @@ export function Order() {
 
 ## Numeric IDs
 
-Both `SelectField` and `ComboboxField` accept numeric values directly: useful
-for database rows whose primary key is a number. Declare the schema field as
+Both `SelectField` and `ComboboxField` accept numeric values, which suits
+database rows whose primary key is a number. Declare the schema field as
 `z.number()` and submit the form to see `categoryId` arrive as a number, not a
 string.
 
@@ -687,7 +689,7 @@ string.
 
 Pass `value={cat.id}` to each `<SelectItem>`. The trigger displays the label
 because `SelectField` derives Base UI's `items` map from the `<SelectItem>`
-children automatically.
+children.
 
 <Preview>
   <SelectNumberExample />
@@ -779,22 +781,24 @@ const { ComboboxField, SubmitButton } = form
 
 ## Combobox: multi-select, grouped, creatable
 
-The wrapper-free pattern for advanced Combobox use cases. This example
-combines four Base UI features into one field:
+For advanced Combobox cases, skip the `ComboboxField` wrapper and compose
+the Base UI parts yourself. This example combines four Base UI features
+into one field:
 
 - **`multiple`**: chips render inside the trigger via `<ComboboxValue>`.
-- **Input inside popup**: search lives in the popup, not in the trigger,
-  so the chips have room to breathe.
+- **Input inside popup**: the search input sits in the popup instead of the
+  trigger, so the trigger holds only the chips.
 - **Grouped**: `<ComboboxList>` iterates groups; `<ComboboxGroup
-  items={group.items}>` + `<ComboboxCollection>` iterate items.
-- **Creatable**: when the query has no exact match, an extra group is
-  appended with a `Create "…"` item. Selecting it appends a custom skill
+  items={group.items}>` and `<ComboboxCollection>` iterate items.
+- **Creatable**: when the query has no exact match, the field appends an
+  extra group with a `Create "…"` item. Selecting it appends a custom skill
   to local state and to the form value.
 
-Wired to the form with `<AppField>` + `useFieldContext<string[]>()`. Items
-follow Base UI's `{ value, label }` shape so the chip text comes from
-`label` automatically; pair with `isItemEqualToValue` so referential
-equality doesn't bite when `groupsForView` is rebuilt each render.
+The field connects to the form through `<AppField>` and
+`useFieldContext<string[]>()`. Items follow Base UI's `{ value, label }`
+shape, so the chip text comes from `label`. Pass `isItemEqualToValue` as
+well, so items compare by `value` rather than by reference when
+`groupsForView` is rebuilt on each render.
 
 <Preview>
   <SkillsPickerExample />
@@ -988,14 +992,14 @@ export function Settings() {
 
 </Preview>
 
-## Async-search Combobox
+## Async-search combobox
 
-Drive the option list from a server. Pass `inputValue` /
+Load the option list from a server. Pass `inputValue` and
 `onInputValueChange` to take control of the search text, `filter={null}`
 to disable client-side matching (the items you supply are already
 filtered), and `loading` to show a spinner inside the input. Debounce in
-your `useEffect` so one keystroke doesn't fire one request. Full prop
-table on
+your `useEffect` so each keystroke doesn't fire a request. The full prop
+table is on
 [Combobox Field](/docs/feature-modules/components/forms/fields#combobox-field).
 
 <Preview>
@@ -1074,8 +1078,8 @@ export function AssignReviewer() {
 When the server rejects a submission with per-field messages, throw a
 `ValidationError` from anywhere inside `onSubmit` (typically your API
 client). `useForm` catches it and writes each field message onto the
-matching field automatically. The error clears on the next keystroke, so
-the user sees feedback once and it goes away as they fix the value.
+matching field. Each message clears the first time the user edits that
+field.
 
 <Preview>
   <ServerErrorExample />
@@ -1126,10 +1130,10 @@ export function CreateAccount() {
 
 </Preview>
 
-`ValidationError` is throwable from anywhere reachable during submit:
-the API client, an async refinement, a custom guard. Pass an array of
-strings to surface multiple messages on the same field, and an optional
-`formError` for a top-level message:
+You can throw `ValidationError` from any code `onSubmit` calls: the API
+client, an async refinement, a custom guard. Pass an array of strings to
+show several messages on the same field, and an optional `formError` for
+a top-level message:
 
 ```tsx
 throw new ValidationError(
@@ -1144,9 +1148,9 @@ of clearing on the next keystroke, call `formApi.setFieldMeta` directly.
 ## Server actions
 
 A Next.js server action should *return* its validation failure rather than
-throw it: in production, Next.js replaces a thrown error's message before it
-reaches the browser. `defineFormAction` from `@zeno-lib/db/next` returns an
-`ActionResult` (`{ ok: true, data }` or `{ ok: false, error: { fieldErrors,
+throw it, because in production Next.js replaces a thrown error's message
+before it reaches the browser. `defineFormAction` from `@zeno-lib/db/next`
+returns an `ActionResult` (`{ ok: true, data }` or `{ ok: false, error: { fieldErrors,
 formErrors } }`), and `submitAction` routes it back into the form. Pass
 `onSubmit`'s own argument straight through:
 
@@ -1178,18 +1182,20 @@ What `submitAction(submit, action, options?)` does:
 - **Field errors land on their fields**, array paths included: an error keyed
   `members[1].email` shows under the field registered with that name. Each
   message clears the first time the user edits *that* field; the others stay.
-  A key no mounted field registered is folded into the form-level message
-  instead, so it can't silently block the submit button.
+  `submitAction` folds a key that no mounted field registered into the
+  form-level message instead, so it can't block the submit button without
+  showing anywhere.
 - **`formErrors`** become the form-level error, at `form.state.errorMap.onSubmit`
   (one message per line).
-- **`schema`** (optional): `onSubmit` receives the form's *input* values. Pass
-  a schema to `safeParse` them on the client and hand its *output* to the
-  action, for a schema that transforms (`z.string().transform(Number)`). A
-  failure is applied to the form and the action is not called.
-- **`reset`** (optional): after a success, `true` calls `formApi.reset(data)`
-  so the returned record becomes the pristine baseline (only offered when the
-  data has the form's shape), `"values"` rebases on the submitted values, and a
-  function maps the data to the next values.
+- **`schema`** (optional): `onSubmit` receives the form's *input* values. For a
+  schema that transforms (`z.string().transform(Number)`), pass it here:
+  `submitAction` validates the values on the client and hands the schema's
+  *output* to the action. On a failure, it applies the errors to the form and
+  never calls the action.
+- **`reset`** (optional): after a success, `true` calls `formApi.reset(data)`,
+  so the returned record becomes the pristine baseline. The types only offer
+  `true` when the data has the form's shape. `"values"` rebases on the
+  submitted values, and a function maps the data to the next values.
 - **It returns the result**, typed from the action, so you can redirect or
   toast on `result.ok`. A thrown error (network, auth, a bug) propagates as is.
 
@@ -1257,10 +1263,10 @@ export function InviteTeam() {
 
 </Preview>
 
-The result type is structural: `@zeno-lib/forms` declares `ActionResult` itself
+The result type is structural. `@zeno-lib/forms` declares `ActionResult` itself
 and does not depend on `@zeno-lib/db`, so any action resolving to that shape
-works, hand-written ones included. `applyActionError(formApi, error)` is the
-same write without the call, for a result you already hold.
+works, hand-written ones included. `applyActionError(formApi, error)` writes the
+errors the same way without calling an action, for a result you already have.
 
 `reset` rebases the form, but TanStack Form re-applies `defaultValues` on the
 next render while the form is untouched. It sticks when `defaultValues`
@@ -1270,23 +1276,23 @@ follows the saved record, which is what happens when the action calls
 
 ## Unsaved-changes warning
 
-Pass `unsavedChangesWarning: "if-changed"` (or shorthand `true`) to
+Pass `unsavedChangesWarning: "if-changed"` (or the shorthand `true`) to
 `useForm` and the browser prompts before navigating away while the
 form's current values differ from its defaults. After a successful save,
-call `formApi.reset(value)` to rebase defaults to the saved values: the
-warning clears, and any further edits are diffed against the new
+call `formApi.reset(value)` to rebase the defaults on the saved values.
+The warning clears, and the form compares further edits against the new
 baseline. The rebase sticks across re-renders even though the component
-keeps passing the same `defaultValues`; `useForm` only re-applies
-`defaultValues` when they deeply change (a refetched record, say), and,
-as in TanStack Form, only while the form is untouched.
+keeps passing the same `defaultValues`. `useForm` re-applies
+`defaultValues` only when they deeply change (a refetched record, for
+example), and, as in TanStack Form, only while the form is untouched.
 
-Two trigger modes:
+There are two trigger modes:
 
-- **`"if-changed"`** (recommended): fires while values differ from
-  defaults. Clears if the user restores the originals, or after
-  `formApi.reset(value)` post-save.
-- **`"if-touched"`**: fires after the user has edited any field, even
-  if they reverted (sticky once edited until `formApi.reset()`).
+- **`"if-changed"`** (recommended): fires while the values differ from the
+  defaults, and clears when the user restores the originals or after a
+  `formApi.reset(value)` that follows a save.
+- **`"if-touched"`**: fires once the user has edited any field, even if
+  they reverted the edit, and stays on until `formApi.reset()`.
 
 <Preview>
   <UnsavedChangesExample />
@@ -1330,12 +1336,12 @@ export function EditPost() {
 
 </Preview>
 
-The `Subscribe` block follows the same pattern as the warning: select
+The `Subscribe` block reads the same state as the warning: select
 `!state.isDefaultValue` for "if-changed", or `state.isDirty` for the
-sticky "if-touched" feel.
+sticky "if-touched" behaviour.
 
 `unsavedChangesWarning` only covers full-page navigation (closing the
 tab, typing a new URL, hitting the back button). For client-side route
-changes inside a SPA, read the matching state flag from the form and
-prompt before pushing the next route. Most routers expose a
+changes in a single-page app, read the matching state flag from the form
+and prompt before pushing the next route. Most routers expose a
 `useBeforeUnload`-style hook for this.

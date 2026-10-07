@@ -33,10 +33,11 @@ import {
   YearFieldPreview,
 } from "@/components/forms/field-previews"
 
-Every shipped field handles its own label, description, error message, and
-accessibility wiring. Destructure from the `form` returned by `useForm`,
-drop it inside `<Form>`, and the `name` prop autocompletes against your
-schema (or `defaultValues` when no schema is passed).
+Every shipped field handles its own label, description, and error message,
+and sets `aria-invalid` and `aria-describedby` on its control. Destructure a
+field from the `form` returned by `useForm` and drop it inside `<Form>`. Its
+`name` prop autocompletes against your schema (or `defaultValues` when you
+pass no schema).
 
 ```tsx lineNumbers
 const form = useForm({ schema })
@@ -52,8 +53,8 @@ const { InputField, SubmitButton } = form
 </FormProvider>
 ```
 
-Every field accepts an optional `validators` prop forwarded to TanStack
-Form's `<Field>` for per-field overrides. See
+Every field accepts an optional `validators` prop, which it forwards to
+TanStack Form's `<Field>` to add checks to that one field. See
 [Validation modes](/docs/feature-modules/components/forms/validation#per-field-validators).
 
 `name` is required on every field, presets included. Array rows use
@@ -73,7 +74,7 @@ await expect(page.locator('[data-field="members[1].name"]')).toBeVisible()
 The root also carries `data-invalid`, and the control inside carries
 `aria-invalid="true"` while its error is shown.
 
-## Input Field
+## Input field
 
 <Preview>
   <InputFieldPreview />
@@ -89,11 +90,11 @@ The root also carries `data-invalid`, and the control inside carries
 
 </Preview>
 
-## Email Field
+## Email field
 
-Preset over `InputField` with `type="email"`, `inputMode="email"`, and
-`autoComplete="email"`. Defaults `label` to `"Email"`; `name` is required
-like on every other field.
+`EmailField` is a preset over `InputField` that sets `type="email"`,
+`inputMode="email"`, and `autoComplete="email"`. It defaults `label` to
+`"Email"`; `name` is required, as on every other field.
 
 <Preview>
   <EmailFieldPreview />
@@ -104,11 +105,11 @@ like on every other field.
 
 </Preview>
 
-## Password Field
+## Password field
 
-Preset over `InputField` with `type="password"` and
-`autoComplete="current-password"`. Pass `autoComplete="new-password"` on
-signup. Defaults `label` to `"Password"`; `name` is required.
+`PasswordField` is a preset over `InputField` that sets `type="password"`
+and `autoComplete="current-password"`. Pass `autoComplete="new-password"` on
+a signup form. It defaults `label` to `"Password"`; `name` is required.
 
 <Preview>
   <PasswordFieldPreview />
@@ -119,7 +120,7 @@ signup. Defaults `label` to `"Password"`; `name` is required.
 
 </Preview>
 
-## Text Area Field
+## Text area field
 
 <Preview>
   <TextAreaFieldPreview />
@@ -135,10 +136,10 @@ signup. Defaults `label` to `"Password"`; `name` is required.
 
 </Preview>
 
-## Number Field
+## Number field
 
-Stores the input as `number` (or `undefined` when empty), so your form
-state stays typed without manual coercion.
+`NumberField` stores the input as a `number` (or `undefined` when empty), so
+you never convert the input's string yourself.
 
 <Preview>
   <NumberFieldPreview />
@@ -149,14 +150,15 @@ state stays typed without manual coercion.
 
 </Preview>
 
-## Money Field
+## Money field
 
-A text input with locale-aware thousands separators, re-inserted as the
-user types (the caret stays put), and the currency as an add-on. The form
-value is `number | null` (empty → `null`). Pasted text is parsed leniently:
-`CHF 1'234.50`, `1.234,50 €` and `1,234.50` all land as `1234.5`, whatever
-the input's locale. On blur a non-integer amount is padded to the
-currency's minor units (`12.5` → `12.50`); integers stay bare.
+`MoneyField` is a text input that shows the currency as an addon. It
+re-inserts the locale's thousands separators as the user types and keeps the
+caret in place. The form value is `number | null` (`null` when empty). The
+field also accepts pasted amounts in other locales' formats: `CHF 1'234.50`,
+`1.234,50 €` and `1,234.50` all become `1234.5`, whatever the input's locale.
+On blur, the field pads a non-integer amount to the currency's minor units
+(`12.5` becomes `12.50`); integers stay bare.
 
 <Preview>
   <MoneyFieldPreview />
@@ -169,25 +171,27 @@ currency's minor units (`12.5` → `12.50`); integers stay bare.
 
 | Prop | Type | What it does |
 |---|---|---|
-| `currency` | `string` | ISO 4217 code for the add-on (`"CHF"`, `"EUR"`). Omit for a bare amount. |
-| `currencyDisplay` | `"symbol" \| "narrowSymbol" \| "code" \| "name"` | How the add-on reads. Defaults to `"symbol"`. |
-| `currencyPosition` | `"start" \| "end"` | Add-on side. Defaults to the locale's convention (`CHF 1’234` in `de-CH`, `1.234 €` in `de-DE`). |
+| `currency` | `string` | ISO 4217 code for the addon (`"CHF"`, `"EUR"`). Omit for a bare amount. |
+| `currencyDisplay` | `"symbol" \| "narrowSymbol" \| "code" \| "name"` | How the addon reads. Defaults to `"symbol"`. |
+| `currencyPosition` | `"start" \| "end"` | Which side the addon sits on. Defaults to the locale's convention (`CHF 1’234` in `de-CH`, `1.234 €` in `de-DE`). |
 | `locale` | `string` | BCP 47 locale for the separators. Defaults to the runtime locale. |
 | `fractionDigits` | `number` | Decimals allowed. Defaults to the currency's minor units (2 for CHF, 0 for JPY), else 2. |
 | `allowNegative` | `boolean` | Accept a leading minus. Defaults to `false`. |
 | `min` / `max` | `number` | Clamp on blur. For an error message instead, validate in the schema. |
 
-Only the locale's decimal separator starts the fraction while typing
-(`.` in `de-CH`, `,` in `de-DE`); every other character is dropped.
+While the user types, only the locale's decimal separator starts the
+fraction (`.` in `de-CH`, `,` in `de-DE`), and the field drops any other
+non-digit character.
 
-## Percentage Field
+## Percentage field
 
-Same formatting engine as `MoneyField`, with a `%` add-on. Pick what the
-form value means with `scale`:
+`PercentageField` uses the same formatting hook as `MoneyField`, with a `%`
+addon. Pick what the form value means with `scale`:
 
-- `scale="percent"` (default): the value is the number shown, `12.5` ↔ `12.5 %`.
-- `scale="fraction"`: the value is a ratio, `0.125` ↔ `12.5 %`, which is what
-  most APIs and databases store.
+- `scale="percent"` (default): the value is the number shown, so `12.5` shows
+  as `12.5 %`.
+- `scale="fraction"`: the value is a ratio, so `0.125` shows as `12.5 %`,
+  which is what most APIs and databases store.
 
 <Preview>
   <PercentageFieldPreview />
@@ -198,14 +202,15 @@ form value means with `scale`:
 
 </Preview>
 
-`fractionDigits` (default `2`) counts decimals of the shown percentage.
+`fractionDigits` (default `2`) counts the decimals of the shown percentage.
 `min`/`max` clamp on blur, in the form value's scale. `allowNegative`
 defaults to `false`.
 
-## Year Field
+## Year field
 
-A four-digit integer year (`number | null`): digits only, no thousands
-separator, `inputMode="numeric"`. `min`/`max` clamp the value on blur.
+`YearField` takes a four-digit integer year (`number | null`). It accepts
+digits only, with no thousands separator, and sets `inputMode="numeric"`.
+`min`/`max` clamp the value on blur.
 
 <Preview>
   <YearFieldPreview />
@@ -235,9 +240,10 @@ const inputProps = useFormattedNumber({
 ```
 
 It returns `value`, `onChange`, `onBlur`, `onPaste`, `inputMode` and
-`type="text"`. Options: `padFraction`, `useGrouping`, `allowNegative`,
-`maxIntegerDigits`, `min`/`max`, and a `toDisplay`/`fromDisplay` pair to map
-the stored value (that's how `scale="fraction"` works). The pure helpers
+`type="text"`. It also takes `padFraction`, `useGrouping`, `allowNegative`,
+`maxIntegerDigits`, `min`/`max`, and a `toDisplay`/`fromDisplay` pair that
+maps the stored value to the shown number and back (that's how
+`scale="fraction"` works). The pure helpers
 (`parseLocaleNumber`, `formatNumber`, …) live in
 `@zeno-lib/forms/lib/formatted-number`.
 
@@ -250,8 +256,8 @@ prefix icons, suffix actions, block-level toolbars. Without children the
 field renders a plain input.
 
 `<InputGroupAddon align>` accepts `inline-start`, `inline-end`,
-`block-start`, and `block-end`. Visual order is driven by CSS, so the JSX
-order doesn't matter.
+`block-start`, and `block-end`. CSS sets the visual order, so the JSX order
+doesn't matter.
 
 ### Prefix icon
 
@@ -294,7 +300,7 @@ import { InputGroupAddon, InputGroupText } from "@zeno-lib/ui/input-group"
 ### Block toolbar
 
 `block-start` and `block-end` render above and below the input inside the
-same focus ring. Useful for textarea toolbars, helper rows, character
+same focus ring. Use them for textarea toolbars, helper rows, or character
 counters.
 
 <Preview>
@@ -320,9 +326,9 @@ import { BoldIcon, ItalicIcon } from "lucide-react"
 
 ### Async-validation indicator
 
-`@zeno-lib/forms` ships `<ValidationSpinner />` for the common case: a spinner
-appears in the input while an async validator is in flight, and clears
-when it resolves. See the
+`@zeno-lib/forms` ships `<ValidationSpinner />`, which shows a spinner in the
+input while an async validator runs and renders nothing once it resolves. See
+the
 [Async submission example](/docs/feature-modules/components/forms/examples#async-submission)
 for a full setup.
 
@@ -351,19 +357,19 @@ import { ValidationSpinner } from "@zeno-lib/forms/create-form"
 
 For other state-dependent addons, write a small component that calls
 `useFieldContext()` and returns an addon (or `null`). The field's
-children render inside the field context, so subscribing composes
-naturally.
+children render inside the field context, so `useFieldContext()` returns
+that field's state.
 
 > **Don't toggle children directly.** `<EmailField>{cond && <Addon />}</EmailField>`
-> swaps the field between plain `<Input>` and `<InputGroup>` wrappers,
-> remounting the input and losing focus. Always render the child element,
-> let it return `null` internally when not needed (the way
-> `ValidationSpinner` does).
+> swaps the field between a plain `<Input>` and an `<InputGroup>` wrapper,
+> which remounts the input, so it loses focus. Always render the child
+> element, and let it return `null` when it has nothing to show, as
+> `ValidationSpinner` does.
 
-## Select Field
+## Select field
 
-Wraps `@zeno-lib/ui/select`. Pass `<SelectItem>` children for the options. For
-the common case of database rows where the ID is a number, see
+`SelectField` wraps `@zeno-lib/ui/select`. Pass `<SelectItem>` children for
+the options. For database rows with numeric IDs, see
 [Numeric IDs](/docs/feature-modules/components/forms/examples#numeric-ids).
 
 <Preview>
@@ -381,7 +387,7 @@ import { SelectItem } from "@zeno-lib/ui/select"
 
 </Preview>
 
-## Checkbox Field
+## Checkbox field
 
 <Preview>
   <CheckboxFieldPreview />
@@ -396,12 +402,13 @@ import { SelectItem } from "@zeno-lib/ui/select"
 
 </Preview>
 
-## Checkbox Group Field
+## Checkbox group field
 
-A set of checkboxes bound to one array value (`[]` when none is checked),
-rendered as a `<fieldset>` with the label as its legend. Pass strings or
-numbers, or `{ value, label, description?, disabled? }` objects. The stored
-array follows the order of `items`, not click order.
+`CheckboxGroupField` binds a set of checkboxes to one array value (`[]` when
+none is checked) and renders them as a `<fieldset>` with the label as its
+legend. Pass `items` as strings or numbers, or as
+`{ value, label, description?, disabled? }` objects. The stored array follows
+the order of `items`, not click order.
 
 <Preview>
   <CheckboxGroupFieldPreview />
@@ -423,7 +430,7 @@ array follows the order of `items`, not click order.
 `orientation="horizontal"` wraps the options in a row; `disabled` disables
 the whole group.
 
-## Switch Field
+## Switch field
 
 <Preview>
   <SwitchFieldPreview />
@@ -438,10 +445,10 @@ the whole group.
 
 </Preview>
 
-## Radio Group Field
+## Radio group field
 
-Wraps `@zeno-lib/ui/radio-group`. `<RadioGroupFieldItem>` pairs each radio
-with its label and `htmlFor` so you don't wire IDs by hand.
+`RadioGroupField` wraps `@zeno-lib/ui/radio-group`. `<RadioGroupFieldItem>`
+pairs each radio with its label and `htmlFor`, so you don't wire IDs by hand.
 
 <Preview>
   <RadioGroupFieldPreview />
@@ -458,11 +465,11 @@ import { RadioGroupFieldItem } from "@zeno-lib/forms/create-form"
 
 </Preview>
 
-## Slider Field
+## Slider field
 
-Wraps `@zeno-lib/ui/slider`. The form value is `number` for a single thumb,
-`number[]` for a range (pick by typing your `defaultValues`). Pass
-`formatValue` to render a live readout next to the label.
+`SliderField` wraps `@zeno-lib/ui/slider`. The form value is a `number` for a
+single thumb and a `number[]` for a range; the type of your `defaultValues`
+picks which. Pass `formatValue` to render a live readout next to the label.
 
 <Preview>
   <SliderFieldPreview />
@@ -481,11 +488,11 @@ Wraps `@zeno-lib/ui/slider`. The form value is `number` for a single thumb,
 
 </Preview>
 
-## OTP Field
+## OTP field
 
-Wraps `@zeno-lib/ui/input-otp`. Defaults to a 6-slot group. Override with
-`maxLength`, restrict input with `pattern` (a string regex), or pass
-`children` to insert a separator between groups.
+`OtpField` wraps `@zeno-lib/ui/input-otp` and defaults to one group of 6
+slots. Change the count with `maxLength`, restrict input with `pattern` (a
+string regex), or pass `children` to insert a separator between groups.
 
 <Preview>
   <OtpFieldPreview />
@@ -501,11 +508,11 @@ Wraps `@zeno-lib/ui/input-otp`. Defaults to a 6-slot group. Override with
 
 </Preview>
 
-## Date Picker Field
+## Date picker field
 
-Composes `@zeno-lib/ui/popover` and `@zeno-lib/ui/calendar`. The form value is
-`Date | undefined`. The trigger formats the selected date via
-`toLocaleDateString` by default; pass `formatValue` to override or
+`DatePickerField` composes `@zeno-lib/ui/popover` and `@zeno-lib/ui/calendar`.
+The form value is `Date | undefined`. By default the trigger formats the
+selected date with `toLocaleDateString`. Pass `formatValue` to override it, or
 `calendarProps` to forward options (`disabled`, `locale`, …) to the
 underlying `<Calendar>`.
 
@@ -522,11 +529,12 @@ underlying `<Calendar>`.
 
 </Preview>
 
-## Combobox Field
+## Combobox field
 
-Wraps `@zeno-lib/ui/combobox`. Single-select with client-side filtering as the
-user types. Pass plain strings for `string[]` items, or `{ value, label }`
-objects when the value isn't a string; see
+`ComboboxField` wraps `@zeno-lib/ui/combobox`. It selects a single value and
+filters the options client-side as the user types. Pass plain strings for
+`string[]` items, or `{ value, label }` objects when the value isn't a string;
+see
 [Numeric IDs](/docs/feature-modules/components/forms/examples#numeric-ids).
 
 <Preview>
@@ -560,15 +568,15 @@ const FRAMEWORKS = ["Next.js", "Remix", "SvelteKit", "Nuxt.js", "Astro"]
 | `loading` | `boolean` | Show a spinner inside the input while options load. |
 
 For server-driven search with debouncing, see
-[Async-search Combobox](/docs/feature-modules/components/forms/examples#async-search-combobox).
+[Async-search combobox](/docs/feature-modules/components/forms/examples#async-search-combobox).
 
-## Multi-select Field
+## Multi-select field
 
-A multi-value combobox. The selection renders as removable chips inside the
-input, and the form value is an array (`[]` when empty) of the selected
-values: the items themselves for strings and numbers, `item.value` for
-`{ value, label }` objects (so numeric IDs stay numbers). A clear button
-empties the selection.
+`MultiSelectField` is a multi-value combobox that renders the selection as
+removable chips inside the input. The form value is an array of the selected
+values (`[]` when empty). For string and number items it holds the items
+themselves; for `{ value, label }` objects it holds `item.value`, so numeric
+IDs stay numbers. A clear button empties the selection.
 
 <Preview>
   <MultiSelectFieldPreview />
@@ -607,7 +615,8 @@ For grouped options or on-the-fly creation, compose your own; see
 
 When the gallery doesn't fit, build your own on top of `useFieldContext<T>()`
 and drop it inside `<AppField>` (destructured from `form`). You get the
-same typed field state and accessibility plumbing the shipped fields use.
+same typed field state the shipped fields use, and `useIsInvalid` applies
+their rules for when an error shows.
 
 <Preview>
   <CustomFieldPreview />
@@ -652,5 +661,5 @@ const { AppField } = form
 
 </Preview>
 
-`AppField` is also the escape hatch when you want direct access to a
-shipped field's instance.
+Use `AppField` too when you want direct access to a shipped field's
+instance.

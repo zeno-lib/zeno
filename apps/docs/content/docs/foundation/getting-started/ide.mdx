@@ -1,17 +1,17 @@
 ---
-title: IDE Setup
+title: IDE setup
 description: Configuring Cursor for Zeno development
 icon: Code
 status: to check
 ---
 
-Zeno requires [Cursor](https://cursor.com), an AI-powered code editor built on [VSCode](https://code.visualstudio.com). The project relies on Cursor-specific features like AI rules and hooks that are not available in plain VSCode.
+Zeno requires [Cursor](https://cursor.com), an AI code editor built on [VS Code](https://code.visualstudio.com). The project relies on Cursor hooks, which plain VS Code doesn't run.
 
-Everything is preconfigured — extensions, editor settings, formatter, and AI rules are all committed to the repo. Just open the project in Cursor and you're ready to go.
+The repo includes the extension recommendations, editor settings, formatter config and Cursor hook, so you only need to open the project in Cursor and install the recommended extensions.
 
-## Recommended Extensions
+## Recommended extensions
 
-The repo includes a `.vscode/extensions.json` file that prompts you to install the recommended extensions when you open the project. You can also install them manually:
+`.vscode/extensions.json` lists the recommended extensions, so Cursor prompts you to install them when you open the project. You can also install them by hand:
 
 | Extension | Purpose |
 |-----------|---------|
@@ -19,27 +19,27 @@ The repo includes a `.vscode/extensions.json` file that prompts you to install t
 | [Tailwind CSS IntelliSense](https://marketplace.visualstudio.com/items?itemName=bradlc.vscode-tailwindcss) | Tailwind autocomplete |
 | [Tailwind Fold](https://marketplace.visualstudio.com/items?itemName=stivo.tailwind-fold) | Collapse long Tailwind class lists |
 | [MDX](https://marketplace.visualstudio.com/items?itemName=unifiedjs.vscode-mdx) | MDX language support |
-| [Pretty TypeScript Errors](https://marketplace.visualstudio.com/items?itemName=yoavbls.pretty-ts-errors) | Readable TS errors |
+| [Pretty TypeScript Errors](https://marketplace.visualstudio.com/items?itemName=yoavbls.pretty-ts-errors) | Readable TypeScript errors |
 | [Vitest](https://marketplace.visualstudio.com/items?itemName=vitest.explorer) | Test runner integration |
 | [Playwright Test](https://marketplace.visualstudio.com/items?itemName=ms-playwright.playwright) | E2E test runner |
 
 ## Settings
 
-The repo ships a `.vscode/settings.json` with preconfigured settings. Key highlights:
+The repo ships a `.vscode/settings.json`. The main settings are:
 
 - **Biome** is the default formatter for all supported file types (TypeScript, JavaScript, JSON, HTML, CSS, MDX, etc.)
 - **Format on save** and **format on paste** are enabled
-- **Code actions on save** automatically fix lint issues and organize imports
-- **CSS files** are associated with `tailwindcss` for IntelliSense support
+- **Code actions on save** fix lint issues and organize imports
+- **CSS files** open in the `tailwindcss` language mode, so Tailwind IntelliSense works in them
 - **TypeScript SDK** points to the workspace `node_modules` version
 
-These settings are committed to the repo, so you get them automatically when you clone.
+Because the file is committed, every clone gets these settings.
 
-## Cursor Configuration
+## Cursor configuration
 
 The `.cursor/` directory contains project-specific AI configuration:
 
-- **Rules** — AI-specific coding standards loaded automatically for matching files
-- **Hooks** — Auto-format and lint after every AI-generated file edit
+- **Rules**: AI-specific coding standards loaded automatically for matching files
+- **Hooks**: auto-format and lint after every AI-generated file edit
 
-See [AI Setup](/docs/foundation/getting-started/ai-setup) for details.
+See [AI setup](/docs/foundation/getting-started/ai-setup) for details.

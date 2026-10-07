@@ -1,78 +1,79 @@
 ---
 title: What is Zeno
-description: Introducing Zeno, a high-level modern web development framework that helps you build beautiful, performant, flexible and maintainable web applications faster than ever before.
+description: An opinionated framework of npm packages and shadcn registry items for building web applications with Next.js, React, TypeScript and Supabase.
 icon: House
 status: in progress
 ---
 
 ## Philosophy
 
-All that Zeno does follows these principles:
+Zeno follows these principles:
 
-#### Development Speed
-We aim to accelerate web application development through intelligent 
-defaults, streamlined workflows and high-level abstractions.
+#### Development speed
+Zeno speeds up development with presets you extend instead of writing, such as the TypeScript,
+Vitest and Playwright configs, and with one command per workflow, such as `pnpm ci` for the whole
+pre-PR pipeline.
 
-#### Development Experience
-We believe that development experience is part of development productivity.
-Spending time on development experience is less time spent on building features. Let us do it for you.
+#### Development experience
+Development experience is part of development productivity. Time you spend configuring tools is
+time you don't spend building features, so Zeno ships the editor settings, extensions, linting,
+formatting and test setup already configured.
 
 #### Opinionated
-In order to achieve the goal of development speed & experience, we take strong stances on 
-development best practices and architectural decisions. Rather than presenting endless configuration 
-options, we carefully choose proven patterns and technologies that work well together. This 
-opinionated approach eliminates decision fatigue, reduces cognitive overhead, and helps teams maintain 
-consistency across projects. While we provide flexibility where it matters, we believe that having a 
-clear, well-defined path leads to better, more maintainable applications.
+To get that speed and experience, Zeno takes strong stances on development best practices and
+architectural decisions. Instead of offering a long list of configuration options, it picks one tool
+per job and makes them work together: pnpm and Turborepo for the monorepo, Ultracite for linting
+and formatting, Supabase for the database and auth, and TanStack Form for forms. You make fewer
+setup decisions, and your projects stay consistent with each other. You can still override a preset
+where your project needs to, but the default is one clear path, which keeps applications easier to
+maintain.
 
-#### High Level
-Being opinionated allows us to provide a high level of abstraction, meaning you can 
-focus on building features rather than worrying about re-implementing the wheel & the underlying
-implementation details.
+#### High level
+Because the stack is fixed, Zeno can ship higher-level building blocks, such as the form factory
+and the auth flows, so you build features instead of re-implementing the code underneath them.
 
-#### AI Conscious
-AI is revolutionizing how we build web applications. Zeno embraces this by putting it at 
-the core of the development experience. Through AI-first principles, we are creating a framework that 
-seamlessly integrates with AI to help you build better applications even faster.
+#### AI conscious
+Zeno is set up for AI coding assistants. `AGENTS.md` files hold the rules and traps for each
+folder, a Cursor hook formats every file an agent edits, and every docs page is also served as
+Markdown for an assistant to read.
 
-#### Open Code
-Zeno embraces the open code distribution strategy popularized by Shadcn. When relevant,
-we provide source code directly into your codebase. This empowers developers and AI with more control 
-over the codebase.
-
-Let's dive into how Zeno achieves these goals.
+#### Open code
+Zeno follows the open code distribution model popularized by shadcn. UI that renders shadcn
+components ships through the shadcn registry, and the shadcn CLI copies its source into your
+codebase, where you and your AI assistant can read and change it. UI-free code ships on npm.
 
 ### Modern
 
-Zeno embraces the latest and greatest technologies to ensure your applications are built on a solid, 
-future-proof foundation.
+Zeno is built on current releases of these tools:
 
-- **[TypeScript 5](https://www.typescriptlang.org)**: JavaScript with syntax for types.
-- **[Turborepo](https://turbo.build/repo)**: Monorepo management & high-performance build system for TypeScript codebases.
-- **[Turbopack](https://turbo.build/pack)**: High-performance TypeScript bundler.
-- **[React 19](https://react.dev)**: The library for web and native user interfaces.
-- **[Next.js 16](https://nextjs.org)**: The React Framework for the web.
-- **[Tailwind CSS 4](https://tailwindcss.com)**: Utility-first CSS framework for rapid UI development.
+- **[TypeScript 7](https://www.typescriptlang.org)**: JavaScript with syntax for types.
+- **[Turborepo](https://turbo.build/repo)**: Task runner and build cache for the monorepo.
+- **[Turbopack](https://turbo.build/pack)**: The bundler Next.js uses by default.
+- **[React 19](https://react.dev)**: The UI library Zeno's components are written in.
+- **[Next.js 16](https://nextjs.org)**: The React framework Zeno apps run on, with the App Router.
+- **[Tailwind CSS 4](https://tailwindcss.com)**: Utility-first CSS framework.
 - **[Ultracite](https://ultracite.ai)**: JavaScript/TypeScript linting and formatting.
-- **[Supabase](https://supabase.com)**: Open source Postgres database, Authentication, instant APIs, Edge Functions, Realtime subscriptions, Storage, and Vector embeddings.
-- **[Playwright](https://playwright.dev)**: Next-generation end-to-end testing for modern web apps.
+- **[Supabase](https://supabase.com)**: Postgres database and auth, run locally with the Supabase CLI.
+- **[Playwright](https://playwright.dev)**: End-to-end browser testing.
 
 
 ### Complete
 
-Zeno is a complete solution for building web applications. Here is a non-exhaustive list of what it includes:
+Zeno aims to cover everything a web application needs. Some of the items below are still in
+progress or planned, and the [roadmap](/docs/foundation/roadmap) shows the status of each. Here is a
+non-exhaustive list:
 
-- **Monorepo**: Scalable codebase management with shared configurations and packages
-- **Database**: Full-featured Postgres database with real-time capabilities
-- **API**: Built-in API routes with Next.js App Router
-- **Authentication**: Secure user authentication with multiple providers
+- **Monorepo**: Turborepo and pnpm workspace with shared configurations and packages
+- **Database**: Supabase Postgres with Drizzle clients and row-level security
+- **API**: API routes with the Next.js App Router
+- **Authentication**: Supabase Auth flows for password and magic-link sign-in, sign-up and password recovery
 - **Authorization**: Role-based access control and permissions
 - **Storage**: File storage with CDN integration
-- **Forms**: Form handling with validation and error management
-- **UI**: Beautiful, accessible, and customizable components
+- **Forms**: A headless form factory on npm and a field kit in the shadcn registry
+- **UI**: shadcn components plus Zeno registry items such as the theme and the auth flows
 - **Layouts**: Pre-built layouts for common application patterns
-- **Testing**: Comprehensive testing suite with Vitest and Playwright
-- **CI / CD**: Automated deployment pipelines with GitHub Actions
-- **AI**: AI-powered development tools and integrations
-- **DX**: Enhanced development experience with pre-configured tools
+- **Testing**: Vitest and Playwright presets, plus helpers for testing Supabase row-level security
+- **CI / CD**: GitHub Actions workflows that run `pnpm ci` and publish the packages with Changesets
+- **AI**: `AGENTS.md` files, agent skills and a Cursor formatting hook
+- **DX**: Preconfigured editor settings, extensions and formatter
 - **I18N**: Internationalization and localization support

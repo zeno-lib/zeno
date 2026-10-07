@@ -7,17 +7,17 @@ status: to check
 
 Zeno uses the `@zeno-lib/typescript` package to share strict TypeScript configurations across all packages and apps.
 
-You never have to manually configure `tsconfig.json` options like `moduleResolution`, `jsx`, `lib`, `strict`, Next.js `include` globs, or the Next.js plugin — just extend one config and everything is set up correctly.
+You don't have to set `tsconfig.json` options such as `moduleResolution`, `jsx`, `lib`, `strict`, Next.js `include` globs or the Next.js plugin by hand. Extend one config and it sets them for you.
 
-## Available Configs
+## Available configs
 
-The configs form an inheritance chain — each level extends the previous one:
+The configs form an inheritance chain. Each level extends the previous one:
 
 | Config | Extends | Purpose |
 |--------|---------|---------|
-| `base.json` | — | Core settings (module resolution, ESNext, bundler mode, JSON imports) |
+| `base.json` | None | Core settings (module resolution, ESNext, bundler mode, JSON imports) |
 | `strict.json` | `base` | Enables `strict: true` |
-| `strictest.json` | `strict` | Maximum strictness (no unused locals/params, no fallthrough, no unchecked indexed access) |
+| `strictest.json` | `strict` | Extra strict checks (no unused locals or parameters, no switch fallthrough, no unchecked indexed access) |
 | `react.json` | `strictest` | Adds JSX support and DOM lib |
 | `nextjs.json` | `react` | Adds Next.js plugin, `next-env.d.ts`, and `.next/types` includes |
 
@@ -31,9 +31,9 @@ Extend the appropriate config in your package's `tsconfig.json`:
 }
 ```
 
-That's it. No need to configure `compilerOptions`, `include`, or `exclude` — the config handles module resolution, strict checks, JSX, DOM libs, and Next.js-specific includes for you.
+You don't need to set `compilerOptions`, `include` or `exclude`. The config handles module resolution, strict checks, JSX, the DOM libs and the Next.js includes.
 
-### Which Config to Use
+### Which config to use
 
 | Package type | Config |
 |-------------|--------|
@@ -42,7 +42,7 @@ That's it. No need to configure `compilerOptions`, `include`, or `exclude` — t
 | Non-React package | `@zeno-lib/typescript/strictest.json` |
 | Loose / legacy | `@zeno-lib/typescript/strict.json` |
 
-### Examples in the Repo
+### Examples in the repo
 
 | Package | Config |
 |---------|--------|
@@ -51,41 +51,41 @@ That's it. No need to configure `compilerOptions`, `include`, or `exclude` — t
 | `packages/supabase` | `@zeno-lib/typescript/strictest.json` |
 | `packages/e2e` | `@zeno-lib/typescript/strictest.json` |
 
-## What's Included
+## What's included
 
-### Base Config
+### Base config
 
-Every config inherits these sensible defaults:
+Every config inherits these settings:
 
-- **Bundler module resolution** — Works with modern bundlers (Vite, Turbopack, webpack)
-- **ESNext modules** with `verbatimModuleSyntax` — Clean import/export handling
-- **JSON imports** — `resolveJsonModule` enabled
-- **Incremental builds** — Faster recompilation
-- **Isolated modules** — Compatible with SWC and esbuild
-- **No emit** — Bundlers handle output, TypeScript only type-checks
+- **Bundler module resolution**: resolves imports the way bundlers such as Vite, Turbopack and webpack do
+- **ESNext modules** with `verbatimModuleSyntax`: TypeScript drops imports marked `type` and leaves every other import and export as written
+- **JSON imports**: `resolveJsonModule` is on
+- **Incremental builds**: TypeScript reuses the previous run's results, so rechecks are faster
+- **Isolated modules**: every file must compile on its own, as SWC and esbuild require
+- **No emit**: TypeScript only type-checks, and bundlers produce the output
 
-### Strictest Config
+### Strictest config
 
-Enables all strict checks beyond `strict: true`:
+Adds these checks on top of `strict: true`:
 
-- `noFallthroughCasesInSwitch` — Prevent fallthrough in switch statements
-- `noImplicitOverride` — Require `override` keyword
-- `noImplicitReturns` — All code paths must return
-- `noUnusedLocals` — No unused local variables
-- `noUnusedParameters` — No unused function parameters
-- `noUncheckedIndexedAccess` — Indexed access returns `T | undefined`
-- `allowUnreachableCode: false` — Error on unreachable code
-- `allowUnusedLabels: false` — Error on unused labels
+- `noFallthroughCasesInSwitch`: prevents fallthrough in switch statements
+- `noImplicitOverride`: requires the `override` keyword
+- `noImplicitReturns`: every code path must return
+- `noUnusedLocals`: no unused local variables
+- `noUnusedParameters`: no unused function parameters
+- `noUncheckedIndexedAccess`: indexed access returns `T | undefined`
+- `allowUnreachableCode: false`: unreachable code is an error
+- `allowUnusedLabels: false`: unused labels are an error
 
-### Next.js Config
+### Next.js config
 
-On top of React support, the Next.js config automatically:
+On top of the React config, the Next.js config:
 
 - Registers the `next` TypeScript plugin for App Router type safety
 - Includes `next-env.d.ts` and `.next/types/**/*.ts` for generated types
-- Includes all `*.ts` and `*.tsx` files in the project root
+- Includes every `*.ts` and `*.tsx` file under the project root
 
-## Type Checking
+## Type checking
 
 Run type checking across all packages:
 

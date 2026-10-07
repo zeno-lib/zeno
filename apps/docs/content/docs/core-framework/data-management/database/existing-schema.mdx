@@ -6,15 +6,15 @@ status: in progress
 ---
 
 The rest of this guide is codebase-first: you declare tables in TypeScript,
-generate a migration, and Postgres follows. Plenty of projects start the other
-way round, which is what the Supabase dashboard and SQL editor encourage. If you
-already have a database, your schema files are a **description** of it, not the
-thing that creates it, and that changes how you write and check them.
+generate a migration, and apply it to Postgres. Many projects start the other
+way round, because the Supabase dashboard and SQL editor encourage it. If you
+already have a database, your schema files describe it rather than create it,
+and that changes how you write and check them.
 
 Drizzle's
 [Supabase with an existing database](https://orm.drizzle.team/docs/get-started/supabase-existing)
 guide covers the `drizzle-kit pull` side. This page covers what Zeno adds on top:
-which helpers describe what Supabase actually creates, what must stay out of your
+which helpers describe what Supabase creates, what must stay out of your
 schema barrel, and how to prove the description still matches.
 
 ## Start from the database
@@ -24,8 +24,8 @@ pnpm exec drizzle-kit pull
 ```
 
 `pull` introspects the live database and writes schema files from it. Treat the
-result as a starting point and move it onto the Zeno helpers where they emit the
-same SQL, so the file reads as intent rather than as introspection output:
+result as a starting point, and replace a pulled column with a Zeno helper
+wherever the helper emits the same SQL:
 
 ```typescript title="{project}-db/src/schemas/posts.ts"
 export const posts = table("posts", {
@@ -35,11 +35,11 @@ export const posts = table("posts", {
 })
 ```
 
-The helpers are matched to the SQL Supabase itself produces, so this usually
-holds. Where it does not, keep the column longhand rather than changing the
-database to suit the helper — and see
-[Tables](/docs/core-framework/data-management/database/tables) for the options
-each one takes.
+Each helper emits the SQL Supabase itself produces, so the swap usually works.
+Where it does not, keep the column longhand rather than changing the database
+to suit the helper.
+[Tables](/docs/core-framework/data-management/database/tables) lists the options
+each helper takes.
 
 <Callout type="info">
   Two defaults are worth checking against what you already have.
@@ -47,7 +47,7 @@ each one takes.
   the table editor; if your ids came from somewhere else they may be `integer`
   or `generated always`, which the `type` and `generated` options cover. Author
   columns are nullable with `on delete set null`, and `createdBy()` defaults to
-  referencing `auth.users` — pass `reference` to point at your own `profiles`
+  referencing `auth.users`. Pass `reference` to point at your own `profiles`
   mirror, or `reference: null` if the column has no foreign key at all.
 </Callout>
 
@@ -56,11 +56,11 @@ each one takes.
 `drizzle-kit generate` applies **no entity filter**. It passes `() => true`, and
 its config accepts neither `schemaFilter` nor `entities`, so nothing you put in
 `drizzle.config.ts` stops it emitting a Supabase-owned table. Neither does
-`pgSchema("auth").existing()`: that binds `push` and `pull`, not `generate`.
+`pgSchema("auth").existing()`, which binds `push` and `pull`, not `generate`.
 
-The only thing that keeps such a table out of your migrations is it never
-reaching the files your `schema` glob reads. So `auth.users` ships behind its own
-entrypoint rather than from `@zeno-lib/db/schema`:
+Such a table stays out of your migrations only if it never reaches the files
+your `schema` glob reads. So `auth.users` ships from its own entrypoint rather
+than from `@zeno-lib/db/schema`:
 
 ```typescript title="{project}-db/src/schemas/profiles.ts"
 import { authUsers } from "@zeno-lib/db/auth"
@@ -70,17 +70,17 @@ export const profiles = table("profiles", {
 })
 ```
 
-Referencing it is safe — a table reached only through a `references()` thunk is
-never collected. **Re-exporting it is not.** If `src/schema.ts` re-exports a
-module that exports `authUsers`, the next generated migration contains
-`CREATE TABLE "auth"."users"`.
+Referencing it is safe, because Drizzle Kit never collects a table reached only
+through a `references()` thunk. **Re-exporting it is not.** If `src/schema.ts`
+re-exports a module that exports `authUsers`, the next generated migration
+contains `CREATE TABLE "auth"."users"`.
 
-The same applies to a `schema("auth")` of your own: it emits `CREATE SCHEMA` on
-its own account, independently of any table in it.
+The same applies to a `schema("auth")` of your own. It emits `CREATE SCHEMA` by
+itself, independently of any table in it.
 
 <Callout type="warn">
-  Relations are a separate file, and a good thing to check. `defineRelations`
-  takes any record, so merge `authUsers` in there rather than through the barrel:
+  Relations live in a separate file, so check them too. `defineRelations` takes
+  any record, so merge `authUsers` in there rather than through the barrel:
   `defineRelations({ ...schema, users: authUsers }, ...)`. `relations.ts` is
   outside the `schema` glob, so Drizzle Kit never reads it.
 </Callout>
@@ -90,7 +90,7 @@ its own account, independently of any table in it.
 Two commands answer two different questions, and for an existing database you
 want both.
 
-### `push --explain` — does the schema match the database?
+### `push --explain` checks the schema against the database
 
 ```bash
 pnpm exec drizzle-kit push --explain
@@ -104,8 +104,8 @@ description prints:
 [i] No changes detected
 ```
 
-This is the gate that means something. `push` also reconciles implicit
-constraint names: an inline `.references()` produces a Drizzle-style
+This is the check that proves the description matches. `push` also reconciles
+implicit constraint names. An inline `.references()` produces a Drizzle-style
 `posts_author_id_profiles_id_fk`, where an existing database usually has
 `posts_author_id_fkey`, and `push` matches them by shape rather than reporting a
 difference.
@@ -113,7 +113,7 @@ difference.
 Run it against a local database restored from your migrations, never a
 deployed one.
 
-### `export --sql` — did my refactor change anything?
+### `export --sql` checks whether a refactor changed anything
 
 ```bash
 pnpm exec drizzle-kit export --sql > before.sql
@@ -122,19 +122,20 @@ pnpm exec drizzle-kit export --sql > after.sql
 diff before.sql after.sql
 ```
 
-`export` reads no database and writes no files: it prints the SQL for your schema
-as it stands. That makes it the right tool for a *relative* check — move a column
-onto a helper, confirm the emitted SQL is byte-identical — and it catches things
-`push` deliberately hides, such as a table that silently lost its columns.
+`export` reads no database and writes no files. It prints the SQL for your
+schema as it stands, which makes it the right tool for a *relative* check: move
+a column onto a helper, then confirm the emitted SQL is byte-identical. It also
+catches things `push` deliberately hides, such as a table that silently lost its
+columns.
 
 <Callout type="warn">
-  `export` compares text, so it reports differences that are not differences.
+  `export` compares text, so it reports differences Postgres does not see.
   `functionPolicies` emits `(select "can_select_posts"("posts"."id"))` where
   `drizzle-kit pull` writes
-  `( SELECT can_select_posts(posts.id) AS can_select_posts)` — the same
-  expression, because the second is just how Postgres renders the first back
-  once stored. `export` shows a diff; `push --explain` correctly shows none.
-  When the two disagree about policies, believe `push`.
+  `( SELECT can_select_posts(posts.id) AS can_select_posts)`. They are the same
+  expression, because the second is how Postgres renders the first once stored.
+  `export` shows a diff; `push --explain` correctly shows none. When the two
+  disagree about policies, believe `push`.
 </Callout>
 
 ## Triggers are invisible to both
@@ -148,10 +149,9 @@ covers getting it into a tracked migration.
 
 ## When the helpers and the database disagree
 
-Some of the time the honest answer is that they do not fit, and the database is
-right. A column that ends in a digit is the common one: Drizzle derives
-`address_line1` from `addressLine1`, but the column is `address_line_1`, so it
-keeps an explicit name. Write the column longhand, and keep a note of every such
-place — a short document listing where your schema and the defaults diverge, and
-why, is what stops the next person "fixing" a table into a migration against
-production.
+Sometimes the helpers do not fit, and the database is right. The common case is
+a column that ends in a digit. Drizzle derives `address_line1` from
+`addressLine1`, but the column is `address_line_1`, so it keeps an explicit
+name. Write the column longhand, and keep a note of every such place. A short
+document listing where your schema and the defaults diverge, and why, stops the
+next person from "fixing" a table into a migration against production.

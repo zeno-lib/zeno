@@ -7,8 +7,9 @@ icon: Hourglass
 `@zeno-lib/query` is a small layer over [TanStack Query](https://tanstack.com/query) for
 suspense queries in a server-rendered React app. It gives you one boundary that handles loading,
 errors and retry, a server component that prefetches a route's data into the page, and a set of
-timing presets so freshness stays consistent. The package is UI-free; the error card that pairs
-with it comes from the registry, so you own and restyle it.
+timing presets so queries share a few `staleTime` values instead of each inventing its own. The
+package is UI-free; the error card that goes with it comes from the registry, so its source lives
+in your app and you can restyle it.
 
 ## Installation
 
@@ -17,14 +18,14 @@ pnpm add @zeno-lib/query @tanstack/react-query
 pnpm dlx shadcn@latest add zeno-lib/zeno/query-error-fallback
 ```
 
-The registry item drops `QueryErrorFallback` into `components/query/` and pulls in shadcn's
+The registry item adds `QueryErrorFallback` to `components/query/` and installs shadcn's
 `Button`. Your app still needs its own `QueryClientProvider`.
 
 ## Suspense boundaries
 
-Wrap every component that calls `useSuspenseQuery` in a `QuerySuspense`. It stacks TanStack's
-recommended `QueryErrorResetBoundary`, an error boundary and `Suspense`, so `fallback` shows while
-the query loads and `errorFallback` shows when it fails, with an `onRetry` that resets the query.
+Wrap every component that calls `useSuspenseQuery` in a `QuerySuspense`. It nests TanStack's
+recommended `QueryErrorResetBoundary`, an error boundary and `Suspense`. `fallback` shows while
+the query loads, and `errorFallback` shows when it fails, with an `onRetry` that resets the query.
 
 ```tsx
 "use client"
@@ -65,19 +66,19 @@ export function NotesCard({ dealId }: { dealId: string }) {
 }
 ```
 
-`QuerySuspenseLoading` is a plain `div` that sets `aria-busy` and `aria-live` for you, so the
-skeleton is announced without an extra wrapper.
+`QuerySuspenseLoading` is a plain `div` that sets `aria-busy` and `aria-live` for you, so screen
+readers announce the skeleton without an extra wrapper.
 
 ### Why the boundary waits for hydration
 
-A Server Function cannot run during the initial server render: React throws _"Server Functions
+A Server Function cannot run during the initial server render. React throws _"Server Functions
 cannot be called during initial render"_ there. So a `useSuspenseQuery` whose `queryFn` calls one
-would render its error into the HTML, while the browser suspends instead, and the mismatch makes
-React re-render the whole subtree on the client.
+would render its error into the HTML, while the browser suspends instead. The mismatch makes React
+re-render the whole subtree on the client.
 
 To keep both passes identical, `QuerySuspense` renders only its `fallback` on the server and
-through hydration, then runs the query in the browser. That is safe, but it means the route
-arrives as a skeleton. Prefetching buys real server HTML back.
+through hydration, then runs the query in the browser. That avoids the error, but the route
+arrives as a skeleton. Prefetching lets the server render the real HTML.
 
 ## Prefetching a route
 
@@ -109,22 +110,24 @@ cache in both passes. Three rules keep that working:
 
 - **Prefetch through the same `queryOptions` factory the browser uses, unchanged.** The cache
   entry needs the exact key and value the client would build, or the client refetches and the
-  prefetch bought nothing. Don't spread the options and swap the `queryFn`.
-- **Prefetch every suspense query the server pass reaches.** The boundary opens the gate for the
-  whole subtree, so one you left out runs its `queryFn` during the server render and fails there.
-  A component the server does not render (an inactive tab, a closed dialog) doesn't count.
+  prefetch is wasted. Don't spread the options and swap the `queryFn`.
+- **Prefetch every suspense query the server pass reaches.** The boundary lets every
+  `QuerySuspense` in its subtree render on the server, so a query you left out runs its `queryFn`
+  during the server render and fails there. A component the server does not render (an inactive
+  tab, a closed dialog) doesn't count.
 - **Use `fetchQuery` for the read the page cannot render without.** `prefetchQuery` swallows
-  failures, so a failed prefetch would quietly send an error card the browser then throws away.
-  `fetchQuery` fails the page loudly instead.
+  failures, so a failed prefetch still sends the page, with an error card in the HTML that the
+  browser then throws away. `fetchQuery` throws instead, so the page render fails.
 
-The opt-in cannot be faked: the flag `QuerySuspense` reads is derived from the dehydrated payload,
-so a prefetch that produced nothing keeps the client-only behaviour.
+No prop can switch this on. `PrefetchedQueries` derives the flag `QuerySuspense` reads from the
+dehydrated payload, so a prefetch that produced nothing keeps the client-only behaviour.
 
 To build the server `QueryClient` yourself (for example with shared `defaultOptions`), pass
-`createQueryClient`. `dehydrateOptions` is forwarded to TanStack's `dehydrate`.
+`createQueryClient`. `QueryHydrationBoundary` forwards `dehydrateOptions` to TanStack's
+`dehydrate`.
 
 If you already have a dehydrated state from elsewhere, render `PrefetchedQueries` from
-`@zeno-lib/query/prefetched-queries` directly: it is TanStack's `HydrationBoundary` plus the flag.
+`@zeno-lib/query/prefetched-queries` directly. It is TanStack's `HydrationBoundary` plus the flag.
 
 ## Timing presets
 
@@ -154,5 +157,5 @@ export const countriesQueryOptions = () =>
 ## Screenshots of loading and error states
 
 In development and tests, `debugState="loading"` or `debugState="error"` on a `QuerySuspense`
-forces that UI without running the query, which helps when capturing screenshots. It is ignored
-when `NODE_ENV` is `"production"`, but remove it from source once you're done.
+forces that UI without running the query, so you can capture it in a screenshot. `QuerySuspense`
+ignores it when `NODE_ENV` is `"production"`, but remove it from source once you're done.

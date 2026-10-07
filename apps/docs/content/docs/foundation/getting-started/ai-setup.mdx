@@ -1,27 +1,27 @@
 ---
-title: AI Setup
-description: AI-first development with Cursor and coding assistants
+title: AI setup
+description: How Zeno configures Cursor and other AI coding assistants
 icon: Sparkles
 status: in progress
 ---
 
-Zeno embraces AI-assisted development. The codebase is designed to work seamlessly with [Cursor](https://cursor.com) and other AI coding tools.
+Zeno is set up for AI-assisted development with [Cursor](https://cursor.com) and other AI coding tools.
 
-AI assistants work best when they understand your project's conventions. Zeno ships with `AGENTS.md`, Cursor rules, and auto-formatting hooks so that AI-generated code follows the same standards as hand-written code — no manual cleanup needed.
+AI assistants write better code when they know your project's conventions. Zeno ships `AGENTS.md` files that describe them, and a Cursor hook that runs Ultracite on every file the agent edits, so AI-generated code meets the same lint and format rules as hand-written code.
 
 ## AGENTS.md
 
-The root `AGENTS.md` file is automatically picked up by Cursor and other AI assistants. It provides:
+Cursor and other AI assistants pick up the root `AGENTS.md` on their own. It covers:
 
-- Project overview and structure
-- Development commands
-- TypeScript and React/Next.js conventions
-- Testing guidelines
-- Package management rules
+- The project overview and the folder map, with a link to each package's own `AGENTS.md`
+- Which code ships through the shadcn registry and which ships on npm
+- Development commands and their catches
+- Formatting and testing rules
+- Rules for Supabase, agent skills and secrets
 
-This file ensures AI-generated code follows the project's conventions out of the box.
+Packages with their own traps have an `AGENTS.md` too. Not every tool loads those nested files, so the root file tells the agent to read each `AGENTS.md` between a folder and the root before it changes code there.
 
-## Cursor Configuration
+## Cursor configuration
 
 The `.cursor/` directory contains Cursor-specific configuration:
 
@@ -38,7 +38,7 @@ The Ultracite rule is scoped to source files and automatically loaded when worki
 
 ### Hooks
 
-The `.cursor/hooks.json` configures an `afterFileEdit` hook that automatically runs Ultracite formatting after every AI-generated file edit:
+`.cursor/hooks.json` registers an `afterFileEdit` hook that runs Ultracite after every file edit the Cursor agent makes:
 
 ```json title=".cursor/hooks.json"
 {
@@ -52,13 +52,13 @@ The `.cursor/hooks.json` configures an `afterFileEdit` hook that automatically r
 }
 ```
 
-This ensures AI-generated code is always formatted and linted before you even review it.
+The hook formats and lint-fixes the agent's edits before you review them, so a file on disk can differ from what the agent just wrote.
 
-## AI-Friendly Patterns
+## AI-friendly patterns
 
-Zeno follows patterns that help AI understand and generate better code:
+Zeno follows these patterns, which give an AI assistant more context to work from:
 
-### Explicit Types
+### Explicit types
 
 Use interfaces for props and function signatures so AI understands the contract:
 
@@ -74,9 +74,9 @@ function UserCard({ id, name, email }: UserProps) {
 }
 ```
 
-### Descriptive Names
+### Descriptive names
 
-Use auxiliary verbs and clear naming for self-documenting code:
+Start boolean names with an auxiliary verb such as `is` or `has`, so the name says what the value means:
 
 ```typescript
 // Good
@@ -88,9 +88,9 @@ const auth = checkAuth()
 const admin = user.role === "admin"
 ```
 
-### Co-located Types
+### Co-located types
 
-Keep types near their usage for better AI context:
+Define a type next to the code that uses it, so an assistant reading that code sees both:
 
 ```typescript
 interface CreateUserInput {
@@ -103,10 +103,10 @@ async function createUser(input: CreateUserInput) {
 }
 ```
 
-## LLM Documentation
+## LLM documentation
 
-Zeno docs support LLM-friendly formats via [Fumadocs](https://fumadocs.vercel.app):
+The Zeno docs serve Markdown for LLMs, through [Fumadocs](https://fumadocs.vercel.app):
 
-- Any doc page is available as Markdown at `/docs/<path>.mdx` (e.g. `/docs/foundation/getting-started/installation.mdx`)
+- Any doc page is available as Markdown at `/docs/<path>.mdx` (for example `/docs/foundation/getting-started/installation.mdx`)
 
-This allows AI assistants to fetch and reference documentation directly.
+An AI assistant can fetch these URLs to read the docs.

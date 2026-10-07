@@ -1,35 +1,33 @@
 ---
 title: Technologies
-description: The technologies powering Zeno
+description: The tools Zeno is built on, and what it uses each one for
 icon: Layers
 status: in progress
 ---
 
-Zeno is built on a carefully selected stack of modern, production-ready technologies.
-
 ## Core
 
-- **[TypeScript 5](https://www.typescriptlang.org)** — JavaScript with syntax for types
-- **[React 19](https://react.dev)** — The library for web and native user interfaces
-- **[Next.js 16](https://nextjs.org)** — The React Framework for the web
+- **[TypeScript 7](https://www.typescriptlang.org)**: JavaScript with syntax for types
+- **[React 19](https://react.dev)**: the UI library Zeno's components are written in
+- **[Next.js 16](https://nextjs.org)**: the React framework Zeno apps run on, with the App Router
 
-## Build & Dev Tools
+## Build & dev tools
 
-- **[Turborepo](https://turbo.build/repo)** — Monorepo management & high-performance build system
-- **[Turbopack](https://turbo.build/pack)** — High-performance TypeScript bundler
-- **[Ultracite](https://ultracite.ai)** — JavaScript/TypeScript linting and formatting
+- **[Turborepo](https://turbo.build/repo)**: runs the monorepo's tasks in dependency order and caches their outputs
+- **[Turbopack](https://turbo.build/pack)**: the bundler Next.js 16 uses by default
+- **[Ultracite](https://ultracite.ai)**: JavaScript/TypeScript linting and formatting, as a Biome preset
 
 ## Styling
 
-- **[Tailwind CSS 4](https://tailwindcss.com)** — Utility-first CSS framework
-- **[Shadcn UI](https://ui.shadcn.com)** — Beautifully designed components
+- **[Tailwind CSS 4](https://tailwindcss.com)**: utility-first CSS framework
+- **[shadcn/ui](https://ui.shadcn.com)**: component primitives you copy into your app, and the registry Zeno ships its UI items through
 
-## Database & Backend
+## Database & backend
 
-- **[Supabase](https://supabase.com)** — Open source Postgres database, Auth, APIs, Edge Functions, Realtime, Storage
-- **[Drizzle](https://orm.drizzle.team)** — TypeScript ORM for SQL databases
+- **[Supabase](https://supabase.com)**: Postgres database and auth, run locally with the Supabase CLI
+- **[Drizzle](https://orm.drizzle.team)**: TypeScript ORM that `@zeno-lib/db` and `@zeno-lib/schema` build on
 
 ## Testing
 
-- **[Vitest](https://vitest.dev)** — Next generation testing framework
-- **[Playwright](https://playwright.dev)** — End-to-end testing for modern web apps
+- **[Vitest](https://vitest.dev)**: unit test runner, with shared presets in `@zeno-lib/test`
+- **[Playwright](https://playwright.dev)**: end-to-end browser testing, with the shared preset in `@zeno-lib/e2e`
