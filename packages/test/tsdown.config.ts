@@ -2,6 +2,8 @@ import { defineConfig } from "tsdown"
 
 export default defineConfig({
   clean: true,
+  // Optional peer, type-only today; keep it a bare specifier if that changes.
+  deps: { neverBundle: [/^@supabase\//] },
   dts: true,
   entry: {
     "configs/index": "src/configs/index.ts",
@@ -9,6 +11,4 @@ export default defineConfig({
     "testing-library": "src/testing-library.ts",
     "user-event": "src/user-event.ts",
   },
-  // Optional peer, type-only today; keep it a bare specifier if that changes.
-  external: [/^@supabase\//],
 })
