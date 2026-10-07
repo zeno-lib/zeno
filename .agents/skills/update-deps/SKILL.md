@@ -1,14 +1,16 @@
 ---
 name: update-deps
-description: Update every dependency in the monorepo to its latest version and fix what breaks, as one batch PR, plus a separate PR only for an update that needs the maintainer's decision or a large migration. Use for the weekly dependency update, or when asked to bump, upgrade or refresh dependencies.
+description: Update every dependency in the monorepo to its latest version and fix what breaks, as one batch PR for every routine update plus one PR per update that needs attention (a maintainer decision or a large migration), however many that is. Use for the weekly dependency update, or when asked to bump, upgrade or refresh dependencies.
 ---
 
 # Update dependencies
 
-One PR carries the whole update. An update gets its own PR only when the reviewer has a real
-decision to make or the migration is too big to review inside the batch. Every PR is green on
-`pnpm run ci`. A bump that breaks the build is yours to fix: read the changelog, migrate the code,
-and keep it in the batch unless the fix makes it an own-PR update.
+One batch PR carries every routine update. Each update that needs attention gets its own PR, one
+per update, so a run opens the batch plus as many PRs as there are attention updates (often
+none). An update needs attention only when the reviewer has a real decision to make or the
+migration is too big to review inside the batch. Every PR is green on `pnpm run ci`. A bump that
+breaks the build is yours to fix: read the changelog, migrate the code, and keep it in the batch
+unless the fix makes it an attention update.
 
 ## Batch or own PR
 
@@ -17,7 +19,7 @@ even when it is a new major, a prerelease, a widened peer range, a Supabase CLI 
 needs a small migration: a renamed config key or option, a one-line type fix, a config file
 following an upstream rename.
 
-**It gets its own PR** only when:
+**It needs attention, and gets its own PR,** only when:
 
 - the migration is a sweep: it changes code across many files, or rewrites shipped code (npm
   entries or registry sources) beyond a few lines, such as a linter preset that enables new rules;
@@ -40,10 +42,10 @@ following an upstream rename.
    `pnpm update -r --latest <pkg>...`, plus the Actions bumps. Migrate what the release notes
    require. Then run `pnpm registry:build` (it re-infers the registry items' npm dependencies),
    `pnpm lint:fix` and `pnpm run ci`. If it fails, bisect to the culprit and fix it in the batch;
-   move it out only if the fix meets the own-PR bar.
-4. **Own PRs.** Branch each off `origin/main`, not off the batch, so the PRs merge in any order:
-   `deps/<package>-<version>`. Bump, migrate, `pnpm registry:build`, `pnpm lint:fix`, and get
-   `pnpm run ci` green.
+   move it to its own PR only if the fix makes it an attention update.
+4. **One PR per attention update.** Branch each off `origin/main`, not off the batch, so the PRs
+   merge in any order: `deps/<package>-<version>`. Bump, migrate, `pnpm registry:build`,
+   `pnpm lint:fix`, and get `pnpm run ci` green.
 5. **Check the lockfile like CI does.** Before pushing, check out each branch's `package.json`
    files, `pnpm-workspace.yaml` and `pnpm-lock.yaml` into an empty directory and run
    `CI=true pnpm install --frozen-lockfile --lockfile-only --ignore-scripts` there.
@@ -58,8 +60,8 @@ following an upstream rename.
      where), then a short note for each update that needed more than a version bump (a major, a
      prerelease, a migration, a peer range): what changed upstream that matters here and what you
      changed. Then the Actions bumps, and the `pnpm audit` findings fixed and left open.
-   - Own PR: `Update <package> to <version>`. The body says what changed upstream that matters
-     here, what the migration changed and why, and what the reviewer has to decide.
+   - Each attention update: `Update <package> to <version>`. The body says what changed upstream
+     that matters here, what the migration changed and why, and what the reviewer has to decide.
 8. **Supersede the last run.** Close the open `dependencies` PRs that the new ones replace (the
    previous batch, and older PRs for the same package), with a comment linking the replacement.
    Leave alone a PR that someone else has pushed commits to.
