@@ -322,8 +322,8 @@ importers:
         specifier: 1.0.0-rc.5-5935859
         version: 1.0.0-rc.5-5935859
       drizzle-orm:
-        specifier: 1.0.0-rc.3
-        version: 1.0.0-rc.3(postgres@3.4.9)(zod@4.6.5)
+        specifier: 1.0.0-rc.5-5935859
+        version: 1.0.0-rc.5-5935859(postgres@3.4.9)(zod@4.6.5)
       postgres:
         specifier: 3.4.9
         version: 3.4.9
@@ -488,8 +488,8 @@ importers:
         specifier: workspace:^
         version: link:../typescript
       drizzle-orm:
-        specifier: 1.0.0-rc.3
-        version: 1.0.0-rc.3(postgres@3.4.9)(zod@4.6.5)
+        specifier: 1.0.0-rc.5-5935859
+        version: 1.0.0-rc.5-5935859(postgres@3.4.9)(zod@4.6.5)
       tsdown:
         specifier: ^0.23.0
         version: 0.23.0(tsx@4.23.15)(typescript@7.0.2)
@@ -3899,25 +3899,36 @@ packages:
     resolution: {integrity: sha512-p//MvJbSeDFxa3pODv0ebNVJmk/5aAHHaCyQTtDGFlCYX4e7eY9rrSX/liBJ7098Ei9WUi9VT65JQkSFDuG1ng==}
     hasBin: true
 
-  drizzle-orm@1.0.0-rc.3:
-    resolution: {integrity: sha512-akZOa5UxapFbdBG8IDkfBRpSZJpMHaOJtGgp7oi1oHaiU8S3KN92waHo2l5aRuv1D9tMGYpv3BQFOsiGcNjLTQ==}
+  drizzle-orm@1.0.0-rc.5-5935859:
+    resolution: {integrity: sha512-PkVjyxhamD7IOVfpDMn3BmV9afyvj3eeLvIPind3NmPv+cfv6/jh6GN0fHP0zzgrprGx/jGE4mkE0ttRFlzHwA==}
     peerDependencies:
       '@aws-sdk/client-rds-data': '>=3'
       '@cloudflare/workers-types': '>=4'
-      '@effect/sql-pg': '>=4.0.0-beta.58 || >=4.0.0'
+      '@drizzle-team/minipg': '>=0.3.2'
+      '@effect/sql-d1': '>=4.0.0-beta.105 || >=4.0.0'
+      '@effect/sql-libsql': '>=4.0.0-beta.105 || >=4.0.0'
+      '@effect/sql-mysql2': '>=4.0.0-beta.105 || >=4.0.0'
+      '@effect/sql-pg': '>=4.0.0-beta.105 || >=4.0.0'
+      '@effect/sql-pglite': '>=4.0.0-beta.105 || >=4.0.0'
+      '@effect/sql-sqlite-bun': '>=4.0.0-beta.105 || >=4.0.0'
+      '@effect/sql-sqlite-do': '>=4.0.0-beta.105 || >=4.0.0'
+      '@effect/sql-sqlite-node': '>=4.0.0-beta.105 || >=4.0.0'
+      '@effect/sql-sqlite-wasm': '>=4.0.0-beta.105 || >=4.0.0'
       '@electric-sql/pglite': '>=0.2.0'
       '@libsql/client': '>=0.10.0'
       '@libsql/client-wasm': '>=0.10.0'
       '@neondatabase/serverless': '>=0.10.0'
-      '@op-engineering/op-sqlite': '>=2'
+      '@op-engineering/op-sqlite': '>=17'
       '@opentelemetry/api': ^1.4.1
       '@planetscale/database': '>=1.13'
       '@sinclair/typebox': '>=0.34.8'
       '@sqlitecloud/drivers': '>=1.0.653'
       '@tidbcloud/serverless': '*'
-      '@tursodatabase/database': '>=0.2.1'
-      '@tursodatabase/database-common': '>=0.2.1'
-      '@tursodatabase/database-wasm': '>=0.2.1'
+      '@tursodatabase/database': '>=0.7.1'
+      '@tursodatabase/database-common': '>=0.7.1'
+      '@tursodatabase/database-wasm': '>=0.7.1'
+      '@tursodatabase/serverless': '>=1.4.0'
+      '@tursodatabase/sync': '>=0.7.1'
       '@types/better-sqlite3': '*'
       '@types/mssql': ^9.1.4
       '@types/pg': '*'
@@ -3928,7 +3939,7 @@ packages:
       arktype: '>=2.0.0'
       better-sqlite3: '>=9.3.0'
       bun-types: '*'
-      effect: '>=4.0.0-beta.58 || >=4.0.0'
+      effect: '>=4.0.0-beta.105 || >=4.0.0'
       expo-sqlite: '>=14.0.0'
       mssql: ^11.0.1
       mysql2: '>=2'
@@ -3936,7 +3947,7 @@ packages:
       postgres: '>=3'
       sql.js: '>=1'
       sqlite3: '>=5'
-      typebox: '>=1.0.0'
+      typebox: '>=1.2.0'
       valibot: '>=1.0.0-beta.7'
       zod: ^3.25.0 || ^4.0.0
     peerDependenciesMeta:
@@ -3944,7 +3955,25 @@ packages:
         optional: true
       '@cloudflare/workers-types':
         optional: true
+      '@drizzle-team/minipg':
+        optional: true
+      '@effect/sql-d1':
+        optional: true
+      '@effect/sql-libsql':
+        optional: true
+      '@effect/sql-mysql2':
+        optional: true
       '@effect/sql-pg':
+        optional: true
+      '@effect/sql-pglite':
+        optional: true
+      '@effect/sql-sqlite-bun':
+        optional: true
+      '@effect/sql-sqlite-do':
+        optional: true
+      '@effect/sql-sqlite-node':
+        optional: true
+      '@effect/sql-sqlite-wasm':
         optional: true
       '@electric-sql/pglite':
         optional: true
@@ -3971,6 +4000,10 @@ packages:
       '@tursodatabase/database-common':
         optional: true
       '@tursodatabase/database-wasm':
+        optional: true
+      '@tursodatabase/serverless':
+        optional: true
+      '@tursodatabase/sync':
         optional: true
       '@types/better-sqlite3':
         optional: true
@@ -9169,7 +9202,7 @@ snapshots:
       get-tsconfig: 4.14.3
       jiti: 2.7.0
 
-  drizzle-orm@1.0.0-rc.3(postgres@3.4.9)(zod@4.6.5):
+  drizzle-orm@1.0.0-rc.5-5935859(postgres@3.4.9)(zod@4.6.5):
     optionalDependencies:
       postgres: 3.4.9
       zod: 4.6.5
