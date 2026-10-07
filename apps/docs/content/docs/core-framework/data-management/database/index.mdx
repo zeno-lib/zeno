@@ -7,10 +7,10 @@ status: in progress
 
 Zeno uses [Supabase Postgres](https://supabase.com/database) for the database
 and [Drizzle](https://orm.drizzle.team/docs/sql-schema-declaration) for
-type-safe schema definitions, migrations, and server-side queries. The
-`@zeno-lib/db` package ties those pieces together so an app can define tables in
-TypeScript, generate SQL migrations, and run queries with Supabase Row Level
-Security (RLS) applied correctly.
+type-safe schema definitions, migrations, and server-side queries. With the
+`@zeno-lib/db` package, an app defines tables in TypeScript, generates SQL
+migrations from them, and runs user-scoped queries with the caller's role and
+JWT claims set, so Supabase Row Level Security (RLS) policies apply.
 
 To read this guide, you do not need to have used Drizzle,
 RLS, or `@zeno-lib/db` before.
@@ -23,11 +23,11 @@ Every Supabase project includes a Postgres database. You can query it directly
 from trusted server code, and Supabase can also expose it through APIs such as
 PostgREST and Supabase client libraries.
 
-The important security rule is: user-scoped tables need
+Every user-scoped table needs
 [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security).
-RLS is a Postgres feature that attaches policies to tables. You can think of a
-policy as database-level authorization logic that Postgres applies whenever a
-role tries to read, insert, update, or delete rows.
+RLS is a Postgres feature that attaches policies to tables. A policy is an
+authorization rule that Postgres checks whenever a role reads, inserts, updates,
+or deletes rows.
 
 Postgres requests run as database roles. The roles you meet most often are:
 
@@ -35,16 +35,16 @@ Postgres requests run as database roles. The roles you meet most often are:
   written without a signed-in user, if your app allows that.
 - `authenticated`: a request with a valid signed-in Supabase user. Use this for
   data that depends on who the user is.
-- `service_role`: a trusted role that bypasses RLS, for code paths where you
-  intentionally do not want user-scoped policies to apply.
+- `service_role`: a trusted role that bypasses RLS, for code paths that must
+  skip user-scoped policies.
 - `postgres`: the role the database client connects as by default. It also
   bypasses RLS.
 
-Zeno connects to Postgres directly rather than through Supabase's API, so it maps
-onto these roles itself: RLS-scoped queries run as `anon` or `authenticated`,
-trusted admin queries run as the `postgres` connection role, and a dedicated
-client runs as `service_role` for trusted work that should bypass RLS through
-Supabase's `BYPASSRLS` grant. A user token can only ever resolve to `anon` or
+Zeno connects to Postgres directly rather than through Supabase's API, so it
+chooses the role itself. RLS-scoped queries run as `anon` or `authenticated`.
+Trusted admin queries run as the `postgres` connection role. A dedicated client
+runs as `service_role` for trusted work that should bypass RLS through
+Supabase's `BYPASSRLS` grant. A user token only ever resolves to `anon` or
 `authenticated`; `service_role` is reachable only through that explicit
 server-side client, never from a JWT.
 
@@ -68,13 +68,14 @@ schema files, generate SQL migration files, and apply them to the database. In
 Zeno, the normal workflow is codebase-first: update the TypeScript schema,
 generate migrations, review the generated SQL, and apply it.
 
-If you already have a database, the direction reverses: your schema files
+If you already have a database, the direction reverses, and your schema files
 describe what Postgres already has. Drizzle's
 [Supabase with an existing database](https://orm.drizzle.team/docs/get-started/supabase-existing)
 guide covers `drizzle-kit pull`, and
 [Existing schema](/docs/core-framework/data-management/database/existing-schema)
-covers what Zeno adds — which helpers match what Supabase creates, what must
-stay out of your schema barrel, and how to prove the description still matches.
+covers what Zeno adds. It explains which helpers match what Supabase creates,
+what must stay out of your schema barrel, and how to check that the description
+still matches.
 
 Drizzle also supports
 [RLS policies](https://orm.drizzle.team/docs/rls), including Supabase's built-in
@@ -86,64 +87,60 @@ Supabase also ships a
 [JavaScript client](https://supabase.com/docs/reference/javascript/introduction)
 whose data API (`supabase.from(...).select(...)`) reaches Postgres through
 [PostgREST](https://postgrest.org). It is convenient to start with, but for
-application data Zeno queries Postgres directly with Drizzle. Here is the
-reasoning.
+application data Zeno queries Postgres directly with Drizzle.
 
 - **SQL, not a query meta-language.** The Supabase data API builds queries
   through PostgREST's filter and resource-embedding syntax, a meta-language
-  layered over SQL. It reads nicely for simple lookups, but you soon meet its
-  edges: joins beyond embedded resources, richer aggregations, conditional
-  logic, and other advanced SQL features. Drizzle expresses all of these because
-  it *is* SQL with TypeScript types.
-- **No forced workarounds.** When the meta-language cannot express a query you
+  layered over SQL. It works for simple lookups, but you soon hit its limits
+  with joins beyond embedded resources, richer aggregations, conditional logic,
+  and other advanced SQL features. Drizzle can express all of these, because its
+  query builder mirrors SQL and adds TypeScript types.
+- **No forced workarounds.** When the meta-language cannot express a query, you
   either split it into several round-trips or push it into an RPC function. Both
-  tend to produce slower queries than the single statement you would have
-  written in SQL, so the limitation quietly costs performance.
-- **Relational writes, not just reads.** PostgREST can embed related rows when
-  reading, but it has no relational insert or update, so nested writes turn into
-  several calls you sequence yourself. Drizzle gives you the full range of writes,
-  and real transactions to group them.
+  tend to be slower than the single statement you would have written in SQL.
+- **Relational writes.** PostgREST can embed related rows when reading, but it
+  has no relational insert or update, so nested writes turn into several calls
+  you sequence yourself. With Drizzle you write each insert or update as a SQL
+  statement and group them in a real transaction.
 - **Fewer layers between app and database.** The JavaScript client sends HTTP to
   PostgREST, which parses the request, plans it, and serializes rows to JSON.
   Drizzle uses a direct `postgres-js` connection to Postgres and skips the
   PostgREST and HTTP hop, which lowers latency and serialization overhead.
-- **Transactions on your terms.** PostgREST runs each request as its own
+- **Multi-statement transactions.** PostgREST runs each request as its own
   transaction, so you cannot group several calls into one atomic unit. Drizzle
   runs over a direct connection and lets you decide how to manage transactions,
   so related writes can commit or roll back together.
-- **One TypeScript schema, migrations handled for you.** Tables are defined once
-  in TypeScript; Drizzle Kit diffs that schema and generates SQL migrations,
-  versioned in git. You are not changing schema in the dashboard and then
-  regenerating client types to match.
-- **End-to-end types from the source of truth.** Query result types are inferred
-  from the same table objects that drive migrations, so a schema change surfaces
-  as a type error at every call site, with no separate generated-types file to
-  regenerate and keep in sync.
+- **One TypeScript schema, generated migrations.** You define tables once in
+  TypeScript; Drizzle Kit diffs that schema and generates SQL migrations that
+  you commit to git. You don't change the schema in the dashboard and then
+  regenerate client types to match.
+- **End-to-end types from the source of truth.** Drizzle infers query result
+  types from the same table objects Drizzle Kit generates migrations from, so
+  renaming or removing a column is a type error at every call site that uses it.
+  There is no separate generated-types file to regenerate and keep in sync.
 - **No runaway type inference.** The Supabase client derives result types from a
   generated types file, and on larger schemas or nested embeds TypeScript can
-  give up with `Type instantiation is excessively deep and possibly infinite`
+  fail with `Type instantiation is excessively deep and possibly infinite`
   ([supabase-js #808](https://github.com/supabase/supabase-js/issues/808)).
-  Drizzle infers types straight from your table objects, so it does not hit that
-  wall.
+  Drizzle infers types straight from your table objects, so it avoids that
+  error.
 - **Seeding in TypeScript too.** Seed scripts run through the same Drizzle schema
   and client as the rest of the app, so you write seed data in TypeScript with
-  full types instead of maintaining separate SQL or dashboard steps. That is more
-  flexible and stays in sync with the schema as it changes.
+  full types instead of maintaining separate SQL or dashboard steps. When the
+  schema changes, the type checker flags seed data that no longer fits.
 - **Less locked in to Supabase.** Zeno relies on Supabase for authentication,
-  Realtime, and Storage, but keeping data access in Drizzle and standard Postgres
-  means the data layer itself is not tied to Supabase. That keeps
-  dependency on any single vendor smaller and leaves room to move or change the
-  database without rewriting every query.
-- **No drift from Postgres.** Drizzle stays close to standard SQL, so your
-  queries and your team's knowledge stay portable rather than tied to a
-  Supabase-specific query dialect.
+  Realtime, and Storage, but data access goes through Drizzle and standard
+  Postgres, so the data layer itself is not tied to Supabase. You can move or
+  change the database without rewriting every query.
+- **No drift from Postgres.** Drizzle queries follow standard SQL, so your
+  queries and your team's SQL knowledge carry over to other Postgres databases
+  instead of depending on a Supabase-specific query dialect.
 
 <Callout type="info">
-This is about *data access*, not about replacing the Supabase client. The
-Supabase client remains the right tool for what it is built for:
-authentication, Realtime, and Storage. Zeno uses it for
-[authentication](/docs/core-framework/user-management/authentication) and binds
-the verified session into Drizzle's RLS queries.
+Drizzle replaces the Supabase client for *data access* only. You still use the
+Supabase client for authentication, Realtime, and Storage. Zeno uses it for
+[authentication](/docs/core-framework/user-management/authentication) and passes
+the verified session's claims to Drizzle's RLS queries.
 </Callout>
 
 ## Installation
@@ -186,7 +183,8 @@ What each script does:
 ## Environment
 
 Both the runtime clients and the Drizzle Kit preset read `SUPABASE_DATABASE_URL`
-from the environment unless you pass an explicit `connectionString` override.
+from the environment. To override it, pass `connectionString` to a runtime
+client, or `dbCredentials` to the preset.
 
 For local Supabase:
 
@@ -224,7 +222,7 @@ createServiceClient({
 ```
 
 `resolveDatabaseUrl({ connectionString?, requirePooler? })` from `@zeno-lib/db`
-runs the same resolution on its own.
+resolves and checks the URL the same way, without creating a client.
 
 ## Next steps
 

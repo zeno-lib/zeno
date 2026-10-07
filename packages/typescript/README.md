@@ -1,12 +1,12 @@
-# TypeScript Configuration
+# TypeScript configuration
 
-This package provides shared TypeScript configurations for the monorepo, with progressive levels of strictness and framework-specific settings.
+This package provides shared TypeScript configurations for the monorepo, with increasing levels of strictness and framework-specific settings.
 
 ## Configurations
 
 ### `base.json`
 
-The foundation configuration with modern ESM features and sensible defaults.
+The base configuration, with ESNext modules, `Bundler` module resolution and `noEmit`.
 
 ```json
 {
@@ -59,7 +59,7 @@ Extends `base.json` with strict type checking enabled.
 
 ### `strictest.json`
 
-Extends `strict.json` with the most stringent rules for maximum type safety.
+Extends `strict.json` with stricter checks, such as unused locals and parameters, implicit returns and unchecked indexed access.
 
 ```json
 {
@@ -90,7 +90,7 @@ Extends `strict.json` with the most stringent rules for maximum type safety.
 
 ### `react.json`
 
-Extends `strictest.json` with React-specific configurations.
+Extends `strictest.json` with the JSX and DOM library settings React needs.
 
 ```json
 {
@@ -107,7 +107,7 @@ Extends `strictest.json` with React-specific configurations.
 
 ### `nextjs.json`
 
-Extends `react.json` with Next.js-specific configurations.
+Extends `react.json` with the Next.js TypeScript plugin and the Next.js `include` paths.
 
 ```json
 {
@@ -132,13 +132,13 @@ Extends `react.json` with Next.js-specific configurations.
 
 ## Usage
 
-Choose the appropriate configuration based on your needs:
+Pick the configuration that fits your project:
 
-- **`base.json`**: For basic TypeScript projects with modern ESM support
-- **`strict.json`**: For projects that want strict type checking
-- **`strictest.json`**: For projects that want maximum type safety (recommended)
-- **`react.json`**: For React applications
-- **`nextjs.json`**: For Next.js applications
+- `base.json`: for basic TypeScript projects with ESM support
+- `strict.json`: for projects that want strict type checking
+- `strictest.json`: for projects that want maximum type safety (recommended)
+- `react.json`: for React applications
+- `nextjs.json`: for Next.js applications
 
 ### Example
 
@@ -156,7 +156,7 @@ In your project's `tsconfig.json`:
 }
 ```
 
-## Configuration Hierarchy
+## Configuration hierarchy
 
 ```
 base.json

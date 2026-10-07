@@ -1,15 +1,15 @@
 ---
-title: Unit Testing
+title: Unit testing
 description: Unit testing with Vitest
 icon: ListChecks
 status: in progress
 ---
 
-Zeno uses [Vitest](https://vitest.dev) for fast, modern unit testing with native TypeScript support. The `@zeno-lib/test` package provides shared, opinionated configs and Testing Library re-exports so every package tests the same way — install it alongside `vitest` and `vite`.
+Zeno uses [Vitest](https://vitest.dev) for unit testing, with native TypeScript support. The `@zeno-lib/test` package provides shared configs and Testing Library re-exports, so every package tests the same way. Install it alongside `vitest` and `vite`.
 
 ## What you get
 
-Adding `@zeno-lib/test` (with `vitest` and `vite`) gives you shared configs and re-exports for writing and running tests. Import Vitest runtime helpers (`describe`, `test`, `expect`, `vi`, …) directly from `vitest`:
+Adding `@zeno-lib/test` (with `vitest` and `vite`) gives you shared configs, Testing Library re-exports and a Row Level Security test harness. Import Vitest runtime helpers (`describe`, `test`, `expect`, `vi`, …) directly from `vitest`:
 
 | Import | What it provides |
 |---|---|
@@ -45,7 +45,7 @@ The `vitest` CLI comes from the `vitest` package you installed:
 
 ### 3. Create a Vitest config
 
-Create a `vitest.config.ts` at the root of your package and re-export **one** config — pick the preset that matches your package (see [Choosing a config](#choosing-a-config) for the differences).
+Create a `vitest.config.ts` at the root of your package and re-export **one** config. Pick the preset that matches your package (see [Choosing a config](#choosing-a-config) for the differences).
 
 For plain TypeScript packages, use `defaultConfig`:
 
@@ -85,7 +85,7 @@ The package ships two presets. Pick the one that matches your package.
 
 ### `defaultConfig`
 
-For plain TypeScript packages (no DOM). It:
+Use it for plain TypeScript packages that need no DOM. It:
 
 - Resolves your `tsconfig` path aliases (`vite-tsconfig-paths`).
 - Loads environment variables from `.env.test` automatically.
@@ -97,11 +97,11 @@ For plain TypeScript packages (no DOM). It:
 Extends `defaultConfig` with what React component tests need:
 
 - Runs tests in a `jsdom` environment so the DOM is available.
-- Enables the React plugin with the automatic JSX runtime — no `import React` needed.
-- Widens test discovery to `{src,test,tests}/**/*.test.{ts,tsx}` so `.tsx` tests are included.
+- Enables the React plugin with the automatic JSX runtime, so you don't need `import React`.
+- Widens test discovery to `{src,test,tests}/**/*.test.{ts,tsx}`, so it also picks up `.tsx` tests.
 
 <Callout type="info">
-Both configs set `globals: false`. This means Vitest helpers are **not** injected into the global scope — you must import `describe`, `test`, `expect`, etc. from `vitest` in every test file. This keeps test files explicit and type-safe.
+Both configs set `globals: false`, so Vitest does **not** inject its helpers into the global scope. Import `describe`, `test`, `expect` and the rest from `vitest` in every test file.
 </Callout>
 
 ### Extending the config
@@ -123,7 +123,7 @@ export default mergeConfig(
 
 ## Writing tests
 
-Import the helpers you need from `vitest` (remember: there are no globals):
+Import the helpers you need from `vitest`, since there are no globals:
 
 ```typescript lineNumbers
 import { describe, expect, test } from "vitest"
@@ -142,7 +142,7 @@ describe("Calculator", () => {
 
 ### File location and naming
 
-Tests live alongside your source in `src/` and must end in `.test.ts` or `.test.tsx` to be picked up:
+Tests live alongside your source in `src/` and must end in `.test.ts` or `.test.tsx` for Vitest to find them:
 
 ```
 src/
@@ -156,12 +156,12 @@ src/
 
 Use `@zeno-lib/test/testing-library` for rendering and querying, and `@zeno-lib/test/user-event` to simulate interactions. Both require the `reactConfig` preset.
 
-`@zeno-lib/test/testing-library` is [React Testing Library](https://testing-library.com/docs/react-testing-library/intro) and `@zeno-lib/test/user-event` is [User Event](https://testing-library.com/docs/user-event/intro), re-exported without changes. Refer to their official documentation for the complete API.
+`@zeno-lib/test/testing-library` is [React Testing Library](https://testing-library.com/docs/react-testing-library/intro) and `@zeno-lib/test/user-event` is [User Event](https://testing-library.com/docs/user-event/intro), re-exported without changes. See their documentation for the complete API.
 
-These libraries let you test components the way a user actually experiences them, rather than reaching into implementation details:
+These libraries let you test components the way a user uses them, rather than reaching into implementation details:
 
-- **React Testing Library** mounts a component into the `jsdom` DOM and exposes queries (`getByRole`, `getByText`, …) that find elements by their accessible role and visible text. Asserting on what's on screen — instead of on internal state or props — keeps tests resilient to refactors.
-- **User Event** dispatches realistic interaction sequences (a click fires `pointerdown`, `mousedown`, `focus`, `click`, …), so tests exercise the same event flow a real user triggers, catching bugs that a single synthetic event would miss.
+- **React Testing Library** mounts a component into the `jsdom` DOM and exposes queries (`getByRole`, `getByText`, …) that find elements by their accessible role and visible text. Assert on what's on screen, not on internal state or props, and a refactor that leaves the output unchanged doesn't break the test.
+- **User Event** dispatches realistic interaction sequences (a click fires `pointerdown`, `mousedown`, `focus`, `click`, …), the same events a real user triggers. That catches bugs a single synthetic event would miss.
 
 ```tsx lineNumbers
 import { describe, expect, test, vi } from "vitest"
@@ -189,7 +189,7 @@ describe("Button", () => {
 
 ## Mocking
 
-Import [`vi`](https://vitest.dev/api/vi) and other helpers from `vitest`. Vitest's mock hoister only recognizes `vi` from the `"vitest"` specifier, so always import mocking utilities from `vitest` — `vi.fn()`, `vi.mock()`, `vi.hoisted()`, and the rest. See the [Mocking guide](https://vitest.dev/guide/mocking) for the full range of techniques.
+Import [`vi`](https://vitest.dev/api/vi) and other helpers from `vitest`. Vitest's mock hoister only recognizes `vi` from the `"vitest"` specifier, so always import it from `vitest` for `vi.fn()`, `vi.mock()`, `vi.hoisted()`, and the rest. See the [Mocking guide](https://vitest.dev/guide/mocking) for the full range of techniques.
 
 ```typescript lineNumbers
 import { describe, expect, test, vi } from "vitest"
@@ -225,7 +225,7 @@ describe("API client", () => {
 
 ## Testing Row Level Security
 
-`@zeno-lib/test/supabase` runs a suite as real Supabase users: it creates them through the Auth admin API, signs them in on one publishable-key client, and gives you a database handle bound to that client. It needs `@supabase/supabase-js` and a running local Supabase; the database client is yours to pass (typically `createAuthClient` from `@zeno-lib/db`).
+`@zeno-lib/test/supabase` runs a suite as real Supabase users: it creates them through the Auth admin API, signs them in on one publishable-key client, and gives you a database handle bound to that client. It needs `@supabase/supabase-js` and a running local Supabase. You pass the database client through `createDb`, typically `createAuthClient` from `@zeno-lib/db`.
 
 ```ts title="tests/deals.rls.test.ts"
 import { createClient } from "@supabase/supabase-js"
@@ -259,10 +259,10 @@ it("admins see every deal", async () => {
 })
 ```
 
-- `harness.db` is built once and follows whoever is signed in, so capture it anywhere.
-- `signInAs` always signs in a **fresh** user: claims such as roles are usually minted into the token at sign-in.
+- The harness builds `harness.db` once, and the handle follows whoever is signed in, so you can capture it anywhere.
+- `signInAs` always signs in a **fresh** user, because an access-token hook usually writes claims such as roles into the token at sign-in.
 - Assert the exact set `idsSeen` returns. An empty set is also what a broken claims setup looks like.
-- `cleanUp()` deletes every user it created, retrying transient Auth errors and ignoring users that are already gone, then signs out and closes `db`. Delete rows that reference those users first.
+- `cleanUp()` deletes every user the harness created, then signs out and closes `db`. It retries transient Auth errors and skips users that are already gone. Delete rows that reference those users first.
 
 ## Type testing
 
@@ -278,7 +278,7 @@ test("greet returns a string", () => {
 
 ## Environment variables
 
-Tests run with `NODE_ENV=test`. Both configs load `.env.test` automatically — create a `.env.test` file in your package for test-specific variables, and they'll be available via `process.env` during the run.
+Tests run with `NODE_ENV=test`. Both configs load `.env.test` automatically, so put test-specific variables in a `.env.test` file in your package and read them from `process.env` during the run.
 
 ## Commands
 

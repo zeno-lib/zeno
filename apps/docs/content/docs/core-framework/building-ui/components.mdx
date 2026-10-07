@@ -1,5 +1,5 @@
 ---
-title: UI Primitives
+title: UI primitives
 description: The shadcn Base UI primitives Zeno builds on, and how to add them
 icon: LayoutGrid
 status: in progress
@@ -15,14 +15,14 @@ import { Label } from "@zeno-lib/ui/label"
 import { TriangleAlertIcon } from "lucide-react"
 
 Zeno's primitives are the [shadcn](https://ui.shadcn.com) components, built on
-[Base UI](https://base-ui.com) and styled with Tailwind CSS. Go to the [shadcn components](https://ui.shadcn.com/docs/components)
-page to browse the full catalog and add any of them with the CLI:
+[Base UI](https://base-ui.com) and styled with Tailwind CSS. Browse the full catalog on the
+[shadcn components](https://ui.shadcn.com/docs/components) page, and add any of them with the CLI:
 
 ```npm
 pnpm dlx shadcn@latest add button dialog
 ```
 
-Once added, you can import them like so:
+Then import them from the shared `ui` package:
 
 ```tsx
 import { Button } from "@{yourWorkspace}/ui/components/button"
@@ -31,7 +31,8 @@ import { Dialog, DialogContent, DialogTrigger } from "@{yourWorkspace}/ui/compon
 
 ## Anatomy
 
-- Composition via Base UI's `render` prop: pass another element to swap the underlying tag (e.g. render a `Button` as a Next.js `Link`)
+Base UI components compose through the `render` prop. Pass another element to swap the
+underlying tag, for example to render a `Button` as a Next.js `Link`:
 
 ```tsx
 import Link from "next/link"

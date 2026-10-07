@@ -1,11 +1,11 @@
 ---
 title: Supabase
-description: Framework-aware Supabase clients, middleware, and Storage image loader
+description: Supabase clients, middleware, and a Storage image loader for Next.js
 icon: Plug
 status: in progress
 ---
 
-`@zeno-lib/supabase` handles the boilerplate of wiring Supabase into different frameworks. The Next.js framework is the main focus for now.
+`@zeno-lib/supabase` wraps `@supabase/ssr` and `@supabase/supabase-js`, so you don't write the client, cookie, and middleware setup yourself. It targets Next.js for now.
 
 ## Installation
 
@@ -17,7 +17,7 @@ npm install @zeno-lib/supabase @supabase/ssr @supabase/supabase-js
 
 ## Plain client
 
-`@zeno-lib/supabase/client` provides plain `@supabase/supabase-js` clients with no cookie/session wiring, for backend, API, or script contexts that don't need the user's session. Three factories cover the common cases:
+`@zeno-lib/supabase/client` provides plain `@supabase/supabase-js` clients with no cookie or session handling, for backend, API, or script code that doesn't need the user's session. Three factories cover the common cases:
 
 - **`createAnonClient`** uses the publishable (anon) key by default, so it honors Row Level Security.
 - **`createAdminClient`** uses the secret (service-role) key by default, so it **bypasses Row Level Security**.
@@ -41,7 +41,7 @@ All three take `(supabaseUrl?, supabaseKey?, options?)`, return a session-less c
 
 ### Security
 
-`createAdminClient` uses the secret (service-role) key, so it **bypasses Row Level Security** and can read or write any row. Keep it server-side, and scope `SUPABASE_SECRET_KEY` to where admin access is intended.
+`createAdminClient` uses the secret (service-role) key, so it **bypasses Row Level Security** and can read or write any row. Keep it server-side, and set `SUPABASE_SECRET_KEY` only where the code needs admin access.
 
 ## Next.js browser client
 
@@ -80,7 +80,7 @@ export function TodoItem({ id, title, completed }: Todo) {
 
 ## Next.js server client
 
-`@zeno-lib/supabase/next-server` returns a standard `@supabase/ssr` server client. It reads cookies through `next/headers`, so its `createClient` is **async and must be awaited**. Use it from Server Components, Route Handlers, and Server Actions. Queries run as the signed-in user, so RLS applies.
+`@zeno-lib/supabase/next-server` returns a standard `@supabase/ssr` server client. It reads cookies through `next/headers`, so its `createClient` is **async, and you must `await` it**. Use it from Server Components, Route Handlers, and Server Actions. Queries run as the signed-in user, so RLS applies.
 
 **Server Component.** Fetch the user's data during render:
 
@@ -144,7 +144,7 @@ export async function GET() {
 
 ## Next.js middleware
 
-The middleware refreshes the auth session on every request and gates unauthenticated traffic. The fastest setup is to re-export the ready-made middleware in a `middleware.ts` file:
+The middleware refreshes the auth session on every request and blocks unauthenticated requests to non-public paths. For the default setup, re-export the ready-made middleware from a `middleware.ts` file:
 
 ```typescript title="middleware.ts"
 export { middleware, config } from "@zeno-lib/supabase/next-middleware"
@@ -191,12 +191,12 @@ Both `createMiddleware(options)` and `updateSession(request, options)` accept th
 
 ### Redirect defaults
 
-The middleware **defaults** to redirecting unauthenticated users to `/sign-in` and treating `/sign-in` as public, matching the [`@zeno-lib/authentication`](https://www.npmjs.com/package/@zeno-lib/authentication) package's `/sign-in` UI, so the two work together with no configuration.
+By default, the middleware redirects unauthenticated users to `/sign-in` and treats `/sign-in` as public. That matches the `/sign-in` UI of the [`@zeno-lib/authentication`](https://www.npmjs.com/package/@zeno-lib/authentication) package, so the two work together with no configuration.
 
-Since only `/sign-in` is public by default, pass `signInPath` and `publicPaths` to `createMiddleware` / `updateSession` (above) when your routes differ, e.g. add `/sign-up` and `/recover-password` so those flows stay reachable.
+Only `/sign-in` is public by default, so pass `signInPath` and `publicPaths` to `createMiddleware` or `updateSession` when your routes differ. For example, add `/sign-up` and `/recover-password` so users can reach those flows.
 
 <Callout type="warn">
-`signInPath` must itself be listed in `publicPaths`, or unauthenticated users hit an infinite redirect loop (they get sent to the sign-in page, which then redirects again). The defaults keep this in sync.
+List `signInPath` itself in `publicPaths`, or unauthenticated users hit an infinite redirect loop (the middleware sends them to the sign-in page, then redirects that request too). The defaults keep this in sync.
 </Callout>
 
 ## Next.js Storage image loader
@@ -213,9 +213,9 @@ export default {
 }
 ```
 
-When the project id isn't available via environment variables at import time, build the loader explicitly with `createSupabaseImageLoader({ projectId })` and default-export the result.
+When the project id isn't available from environment variables at import time, build the loader explicitly with `createSupabaseImageLoader({ projectId })` and default-export the result.
 
-`http(s)` sources pass through untouched; relative paths are rewritten to `https://<projectId>.supabase.co/storage/v1/object/public/<src>?width=<w>&quality=<q|75>`.
+The loader returns `http(s)` sources unchanged and rewrites relative paths to `https://<projectId>.supabase.co/storage/v1/object/public/<src>?width=<w>&quality=<q|75>`.
 
 `createSupabaseImageLoader(options)` accepts:
 
@@ -226,7 +226,7 @@ When the project id isn't available via environment variables at import time, bu
 
 ## Common mistakes
 
-- **Using `next-client` on the server (or `next-server` in a Client Component).** Cookie state diverges and the session silently desyncs across navigations. Match the client to where the code runs.
+- **Using `next-client` on the server (or `next-server` in a Client Component).** The client still works, but it loses the auth state across navigations without an error. Match the client to where the code runs.
 - **Forgetting `await` on `next-server`'s `createClient`.** It's async; without `await` every method call resolves to `undefined` at runtime, even though it type-checks.
-- **Reaching for `client` when `next-server` would do.** If there's a signed-in user, use the server client so RLS enforces access for you. Keep the RLS-bypassing `client` for genuinely session-less work.
-- **Leaving `signInPath` out of `publicPaths`.** Unauthenticated users get redirected to the sign-in page, which isn't exempt, so they're redirected again (an infinite loop). The defaults keep the two in sync.
+- **Using `client` when `next-server` would do.** If there's a signed-in user, use the server client so RLS enforces access for you. Keep `client` for session-less work. Its `createAnonClient` runs as the `anon` role, and its `createAdminClient` bypasses RLS.
+- **Leaving `signInPath` out of `publicPaths`.** The middleware redirects unauthenticated users to the sign-in page, which isn't exempt, so it redirects them again (an infinite loop). The defaults keep the two in sync.

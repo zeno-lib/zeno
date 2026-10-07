@@ -5,17 +5,18 @@ icon: Download
 status: in progress
 ---
 
-Zeno's UI primitives are plain [Shadcn](https://ui.shadcn.com) [Base UI](https://base-ui.com) components;
-you add them with the CLI and own the code. Zeno layers
-on a [registry](https://ui.shadcn.com/docs/registry/github) that ships the design elements as
-`shadcn add` commands. Everything lands in **your** repo for further customization.
+Zeno's UI primitives are plain [shadcn](https://ui.shadcn.com) [Base UI](https://base-ui.com)
+components; you add them with the CLI and own the code. Zeno adds a
+[registry](https://ui.shadcn.com/docs/registry/github) for its own items, such as the theme, the
+auth flows, and the form field kit, which you also install with `shadcn add`. Every file lands in
+**your** repo, so you can customize it.
 
 ## Project structure
 
-One shared `ui` package owns the primitives and the **default
-theme**, and one or more apps that consume that package and **override** the theme as needed.
-It follows the [shadcn monorepo](https://ui.shadcn.com/docs/monorepo#file-structure) convention, with
-a theme living in the `ui` package:
+A Zeno monorepo has one shared `ui` package that owns the primitives and the **default theme**,
+and one or more apps that consume that package and **override** the theme as needed. The layout
+follows the [shadcn monorepo](https://ui.shadcn.com/docs/monorepo#file-structure) convention, with
+the theme in the `ui` package:
 
 ```txt
 apps
@@ -49,13 +50,13 @@ turbo.json
 ## Configure shadcn
 
 <Callout>
-An upcoming `zeno-cli` will generate the whole structure for you. But for now, you need to manually configure the project structure.
-`shadcn-cli` is not great at generating the the monorepo structure for you.
+An upcoming `zeno-cli` will generate this whole structure for you. Until then, configure it by hand.
+`shadcn-cli` doesn't generate this monorepo layout well.
 </Callout>
 
-Give app(s) and the shared `ui` package each a `components.json`.
-Copy paste or edit as needed the following into your project with `{yourApp}` (your app's directory)
-and `@{yourWorkspace}` (your monorepo's package scope):
+Give each app and the shared `ui` package a `components.json`. Copy the files below into your
+project and edit them as needed, replacing `{yourApp}` with your app's directory and
+`@{yourWorkspace}` with your monorepo's package scope:
 
 ```json title="apps/{yourApp}/components.json"
 {
@@ -103,9 +104,9 @@ and `@{yourWorkspace}` (your monorepo's package scope):
 }
 ```
 
-Keep `style`, `baseColor`, and `iconLibrary` identical across both files; the
-[shadcn monorepo guide](https://ui.shadcn.com/docs/monorepo) covers the full rationale, and running
-`add` from the app path installs primitives into `packages/ui` while wiring imports in the app.
+Keep `style`, `baseColor`, and `iconLibrary` identical across both files. Running `add` from the
+app path installs primitives into `packages/ui` and wires the imports in the app. The
+[shadcn monorepo guide](https://ui.shadcn.com/docs/monorepo) explains why.
 
 ## Back the aliases
 
@@ -145,13 +146,14 @@ Then give the app its `@/*` alias. The shared package needs no `paths`:
 
 ## Add the theme
 
-Add Zeno's pre-set theme:
+Add Zeno's default theme to the shared `ui` package:
 
 ```npm
 pnpm dlx shadcn@latest add zeno-lib/zeno/theme -c packages/ui
 ```
 
-Then make sure that stylesheet imports Tailwind, the animations, and declares the dark variant:
+Then make sure the shared stylesheet imports Tailwind and the animations, and declares the dark
+variant:
 
 ```css title="packages/ui/src/styles/globals.css"
 @import "tailwindcss";
@@ -166,4 +168,4 @@ For the full token reference, dark mode, and how to override the palette, see
 ## Add primitives
 
 Add the shadcn primitives you need with the CLI. See
-[UI Primitives](/docs/core-framework/building-ui/components).
+[UI primitives](/docs/core-framework/building-ui/components).

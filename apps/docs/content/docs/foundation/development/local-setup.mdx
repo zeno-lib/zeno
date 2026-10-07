@@ -1,13 +1,13 @@
 ---
-title: Local Setup & Env Vars
+title: Local setup & env vars
 description: Managing environment variables and local development configuration
 icon: Copy
 status: in progress
 ---
 
-Zeno uses environment variables for configuration across different environments.
+Zeno apps read their configuration from environment variables, which you set per environment in `.env` files.
 
-## Environment Files
+## Environment files
 
 ```
 .env                 # Default values (committed)
@@ -17,7 +17,7 @@ Zeno uses environment variables for configuration across different environments.
 .env.test            # Test-specific
 ```
 
-## Loading Order
+## Loading order
 
 Environment variables are loaded in this order (later overrides earlier):
 
@@ -26,7 +26,7 @@ Environment variables are loaded in this order (later overrides earlier):
 3. `.env.[NODE_ENV]`
 4. `.env.[NODE_ENV].local`
 
-## Next.js Variables
+## Next.js variables
 
 For Next.js apps, prefix public variables with `NEXT_PUBLIC_`:
 
@@ -40,7 +40,7 @@ NEXT_PUBLIC_API_URL=https://api.example.com
 NEXT_PUBLIC_APP_NAME=My App
 ```
 
-## TypeScript Support
+## TypeScript support
 
 Create a typed env file for autocomplete:
 
@@ -52,9 +52,9 @@ export const env = {
 }
 ```
 
-## Vitest Environment
+## Vitest environment
 
-Tests use `.env.test` and `NODE_ENV=test`. The shared config from `@zeno-lib/test` loads env vars automatically:
+Tests use `.env.test` and `NODE_ENV=test`. The shared config from `@zeno-lib/test` loads the env files for you, through Vite's `loadEnv` in `test` mode:
 
 ```typescript title="vitest.config.ts"
 export { defaultConfig as default } from "@zeno-lib/test/configs"
@@ -80,12 +80,12 @@ Pass environment variables to Turborepo tasks:
 
 ## Security
 
-- **Never commit secrets** — Use `.env.local` for sensitive values
-- **Use `.gitignore`** — Ensure `.env*.local` is ignored
-- **Validate at startup** — Check required vars exist
-- **Rotate credentials** — Update secrets regularly
+- **Never commit secrets.** Use `.env.local` for sensitive values.
+- **Use `.gitignore`.** Make sure it ignores `.env*.local`.
+- **Validate at startup.** Check that the required variables exist.
+- **Rotate credentials.** Replace secrets on a regular schedule.
 
-Example validation:
+A startup check can look like this:
 
 ```typescript
 function validateEnv() {

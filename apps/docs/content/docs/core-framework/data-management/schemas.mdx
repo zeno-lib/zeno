@@ -1,6 +1,6 @@
 ---
 title: Schemas
-description: Data schemas and validation
+description: Derive Zod validation schemas from your Drizzle tables
 icon: Blocks
 ---
 
@@ -16,10 +16,11 @@ type (`z.infer<typeof schema>`).
 
 Your Drizzle table already describes that shape for the database. Redeclaring it
 by hand for validation means two definitions that drift apart the moment you add
-a column. Instead, Zeno **derives** the Zod schema from the table, so a single
-definition keeps everything in lockstep: the database shape, runtime validation
-at your trust boundaries, and the inferred TypeScript types. Add a field to the
-table and your validation and types follow automatically.
+a column. Instead, Zeno **derives** the Zod schema from the table, so the
+database shape, runtime validation at your trust boundaries, and the inferred
+TypeScript types all come from one definition. When you add a column to the
+table, the derived schema validates it and the inferred type includes it, with
+no other edit.
 
 ## Installation
 
@@ -36,18 +37,19 @@ pnpm add @zeno-lib/db @zeno-lib/schema @zeno-lib/forms drizzle-orm@1.0.0-rc.3 po
 pnpm add -D drizzle-kit@1.0.0-rc.3 dotenv
 ```
 
-`@zeno-lib/schema` peers on Drizzle's Zod bridge. Import Drizzle table builders
-from Drizzle, and import Zod itself directly from `zod` when you compose
-product-specific schemas.
+`@zeno-lib/schema` builds on Drizzle's Zod bridge and takes `drizzle-orm` and
+`zod` as peer dependencies. Import Drizzle table builders from Drizzle, and
+import Zod itself directly from `zod` when you compose product-specific schemas.
 
 ## Start from a table
 
-Zod schemas are derived from a Drizzle table, so everything begins with one. The
-table is the database source of truth and lives in your database package under
-`{project}-db/src/schemas/`. Defining tables and the Zeno helpers it uses
-(`table`, `primaryId`, `authUserId`, `auditColumns`, RLS policies, …) are
-covered in [Tables](/docs/core-framework/data-management/database/tables); the
-example below is just the input the rest of this page builds on.
+You derive Zod schemas from a Drizzle table, so start with the table. It is the
+database source of truth and lives in your database package under
+`{project}-db/src/schemas/`.
+[Tables](/docs/core-framework/data-management/database/tables) covers how to
+define one and the Zeno helpers it uses (`table`, `primaryId`, `authUserId`,
+`auditColumns`, RLS policies, …). The rest of this page builds on the example
+below.
 
 ```ts title="{project}-db/src/schemas/posts.ts"
 import { auditColumns, authUserId, primaryId, table } from "@zeno-lib/db/schema"
@@ -92,16 +94,16 @@ export const postSchema = defineTableSchema(posts)
 `createdAt`, `updatedAt`, `createdBy` and `updatedBy` are the keys
 `auditColumns()`, `timestamps()` and `authorship()` emit. The database fills
 them, through a column default and the triggers from `@zeno-lib/db/triggers`, so
-`insert` and `update` leave them out: a caller who sends `createdBy` has it
-stripped rather than written. The match is by key **and** default, so a
-`createdAt` column without a default stays writable. When a trusted path really
-needs to set one (a data import, say), build that schema with
+`insert` and `update` leave them out. If a caller sends `createdBy`, the schema
+strips it and nothing writes it. The match is by key **and** default, so a
+`createdAt` column without a default stays writable. When a trusted path needs
+to set one (a data import, say), build that schema with
 `createInsertSchema(...)` instead.
 
 ### Identity ids are positive
 
 A column from `sequentialPrimaryId()` (or any identity column whose sequence
-counts up from 1, which is Postgres's default) only accepts positive numbers, in
+counts up from 1, which is Postgres's default) accepts only positive numbers, in
 every variant. A function refinement on that column runs on top of the check; a
 schema passed as the refinement replaces it.
 
@@ -135,14 +137,15 @@ Drizzle also exposes raw row types on the table object itself,
 `posts.$inferInsert` and `posts.$inferSelect` (covered in
 [Tables](/docs/core-framework/data-management/database/tables)). Those mirror the
 table exactly. Prefer the Zod-inferred types once a schema diverges from the
-table: the moment you refine, omit, extend, or coerce a variant (as in the
-sections below), the `$infer` types can no longer describe it, but `z.infer` of
-the actual schema always can.
+table. When you refine, omit, extend, or coerce a variant (as in the sections
+below), the `$infer` types no longer describe it, but `z.infer` of the actual
+schema does.
 
 ## Refine each variant
 
-Pass refinement maps when the database shape needs richer validation. The maps
-match Drizzle's first-party
+Pass refinement maps when a column needs rules its database type can't express,
+such as a minimum length or a pattern. The maps take the same form as the
+refinements in Drizzle's first-party
 [Zod schema helpers](https://orm.drizzle.team/docs/zod).
 
 ```ts lineNumbers title="{project}-forms/src/posts/schemas.ts"
@@ -161,10 +164,10 @@ export const postSchema = defineTableSchema(posts, {
 ```
 
 Refinements are per variant. A rule under `insert` does not affect `update` or
-`select`, so repeat rules intentionally when the same constraint belongs in more
-than one workflow.
+`select`, so repeat a rule in each variant where the same constraint belongs.
 
-For advanced cases such as coercion, pass a Drizzle schema factory option:
+For cases such as coercion, pass Drizzle schema factory options through
+`factory`:
 
 ```ts
 export const postSchema = defineTableSchema(posts, {
@@ -178,11 +181,11 @@ export const postSchema = defineTableSchema(posts, {
 
 ## Derive form and action schemas
 
-Zeno does not generate form-specific schemas automatically. Forms are product
-workflows: they may omit server-owned fields, add UI-only values, or require
-cross-field validation that the database table should not know about.
+Zeno does not generate form-specific schemas. Forms are product workflows. They
+may omit server-owned fields, add UI-only values, or require cross-field
+validation that the database table should not know about.
 
-Derive those schemas explicitly with Zod, in the same `schemas.ts` alongside the
+Derive those schemas yourself with Zod, in the same `schemas.ts` as the
 table-derived `postSchema`:
 
 ```ts lineNumbers title="{project}-forms/src/posts/schemas.ts"
@@ -282,8 +285,8 @@ variant names across forms, actions, and tests.
 - Do not import `createAuthClient(...)` or other server-only code from a
   module a Client Component imports for validation. Keep database clients at the
   action/route boundary.
-- Refinements are per variant: a rule under `insert` does not apply to `update`
-  or `select`. Repeat it in each variant where the constraint belongs.
+- Refinements are per variant. A rule under `insert` does not apply to `update`
+  or `select`, so repeat it in each variant where the constraint belongs.
 - Once you omit, extend, or coerce a schema, infer its type from the Zod schema
   (`z.infer<typeof schema>`), not the table's `$inferInsert` / `$inferSelect`;
   the `$infer` types only know the raw table.

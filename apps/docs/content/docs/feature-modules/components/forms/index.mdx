@@ -1,30 +1,32 @@
 ---
 title: Forms
-description: Typed form factory, a registry field kit, and Zod validation on a shadcn-style layout
+description: A typed form factory, a registry field kit, and Zod validation on a shadcn-style layout
 icon: Form
 status: in progress
 ---
 
 import { NewsletterPreview } from "@/components/forms/newsletter-preview"
 
-`@zeno-lib/forms` is a thin layer over [TanStack Form](https://tanstack.com/form)
+`@zeno-lib/forms` is a typed layer over [TanStack Form](https://tanstack.com/form)
 and [Zod](https://zod.dev). The **headless core** (the form factory, validation, and schema
-helpers) ships on npm and is UI-free. The **field components** (built on shadcn primitives) drop
-into your repo via the registry, so you own and restyle them. You get type-safe field names, an
-automatic submit button, and a single `schema` prop instead of hand-wiring validators.
+helpers) ships on npm and is UI-free. The shadcn CLI copies the **field components** (built on
+shadcn primitives) into your repo from the registry, so you own and restyle them. You get type-safe
+field names, a submit button that disables itself during submit, and a single `schema` prop
+instead of hand-wired validators.
 
 ## Setup
 
-Add the field kit + `create-form` composition with the CLI, then install the headless core:
+Add the field kit and the `create-form` composition with the shadcn CLI, then install the headless
+core:
 
 ```npm
 pnpm dlx shadcn@latest add zeno-lib/zeno/create-form
 pnpm add @zeno-lib/forms
 ```
 
-`create-form` wires your dropped-in fields into the factory and exports the `useForm` hook. Import
-it from wherever you added it (`@zeno-lib/forms/create-form` is the batteries-included shortcut used
-in the examples below).
+`create-form` passes your installed fields to the factory and exports the `useForm` hook. Import
+it from wherever you added it. The examples below import the package's own copy of the same file,
+`@zeno-lib/forms/create-form`.
 
 ## Quick start
 
@@ -72,14 +74,15 @@ Three pieces to know:
   `defaultValues`, and `value` types match what your schema produces.
 - **`<FormProvider form={form}>`** lets every destructured component
   (`EmailField`, `SubmitButton`, …) resolve the form from React context.
-- **`<Form>`** renders the `<form>` element and wires up submission.
-  `SubmitButton` placed inside it disables and shows a spinner during
-  submit, no extra wiring needed.
+- **`<Form>`** renders the `<form>` element and calls `form.handleSubmit()`
+  on submit. A `SubmitButton` inside it disables itself and shows a spinner
+  during submit, with no props to pass.
 
 ## Destructure the components
 
-The field components on `form` are stable, so destructure them at the top
-of your component for cleaner JSX:
+The field components on `form` are stable across renders, so destructure
+them at the top of your component and write `<EmailField>` rather than
+`<form.EmailField>`:
 
 ```tsx lineNumbers
 const form = useForm({ /* … */ })
@@ -98,8 +101,8 @@ return (
 )
 ```
 
-The destructure list reads like an `import` block: a glance tells you
-which fields the component uses. This is the recommended pattern in
+Like an `import` block, the destructure line lists every field the
+component uses. This is the recommended pattern in
 `@zeno-lib/forms`, and it differs from upstream TanStack Form (which favors
 `form.EmailField`).
 
@@ -125,29 +128,31 @@ const form = useForm({
 ```
 
 A second prop, `validators`, controls when errors appear:
-`'blur-then-change'` (default), `'change'`, `'blur'`, or `'submit'`. The
-default keeps pristine fields quiet, errors land on first blur, then
-update live. Full breakdown in
-[Validation modes](/docs/feature-modules/components/forms/validation).
+`'blur-then-change'` (default), `'change'`, `'blur'`, or `'submit'`. With
+the default, a field shows no error until its first blur, then its errors
+update as the user types. See
+[Validation modes](/docs/feature-modules/components/forms/validation) for
+the full breakdown.
 
 ## Defaults from the schema
 
 When you pass a Zod schema, `useForm` derives initial values from it
-so you don't repeat yourself in `defaultValues`:
+so you don't repeat them in `defaultValues`:
 
-- **`.default(value)`** flows through. Change the default in the schema,
-  the form follows.
+- **`.default(value)`** becomes the field's initial value, so changing the
+  default in the schema changes the form.
 - **Strings** (`z.string()`, `z.email()`, `z.url()`, …) and **arrays**
   (`z.array(...)`) without a `.default(...)` initialise as `""` and `[]`
   respectively, so React inputs render controlled.
 - **Numbers, booleans, dates, enums, files** without a `.default(...)`
-  carry domain meaning (`0`? `false`? `today`?), so the user supplies
-  them explicitly via `defaultValues`; passing them is the only way to
-  tell the form "this is the empty value I want".
-- Anything you put in `defaultValues` always wins on conflict; schema
-  defaults are a baseline, not a guard.
-- Nested `z.object(...)` recurses with the same rules; partial user
-  overrides are deep-merged into the schema-derived shape.
+  are skipped, because their empty value depends on your domain (`0`,
+  `false`, `today`). Supply them in `defaultValues`, the only way to
+  tell the form which empty value you want.
+- Anything you put in `defaultValues` always wins on conflict; the schema
+  only fills the keys you leave out.
+- Nested `z.object(...)` follows the same rules, and `useForm` deep-merges
+  a partial nested object from `defaultValues` into the schema-derived
+  shape.
 
 ```tsx lineNumbers
 const schema = z.object({
@@ -163,35 +168,35 @@ const form = useForm({
 })
 ```
 
-This Zod-only behaviour degrades gracefully: pass a Valibot or ArkType
-schema and the hook simply skips extraction, leaving your
-`defaultValues` untouched.
+Schema defaults are Zod-only. With a Valibot or ArkType schema, the hook
+skips extraction and uses your `defaultValues` as they are.
 
 ## Focus on submit
 
 When a submit fails validation, `<Form>` moves focus to the first control
-with `aria-invalid="true"` **inside that same `<form>` element**, the
-pattern from TanStack Form's
+with `aria-invalid="true"` inside the submitted `<form>` element. This
+follows the pattern from TanStack Form's
 [focus management guide](https://tanstack.com/form/latest/docs/framework/react/guides/focus-management).
-The lookup is scoped to the submitted form node, so a form in a dialog
-never reaches into the page behind it, and an external
-`<button form="…">` submit works the same way. A group root that isn't
-focusable itself (radio group, slider) hands focus to its first tabbable
-child. Your own `onSubmitInvalid` passes straight through to TanStack Form.
-Forms rendered without `<Form>` (your own `<form>` calling
-`handleSubmit`) don't get this behaviour.
+Because the lookup only searches the submitted form, a form in a dialog
+never moves focus to the page behind it, and a submit from an external
+`<button form="…">` works the same way. When the invalid element is a
+group root that can't take focus itself (radio group, slider), `<Form>`
+focuses its first tabbable child. An `onSubmitInvalid` you pass goes to
+TanStack Form unchanged. Forms rendered without `<Form>` (your own
+`<form>` calling `handleSubmit`) don't get this behaviour.
 
 ## Custom fields
 
-When the shipped gallery doesn't cover what you need, `AppField` and
-`useFieldContext` give you the same typed field state with no styling
-constraints. See
+When the field kit doesn't cover what you need, `AppField` and
+`useFieldContext` give you the same typed field state, and you write the
+markup. See
 [Custom fields](/docs/feature-modules/components/forms/fields#custom-fields).
 
 ## Devtools
 
 Install `@tanstack/react-devtools` and `@tanstack/react-form-devtools`
-(both declared as optional peer deps), then drop the panel near your app root:
+(`@zeno-lib/forms` lists both as optional peer dependencies), then render the panel
+near your app root:
 
 ```tsx
 import { TanStackDevtools } from "@tanstack/react-devtools"
@@ -200,4 +205,5 @@ import { formDevtoolsPlugin } from "@tanstack/react-form-devtools"
 <TanStackDevtools plugins={[formDevtoolsPlugin()]} />
 ```
 
-Every `useForm` instance shows up live, no wrapping needed.
+Every `useForm` instance appears in the panel with its live state. You don't need to wrap
+anything.

@@ -1,15 +1,15 @@
 ---
 title: Installation
-description: Get started with Zeno in minutes
+description: Install the requirements, clone Zeno and verify the setup
 icon: Download
 status: to check
 ---
 
 ## Requirements
 
-### Package Manager
+### Package manager
 
-Zeno uses [pnpm](https://pnpm.io) for fast, disk-efficient package management. Install it globally:
+Zeno is a [pnpm](https://pnpm.io) workspace. Install pnpm globally:
 
 ```npm
 npm install -g pnpm
@@ -17,10 +17,10 @@ npm install -g pnpm
 
 ### Node.js
 
-Zeno requires Node.js 24 or higher. Install it from the [Node.js website](https://nodejs.org/en/download/).
+Zeno requires Node.js 24. Install it from the [Node.js website](https://nodejs.org/en/download/).
 
 
-## Quick Start
+## Quick start
 
 Clone the Zeno repository:
 
@@ -35,15 +35,15 @@ Install dependencies:
 pnpm install
 ```
 
-Start development servers:
+Start the development servers:
 
 ```bash
 pnpm dev
 ```
 
-## Verify Installation
+## Verify installation
 
-Run the full CI pipeline to ensure everything works:
+Run the full CI pipeline to check that everything works:
 
 ```bash
 pnpm ci
@@ -52,6 +52,6 @@ pnpm ci
 This runs:
 1. Linting with Ultracite
 2. TypeScript type checking
-3. Build all packages
+3. Building all packages
 4. Unit tests with Vitest
 5. E2E tests with Playwright

@@ -10,10 +10,9 @@ Each table lives in its own file under `{project}-db/src/schemas/`, where
 generates migrations, and Drizzle uses the same exported table objects when you
 write queries.
 
-The example below is a complete table definition. It is here to show how the
-pieces fit together; every helper it uses (`table`, `primaryId`, `authUserId`,
-`auditColumns`, and the owner policies) is documented in detail under
-[Schema helpers](#schema-helpers) further down.
+The example below is a complete table definition. Every helper it uses
+(`table`, `primaryId`, `authUserId`, `auditColumns`, and the owner policies) is
+documented under [Schema helpers](#schema-helpers) further down.
 
 ```typescript lineNumbers title="{project}-db/src/schemas/posts.ts"
 import {
@@ -55,26 +54,24 @@ export * from "./schemas/posts"
 // export * from "./schemas/comments"
 ```
 
-Keeping this shape in TypeScript has a few practical benefits: the table is the
-source of truth for migrations, query types are inferred from the same object,
-common columns can be reused as code, and validation schemas can be derived from
-the table later. For that next layer, see
-[Schemas](/docs/core-framework/data-management/schemas).
+The TypeScript table is the source of truth for migrations. Drizzle infers query
+types from the same object, common columns are helpers you call instead of
+redeclaring, and you can derive validation schemas from the table later. For
+that next layer, see [Schemas](/docs/core-framework/data-management/schemas).
 
 ## Schema helpers
 
-Everything below is exported from `@zeno-lib/db/schema`, and all of it is just
-convenience utilities, none of it is required. You can always define tables,
-columns, and RLS policies with Drizzle's own primitives directly whenever you
-need something these utils don't cover. The module simply gathers the common
-cases (table builders, reusable columns, RLS policies, and curated re-exports of
-the Drizzle and Supabase primitives) behind one Zeno-owned entrypoint so you
-don't import them from several packages.
+Everything below is exported from `@zeno-lib/db/schema`, and none of it is
+required. When you need something these helpers don't cover, define tables,
+columns, and RLS policies with Drizzle's own `pg-core` builders. The module
+gathers the common cases (table builders, reusable columns, RLS policies, and
+curated re-exports from Drizzle and Supabase) behind one Zeno-owned entrypoint,
+so you don't import them from several packages.
 
 ### Anatomy of a table
 
-Every helper slots into one of three places in a table definition. Keep this
-shape in mind. Each helper below is tagged with the slot it belongs to.
+Every helper goes in one of three places in a table definition. Each helper
+below is tagged with the slot it belongs to.
 
 ```typescript
 export const posts = table(   // ① table builder: wraps the table, toggles RLS
@@ -138,9 +135,9 @@ CREATE TABLE "billing"."rates" ( /* columns */ );
 ```
 
 It is otherwise Drizzle's `pgSchema`, so `existing()`, `enum()`, `sequence()`,
-`view()` and `materializedView()` all work as they do there. Reach for Drizzle's
-`pgSchema` directly only when you want a schema whose column names come
-verbatim from their TypeScript keys.
+`view()` and `materializedView()` all work as they do there. Use Drizzle's
+`pgSchema` only when you want a schema whose column names come verbatim from
+their TypeScript keys.
 
 ### Primary keys
 
@@ -164,9 +161,9 @@ id: primaryId("sequential")
 )
 ```
 
-`bigint` rather than `integer` because `integer` stops at 2.1 billion rows, and
-`by default` rather than `always` because `always` refuses ids you supply
-yourself, which breaks seeds and upserts.
+It uses `bigint` rather than `integer` because `integer` stops at 2.1 billion
+rows, and `by default` rather than `always` because `always` refuses ids you
+supply yourself, which breaks seeds and upserts.
 
 `primaryId("uuid")` is a random UUID key, the dashboard's UUID option:
 
@@ -222,8 +219,8 @@ ALTER TABLE "profiles" ADD CONSTRAINT "profiles_id_users_id_fkey"
   ON DELETE CASCADE ON UPDATE CASCADE;
 ```
 
-`sequentialPrimaryId()` takes the three axes of the Postgres identity column it
-builds, which is where the option names come from:
+`sequentialPrimaryId()` takes one option for each setting of the identity column
+it builds:
 
 | Option | Values | Default | What it changes |
 |---|---|---|---|
@@ -232,7 +229,7 @@ builds, which is where the option names come from:
 | `generated` | `"byDefault"`, `"always"` | `"byDefault"` | `always` refuses client-supplied ids. |
 
 `mode` defaults to `"number"` because PostgREST serialises to JSON numbers, so
-`"bigint"` would put your Drizzle type at odds with the types Supabase
+with `"bigint"` your Drizzle type would no longer match the types Supabase
 generates. It applies to `bigint` only, and passing it alongside
 `type: "integer"` is a type error.
 
@@ -246,9 +243,9 @@ All three take `name` when the column isn't called `id`.
 
 ### Columns
 
-_Slot ②: in the columns map._ Utils that create commonly-used columns so you
-don't redeclare them on every table. All of them are functions you call at each
-use site, and they come in two shapes.
+_Slot ②: in the columns map._ These helpers create common columns so you don't
+redeclare them on every table. Each one is a function you call at each use site,
+and they come in two shapes.
 
 **Ready-made columns** have fixed database names. Spread a group into your column
 map (`...auditColumns()`), or assign a single column to a key. Every call returns
@@ -289,15 +286,15 @@ SQL:
 #### Keeping the update columns current
 
 `created_at` and `created_by` are column `DEFAULT`s, so Postgres fills them for
-every writer. `updated_at` and `updated_by` have no equivalent, so they need a
-trigger, and that trigger is **required** for the values to mean anything.
+every writer. `updated_at` and `updated_by` have no equivalent for updates, so
+they need a trigger, and that trigger is **required** for the values to mean
+anything.
 
-Drizzle offers a `$onUpdateFn` hook for this and Zeno deliberately does not use
-it. It is applied while Drizzle builds its own statement, so a write arriving
-through PostgREST (the `supabase-js` client, the dashboard, any REST caller)
-never runs it, and in a Supabase app that is most writes. A column that is
-right only when you happen to write through Drizzle is worse than one you know
-needs a trigger.
+Drizzle offers a `$onUpdateFn` hook for this, and Zeno does not use it. Drizzle
+applies it while building its own statement, so a write arriving through
+PostgREST (the `supabase-js` client, the dashboard, any REST caller) never runs
+it, and in a Supabase app that is most writes. A column that is right only when
+you write through Drizzle is worse than one you know needs a trigger.
 
 Drizzle Kit generates no trigger DDL, but `drizzle-kit generate --custom` writes
 an **empty but tracked** migration (its snapshot links into the chain like any
@@ -384,7 +381,7 @@ ownerId: userId(() => profiles.id, { notNull: true })
 ```
 
 <Callout type="warn">
-  An **ownership** column that an RLS policy keys on wants `notNull: true`.
+  An **ownership** column that an RLS policy keys on needs `notNull: true`.
   `authUserOwns` builds `owner_column = auth.uid()`, which is `NULL` rather than
   `true` for a null owner, so the row is invisible and cannot be inserted.
   Nullable is right for an audit trail and wrong for ownership.
@@ -392,10 +389,10 @@ ownerId: userId(() => profiles.id, { notNull: true })
 
 ### RLS policies
 
-_Slot ③: return them from the extra callback._ Wrappers over Drizzle's
+_Slot ③: return them from the extra callback._ These helpers wrap Drizzle's
 `pgPolicy` so you don't hand-write the `for` operation or the owner check at
-every call site. Like the rest of this module they are optional: reach for
-`policy(...)` or Drizzle's `pgPolicy` directly when you need full control.
+every call site. Like the rest of this module they are optional. Use
+`policy(...)` or Drizzle's `pgPolicy` when you need full control.
 
 **Operation-scoped policies** preset the policy's `for` operation. Each takes
 `(name, config?)`, and `config` accepts the usual Drizzle policy options (`to`,
@@ -424,8 +421,8 @@ accepts it in a different clause per operation:
 | `allPolicy(name, config?)` | `ALL` | `using` + `withCheck` |
 | `policy(name, config)` | raw `pgPolicy`, you set `for` yourself | n/a |
 
-`authUserOwns(ownerColumn)` is not a policy but the condition most of them use,
-the SQL fragment for composing `using` / `withCheck`:
+`authUserOwns(ownerColumn)` is the condition most of them use. It returns an SQL
+fragment for composing `using` or `withCheck`, not a policy:
 
 ```typescript
 authUserOwns(t.userId) // sql`${t.userId} = ${authUid}`
@@ -435,9 +432,9 @@ authUserOwns(t.userId) // sql`${t.userId} = ${authUid}`
 "posts"."user_id" = (select auth.uid())
 ```
 
-**Authenticated policies** sit between the two: they preset `TO authenticated`,
-which every hand-written policy repeats, and leave the condition to you. Reach
-for these whenever access depends on more than the row's own owner column.
+**Authenticated policies** add one preset to the operation-scoped ones,
+`TO authenticated`, which every hand-written policy repeats. You still write the
+condition. Use them when access depends on more than the row's own owner column.
 
 ```typescript
 authenticatedSelectPolicy("posts_read", { using: sql`is_published(posts.id)` })
@@ -456,10 +453,11 @@ CREATE POLICY "posts_read" ON "posts" AS PERMISSIVE FOR SELECT
 | `authenticatedDeletePolicy(name, config?)` | `DELETE` | `using` |
 | `authenticatedAllPolicy(name, config?)` | `ALL` | `using` + `withCheck` |
 
-**Function policies** cover the case those still leave verbose. Once access
-depends on anything but the row's own owner column, the usual answer is a
-`security definer` function, which is also the standard advice for keeping RLS
-predicates out of the planner's way. `functionPolicies(columns, options?)`
+**Function policies** shorten the case the authenticated policies still leave
+verbose. Once access depends on anything but the row's own owner column, the
+usual answer is a `security definer` function. Supabase's RLS guide recommends
+one when a policy has to read another table, because the function reads that
+table without running its RLS policies. `functionPolicies(columns, options?)`
 writes all four:
 
 ```typescript
@@ -481,11 +479,11 @@ CREATE POLICY "can_delete_posts" ON "posts" AS PERMISSIVE FOR DELETE
 
 It puts the condition in the clause each operation takes: `using` for select,
 update and delete, `withCheck` for insert. Update accepts both clauses, but
-Postgres reuses `using` for the check when `withCheck` is left out, so the
-second copy would say the same thing and only show up as a `polwithcheck` the
-`USING`-only policies in an existing database do not have. The call is wrapped
-in a `select` so Postgres evaluates it once per statement rather than once per
-row, the same shape `auth.uid()` uses.
+Postgres reuses `using` for the check when `withCheck` is left out. A second
+copy would say the same thing, and would only add a `polwithcheck` that the
+`USING`-only policies in an existing database do not have. `functionPolicies`
+wraps the call in a `select` so Postgres evaluates it once per statement rather
+than once per row, the same shape `auth.uid()` uses.
 
 | Option | Default | What it changes |
 |---|---|---|
@@ -494,9 +492,9 @@ row, the same shape `auth.uid()` uses.
 | `prefix` | `"can"` | Start of the generated function and policy names. |
 | `name` | `(operation, table) => …` | Overrides the policy name only. |
 
-The row-scoped operations usually take the row while `insert` takes nothing,
-there being no row yet to authorise, only the caller. Pass a record for that,
-and for functions whose signatures differ in any other way:
+The row-scoped operations usually take the row, while `insert` takes nothing
+because there is no row yet to authorise, only the caller. Pass a record for
+that, and for functions whose signatures differ in any other way:
 
 ```typescript
 export const projects = table("projects", { id: primaryId("assigned") }, (t) =>
@@ -514,9 +512,9 @@ arguments. An array passes several: `argument: [t.profileId, t.organisationId]`
 emits `can_select_memberships("memberships"."profile_id",
 "memberships"."organisation_id")`.
 
-Helpers for a table outside `public` usually live in that schema beside it, and
-the bare name only resolves through whatever `search_path` is in effect when the
-`CREATE POLICY` runs. `schema` qualifies it:
+The functions for a table outside `public` usually live in that schema beside
+it, and a bare name resolves only through the `search_path` in effect when
+`CREATE POLICY` runs. `schema` qualifies the name:
 
 ```typescript
 const billing = schema("billing")
@@ -538,9 +536,9 @@ table name comes from the columns, so it stays right through a rename.
 You write the functions themselves; Zeno only writes the policies that call
 them.
 
-To ask the same functions from application code (to show or hide an Edit
+To call the same functions from application code (to show or hide an Edit
 button, say), `selectFunctionPermissions` from `@zeno-lib/db/query` calls all
-four in one statement. The table name is looked up in an allowlist built once
+four in one statement. It looks the table name up in an allowlist built once
 from your schema, so a name from a request never reaches the SQL:
 
 ```typescript
@@ -560,8 +558,8 @@ select "billing"."can_select_invoices"("id" => $1) as "select",
   "billing"."can_delete_invoices"("id" => $3) as "delete"
 ```
 
-The functions are qualified with the table's schema (override with
-`functionSchema`), `id` goes to every function but `insert` as a named argument
+It qualifies the functions with the table's schema, which `functionSchema`
+overrides. It passes `id` to every function but `insert` as a named argument
 (`argumentName`, default `"id"`), and `prefix` matches the one given to
 `functionPolicies`. A `null` answer counts as `false`.
 
@@ -597,9 +595,9 @@ CREATE POLICY "posts_owner_select" ON "posts" AS PERMISSIVE FOR SELECT
 
 ### Supabase primitives
 
-Re-exported from `drizzle-orm/supabase` so roles, the `auth.users` table, and
-helpers all come from one Zeno-owned entrypoint. Reference these; do not
-redeclare Supabase's built-in roles in your schema.
+These are re-exported from `drizzle-orm/supabase` so the roles, the Realtime
+`messages` table, and the SQL helpers come from one Zeno-owned entrypoint.
+Reference these; do not redeclare Supabase's built-in roles in your schema.
 
 | Export | What it is |
 |---|---|
@@ -621,14 +619,14 @@ import { authUsers } from "@zeno-lib/db/auth"
 ```
 
 It is the full 35-column table, generated with `drizzle-kit pull` and pinned to
-Supabase CLI 2.84.1 / GoTrue v2.188.1. Drizzle's own `drizzle-orm/supabase`
-export has 8 of those columns, so putting `auth` in `schemaFilter` made
-drizzle-kit want to drop the other 27, and anyone needing a foreign key into
-`auth.users` hand-wrote the table instead.
+Supabase CLI 2.84.1 and GoTrue v2.188.1. Drizzle's own `drizzle-orm/supabase`
+export has 8 of those columns, so with `auth` in `schemaFilter`, drizzle-kit
+wants to drop the other 27, and a foreign key into `auth.users` means
+hand-writing the table.
 
 <Callout type="warn">
-  The reason it has its own entrypoint is that `drizzle-kit generate` applies
-  **no** entity filter: it passes `() => true`, and its config accepts neither
+  It has its own entrypoint because `drizzle-kit generate` applies **no**
+  entity filter. It passes `() => true`, and its config accepts neither
   `schemaFilter` nor `entities`. So neither `pgSchema("auth").existing()` nor a
   `schemaFilter` in your drizzle config stops it emitting
   `CREATE TABLE "auth"."users"`. The only thing that does is the table never
@@ -655,14 +653,15 @@ const users = await db
   .from(authUsers)
 ```
 
-The nine `auth` enums are deliberately not shipped. `auth.users` uses none of
-them (they belong to the `mfa_*`, `oauth_*` and `sso_*` tables), and drizzle-kit
-never filters enums, so an exported one would be `CREATE TYPE` in every command.
+Zeno does not ship the nine `auth` enums. `auth.users` uses none of them (they
+belong to the `mfa_*`, `oauth_*` and `sso_*` tables), and drizzle-kit never
+filters enums, so an exported one would be `CREATE TYPE` in every command.
 
 ### pg-core aliases
 
-Curated aliases over `drizzle-orm/pg-core` so schema files don't repeat the `pg`
-prefix at every call site. They behave exactly like their Drizzle counterparts.
+These are curated aliases over `drizzle-orm/pg-core`, so schema files don't
+repeat the `pg` prefix at every call site. They behave like their Drizzle
+counterparts.
 (`schema` is the one exception and has its own section above, because it applies
 casing and RLS where `pgSchema` applies neither.)
 

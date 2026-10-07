@@ -1,19 +1,19 @@
 ---
 title: Theming
-description: A thin overlay on shadcn theming with easy-to-override color tokens
+description: Default shadcn theme tokens, mapped to Tailwind color variables
 icon: Palette
 status: in progress
 ---
 
-Zeno's theme is a thin overlay on [shadcn theming](https://ui.shadcn.com/docs/theming). It uses the
-exact same semantic CSS-variable tokens (`--background`, `--foreground`, `--primary`, `--radius`,
-[and so on](https://ui.shadcn.com/docs/theming#theme-tokens)); Zeno only ships a set of default values, each mapped to a Tailwind color variable so
-every token is easy to override.
+Zeno's theme is a thin layer over [shadcn theming](https://ui.shadcn.com/docs/theming). It uses the
+same semantic CSS-variable tokens (`--background`, `--foreground`, `--primary`, `--radius`,
+[and so on](https://ui.shadcn.com/docs/theming#theme-tokens)). Zeno only ships their default values,
+and maps the color tokens to Tailwind color variables.
 
 Install it as part of [setup](/docs/core-framework/building-ui/installation#add-the-theme).
 
-The default lives in `packages/ui/src/styles/theme.css` and is imported by the shared package's
-`globals.css`. Every app then pulls that in through its own stylesheet:
+The default lives in `packages/ui/src/styles/theme.css`, which the shared package's `globals.css`
+imports. Every app then imports that stylesheet in its own:
 
 ```css title="apps/{yourApp}/src/app/globals.css"
 @import "@{yourWorkspace}/ui/styles/globals.css";
@@ -68,7 +68,7 @@ Use the shared theme for tokens the app should inherit, and only list the ones i
 ## Fonts
 
 The theme ships two font tokens, `--font-text` (body) and `--font-title` (headings).
-Tailwind turns each into a utility (`font-text`, `font-title`); you just supply the fonts they point at.
+Tailwind turns each into a utility (`font-text`, `font-title`). You supply the fonts they point at.
 
 Load them per app with [`next/font`](https://nextjs.org/docs/app/api-reference/components/font),
 giving each the matching CSS variable:
@@ -92,10 +92,10 @@ export default function Layout({ children }: LayoutProps<"/">) {
 }
 ```
 
-Use `.variable` (not `.className`): it exposes each font as the CSS variable the theme's tokens read,
-which is what lets a single `<html>` carry both fonts at once.
+Use `.variable`, not `.className`. It exposes each font as the CSS variable the theme's tokens read,
+so a single `<html>` element can set both fonts at once.
 
-Now you can apply them anywhere with the utility classes:
+Apply them anywhere with the utility classes:
 
 ```tsx
 <h1 className="font-title">Zeno</h1>

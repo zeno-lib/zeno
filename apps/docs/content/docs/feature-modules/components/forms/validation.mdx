@@ -1,6 +1,6 @@
 ---
 title: Validation
-description: Pick a validation mode, drop in a schema, and the shipped fields gate the error UI to match
+description: Choose when your schema runs and when the shipped fields show its errors
 icon: ShieldCheck
 status: in progress
 ---
@@ -21,11 +21,11 @@ import { ReValidateExample } from "@/components/forms/revalidate-preview"
   `'blur-then-change'` (default), `'change'`, `'blur'`, or `'submit'`.
 - **Manual path**: omit `schema` and pass `validators` as TanStack Form's
   native per-cause object (`{ onChange, onBlur, onSubmit, … }`). Use this
-  when you need split sync/async slots, debounce knobs, or any mix the
-  schema modes don't cover.
+  when you need separate sync and async slots, debounce settings, or any mix
+  the schema modes don't cover.
 
 The two are mutually exclusive at the type level: `useForm({ schema, validators: { onChange } })`
-is a TS error.
+is a TypeScript error.
 
 ```tsx
 const form = useForm({
@@ -35,7 +35,7 @@ const form = useForm({
 })
 ```
 
-## TL;DR
+## Summary
 
 | Mode | When errors appear |
 |---|---|
@@ -49,9 +49,9 @@ warnings) on top of the form-level schema.
 
 ## The default: `blur-then-change`
 
-What the shipped fields are tuned for and what most CRUD forms want.
-Pristine fields stay quiet, errors land on first blur, then update live
-as the user corrects:
+The shipped fields are built for this mode. A pristine field shows no
+error, errors appear on the first blur, and they then update live as the
+user corrects the value:
 
 | Stage | Behavior |
 |---|---|
@@ -59,7 +59,7 @@ as the user corrects:
 | User blurs the field | Schema runs; if invalid, the error appears |
 | User edits to fix it | Schema runs on every keystroke; error clears the moment the value passes |
 | User edits a valid field into invalid | Error reappears immediately |
-| User submits without ever blurring a required field | Errors appear for every invalid field, live updates kick in |
+| User submits without ever blurring a required field | Errors appear for every invalid field, then update live |
 
 <Preview>
   <ReValidateExample />
@@ -151,9 +151,9 @@ export function ChangePassword() {
 
 ### When the form values *are* the output
 
-Search bars, filter panels, computed previews. Anything where there's no
-submit step and the values themselves drive a side-effect. Drop the
-schema from `useForm` and validate manually inside `listeners.onChange`:
+Search bars, filter panels, and computed previews have no submit step, and
+the values themselves drive a side-effect. For these, drop the schema from
+`useForm` and validate inside `listeners.onChange` yourself:
 
 <Preview>
   <LiveSearchExample />
@@ -213,10 +213,10 @@ on subsequent edits. A user who fixed a typo still sees the old error
 until they blur the field again, so `'blur-then-change'` is usually the
 better pick.
 
-`'submit'` skips field-level validation entirely. The schema runs once on
-submit and errors appear for every invalid field. Useful when each field
-is cheap and independent and blur-validating each one would feel chatty
-(long settings pages).
+`'submit'` skips field-level validation. The schema runs once on submit
+and errors appear for every invalid field. Use it when each field is cheap
+and independent and validating each one on blur would show errors while
+the user is still filling the form, as on long settings pages.
 
 ```tsx
 const form = useForm({
@@ -230,12 +230,12 @@ const form = useForm({
 
 When a single field needs an extra check on top of the form-level schema,
 pass a schema (or async function) to its `validators` prop. The cause you
-pick (`onChange`, `onBlur`, `onChangeAsync`, …) runs directly: the form's
-`validators` mode does **not** gate per-field validators.
+pick (`onChange`, `onBlur`, `onChangeAsync`, …) runs on its own event. The
+form's `validators` mode does **not** gate per-field validators.
 
 In the example below, `validators={{ onChange: slugAvailability }}` runs
-the reserved-name check on every keystroke from the very first character,
-even though the form is in the default `'blur-then-change'` mode.
+the reserved-name check on every keystroke from the first character, even
+though the form is in the default `'blur-then-change'` mode.
 
 <Preview>
   <MixedValidationExample />
@@ -301,12 +301,12 @@ export function CreateWorkspace() {
 
 The form-level schema handles required-ness and format with the default
 `'blur-then-change'` timing. The slug's per-field `onChange` validator
-runs on every keystroke independently. Both contribute to the field's
-error list and clear independently as they pass.
+runs on every keystroke, regardless of that timing. Both add to the field's
+error list, and each error clears when its check passes.
 
 For an async server-side check (uniqueness against the database), swap to
-`onChangeAsync` and use `onChangeAsyncDebounceMs` to throttle the
-request.
+`onChangeAsync` and set `onChangeAsyncDebounceMs` so the request waits for
+the user to stop typing.
 
 For errors the server only reports on submit (a Next.js server action
 rejecting the payload), return them from the action and apply them with
@@ -316,9 +316,9 @@ rejecting the payload), return them from the action and apply them with
 ## Required-field indicator
 
 Every shipped field appends a `*` to its label when the schema treats
-that field as required. On by default. Pass `requiredIndicator: false`
-to `useForm` to opt out form-wide, or override per field with the
-boolean `required` prop.
+that field as required. The indicator is on by default. Pass
+`requiredIndicator: false` to `useForm` to opt out form-wide, or override
+per field with the boolean `required` prop.
 
 <Preview>
   <RequiredIndicatorExample />
@@ -340,7 +340,7 @@ const schema = z.object({
 
 export function SignUp() {
   const form = useForm({
-    defaultValues: { newsletter: false }, // strings & schema defaults flow from the schema
+    defaultValues: { newsletter: false }, // strings and schema defaults come from the schema
     schema,
     // requiredIndicator: false, // disable for the whole form
   })
@@ -366,11 +366,11 @@ export function SignUp() {
 
 </Preview>
 
-Fields wrapped in `.optional()`, `.nullable()`, or `.default(...)` stay
-silent; everything else gets the `*`. Required children of nested objects
-and array rows are detected too: `members[0].name`, `members[3].name`, …
-all get the `*` when the row schema requires `name`. Async schemas can't be detected
-this way, so pass `required` on the field to set it explicitly:
+Fields wrapped in `.optional()`, `.nullable()`, or `.default(...)` get no
+`*`; everything else gets one. Detection also covers required children of
+nested objects and array rows: `members[0].name`, `members[3].name`, … all
+get the `*` when the row schema requires `name`. Detection skips async
+schemas, so pass `required` on the field to set it explicitly:
 
 ```tsx
 {/* Force on, regardless of schema */}
@@ -388,8 +388,8 @@ collect every error in one place (above or below the submit button) and
 keep the fields visually clean.
 
 Pass `hideFieldErrors: true` to `useForm`. The shipped fields keep
-their `data-invalid` / `aria-invalid` styling but skip rendering the
-inline error. Then subscribe via `form.Subscribe` and render the summary
+their `data-invalid` and `aria-invalid` styling but don't render the
+inline error. Then subscribe with `form.Subscribe` and render the summary
 yourself.
 
 <Preview>
@@ -471,27 +471,26 @@ export function SignInWithSummary() {
 </Preview>
 
 The `isBlurred || wasSubmitted` gate matches the shipped fields' own
-behavior under `'blur-then-change'`, so pristine fields never appear in
-the summary and the form starts quiet. `role="alert"` and
-`aria-live="polite"` make the summary readable by screen readers as it
+behavior under `'blur-then-change'`, so the summary lists a field only once
+the user blurs it or submits the form. `role="alert"` and
+`aria-live="polite"` make screen readers announce the summary as it
 updates.
 
 ## Manual path: `validators` as an object
 
 The schema path's `validators: <mode>` is sugar over TanStack Form's
-`validators` + `validationLogic`. Drop `schema` and pass `validators` as
+`validators` and `validationLogic`. Drop `schema` and pass `validators` as
 the native object when you need finer control:
 
 - **`validators`**: the original per-cause object (`{ onMount, onChange,
-  onBlur, onSubmit, onChangeAsync, … }`). Useful for split sync/async
-  slots, debounce knobs, or per-cause schemas. A schema variable can
-  still be used inside any slot (`onChange: schema`); what TS forbids
-  is the `schema` *prop* coexisting with the object form.
-- **`validationLogic`**: only accepted in the manual path. The function
-  that decides which validator runs for each event.
-  `blurThenChangeLogic` is exported from `@zeno-lib/forms` if you want the
-  default mode's behavior; otherwise pass TanStack's
-  `defaultValidationLogic`.
+  onBlur, onSubmit, onChangeAsync, … }`). Use it for separate sync and
+  async slots, debounce settings, or per-cause schemas. You can still use
+  a schema variable inside any slot (`onChange: schema`); TypeScript only
+  forbids the `schema` *prop* alongside the object form.
+- **`validationLogic`**: the function that decides which validator runs
+  for each event, accepted only in the manual path. `@zeno-lib/forms`
+  exports `blurThenChangeLogic` if you want the default mode's behavior;
+  otherwise pass TanStack's `defaultValidationLogic`.
 
 ```tsx lineNumbers
 import { defaultValidationLogic } from "@tanstack/react-form"
@@ -511,9 +510,9 @@ const form = useForm({
 ## Anti-patterns
 
 - **Don't use `'change'` with an expensive sync schema.** Every keystroke
-  re-runs the whole thing. For network checks, switch to a per-field
+  re-runs the whole schema. For network checks, switch to a per-field
   `onChangeAsync` with `onChangeAsyncDebounceMs`.
 - **Don't validate on `onMount` to "show what's required."** The shipped
   fields already render a `*` next to required-field labels (see
   [Required-field indicator](#required-field-indicator)). `onMount` is
-  for cases where pre-filled defaults legitimately violate the schema.
+  for cases where you expect pre-filled defaults to violate the schema.

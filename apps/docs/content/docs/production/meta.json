@@ -1,5 +1,5 @@
 {
-  "title": "Going to Production",
+  "title": "Going to production",
   "description": "Deploy and monitor your application",
   "icon": "Rocket",
   "root": true,
@@ -7,7 +7,7 @@
     "index",
     "---Deployment---",
     "deployment/ci-cd",
-    "---Monitoring & Insights---",
+    "---Monitoring & insights---",
     "monitoring/audit-trails",
     "monitoring/bug-tracking",
     "monitoring/crons-monitoring",

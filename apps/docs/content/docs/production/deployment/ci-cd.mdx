@@ -1,41 +1,41 @@
 ---
-title: CI/CD Pipelines
+title: CI/CD pipelines
 description: Continuous integration and deployment pipelines
 icon: GitBranch
 status: to check
 ---
 
-Zeno includes a comprehensive CI pipeline that runs on every push and pull request.
+Zeno's CI pipeline runs on every push to `main` and on every pull request against it.
 
-## CI Pipeline
+## CI pipeline
 
 The CI pipeline runs these steps in order:
 
-1. **Lint** — Code quality checks with Ultracite
-2. **Type Check** — TypeScript validation
-3. **Build** — Build all packages
-4. **Unit Tests** — Run Vitest tests
-5. **E2E Tests** — Run Playwright tests
+1. **Lint**: Ultracite checks formatting and lint rules
+2. **Type check**: TypeScript checks every package
+3. **Build**: Turborepo builds every package and app
+4. **Unit tests**: Vitest runs the unit tests
+5. **E2E tests**: Playwright runs the end-to-end tests
 
-It can be run locally with:
+Run it locally with:
 
 ```bash
 pnpm ci
 ```
 
-Or force a rebuild without caches with:
+To rebuild without the cache, run:
 
 ```bash
 pnpm ci:force
 ```
 
-Or generate a dependency graph in `turbo-graph.html` with:
+To write a dependency graph to `turbo-graph.html`, run:
 
 ```bash
 pnpm ci:graph
 ```
 
-It is defined in `package.json`:
+The root `package.json` defines these scripts:
 
 ```json title="package.json"
 {
@@ -47,21 +47,21 @@ It is defined in `package.json`:
 }
 ```
 
-## Turborepo Tasks
+## Turborepo tasks
 
-The pipeline order and dependencies are defined in `turbo.json`. 
+`turbo.json` defines the pipeline order and dependencies.
 
 
 ## GitHub Actions
 
-Zeno includes a GitHub Actions workflow for CI/CD. It can be found in `.github/workflows/turbo.yml`.
+Zeno's GitHub Actions workflow is `.github/workflows/turbo.yml`.
 
 ## Caching
 
-Turborepo caches task outputs for faster builds:
+Turborepo caches task outputs and replays them when a task's inputs haven't changed:
 
-- Local cache in `.turbo/`
-- Remote cache available with Vercel
+- A local cache in `.turbo/`
+- A remote cache on Vercel
 
 Enable remote caching locally with:
 
@@ -70,7 +70,7 @@ npx turbo login
 npx turbo link
 ```
 
-Enable remote caching within Github Actions by editing and uncommenting the following lines in `.github/workflows/turbo.yml`:
+To enable remote caching in GitHub Actions, uncomment these lines in `.github/workflows/turbo.yml` and edit them as needed:
 
 ```yaml title=".github/workflows/turbo.yml"
   env:
@@ -81,12 +81,12 @@ Enable remote caching within Github Actions by editing and uncommenting the foll
 
 ## E2E in CI
 
-Playwright tests in CI have special settings:
+In CI, Playwright runs with these settings:
 
-- HTML reporter for artifacts
+- An HTML report, which the workflow uploads as an artifact
 - 3 retries on failure
-- 30-second timeout (120s locally)
-- Trace collection on first retry for debugging
+- A 30-second timeout (120 seconds locally)
+- A trace recorded on the first retry, for debugging
 
 ```typescript title="packages/e2e/playwright.config.ts"
 {
