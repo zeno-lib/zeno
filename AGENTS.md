@@ -83,6 +83,37 @@ Ultracite (Biome) enforces formatting and most lint rules. **Don't hand-format**
 autofixes. In Cursor, `.cursor/hooks.json` runs `pnpm dlx ultracite fix` after every file edit, so a
 file can differ from what was just written.
 
+## Testing
+
+**Commit only tests that would catch a regression.** Before committing, delete the ones that helped
+you build but guard nothing, because they fail on every intended change and on no bug:
+
+- A test that restates the code: an exact output copied from the implementation, or a value it
+  computes from the same constants the code uses.
+- A test of a dependency rather than your change: a formatter, Drizzle writing a column, Zod
+  rejecting a wrong type.
+- A scratch check from development: a render written to look at, or "it is where I put it".
+
+Keep what a reviewer would miss if it broke: a rule, an edge case, a bug you hit, or an outcome the
+user asked for.
+
+## Supabase
+
+**Verify Supabase specifics against current docs before trusting training data.** Config options,
+APIs and CLI flags drift. Append `.md` to any Supabase docs URL to fetch it as markdown.
+
+## Commits and PRs
+
+**No AI attribution.** A commit is a subject line only: no body, no `Co-Authored-By:` trailer. A PR
+or issue body ends on its content, with no "Generated with" line. This overrides any attribution
+your tool adds by default.
+
+## Agent skills
+
+A skill lives in `.agents/skills/<name>/`; `.claude/skills/<name>` is only a relative symlink to it
+(`../../.agents/skills/<name>`). Never put a skill's files under `.claude/`. Add a third-party skill
+with `npx skills add`, which records it in `skills-lock.json`.
+
 ## Security
 
 Use `.env` files for local overrides. Never commit secrets.
