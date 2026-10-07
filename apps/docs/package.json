@@ -16,22 +16,22 @@
     "fumadocs-core": "16.15.11",
     "fumadocs-mdx": "14.3.2",
     "fumadocs-ui": "16.15.11",
-    "lucide-react": "^1.23.0",
+    "lucide-react": "^1.52.0",
     "next": "16.3.3",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5",
-    "tailwind-merge": "^3.6.0",
-    "zod": "^4.3.6"
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwind-merge": "^3.7.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
-    "@types/mdx": "^2.0.13",
+    "@types/mdx": "^2.0.14",
     "@types/node": "^25.6.0",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@zeno-lib/typescript": "workspace:^",
-    "postcss": "^8.5.27",
-    "tailwindcss": "^4.2.4",
+    "postcss": "^8.5.29",
+    "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2"
   }
 }

@@ -62,16 +62,16 @@
   },
   "devDependencies": {
     "@types/node": "25.6.0",
-    "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "@zeno-lib/test": "workspace:^",
     "@zeno-lib/typescript": "workspace:^",
     "@zeno-lib/ui": "workspace:^",
-    "lucide-react": "^1.23.0",
+    "lucide-react": "^1.52.0",
     "tsdown": "^0.22.14",
     "typescript": "7.0.2",
-    "vite": "8.0.16",
+    "vite": "8.3.3",
     "vitest": "5.0.2",
-    "zod": "^4.3.6"
+    "zod": "^4.6.5"
   }
 }

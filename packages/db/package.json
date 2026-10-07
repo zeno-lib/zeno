@@ -81,22 +81,22 @@
     }
   },
   "devDependencies": {
-    "@supabase/supabase-js": "2.116.0",
+    "@supabase/supabase-js": "2.117.2",
     "@types/node": "24.10.0",
-    "@types/react": "19.2.14",
+    "@types/react": "19.3.0",
     "@zeno-lib/schema": "workspace:*",
     "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
-    "dotenv": "18.0.4",
+    "dotenv": "18.0.5",
     "drizzle-kit": "1.0.0-rc.5-5935859",
     "drizzle-orm": "1.0.0-rc.3",
-    "postgres": "3.4.7",
-    "react": "^19.2.5",
+    "postgres": "3.4.9",
+    "react": "^19.3.0",
     "supabase": "2.84.1",
     "tsdown": "^0.22.14",
     "typescript": "7.0.2",
-    "vite": "8.0.16",
+    "vite": "8.3.3",
     "vitest": "5.0.2",
-    "zod": "^4.4.3"
+    "zod": "^4.6.5"
   }
 }
