@@ -116,7 +116,7 @@ docker exec supabase_db_db psql -U postgres -t -A \
 pnpm --filter @zeno-lib/db exec drizzle-kit pull \
   --dialect=postgresql \
   --url=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
-  --out=/tmp/auth-pull --schemaFilters=auth --introspect-casing=camel
+  --out=/tmp/auth-pull --schemaFilter=auth --introspect-casing=camel
 ```
 
 Take only the `users` table body from `/tmp/auth-pull/schema.ts` and drop the rest (`relations.ts`,
