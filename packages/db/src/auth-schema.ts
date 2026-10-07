@@ -1,8 +1,8 @@
 // Supabase's auth.users, generated with `drizzle-kit pull` against the local
 // stack. Do not hand-edit; regenerate with the procedure in AGENTS.md.
 //
-// Pinned to: Supabase CLI 2.84.1, Postgres 17.6.1.095, GoTrue v2.188.1,
-// auth.schema_migrations 20260302000000.
+// Pinned to: Supabase CLI 2.120.0, Postgres 17.11.0.004, GoTrue v2.197.0,
+// auth.schema_migrations 20260831180000.
 //
 // drizzle-orm/supabase ships 8 of these 35 columns, so putting `auth` in
 // `schemaFilter` made drizzle-kit want to drop the other 27, and anyone needing

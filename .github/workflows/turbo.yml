@@ -46,10 +46,10 @@ jobs:
     - name: Setup Supabase CLI
       uses: supabase/setup-cli@v3
       with:
-        version: 2.84.1
+        version: 2.120.0
     - name: Start Supabase
       working-directory: packages/db
-      run: supabase start -x=postgres-meta,studio,logflare,supavisor
+      run: supabase start -x=postgres-meta,studio,logflare,vector,supavisor
     - name: Run turbo ci command
       run: pnpm run ci
     - name: Upload Playwright report
