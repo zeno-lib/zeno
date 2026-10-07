@@ -4,7 +4,6 @@
   "scripts": {
     "build": "turbo build",
     "changeset": "changeset",
-    "types:check": "turbo types:check",
     "ci": "pnpm run lint && turbo run types:check build test e2e",
     "ci:force": "turbo run types:check build test e2e --force",
     "ci:graph": "turbo run types:check build test e2e --graph=turbo-graph.html",
@@ -20,17 +19,18 @@
     "release:status": "changeset status --verbose",
     "test": "NODE_ENV=test && turbo run test",
     "test:watch": "NODE_ENV=test && turbo run dev test:watch",
+    "types:check": "turbo types:check",
     "version-packages": "changeset version"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.14",
+    "@biomejs/biome": "2.5.15",
     "@changesets/changelog-git": "^1.0.0",
     "@changesets/cli": "^3.0.3",
     "@typescript/typescript6": "^6.0.2",
     "tsx": "^4.23.15",
     "turbo": "2.11.7",
     "typescript": "7.0.2",
-    "ultracite": "7.8.1"
+    "ultracite": "7.12.4"
   },
   "packageManager": "pnpm@12.10.1",
   "engines": {

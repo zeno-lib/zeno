@@ -83,28 +83,30 @@ export interface RlsTestHarnessOptions<
 
 export interface RlsTestHarness<TClient, TDb, TOptions> {
   /** Deletes every tracked user, signs out, and closes `db`; see `cleanUpUsers`. */
-  cleanUp(): Promise<void>
+  cleanUp: () => Promise<void>
   /**
    * Deletes every tracked user. Retryable Auth errors are retried, a user
    * that is already gone counts as deleted, and every user is attempted before
    * the remaining failures are thrown together as a `TestCleanupError`.
    */
-  cleanUpUsers(): Promise<void>
+  cleanUpUsers: () => Promise<void>
   readonly client: TClient
-  createUser(parameters?: CreateTestUserParameters<TOptions>): Promise<TestUser>
-  createUserAndSignIn(
+  createUser: (
     parameters?: CreateTestUserParameters<TOptions>
-  ): Promise<TestUser>
+  ) => Promise<TestUser>
+  createUserAndSignIn: (
+    parameters?: CreateTestUserParameters<TOptions>
+  ) => Promise<TestUser>
   /** The signed-in user, or `undefined` while signed out (`anon`). */
   readonly currentUser: User | undefined
   /** The handle `createDb` returned (`undefined` without one). Built once; capture it freely. */
   readonly db: TDb
-  deleteUser(user: Pick<User, "id">): Promise<void>
+  deleteUser: (user: Pick<User, "id">) => Promise<void>
   /** Re-reads the user from Auth (a network call); sign-in and sign-out already keep `currentUser` current. */
-  refreshCurrentUser(): Promise<User | undefined>
-  signIn(credentials: { email: string; password: string }): Promise<User>
+  refreshCurrentUser: () => Promise<User | undefined>
+  signIn: (credentials: { email: string; password: string }) => Promise<User>
   /** Drops the session locally (`scope: "local"`); no Auth round trip. */
-  signOut(): Promise<void>
+  signOut: () => Promise<void>
   /** Users created and not yet deleted. */
   readonly users: readonly TestUser[]
 }
@@ -172,9 +174,10 @@ export const deleteAuthUser = async (
   const attempts = Math.max(1, retry.attempts ?? DEFAULT_ATTEMPTS)
   const delayMs = retry.delayMs ?? DEFAULT_DELAY_MS
 
-  for (let attempt = 1; ; attempt++) {
+  for (let attempt = 1; ; attempt += 1) {
     let error: unknown
     try {
+      // biome-ignore lint/performance/noAwaitInLoops: each retry depends on the previous attempt's error and backs off between attempts.
       ;({ error } = await admin.auth.admin.deleteUser(userId))
     } catch (thrown) {
       error = thrown
@@ -305,6 +308,7 @@ export function createRlsTestHarness<
     ]
     for (const step of steps) {
       try {
+        // biome-ignore lint/performance/noAwaitInLoops: the steps run one at a time in a fixed order, so the pool closes only after the users are deleted and the client signed out.
         await step()
       } catch (error) {
         errors.push(error)

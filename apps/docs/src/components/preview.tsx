@@ -16,7 +16,7 @@ function isShikiBlock(child: ReactNode) {
   if (!isValidElement(child)) {
     return false
   }
-  const className = (child.props as { className?: string }).className
+  const { className } = child.props as { className?: string }
   return typeof className === "string" && className.includes("shiki")
 }
 

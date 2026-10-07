@@ -68,11 +68,11 @@ function block(css: string, selector: string): string | null {
     return null
   }
   let depth = 0
-  for (let i = open; i < css.length; i++) {
+  for (let i = open; i < css.length; i += 1) {
     if (css[i] === "{") {
-      depth++
+      depth += 1
     } else if (css[i] === "}") {
-      depth--
+      depth -= 1
       if (depth === 0) {
         return css.slice(open + 1, i)
       }
@@ -182,7 +182,7 @@ type SpecAction = {
  */
 function classifySpec(spec: string): SpecAction {
   if (spec.startsWith("@/components/ui/")) {
-    const name = spec.slice("@/components/ui/".length).split("/")[0]
+    const [name] = spec.slice("@/components/ui/".length).split("/")
     return {
       registryDep: SHADCN_COMPONENTS.has(name) ? name : `zeno-lib/zeno/${name}`,
     }

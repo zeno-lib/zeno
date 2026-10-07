@@ -1,6 +1,10 @@
 {
   "name": "@zeno-lib/forms",
   "version": "0.2.1",
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/forms"
+  },
   "type": "module",
   "exports": {
     ".": {
@@ -25,13 +29,6 @@
     "dist",
     "src"
   ],
-  "publishConfig": {
-    "access": "public"
-  },
-  "repository": {
-    "url": "https://github.com/zeno-lib/zeno.git",
-    "directory": "packages/forms"
-  },
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch --no-clean",
@@ -39,22 +36,6 @@
     "test": "vitest --run",
     "test:watch": "vitest watch",
     "types:check": "tsc --noEmit"
-  },
-  "peerDependencies": {
-    "@tanstack/react-devtools": ">=0.10",
-    "@tanstack/react-form-devtools": ">=0.2",
-    "next": ">=16",
-    "react": ">=19",
-    "react-dom": ">=19",
-    "zod": ">=4"
-  },
-  "peerDependenciesMeta": {
-    "@tanstack/react-devtools": {
-      "optional": true
-    },
-    "@tanstack/react-form-devtools": {
-      "optional": true
-    }
   },
   "dependencies": {
     "@tanstack/react-form": "1.33.5",
@@ -73,5 +54,24 @@
     "vite": "8.3.3",
     "vitest": "5.0.3",
     "zod": "^4.6.5"
+  },
+  "peerDependencies": {
+    "@tanstack/react-devtools": ">=0.10",
+    "@tanstack/react-form-devtools": ">=0.2",
+    "next": ">=16",
+    "react": ">=19",
+    "react-dom": ">=19",
+    "zod": ">=4"
+  },
+  "peerDependenciesMeta": {
+    "@tanstack/react-devtools": {
+      "optional": true
+    },
+    "@tanstack/react-form-devtools": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

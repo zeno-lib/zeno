@@ -5,7 +5,7 @@ import { isConstraintViolation, SqlState, toPostgresError } from "./errors.ts"
 
 // postgres.js builds its errors from a server message; this is that shape,
 // constructed directly so no server is needed.
-const postgresError = (fields: Record<string, string>) =>
+const postgresError = (fields: Partial<Record<string, string>>) =>
   Object.assign(new postgres.PostgresError(fields.message ?? "failed"), fields)
 
 // What Drizzle throws: the driver error as `cause`, `code` undefined.

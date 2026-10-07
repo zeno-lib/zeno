@@ -24,7 +24,7 @@ function errorMessage(error: unknown): string {
     return error
   }
   if (error && typeof error === "object" && "message" in error) {
-    const message = (error as { message?: unknown }).message
+    const { message } = error as { message?: unknown }
     if (typeof message === "string") {
       return message
     }

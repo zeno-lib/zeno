@@ -15,7 +15,7 @@ const subscribeToNothing = () => () => {
 }
 
 /* False on the server and through hydration, true from the first client render after it. */
-const useIsHydrated = () =>
+const useIsHydrated = (): boolean =>
   useSyncExternalStore(
     subscribeToNothing,
     () => true,

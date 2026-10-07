@@ -124,7 +124,7 @@ function ComboboxField<T = string>({
         items={items}
         onInputValueChange={onInputValueChange}
         onValueChange={(next) => {
-          if (next == null) {
+          if (next === null) {
             field.handleChange(undefined)
             return
           }
@@ -143,7 +143,7 @@ function ComboboxField<T = string>({
           name={field.name}
           onBlur={field.handleBlur}
           placeholder={placeholder}
-          showClear={showClear && value != null && value !== "" && !loading}
+          showClear={showClear && value !== null && value !== "" && !loading}
         >
           {loading && (
             <InputGroupAddon align="inline-end">

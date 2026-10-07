@@ -68,7 +68,7 @@ function DatePickerField({
   const schemaRequired = useIsFieldRequired(field)
   const isRequired = required ?? schemaRequired
 
-  const value = field.state.value
+  const { value } = field.state
   const empty = !value
 
   return (

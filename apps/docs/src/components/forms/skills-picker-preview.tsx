@@ -101,7 +101,7 @@ function SkillsField() {
   const selectedValues = field.state.value ?? []
   const selectedItems = selectedValues
     .map((v) => allItems.find((s) => s.value === v))
-    .filter((s): s is SkillItem => s != null)
+    .filter((s): s is SkillItem => s !== undefined)
 
   return (
     <Field data-invalid={isInvalid}>

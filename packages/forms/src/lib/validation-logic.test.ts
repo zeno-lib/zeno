@@ -32,7 +32,6 @@ function makeRun() {
   const runValidation = vi.fn(
     (props: { form: AnyFormApi; validators: ObservedValidator[] }) => {
       observed.push(props.validators)
-      return
     }
   )
   return { observed, runValidation }

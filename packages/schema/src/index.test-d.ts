@@ -12,11 +12,9 @@ type StandardSchema<T> = {
   }
 }
 
-function acceptsFormsSchema<TFormData>(
+declare function acceptsFormsSchema<TFormData>(
   _schema: StandardSchema<TFormData>
-): void {
-  return
-}
+): void
 
 const posts = pgTable("posts", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),

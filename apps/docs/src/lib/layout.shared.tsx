@@ -24,8 +24,11 @@ function getDocsMenuItems(): SubMenuLinkProps[] {
     .map((folder) => ({
       description: folder.index?.description ?? folder.description ?? "",
       href:
-        (findPath(folder.children, (node) => node.type === "page")?.[0] as Item)
-          ?.url ?? "/",
+        (
+          findPath(folder.children, (node) => node.type === "page")?.[0] as
+            | Item
+            | undefined
+        )?.url ?? "/",
       icon: folder.icon,
       title: folder.name,
     }))

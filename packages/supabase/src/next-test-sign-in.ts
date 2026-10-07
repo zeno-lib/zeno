@@ -27,21 +27,17 @@ const storageKeyFor = (supabaseUrl: string | undefined) =>
     : undefined
 
 const readCredentials = async (request: Request) => {
-  try {
-    const body: unknown = await request.json()
-    if (typeof body !== "object" || body === null) {
-      return
-    }
-    const { email, password } = body as Record<string, unknown>
-    return typeof email === "string" &&
-      email !== "" &&
-      typeof password === "string" &&
-      password !== ""
-      ? { email, password }
-      : undefined
-  } catch {
+  const body: unknown = await request.json().catch(() => null)
+  if (typeof body !== "object" || body === null) {
     return
   }
+  const { email, password } = body as Record<string, unknown>
+  return typeof email === "string" &&
+    email !== "" &&
+    typeof password === "string" &&
+    password !== ""
+    ? { email, password }
+    : undefined
 }
 
 /**

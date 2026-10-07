@@ -1,6 +1,10 @@
 {
   "name": "@zeno-lib/query",
   "version": "0.0.2",
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/query"
+  },
   "type": "module",
   "exports": {
     "./prefetched-queries": {
@@ -32,13 +36,6 @@
   "files": [
     "dist"
   ],
-  "publishConfig": {
-    "access": "public"
-  },
-  "repository": {
-    "url": "https://github.com/zeno-lib/zeno.git",
-    "directory": "packages/query"
-  },
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch --no-clean",
@@ -46,10 +43,6 @@
     "test": "vitest --run",
     "test:watch": "vitest watch",
     "types:check": "tsc --noEmit"
-  },
-  "peerDependencies": {
-    "@tanstack/react-query": ">=5",
-    "react": ">=19"
   },
   "devDependencies": {
     "@tanstack/react-query": "^5.104.1",
@@ -65,5 +58,12 @@
     "typescript": "7.0.2",
     "vite": "8.3.3",
     "vitest": "5.0.3"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": ">=5",
+    "react": ">=19"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

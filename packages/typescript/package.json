@@ -1,6 +1,10 @@
 {
   "name": "@zeno-lib/typescript",
   "version": "1.1.0",
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/typescript"
+  },
   "exports": {
     "./base.json": "./base.json",
     "./nextjs.json": "./nextjs.json",
@@ -19,9 +23,5 @@
   ],
   "publishConfig": {
     "access": "public"
-  },
-  "repository": {
-    "url": "https://github.com/zeno-lib/zeno.git",
-    "directory": "packages/typescript"
   }
 }

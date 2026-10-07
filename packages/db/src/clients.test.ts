@@ -14,9 +14,9 @@ const { postgresSpy, endSpies } = vi.hoisted(() => ({
 vi.mock("postgres", async (importOriginal) => {
   const actual = await importOriginal<{ default: typeof import("postgres") }>()
   return {
-    default: (url: string, options?: unknown) => {
-      postgresSpy(url, options)
-      const client = actual.default(url, options as never)
+    default: (connectionString: string, options?: unknown) => {
+      postgresSpy(connectionString, options)
+      const client = actual.default(connectionString, options as never)
       const realEnd = client.end.bind(client)
       const end = vi.fn((opts?: { timeout?: number }) => realEnd(opts))
       client.end = end as typeof client.end
@@ -75,7 +75,7 @@ describe("pool sharing", () => {
 
     // One underlying pool was created for the shared connection string.
     expect(endSpies).toHaveLength(1)
-    const end = endSpies[0]
+    const [end] = endSpies
 
     expect(end).not.toHaveBeenCalled()
 

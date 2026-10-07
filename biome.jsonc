@@ -9,7 +9,8 @@
     "includes": [
       "!**/src/types.ts",
       "!**/supabase/migrations",
-      "!**/packages/*/registry.json"
+      "!**/packages/*/registry.json",
+      "!**/*.svg"
     ]
   },
   "overrides": [
@@ -61,7 +62,10 @@
           },
           "suspicious": {
             "noArrayIndexKey": "off",
-            "noDocumentCookie": "off"
+            "noDocumentCookie": "off",
+            "noEqualsToNull": "off",
+            "noShadow": "off",
+            "noUnnecessaryConditions": "off"
           }
         }
       }
@@ -90,8 +94,14 @@
           }
         }
       },
+      "performance": {
+        "noJsxPropsBind": "off"
+      },
       "style": {
         "useConsistentTypeDefinitions": "off"
+      },
+      "suspicious": {
+        "noLeakedRender": "off"
       }
     }
   }
