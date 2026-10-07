@@ -28,8 +28,8 @@ This node holds what the code and the guide don't make obvious.
 ## Security invariants
 
 - **The RLS clients clamp a user token's `role` to `anon | authenticated`** through
-  `ALLOWED_RLS_ROLES` before `set local role`, defaulting to `anon`. Keep that allowlist: it is what
-  stops a forged claim from injecting SQL or escalating to `service_role`, which only
+  `ALLOWED_RLS_ROLES` before `set_config('role', …, true)`, defaulting to `anon`. Keep that
+  allowlist: it is what stops a forged claim from escalating to `service_role`, which only
   `createServiceClient` grants (through `fixedContext`), never a JWT.
 - **`createServiceClient` clamps nothing.** Never feed it a user-supplied token.
 - **`createSupabaseClient` trusts the decoded token it is given** and doesn't re-verify it.
