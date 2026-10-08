@@ -33,7 +33,7 @@ This node holds what the code and the guide don't make obvious.
   `createServiceClient` grants (through `fixedContext`), never a JWT.
 - **`createServiceClient` clamps nothing.** Never feed it a user-supplied token.
 - **`createSupabaseClient` trusts the decoded token it is given** and doesn't re-verify it.
-  `createAuthClient` verifies through `auth.getClaims()` on every statement.
+  `createAuthClient` verifies through `auth.getClaims()` on every transaction.
 - **Every export of a `"use server"` file is a public endpoint.** Never put `"use server"` in the
   module that calls `createRequestDb`, never export `getRequestDb` / `getRequestContext` from one,
   and never accept a `db` or a user id as an action argument (take the author from
@@ -41,8 +41,11 @@ This node holds what the code and the guide don't make obvious.
 - **`getRequestContext` never falls back to `anon`.** Without a verified `sub` it throws
   `UnauthenticatedError`.
 - **Errors never echo the database URL**, which carries the password.
-- **Claims are set with `set_config(..., true)`** inside each statement's own transaction, so they
-  reset at commit or rollback and never leak across requests.
+- **Claims are set with `set_config(..., true)`** inside each RLS transaction, so they reset at
+  commit or rollback and never leak across requests.
+- **A statement batch belongs to one client handle.** `batchStatements` keeps its queue in the
+  closure of one `createRlsQueryClient` call, so a batch runs under one identity. Never hoist the
+  queue to module scope: it would run one user's statements under another user's claims.
 
 ## Drizzle Kit traps
 
@@ -93,8 +96,9 @@ This node holds what the code and the guide don't make obvious.
   built without `relations` loses `db.query.*`.
 - **Never `close()` a `/next` handle.** It shares the reference-counted `rls` pool, so closing it per
   request forces a cold reconnect for everyone.
-- **Each awaited statement is its own RLS transaction.** Use `db.transaction(...)` when several must
-  be atomic.
+- **The statements awaited in one task share an RLS transaction, but are not atomic.** When one
+  fails, each runs again in its own transaction. Use `db.transaction(...)` when several must be
+  atomic.
 - **`getRequestContext` memoises only inside a server render**, not across server actions.
 - **`defineAction` parses before it authenticates**, so a signed-out caller with a bad payload gets
   the schema error, not `UnauthenticatedError`.

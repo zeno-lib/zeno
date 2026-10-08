@@ -31,18 +31,104 @@ function replayAsUserChain(tx: unknown, path: AsUserChainStep[]): unknown {
 
 const PROMISE_METHODS = new Set<PropertyKey>(["then", "catch", "finally"])
 
-// Awaiting a recorded chain triggers the transaction + replay. The transaction
-// is opened lazily when the promise method is *called* (not merely accessed),
-// so probing `.then` for thenable-detection never starts a stray transaction.
-// The call returns a real promise, so any further `.then`/`.catch`/`.finally`
-// chaining runs on it.
+type RunTransaction = (
+  transaction: (tx: unknown) => unknown
+) => Promise<unknown>
+
+// An awaited chain waiting for the batch it joined to run.
+type PendingStatement = {
+  reject: (reason: unknown) => void
+  resolve: (value: unknown) => void
+  statement: (tx: unknown) => unknown
+}
+
+// Thrown inside a shared transaction to roll it back once a statement failed.
+const STATEMENT_FAILED = Symbol("statementFailed")
+
+// `setImmediate` runs once the current task's microtasks have drained, so a
+// batch collects every chain awaited by code that resumed from the same I/O
+// event, such as parallel loaders all waiting on one session lookup.
+const scheduleFlush = (flush: () => void) => {
+  if (typeof globalThis.setImmediate === "function") {
+    globalThis.setImmediate(flush)
+  } else {
+    setTimeout(flush, 0)
+  }
+}
+
+// The statement in a transaction of its own, as if it had never been batched.
+function runAlone(runTransaction: RunTransaction, pending: PendingStatement) {
+  runTransaction(pending.statement).then(pending.resolve, pending.reject)
+}
+
+// Runs the batch's statements concurrently in one transaction, which the
+// driver pipelines on its connection. A failed statement aborts the whole
+// transaction, so the others' results are discarded with it, and every
+// statement runs again alone: only the failing one rejects, and none of them
+// keeps a write the rollback undid.
+async function runShared(
+  runTransaction: RunTransaction,
+  batch: PendingStatement[]
+) {
+  let values: unknown[]
+  try {
+    values = (await runTransaction(async (tx) => {
+      const results = await Promise.allSettled(
+        batch.map(async ({ statement }) => await statement(tx))
+      )
+      if (results.some((result) => result.status === "rejected")) {
+        throw STATEMENT_FAILED
+      }
+      return results.map(
+        (result) => (result as PromiseFulfilledResult<unknown>).value
+      )
+    })) as unknown[]
+  } catch {
+    for (const pending of batch) {
+      runAlone(runTransaction, pending)
+    }
+    return
+  }
+  for (const [index, pending] of batch.entries()) {
+    pending.resolve(values[index])
+  }
+}
+
+// Coalesces the chains awaited in the same task into one RLS transaction, so a
+// page that loads its reads in parallel opens one transaction, not one per read.
+function batchStatements(runTransaction: RunTransaction): RunTransaction {
+  let batch: PendingStatement[] | undefined
+  return (statement) =>
+    new Promise((resolve, reject) => {
+      if (!batch) {
+        const current: PendingStatement[] = []
+        batch = current
+        scheduleFlush(() => {
+          batch = undefined
+          const [only] = current
+          if (current.length === 1 && only) {
+            runAlone(runTransaction, only)
+          } else {
+            runShared(runTransaction, current)
+          }
+        })
+      }
+      batch.push({ reject, resolve, statement })
+    })
+}
+
+// Awaiting a recorded chain queues its replay. The statement is queued lazily
+// when the promise method is *called* (not merely accessed), so probing
+// `.then` for thenable-detection never starts a stray transaction. The call
+// returns a real promise, so any further `.then`/`.catch`/`.finally` chaining
+// runs on it.
 function replayPromiseMethod(
   prop: PropertyKey,
   path: AsUserChainStep[],
-  runTransaction: (transaction: (tx: unknown) => unknown) => Promise<unknown>
+  runStatement: RunTransaction
 ) {
   return (...promiseArgs: unknown[]) => {
-    const promise = runTransaction((tx) => replayAsUserChain(tx, path))
+    const promise = runStatement((tx) => replayAsUserChain(tx, path))
     return (
       promise[prop as keyof Promise<unknown>] as (...args: unknown[]) => unknown
     ).apply(promise, promiseArgs)
@@ -51,15 +137,16 @@ function replayPromiseMethod(
 
 // Builds the RLS query client returned by `createSupabaseDrizzle`. Querying it
 // records the get/apply chain lazily; only when the chain is awaited
-// (`.then`/`.catch`/`.finally`) does it open an RLS transaction and replay the
-// chain against that transaction's `tx`. Each awaited chain is its own
-// transaction. `db.transaction(cb)` runs several statements in one transaction,
-// and `db.close()` releases the pools. The root itself is intentionally not
-// thenable and not callable.
+// (`.then`/`.catch`/`.finally`) does it replay the chain against an RLS
+// transaction's `tx`. The chains awaited in the same task share one
+// transaction (see `batchStatements`). `db.transaction(cb)` runs several
+// statements in one transaction of their own, and `db.close()` releases the
+// pools. The root itself is intentionally not thenable and not callable.
 export function createRlsQueryClient(
-  runTransaction: (transaction: (tx: unknown) => unknown) => Promise<unknown>,
+  runTransaction: RunTransaction,
   close: (...args: never[]) => Promise<void>
 ): unknown {
+  const runStatement = batchStatements(runTransaction)
   const build = (path: AsUserChainStep[], isRoot: boolean): unknown => {
     // The proxy target must be callable so the `apply` trap fires for `()`.
     const target = () => undefined
@@ -85,7 +172,7 @@ export function createRlsQueryClient(
           // never open a stray transaction; recorded chains are awaitable.
           return isRoot
             ? undefined
-            : replayPromiseMethod(prop, path, runTransaction)
+            : replayPromiseMethod(prop, path, runStatement)
         }
         // Ignore symbol probes (inspection, `Symbol.toPrimitive`, etc.) so they
         // are not recorded as part of the query chain.

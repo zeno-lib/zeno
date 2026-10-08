@@ -255,6 +255,48 @@ describe("db.transaction (multi-statement)", () => {
   })
 })
 
+// Parallel reads must not open one transaction each: the statements awaited in
+// the same task share one, and a statement awaited later opens its own.
+describe("statements awaited in the same task", () => {
+  const txid = sql`select txid_current() as txid, auth.uid() as uid`
+
+  it("share one RLS transaction", async () => {
+    const db = authClient(USER_A)
+    const [first, second, third] = await Promise.all([
+      db.execute(txid),
+      db.execute(txid),
+      db.execute(txid),
+    ])
+    expect(first[0]).toMatchObject({ uid: USER_A })
+    expect(second[0]).toEqual(first[0])
+    expect(third[0]).toEqual(first[0])
+
+    const later = await db.execute(txid)
+    expect(later[0]).not.toEqual(first[0])
+  })
+
+  it("keep their own results when one of them fails", async () => {
+    const db = authClient(USER_A)
+    const title = `beside a forged insert ${crypto.randomUUID()}`
+    const [kept, forged, read] = await Promise.allSettled([
+      db.insert(posts).values({ title, userId: USER_A }).returning(),
+      db.insert(posts).values({ title: "A forging B", userId: USER_B }),
+      db.select().from(posts),
+    ])
+
+    expect(forged.status).toBe("rejected")
+    expect(kept.status).toBe("fulfilled")
+    expect(read.status).toBe("fulfilled")
+    // The forged insert rolled the shared transaction back, and the kept one
+    // ran again on its own: it lands exactly once.
+    const rows = await adminDb
+      .select()
+      .from(posts)
+      .where(eq(posts.title, title))
+    expect(rows).toHaveLength(1)
+  })
+})
+
 describe("audit triggers", () => {
   // The Drizzle-side `$onUpdateFn` only fires for statements Drizzle builds, so
   // it misses PostgREST, the dashboard and psql. The `moddatetime` trigger from

@@ -55,9 +55,25 @@ const myPosts = await db.select().from(schema.posts)
 Awaiting a query calls `supabase.auth.getClaims()`, opens a transaction,
 installs the verified JWT claims into transaction-local Postgres settings (so
 `auth.uid()` and `auth.jwt()` work inside RLS policies), and runs the query as
-the claims' role. The client re-resolves claims on **every** awaited statement,
-so a single client always reflects the live session. Each awaited statement is
-its own transaction.
+the claims' role. The client re-resolves claims for **every** transaction, so a
+single client always reflects the live session.
+
+The statements one client awaits in the same task share one transaction, so a
+page that runs its reads in parallel opens a single transaction instead of one
+per read:
+
+```typescript title="app/posts/page.tsx"
+// One transaction: begin, the claims, both selects, commit.
+const [posts, comments] = await Promise.all([
+  db.select().from(schema.posts),
+  db.select().from(schema.comments),
+])
+```
+
+The statements in a batch run one after another on one connection, and they
+are not atomic: when one fails, the transaction rolls back and each statement
+runs again in a transaction of its own, so only the failing one rejects. A
+statement awaited after the batch has started opens a new transaction.
 
 `createAuthClient(...)` does not take a `schema`. The client resolves types from
 the tables you reference in the query itself. Pass a `relations` object only when
@@ -250,7 +266,7 @@ const db = createAnonClient()
 ```
 
 Prefer `createAuthClient` when you have a Supabase client. It resolves and
-verifies claims through `auth.getClaims()` on every statement, so it always
+verifies claims through `auth.getClaims()` for every transaction, so it always
 reflects the live session.
 
 ## Use admin and service queries carefully
