@@ -206,6 +206,14 @@ export function LiveSearch({
 The listener runs the schema directly and gates the side-effect on
 validity. A one-character query never triggers a search.
 
+To render from the values instead, such as a live preview, read them with
+`useFormValues(form)` from `@zeno-lib/forms`. It is typed from the form and
+re-renders when a value changes, not on focus, blur or validation:
+
+```tsx
+const { title, body } = useFormValues(form)
+```
+
 ## `validators: 'blur'` and `'submit'`
 
 `'blur'` validates only when a field loses focus and doesn't re-validate

@@ -17,6 +17,7 @@ export {
   type SubmitActionSchema,
   submitAction,
 } from "./lib/submit-action"
+export { useFormValues } from "./lib/use-form-values"
 export {
   useHideFieldErrors,
   useIsFieldRequired,

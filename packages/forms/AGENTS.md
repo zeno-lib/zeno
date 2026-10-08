@@ -26,7 +26,9 @@ A typed layer over [TanStack Form](https://tanstack.com/form) and Zod. The user 
 - **`@zeno-lib/ui` is a devDependency, never a peer.** It is private, so a `workspace:^` peer would
   publish as an unresolvable range.
 - **Keep `@tanstack/react-form` and `@tanstack/react-form-nextjs` on the same version**, and
-  subscribe with `useSelector` (`useStore` is deprecated).
+  subscribe with `useSelector` (`useStore` is deprecated). Read the whole values object with
+  `useFormValues(form)`, never `useSelector(form.store)` without a selector, which re-renders on
+  every state change.
 
 ## Contracts every field keeps
 
