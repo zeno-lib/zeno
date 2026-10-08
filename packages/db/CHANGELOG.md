@@ -1,5 +1,20 @@
 # @zeno-lib/db
 
+## 0.8.0
+
+### Minor Changes
+
+- efda905: The `drizzle-orm` peer moves to `1.0.0-rc.5-5935859`, the same build as the
+  `drizzle-kit` peer. Since rc.4, Drizzle drops `generatedAlwaysAsIdentity` values
+  from inserts, and since rc.5 an `undefined` in a `db.query.*` `where` filter
+  throws.
+
+### Patch Changes
+
+- 707eaf0: Lint fixes for Biome 2.5 and Ultracite 7.12, with no behavior change.
+  `ActionSchema.parse` and the `RlsTestHarness` members are now declared as
+  function-typed properties instead of methods.
+
 ## 0.7.1
 
 ### Patch Changes
