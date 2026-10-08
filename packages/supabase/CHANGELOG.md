@@ -1,5 +1,13 @@
 # @zeno-lib/supabase
 
+## 0.1.1
+
+### Patch Changes
+
+- 707eaf0: Lint fixes for Biome 2.5 and Ultracite 7.12, with no behavior change.
+  `ActionSchema.parse` and the `RlsTestHarness` members are now declared as
+  function-typed properties instead of methods.
+
 ## 0.1.0
 
 ### Minor Changes

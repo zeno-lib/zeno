@@ -1,5 +1,15 @@
 # @zeno-lib/authentication
 
+## 0.0.7
+
+### Patch Changes
+
+- f546f5c: The `confirm` handler type-checks against current `@supabase/supabase-js`, whose
+  `EmailOtpType` is now an open string union. A `type` with no default route now
+  redirects to `/` instead of passing `undefined` to `redirect()`.
+- Updated dependencies [707eaf0]
+  - @zeno-lib/supabase@0.1.1
+
 ## 0.0.6
 
 ### Patch Changes

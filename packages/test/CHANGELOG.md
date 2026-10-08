@@ -1,5 +1,19 @@
 # @zeno-lib/test
 
+## 0.1.1
+
+### Patch Changes
+
+- 707eaf0: Lint fixes for Biome 2.5 and Ultracite 7.12, with no behavior change.
+  `ActionSchema.parse` and the `RlsTestHarness` members are now declared as
+  function-typed properties instead of methods.
+- e9ff3ff: Update `@testing-library/react` to 16.3.3, `@testing-library/user-event` to
+  14.6.7 and `@vitejs/plugin-react` to 6.1.2.
+- 875a047: Update `jsdom` to 30.1.2. jsdom 30 supports Node `^22.22.2 || ^24.15.0 || >=26`,
+  so the React preset now needs at least Node 24.15 on the 24 line.
+- 29fc2e3: The `vitest` peer range accepts Vitest 5 (`^4.1.0 || ^5.0.0`), the version the
+  presets are built and tested against.
+
 ## 0.1.0
 
 ### Minor Changes

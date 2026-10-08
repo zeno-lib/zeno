@@ -1,5 +1,16 @@
 # @zeno-lib/forms
 
+## 0.2.2
+
+### Patch Changes
+
+- 3c37c5e: `SliderField` renders a `formatValue` readout of `0` in its readout slot. It
+  tested the readout for truthiness, so a formatter returning the number `0` left
+  a bare "0" without the readout's styling.
+- 707eaf0: Lint fixes for Biome 2.5 and Ultracite 7.12, with no behavior change.
+  `ActionSchema.parse` and the `RlsTestHarness` members are now declared as
+  function-typed properties instead of methods.
+
 ## 0.2.1
 
 ### Patch Changes

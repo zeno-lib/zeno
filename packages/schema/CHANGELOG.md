@@ -1,5 +1,11 @@
 # @zeno-lib/schema
 
+## 0.3.0
+
+### Minor Changes
+
+- efda905: The `drizzle-orm` peer moves to `1.0.0-rc.5-5935859`, matching `@zeno-lib/db`.
+
 ## 0.2.2
 
 ### Patch Changes
