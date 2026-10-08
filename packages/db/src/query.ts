@@ -127,11 +127,11 @@ const tableOf = (value: unknown): PgTable | undefined => {
   if (is(value, PgTable)) {
     return value
   }
-  if (typeof value === "object" && value !== null && "table" in value) {
-    const { table } = value
-    return is(table, PgTable) ? table : undefined
+  if (typeof value !== "object" || value === null || !("table" in value)) {
+    return
   }
-  return
+  const { table } = value
+  return is(table, PgTable) ? table : undefined
 }
 
 /**

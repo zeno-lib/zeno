@@ -37,7 +37,7 @@ function getDef(node: SchemaNode | undefined): SchemaDef | undefined {
 
 function extractDefaultForField(node: SchemaNode): ExtractResult {
   let current: SchemaNode | undefined = node
-  for (let depth = 0; depth < MAX_WRAPPER_DEPTH; depth++) {
+  for (let depth = 0; depth < MAX_WRAPPER_DEPTH; depth += 1) {
     const def: SchemaDef | undefined = getDef(current)
     if (!def?.type) {
       return { ok: false }

@@ -50,6 +50,7 @@ const INDEX_SEGMENT = /^\d+$/
 const INDEX_IN_NAME = /\[\d+\]|\.(\d+)(?=\.|\[|$)/g
 
 function pathKey(part: PathPart): PropertyKey {
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: issue paths come from third-party validators at runtime, and a non-conforming `null` segment would make `in` throw.
   if (typeof part === "object" && part !== null && "key" in part) {
     return part.key
   }
@@ -93,10 +94,7 @@ function probeContainer(expected: unknown): unknown {
   if (kind === "object") {
     return {}
   }
-  if (kind === "array") {
-    return [{}]
-  }
-  return
+  return kind === "array" ? [{}] : undefined
 }
 
 // Write `value` at `keys` inside `root`, only where nothing is set yet.
@@ -140,7 +138,7 @@ function validateSync(
 function getRequiredPaths(schema: StandardSchemaLike): Set<string> {
   const required = new Set<string>()
   const probe: Record<PropertyKey, unknown> = {}
-  for (let depth = 0; depth < MAX_PROBE_DEPTH; depth++) {
+  for (let depth = 0; depth < MAX_PROBE_DEPTH; depth += 1) {
     const issues = validateSync(schema, probe)
     if (!issues) {
       return required

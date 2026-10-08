@@ -67,6 +67,7 @@ export const toPostgresError = (error: unknown): PostgresError | undefined => {
     current = (current as Error & { cause?: unknown }).cause
   }
 
+  // biome-ignore lint/complexity/noUselessReturn: `noImplicitReturns` needs the explicit fall-through return.
   return
 }
 
@@ -129,5 +130,6 @@ export const isConstraintViolation = (
     }
   }
 
+  // biome-ignore lint/complexity/noUselessReturn: `noImplicitReturns` needs the explicit fall-through return.
   return
 }

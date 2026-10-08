@@ -61,6 +61,7 @@ export function resolveDatabaseUrl({
   try {
     parsed = new URL(url)
   } catch {
+    // biome-ignore lint/style/useErrorCause: Node's ERR_INVALID_URL keeps the raw URL (and its password) in `input`, so attaching it as the cause would echo the secret.
     throw new Error("SUPABASE_DATABASE_URL is not a valid URL")
   }
   if (parsed.protocol !== "postgresql:" && parsed.protocol !== "postgres:") {

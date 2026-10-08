@@ -17,7 +17,7 @@ import { toast } from "sonner"
 const getBaseUrl = () => {
   if (
     typeof globalThis !== "undefined" &&
-    globalThis?.location?.origin !== undefined
+    globalThis.location?.origin !== undefined
   ) {
     return globalThis.location.origin
   }

@@ -1,8 +1,9 @@
 {
   "name": "@zeno-lib/authentication",
   "version": "0.0.6",
-  "scripts": {
-    "types:check": "tsc --noEmit"
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/authentication"
   },
   "exports": {
     "./confirm/*": "./src/confirm/*.ts"
@@ -10,12 +11,19 @@
   "files": [
     "src/confirm"
   ],
-  "publishConfig": {
-    "access": "public"
+  "scripts": {
+    "types:check": "tsc --noEmit"
   },
-  "repository": {
-    "url": "https://github.com/zeno-lib/zeno.git",
-    "directory": "packages/authentication"
+  "dependencies": {
+    "@zeno-lib/supabase": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@zeno-lib/typescript": "workspace:^",
+    "@zeno-lib/ui": "workspace:^",
+    "sonner": "^2.0.8"
   },
   "peerDependencies": {
     "@supabase/supabase-js": ">=2",
@@ -24,15 +32,7 @@
     "react-dom": ">=19",
     "react-hook-form": ">=7"
   },
-  "dependencies": {
-    "@zeno-lib/supabase": "workspace:^"
-  },
-  "devDependencies": {
-    "@zeno-lib/typescript": "workspace:^",
-    "@zeno-lib/ui": "workspace:^",
-    "@types/node": "26.6.4",
-    "@types/react": "19.3.0",
-    "@types/react-dom": "19.3.0",
-    "sonner": "^2.0.8"
+  "publishConfig": {
+    "access": "public"
   }
 }

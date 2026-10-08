@@ -84,7 +84,7 @@ function formatNumber(
     useGrouping = true,
   }: FormatNumberOptions
 ): string {
-  if (value == null || !Number.isFinite(value)) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
     return ""
   }
   return normalizeMinus(
@@ -236,10 +236,10 @@ function parseLocaleNumber(text: string, locale?: string): number | null {
 // the same logical place after separators were inserted or removed.
 function countSignificant(text: string, end: number, decimal: string): number {
   let count = 0
-  for (let i = 0; i < end && i < text.length; i++) {
+  for (let i = 0; i < end && i < text.length; i += 1) {
     const char = text[i] as string
     if (DIGIT.test(char) || char === decimal || MINUS_SIGNS.test(char)) {
-      count++
+      count += 1
     }
   }
   return count
@@ -254,10 +254,10 @@ function caretForSignificant(
     return 0
   }
   let count = 0
-  for (let i = 0; i < text.length; i++) {
+  for (let i = 0; i < text.length; i += 1) {
     const char = text[i] as string
     if (DIGIT.test(char) || char === decimal || char === "-") {
-      count++
+      count += 1
       if (count === significant) {
         return i + 1
       }

@@ -1,6 +1,10 @@
 {
   "name": "@zeno-lib/e2e",
   "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/e2e"
+  },
   "type": "module",
   "exports": {
     "./auth": {
@@ -26,13 +30,6 @@
     "dist",
     "src"
   ],
-  "publishConfig": {
-    "access": "public"
-  },
-  "repository": {
-    "url": "https://github.com/zeno-lib/zeno.git",
-    "directory": "packages/e2e"
-  },
   "scripts": {
     "build": "tsdown",
     "e2e": "playwright test",
@@ -41,9 +38,6 @@
     "test": "vitest --run",
     "types:check": "tsc --noEmit",
     "verify-deps": "node ./dist/cli.mjs verify-deps"
-  },
-  "peerDependencies": {
-    "@playwright/test": ">=1"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
@@ -55,5 +49,11 @@
     "typescript": "7.0.2",
     "vite": "8.3.3",
     "vitest": "5.0.3"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

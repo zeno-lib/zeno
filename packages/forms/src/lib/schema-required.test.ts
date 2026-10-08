@@ -166,7 +166,7 @@ describe("getRequiredPaths", () => {
     const schema: StandardSchemaLike = {
       "~standard": {
         validate: (value) => {
-          const profile = (value as { profile?: unknown }).profile
+          const { profile } = value as { profile?: unknown }
           return profile === undefined
             ? { issues: [{ expected: "Object", path: [{ key: "profile" }] }] }
             : {

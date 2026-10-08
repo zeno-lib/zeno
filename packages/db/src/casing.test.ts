@@ -177,7 +177,7 @@ describe("default casing", () => {
     })
     const columns = getTableColumns(posts)
     const config = getTableConfig(posts)
-    const foreignKey = config.foreignKeys[0]
+    const [foreignKey] = config.foreignKeys
 
     expect(columns.ownerId.getSQLType()).toBe("uuid")
     // Nullable so deleting the user blanks the author instead of failing.
@@ -190,7 +190,7 @@ describe("default casing", () => {
 
   it("restricts the delete when an author column is required", () => {
     const posts = table("posts", { ownerId: authUserId({ notNull: true }) })
-    const foreignKey = getTableConfig(posts).foreignKeys[0]
+    const [foreignKey] = getTableConfig(posts).foreignKeys
 
     expect(getTableColumns(posts).ownerId.notNull).toBe(true)
     // `set null` against a NOT NULL column is a foreign key that can never
@@ -206,7 +206,7 @@ describe("default casing", () => {
         name: "owner_id",
       }),
     })
-    const foreignKey = getTableConfig(posts).foreignKeys[0]
+    const [foreignKey] = getTableConfig(posts).foreignKeys
 
     expect(getTableColumns(posts).ownerId.name).toBe("owner_id")
     expect(foreignKey?.onDelete).toBe("cascade")
@@ -232,7 +232,7 @@ describe("default casing", () => {
       ownerId: userId(() => profiles.id),
       ...authorship({ reference: () => profiles.id }),
     })
-    const foreignKeys = getTableConfig(posts).foreignKeys
+    const { foreignKeys } = getTableConfig(posts)
 
     expect(foreignKeys).toHaveLength(3)
     for (const foreignKey of foreignKeys) {
@@ -247,8 +247,8 @@ describe("default casing", () => {
     const viaUserId = table("b", {
       ownerId: userId(() => authUsers.id, { notNull: true }),
     })
-    const authForeignKey = getTableConfig(viaAuth).foreignKeys[0]
-    const userForeignKey = getTableConfig(viaUserId).foreignKeys[0]
+    const [authForeignKey] = getTableConfig(viaAuth).foreignKeys
+    const [userForeignKey] = getTableConfig(viaUserId).foreignKeys
 
     expect(getTableColumns(viaUserId).ownerId.notNull).toBe(
       getTableColumns(viaAuth).ownerId.notNull
@@ -354,7 +354,7 @@ describe("default casing", () => {
       ),
     })
     const columns = getTableColumns(profiles)
-    const foreignKey = getTableConfig(profiles).foreignKeys[0]
+    const [foreignKey] = getTableConfig(profiles).foreignKeys
 
     expect(columns.id.primary).toBe(true)
     expect(columns.id.notNull).toBe(true)
@@ -372,7 +372,7 @@ describe("default casing", () => {
       }),
     })
     const columns = getTableColumns(profiles)
-    const foreignKey = getTableConfig(profiles).foreignKeys[0]
+    const [foreignKey] = getTableConfig(profiles).foreignKeys
 
     expect(columns.id.primary).toBe(true)
     expect(columns.id.default).toBeDefined()
@@ -447,7 +447,7 @@ describe("default casing", () => {
       ...auditColumns({ notNull: true }),
     })
     const columns = getTableColumns(posts)
-    const foreignKeys = getTableConfig(posts).foreignKeys
+    const { foreignKeys } = getTableConfig(posts)
 
     expect(columns.createdBy.notNull).toBe(true)
     expect(columns.updatedBy.notNull).toBe(true)
@@ -618,7 +618,7 @@ describe("default casing", () => {
         authenticatedOwnerDeletePolicy("posts_owner_delete", t.userId),
       ]
     )
-    const policies = getTableConfig(posts).policies
+    const { policies } = getTableConfig(posts)
 
     expect(policies.map((rlsPolicy) => rlsPolicy.for)).toEqual([
       "select",
@@ -705,7 +705,7 @@ describe("default casing", () => {
     const posts = table("posts", { id: primaryId("uuid") }, (t) =>
       functionPolicies(t, { argument: t.id })
     )
-    const policies = getTableConfig(posts).policies
+    const { policies } = getTableConfig(posts)
     const db = createAdminClient()
 
     expect(policies.map((rlsPolicy) => rlsPolicy.name)).toEqual([
@@ -749,7 +749,7 @@ describe("default casing", () => {
     const tags = table("tags", { id: primaryId("uuid") }, (t) =>
       functionPolicies(t)
     )
-    const policies = getTableConfig(tags).policies
+    const { policies } = getTableConfig(tags)
 
     expect(policies).toHaveLength(4)
     expect(new PgDialect().sqlToQuery(policies[0]?.using as SQL).sql).toBe(
@@ -779,7 +779,7 @@ describe("default casing", () => {
       { id: primaryId("assigned"), ownerId: uuid() },
       (t) => functionPolicies(t, { argument: { delete: t.id, select: t.id } })
     )
-    const policies = getTableConfig(projects).policies
+    const { policies } = getTableConfig(projects)
     const dialect = new PgDialect()
 
     // select and delete get the row; insert and update fall to no arguments,
@@ -803,7 +803,7 @@ describe("default casing", () => {
     const projects = table("projects", { id: primaryId("assigned") }, (t) =>
       functionPolicies(t, { argument: { insert: null, select: t.id } })
     )
-    const policies = getTableConfig(projects).policies
+    const { policies } = getTableConfig(projects)
 
     expect(new PgDialect().sqlToQuery(policies[1]?.withCheck as SQL).sql).toBe(
       '(select "can_insert_projects"())'
@@ -820,7 +820,7 @@ describe("default casing", () => {
       },
       (t) => functionPolicies(t, { argument: [t.profileId, t.organisationId] })
     )
-    const policies = getTableConfig(memberships).policies
+    const { policies } = getTableConfig(memberships)
 
     expect(new PgDialect().sqlToQuery(policies[0]?.using as SQL).sql).toBe(
       '(select "can_select_memberships"("memberships"."profile_id", "memberships"."organisation_id"))'
@@ -832,7 +832,7 @@ describe("default casing", () => {
     const invoices = billing.table("invoices", { id: primaryId("uuid") }, (t) =>
       functionPolicies(t, { schema: "billing" })
     )
-    const policies = getTableConfig(invoices).policies
+    const { policies } = getTableConfig(invoices)
 
     expect(new PgDialect().sqlToQuery(policies[0]?.using as SQL).sql).toBe(
       '(select "billing"."can_select_invoices"())'

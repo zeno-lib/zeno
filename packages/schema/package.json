@@ -1,6 +1,10 @@
 {
   "name": "@zeno-lib/schema",
   "version": "0.2.2",
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/schema"
+  },
   "type": "module",
   "exports": {
     ".": {
@@ -13,23 +17,12 @@
     "dist",
     "src"
   ],
-  "publishConfig": {
-    "access": "public"
-  },
-  "repository": {
-    "url": "https://github.com/zeno-lib/zeno.git",
-    "directory": "packages/schema"
-  },
   "scripts": {
     "build": "tsdown",
     "prepack": "tsdown",
     "test": "vitest --run",
     "test:watch": "vitest watch",
     "types:check": "tsc --noEmit"
-  },
-  "peerDependencies": {
-    "drizzle-orm": "1.0.0-rc.5-5935859",
-    "zod": ">=4"
   },
   "devDependencies": {
     "@zeno-lib/typescript": "workspace:^",
@@ -38,5 +31,12 @@
     "typescript": "7.0.2",
     "vitest": "5.0.3",
     "zod": "^4.6.5"
+  },
+  "peerDependencies": {
+    "drizzle-orm": "1.0.0-rc.5-5935859",
+    "zod": ">=4"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

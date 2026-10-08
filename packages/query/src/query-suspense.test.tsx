@@ -77,7 +77,7 @@ class Outer extends Component<
   { children: ReactNode },
   { caught: string | null }
 > {
-  override state = { caught: null }
+  override state: { caught: string | null } = { caught: null }
   static getDerivedStateFromError(error: Error) {
     return { caught: error.message }
   }

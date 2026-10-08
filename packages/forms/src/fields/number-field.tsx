@@ -11,7 +11,7 @@ type NumberFieldProps = Omit<
 
 function NumberField(props: NumberFieldProps) {
   const field = useFieldContext<number | undefined>()
-  const value = field.state.value
+  const { value } = field.state
   const inputValue =
     typeof value === "number" && !Number.isNaN(value) ? value : ""
 

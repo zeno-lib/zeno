@@ -21,7 +21,7 @@ export const source = loader({
           }
 
           const file = this.storage.read(filePath)
-          if (!file || file.format !== "page") {
+          if (file?.format !== "page") {
             return node
           }
 

@@ -1,20 +1,11 @@
 {
   "name": "@zeno-lib/db",
   "version": "0.7.1",
-  "type": "module",
-  "scripts": {
-    "build": "tsdown",
-    "prepack": "tsdown",
-    "dev": "pnpm exec supabase start",
-    "stop": "pnpm exec supabase stop",
-    "reset": "pnpm exec supabase db reset",
-    "db:generate": "drizzle-kit generate",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
-    "test": "vitest --run",
-    "test:watch": "vitest watch",
-    "types:check": "tsc --noEmit"
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/db"
   },
+  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
@@ -61,24 +52,18 @@
     "dist",
     "src"
   ],
-  "publishConfig": {
-    "access": "public"
-  },
-  "repository": {
-    "url": "https://github.com/zeno-lib/zeno.git",
-    "directory": "packages/db"
-  },
-  "peerDependencies": {
-    "@supabase/supabase-js": ">=2",
-    "drizzle-kit": "1.0.0-rc.5-5935859",
-    "drizzle-orm": "1.0.0-rc.5-5935859",
-    "postgres": ">=3.4",
-    "react": ">=19"
-  },
-  "peerDependenciesMeta": {
-    "react": {
-      "optional": true
-    }
+  "scripts": {
+    "build": "tsdown",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "dev": "pnpm exec supabase start",
+    "prepack": "tsdown",
+    "reset": "pnpm exec supabase db reset",
+    "stop": "pnpm exec supabase stop",
+    "test": "vitest --run",
+    "test:watch": "vitest watch",
+    "types:check": "tsc --noEmit"
   },
   "devDependencies": {
     "@supabase/supabase-js": "2.117.2",
@@ -98,5 +83,20 @@
     "vite": "8.3.3",
     "vitest": "5.0.3",
     "zod": "^4.6.5"
+  },
+  "peerDependencies": {
+    "@supabase/supabase-js": ">=2",
+    "drizzle-kit": "1.0.0-rc.5-5935859",
+    "drizzle-orm": "1.0.0-rc.5-5935859",
+    "postgres": ">=3.4",
+    "react": ">=19"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

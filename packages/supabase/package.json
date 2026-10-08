@@ -1,6 +1,10 @@
 {
   "name": "@zeno-lib/supabase",
   "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/supabase"
+  },
   "type": "module",
   "exports": {
     "./next-client": {
@@ -38,29 +42,12 @@
     "dist",
     "src"
   ],
-  "publishConfig": {
-    "access": "public"
-  },
-  "repository": {
-    "url": "https://github.com/zeno-lib/zeno.git",
-    "directory": "packages/supabase"
-  },
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch --no-clean",
     "prepack": "tsdown",
-    "types:check": "tsc --noEmit",
-    "test": "vitest --run"
-  },
-  "peerDependencies": {
-    "@supabase/ssr": ">=0.10.0",
-    "@supabase/supabase-js": ">=2.56.0",
-    "next": ">=16"
-  },
-  "peerDependenciesMeta": {
-    "next": {
-      "optional": true
-    }
+    "test": "vitest --run",
+    "types:check": "tsc --noEmit"
   },
   "devDependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -73,5 +60,18 @@
     "typescript": "7.0.2",
     "vite": "8.3.3",
     "vitest": "5.0.3"
+  },
+  "peerDependencies": {
+    "@supabase/ssr": ">=0.10.0",
+    "@supabase/supabase-js": ">=2.56.0",
+    "next": ">=16"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

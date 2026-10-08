@@ -8,8 +8,8 @@ import { createDefineAction, createDefineFormAction } from "./define-action.ts"
 // marker object, so nothing here builds a pool or opens a connection. What
 // that client does with the claims is covered by test/rls.integration.test.ts.
 const { createSupabaseClientMock } = vi.hoisted(() => ({
-  createSupabaseClientMock: vi.fn((claims: unknown) => ({
-    claims,
+  createSupabaseClientMock: vi.fn((receivedClaims: unknown) => ({
+    claims: receivedClaims,
     fake: true,
   })),
 }))

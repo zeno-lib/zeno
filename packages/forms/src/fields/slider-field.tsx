@@ -51,12 +51,14 @@ function SliderField({
   const schemaRequired = useIsFieldRequired(field)
   const isRequired = required ?? schemaRequired
 
-  const value = field.state.value
+  const { value } = field.state
   const readout = formatValue && value !== undefined ? formatValue(value) : null
+  // Not a truthiness check: a formatter may return the number 0, which must still render.
+  const hasReadout = readout !== null && readout !== undefined
 
   return (
     <Field data-field={field.name} data-invalid={isInvalid}>
-      {(label || readout) && (
+      {(label || hasReadout) && (
         <FieldContent className="flex-row items-center justify-between">
           {label && (
             <FieldLabel htmlFor={field.name}>
@@ -64,7 +66,7 @@ function SliderField({
               {isRequired && <RequiredIndicator />}
             </FieldLabel>
           )}
-          {readout && (
+          {hasReadout && (
             <span className="text-muted-foreground text-sm tabular-nums">
               {readout}
             </span>
@@ -81,9 +83,9 @@ function SliderField({
         name={field.name}
         onBlur={field.handleBlur}
         onValueChange={(next) => {
-          const value: SliderValue =
+          const nextValue: SliderValue =
             typeof next === "number" ? next : Array.from(next)
-          field.handleChange(value)
+          field.handleChange(nextValue)
         }}
         value={value}
         {...props}

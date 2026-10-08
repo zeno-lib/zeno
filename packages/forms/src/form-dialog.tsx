@@ -63,8 +63,8 @@ type DialogForm<TValues> = {
     }
   }
   readonly state: DialogFormState
-  handleSubmit(): unknown
-  reset(values?: TValues): void
+  handleSubmit: () => unknown
+  reset: (values?: TValues) => void
 }
 
 type FormDialogProps<TValues> = {

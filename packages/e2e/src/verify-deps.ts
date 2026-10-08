@@ -31,6 +31,7 @@ function readPackageJson(path: string): PackageJson {
     return JSON.parse(readFileSync(path, "utf-8")) as PackageJson
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
+    // biome-ignore lint/style/useErrorCause: `ErrorOptions` is ES2022, past this package's `lib`; the reason is already in the message.
     throw new Error(`Could not read ${path}: ${reason}`)
   }
 }

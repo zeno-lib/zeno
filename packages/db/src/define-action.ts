@@ -17,7 +17,7 @@ export interface ActionSchema<TInput, TOutput> {
       | { readonly input: TInput; readonly output: TOutput }
       | undefined
   }
-  parse(input: unknown): TOutput
+  parse: (input: unknown) => TOutput
 }
 
 /** What a request context must carry for `defineAction` to hand it over. */
