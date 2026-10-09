@@ -93,7 +93,8 @@ The root also carries `data-invalid`, and the control inside carries
 ## Email field
 
 `EmailField` is a preset over `InputField` that sets `type="email"`,
-`inputMode="email"`, and `autoComplete="email"`. It defaults `label` to
+`inputMode="email"`, and `autoComplete="email"`, and turns off
+auto-capitalisation, autocorrect and spell check. It defaults `label` to
 `"Email"`; `name` is required, as on every other field.
 
 <Preview>
@@ -139,7 +140,9 @@ a signup form. It defaults `label` to `"Password"`; `name` is required.
 ## Number field
 
 `NumberField` stores the input as a `number` (or `undefined` when empty), so
-you never convert the input's string yourself.
+you never convert the input's string yourself. It sets `inputMode="decimal"`,
+so phone keypads keep the decimal key; pass `inputMode="numeric"` for whole
+numbers.
 
 <Preview>
   <NumberFieldPreview />

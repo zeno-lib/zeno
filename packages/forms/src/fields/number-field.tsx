@@ -4,12 +4,11 @@ import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import type { ChangeEvent } from "react"
 import { InputField, type InputFieldProps } from "./input-field"
 
-type NumberFieldProps = Omit<
-  InputFieldProps,
-  "inputMode" | "onChange" | "type" | "value"
->
+type NumberFieldProps = Omit<InputFieldProps, "onChange" | "type" | "value">
 
-function NumberField(props: NumberFieldProps) {
+// `decimal` keeps the decimal key on phone keypads; pass `numeric` for whole
+// numbers.
+function NumberField({ inputMode = "decimal", ...props }: NumberFieldProps) {
   const field = useFieldContext<number | undefined>()
   const { value } = field.state
   const inputValue =
@@ -18,7 +17,7 @@ function NumberField(props: NumberFieldProps) {
   return (
     <InputField
       {...props}
-      inputMode="numeric"
+      inputMode={inputMode}
       onChange={(event: ChangeEvent<HTMLInputElement>) => {
         const next = event.target.valueAsNumber
         field.handleChange(Number.isNaN(next) ? undefined : next)
