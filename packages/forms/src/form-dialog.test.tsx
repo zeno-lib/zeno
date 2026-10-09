@@ -3,6 +3,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
 import { type ReactNode, useState } from "react"
@@ -46,12 +47,16 @@ function Harness({
   children,
   onSubmit = vi.fn(),
   closeOnSubmit,
+  disabled,
+  saveFromPrompt,
 }: {
   /** Submit through `submitAction` with this server action instead. */
   action?: (values: Values) => Promise<ActionResult<unknown>>
   children?: ReactNode
   onSubmit?: (values: Values) => unknown
   closeOnSubmit?: boolean
+  disabled?: boolean
+  saveFromPrompt?: boolean
 }) {
   const dialog = useFormDialog({ defaultValues: BLANK })
   const form = useForm({
@@ -75,7 +80,9 @@ function Harness({
       <FormDialog
         closeOnSubmit={closeOnSubmit}
         dialog={dialog}
+        disabled={disabled}
         form={form}
+        saveFromPrompt={saveFromPrompt}
         title="Person"
       >
         <InputField label="Name" name="name" />
@@ -250,5 +257,90 @@ describe("FormDialog", () => {
         .getByRole("button", { name: "Details" })
         .getAttribute("aria-pressed")
     ).toBe("false")
+  })
+
+  test("Save in the leave prompt saves, then closes", async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(<Harness onSubmit={onSubmit} saveFromPrompt />)
+    const name = await openEdit(user)
+    await user.type(name, "!")
+    await user.keyboard("{Escape}")
+    const prompt = await screen.findByRole("alertdialog")
+
+    // The submit shortcut is off while the prompt asks.
+    await user.keyboard("{Control>}{Enter}{/Control}")
+    expect(onSubmit).not.toHaveBeenCalled()
+
+    await user.click(within(prompt).getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+    expect(onSubmit).toHaveBeenCalledWith({
+      email: "ada@example.com",
+      name: "Ada!",
+    })
+    expect(screen.queryByRole("alertdialog")).toBeNull()
+  })
+
+  test("a failed Save in the leave prompt stays open and focuses the invalid field", async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(<Harness onSubmit={onSubmit} saveFromPrompt />)
+    const name = await openEdit(user)
+    await user.clear(name)
+    // Leave from another field, so focus returning there isn't a pass.
+    await user.click(screen.getByLabelText(EMAIL))
+    await user.keyboard("{Escape}")
+    const prompt = await screen.findByRole("alertdialog")
+
+    await user.click(within(prompt).getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(screen.getByRole("dialog")).toBeTruthy()
+    await waitFor(() => expect(document.activeElement).toBe(name))
+  })
+
+  for (const key of ["Control", "Meta"]) {
+    test(`${key}+Enter submits, from a textarea too; plain Enter there doesn't`, async () => {
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <Harness onSubmit={onSubmit}>
+          <textarea aria-label="Notes" />
+        </Harness>
+      )
+      const name = await openEdit(user)
+      await user.type(name, "!")
+      await user.type(screen.getByLabelText("Notes"), "line{Enter}")
+      expect(onSubmit).not.toHaveBeenCalled()
+
+      await user.keyboard(`{${key}>}{Enter}{/${key}}`)
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith({
+          email: "ada@example.com",
+          name: "Ada!",
+        })
+      )
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+    })
+  }
+
+  test("disabled turns off Save, the shortcut and the native fields", async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(<Harness disabled onSubmit={onSubmit} />)
+    await user.click(screen.getByRole("button", { name: "Edit" }))
+    const dialog = await screen.findByRole("dialog")
+    await waitFor(() =>
+      expect(dialog.contains(document.activeElement)).toBe(true)
+    )
+    expect(screen.getByLabelText(NAME).matches(":disabled")).toBe(true)
+    expect(
+      screen.getByRole("button", { name: "Save" }).matches(":disabled")
+    ).toBe(true)
+
+    await user.keyboard("{Control>}{Enter}{/Control}")
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(screen.getByRole("dialog")).toBeTruthy()
   })
 })
