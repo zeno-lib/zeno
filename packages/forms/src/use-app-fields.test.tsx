@@ -1,4 +1,9 @@
-import { cleanup, render, screen } from "@zeno-lib/test/testing-library"
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
@@ -8,6 +13,10 @@ const CONTACT_EMAIL_LABEL = /Contact email/
 const PASSWORD_LABEL = /Password/
 const NAME_LABEL = /Name/
 const ACCEPT_NAME = /Accept/
+const TITLE_LABEL = /Title/
+const NOTE_LABEL = /Note/
+const DAY_LABEL = /Day/
+const PICKED_DAY = /October 9/
 
 afterEach(() => {
   cleanup()
@@ -162,5 +171,131 @@ describe("field ids", () => {
     const hints = screen.getAllByText("Hint")
     expect(page.getAttribute("aria-describedby")).toBe(hints[0]?.id)
     expect(dialog.getAttribute("aria-describedby")).toBe(hints[1]?.id)
+  })
+})
+
+describe("ComboboxField", () => {
+  test("offers to clear an optional value but not a required one", () => {
+    const schema = z.object({
+      forced: z.string().optional(),
+      kind: z.string().min(1),
+      note: z.string().optional(),
+      overridden: z.string().min(1),
+    })
+    const ITEMS = ["a", "b"]
+    function H() {
+      const form = useForm({
+        defaultValues: { forced: "a", kind: "a", note: "a", overridden: "a" },
+        onSubmit: vi.fn(),
+        schema,
+      })
+      const { ComboboxField } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <ComboboxField items={ITEMS} name="note" />
+            <ComboboxField items={ITEMS} name="kind" />
+            <ComboboxField items={ITEMS} name="forced" required />
+            <ComboboxField items={ITEMS} name="overridden" showClear />
+          </Form>
+        </FormProvider>
+      )
+    }
+    const { container } = render(<H />)
+    const hasClear = (name: string) =>
+      container.querySelector(
+        `[data-field="${name}"] [data-slot="combobox-clear"]`
+      ) !== null
+    expect(hasClear("note")).toBe(true)
+    expect(hasClear("kind")).toBe(false)
+    expect(hasClear("forced")).toBe(false)
+    expect(hasClear("overridden")).toBe(true)
+  })
+})
+
+describe("required fields", () => {
+  test("a required control says so to assistive tech, with or without the `*`", () => {
+    const schema = z.object({
+      kind: z.string().min(1),
+      note: z.string(),
+      title: z.string().min(1),
+    })
+    function H({ requiredIndicator }: { requiredIndicator: boolean }) {
+      const form = useForm({
+        defaultValues: { kind: "a" },
+        onSubmit: vi.fn(),
+        requiredIndicator,
+        schema,
+      })
+      const { ComboboxField, InputField } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <InputField label="Title" name="title" />
+            <InputField label="Note" name="note" />
+            <ComboboxField items={["a", "b"]} label="Kind" name="kind" />
+          </Form>
+        </FormProvider>
+      )
+    }
+    for (const requiredIndicator of [true, false]) {
+      const { container, unmount } = render(
+        <H requiredIndicator={requiredIndicator} />
+      )
+      const title = screen.getByRole("textbox", { name: TITLE_LABEL })
+      const note = screen.getByRole("textbox", { name: NOTE_LABEL })
+      expect(title.getAttribute("aria-required")).toBe("true")
+      expect(note.hasAttribute("aria-required")).toBe(false)
+      expect(
+        container.querySelectorAll('[data-slot="required-indicator"]')
+      ).toHaveLength(requiredIndicator ? 2 : 0)
+      expect(
+        container.querySelector(
+          '[data-field="kind"] [data-slot="combobox-clear"]'
+        )
+      ).toBeNull()
+      unmount()
+    }
+  })
+})
+
+describe("DatePickerField", () => {
+  const DAY = new Date(2026, 9, 9)
+
+  async function pickSelectedDayAgain(required: boolean) {
+    const captured: { day?: Date } = {}
+    function H() {
+      const form = useForm({
+        defaultValues: { day: DAY as Date | undefined },
+        onSubmit: vi.fn(),
+      })
+      const { DatePickerField, Subscribe } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <DatePickerField label="Day" name="day" required={required} />
+            <Subscribe selector={(state) => state.values.day}>
+              {(day) => {
+                captured.day = day
+                return null
+              }}
+            </Subscribe>
+          </Form>
+        </FormProvider>
+      )
+    }
+    const user = userEvent.setup()
+    render(<H />)
+    fireEvent.click(screen.getByRole("button", { name: DAY_LABEL }))
+    await user.click(await screen.findByRole("button", { name: PICKED_DAY }))
+    return captured.day
+  }
+
+  test("picking a required date's day again keeps it", async () => {
+    expect(await pickSelectedDayAgain(true)).toEqual(DAY)
+  })
+
+  test("picking an optional date's day again clears it", async () => {
+    expect(await pickSelectedDayAgain(false)).toBeUndefined()
   })
 })

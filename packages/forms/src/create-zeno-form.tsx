@@ -453,10 +453,10 @@ export function createZenoForm<
 
     const requiredFields = useMemo(
       () =>
-        schema && requiredIndicator
+        schema
           ? getRequiredPaths(schema as Parameters<typeof getRequiredPaths>[0])
           : new Set<string>(),
-      [schema, requiredIndicator]
+      [schema]
     )
 
     const schemaDefaults = useMemo(

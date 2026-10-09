@@ -57,12 +57,16 @@ function getFormHideFieldErrors(form: AnyFormApi): boolean {
   return getFormZenoState(form).hideFieldErrors
 }
 
+// Whether the schema requires the field, whatever `requiredIndicator` says.
+function isFieldRequiredBySchema(form: AnyFormApi, name: string): boolean {
+  return getFormZenoState(form).requiredFields.has(toRequiredPathKey(name))
+}
+
 function isFieldRequired(form: AnyFormApi, name: string): boolean {
-  const state = getFormZenoState(form)
-  if (!state.requiredIndicator) {
-    return false
-  }
-  return state.requiredFields.has(toRequiredPathKey(name))
+  return (
+    getFormZenoState(form).requiredIndicator &&
+    isFieldRequiredBySchema(form, name)
+  )
 }
 
 export {
@@ -70,6 +74,7 @@ export {
   getFormHideFieldErrors,
   getFormValidationMode,
   isFieldRequired,
+  isFieldRequiredBySchema,
   setFormZenoState,
   type ValidationMode,
 }

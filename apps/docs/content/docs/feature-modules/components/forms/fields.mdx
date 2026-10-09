@@ -560,7 +560,7 @@ const FRAMEWORKS = ["Next.js", "Remix", "SvelteKit", "Nuxt.js", "Astro"]
 | `items` | `T[]` (`string` or `{ value, label }`) | Options shown in the dropdown. Filtered client-side unless `filter={null}`. |
 | `renderItem` | `(item: T) => ReactNode` | Override per-row rendering. |
 | `emptyMessage` | `ReactNode` | Shown when filtering produces zero matches. |
-| `showClear` | `boolean` | Show the clear button when a value is selected. Defaults to `true`. |
+| `showClear` | `boolean` | Show the clear button when a value is selected. Defaults to `true` on an optional field and `false` on a required one. |
 | `placeholder` | `string` | Input placeholder when the field is empty. |
 | `inputValue` | `string` | Controlled search text. Pair with `onInputValueChange`. |
 | `onInputValueChange` | `(value: string) => void` | Fires on every keystroke in the search input. |

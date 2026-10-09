@@ -6,6 +6,7 @@ import {
   getFormHideFieldErrors,
   getFormValidationMode,
   isFieldRequired,
+  isFieldRequiredBySchema,
   type ValidationMode,
 } from "./validation-modes"
 
@@ -106,4 +107,16 @@ function useIsFieldRequired(field: AnyFieldApi): boolean {
   return isFieldRequired(field.form, field.name)
 }
 
-export { useHideFieldErrors, useIsFieldRequired, useIsInvalid }
+// Returns whether the form's schema requires this field, even with
+// `requiredIndicator: false`. Drives what a required field does (no clear
+// button, `aria-required`), where `useIsFieldRequired` drives the `*`.
+function useIsFieldRequiredBySchema(field: AnyFieldApi): boolean {
+  return isFieldRequiredBySchema(field.form, field.name)
+}
+
+export {
+  useHideFieldErrors,
+  useIsFieldRequired,
+  useIsFieldRequiredBySchema,
+  useIsInvalid,
+}

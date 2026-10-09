@@ -320,6 +320,12 @@ that field as required. The indicator is on by default. Pass
 `requiredIndicator: false` to `useForm` to opt out form-wide, or override
 per field with the boolean `required` prop.
 
+Required-ness also shapes the control. A required field gets
+`aria-required`, a `ComboboxField` hides its clear button, and a
+`DatePickerField` keeps its date when the selected day is picked again.
+`requiredIndicator: false` hides only the `*`; the `required` prop sets all
+of it.
+
 <Preview>
   <RequiredIndicatorExample />
 

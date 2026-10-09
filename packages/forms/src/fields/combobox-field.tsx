@@ -5,6 +5,7 @@ import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
+  useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
 import { type ReactNode, useId } from "react"
@@ -43,13 +44,16 @@ type ComboboxFieldProps<T = string> = {
   /** Override per-row rendering. Default: plain `<ComboboxItem>{label}</ComboboxItem>`. */
   renderItem?: (item: T) => ReactNode
   /**
-   * If `true`, show the clear button when a value is selected. Defaults to
-   * `true` — pass `false` for required-style comboboxes where clearing is
-   * disallowed.
+   * Show the clear button when a value is selected. Defaults to `true` on an
+   * optional field and `false` on a required one (from the schema or
+   * `required`), where clearing could only make the form invalid.
    */
   showClear?: boolean
   className?: string
-  /** Force the required `*` indicator on or off. Defaults to schema-derived. */
+  /**
+   * Mark the field required, or not, over the schema. Drives the `*`,
+   * `aria-required` and the `showClear` default.
+   */
   required?: boolean
   /**
    * Controlled input text — pair with `onInputValueChange` for server-side
@@ -92,7 +96,7 @@ function ComboboxField<T = string>({
   placeholder,
   renderItem,
   required,
-  showClear = true,
+  showClear,
 }: ComboboxFieldProps<T>) {
   const field = useFieldContext()
   const id = useId()
@@ -103,6 +107,9 @@ function ComboboxField<T = string>({
   const showError = isInvalid && !hideErrors
   const schemaRequired = useIsFieldRequired(field)
   const isRequired = required ?? schemaRequired
+  const schemaRequiresValue = useIsFieldRequiredBySchema(field)
+  const requiresValue = required ?? schemaRequiresValue
+  const canClear = showClear ?? !requiresValue
 
   const fieldValue = field.state.value
   const hasObjectItems = items.some(isItemObject)
@@ -139,12 +146,13 @@ function ComboboxField<T = string>({
             [showError, errorId]
           )}
           aria-invalid={isInvalid || undefined}
+          aria-required={requiresValue || undefined}
           className={className}
           id={id}
           name={field.name}
           onBlur={field.handleBlur}
           placeholder={placeholder}
-          showClear={showClear && value !== null && value !== "" && !loading}
+          showClear={canClear && value !== null && value !== "" && !loading}
         >
           {loading && (
             <InputGroupAddon align="inline-end">

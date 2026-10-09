@@ -5,6 +5,7 @@ import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
+  useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
 import { Children, type ComponentProps, type ReactNode, useId } from "react"
@@ -26,8 +27,8 @@ type InputFieldProps = Omit<
   description?: ReactNode
   label?: ReactNode
   /**
-   * Force the required `*` indicator on or off for this field. When omitted,
-   * the value is derived from the form's schema.
+   * Mark the field required, or not, over the schema. Drives the `*` and
+   * `aria-required`.
    */
   required?: boolean
 }
@@ -49,6 +50,8 @@ function InputField({
   const hasAddons = Children.count(children) > 0
   const schemaRequired = useIsFieldRequired(field)
   const isRequired = required ?? schemaRequired
+  const schemaRequiresValue = useIsFieldRequiredBySchema(field)
+  const requiresValue = required ?? schemaRequiresValue
 
   const inputProps = {
     "aria-describedby": describedBy(
@@ -56,6 +59,7 @@ function InputField({
       [showError, errorId]
     ),
     "aria-invalid": isInvalid || undefined,
+    "aria-required": requiresValue || undefined,
     id,
     name: field.name,
     onBlur: field.handleBlur,

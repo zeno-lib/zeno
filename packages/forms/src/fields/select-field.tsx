@@ -5,6 +5,7 @@ import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
+  useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
 import type { ComponentProps, ReactNode } from "react"
@@ -31,7 +32,10 @@ type SelectFieldProps = Omit<
   description?: ReactNode
   label?: ReactNode
   placeholder?: string
-  /** Force the required `*` indicator on or off. Defaults to schema-derived. */
+  /**
+   * Mark the field required, or not, over the schema. Drives the `*` and
+   * `aria-required`.
+   */
   required?: boolean
   triggerClassName?: string
   triggerSize?: ComponentProps<typeof SelectTrigger>["size"]
@@ -56,6 +60,8 @@ function SelectField({
   const showError = isInvalid && !hideErrors
   const schemaRequired = useIsFieldRequired(field)
   const isRequired = required ?? schemaRequired
+  const schemaRequiresValue = useIsFieldRequiredBySchema(field)
+  const requiresValue = required ?? schemaRequiresValue
 
   const items = useMemo(() => {
     const map: Record<string, ReactNode> = {}
@@ -91,6 +97,7 @@ function SelectField({
             [showError, errorId]
           )}
           aria-invalid={isInvalid || undefined}
+          aria-required={requiresValue || undefined}
           className={triggerClassName}
           id={id}
           onBlur={field.handleBlur}

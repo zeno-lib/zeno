@@ -5,6 +5,7 @@ import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
+  useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
 import { type ComponentProps, type ReactNode, useId } from "react"
@@ -35,8 +36,14 @@ type DatePickerFieldProps = {
   formatValue?: (date: Date) => string
   triggerClassName?: string
   /** Pass-through to the underlying `<Calendar>` (e.g. `disabled`, `locale`). */
-  calendarProps?: Omit<CalendarProps, "mode" | "onSelect" | "selected">
-  /** Force the required `*` indicator on or off. Defaults to schema-derived. */
+  calendarProps?: Omit<
+    CalendarProps,
+    "mode" | "onSelect" | "required" | "selected"
+  >
+  /**
+   * Mark the field required, or not, over the schema. A required date shows
+   * the `*`, and picking its selected day again keeps it instead of clearing.
+   */
   required?: boolean
 }
 
@@ -68,6 +75,8 @@ function DatePickerField({
   const showError = isInvalid && !hideErrors
   const schemaRequired = useIsFieldRequired(field)
   const isRequired = required ?? schemaRequired
+  const schemaRequiresValue = useIsFieldRequiredBySchema(field)
+  const requiresValue = required ?? schemaRequiresValue
 
   const { value } = field.state
   const empty = !value
@@ -105,7 +114,8 @@ function DatePickerField({
         <PopoverContent className="w-auto p-0">
           <Calendar
             mode="single"
-            onSelect={(next) => field.handleChange(next)}
+            onSelect={(next: Date | undefined) => field.handleChange(next)}
+            required={requiresValue}
             selected={value}
             {...calendarProps}
           />
