@@ -39,7 +39,7 @@ function RadioGroupField({
   required,
   ...props
 }: RadioGroupFieldProps) {
-  const field = useFieldContext<string>()
+  const field = useFieldContext()
   const id = useId()
   const errorId = `${id}-error`
   const descriptionId = `${id}-description`
@@ -67,8 +67,8 @@ function RadioGroupField({
         aria-invalid={isInvalid || undefined}
         aria-required={requiresValue || undefined}
         name={field.name}
-        onValueChange={(value) => field.handleChange(String(value))}
-        value={field.state.value ?? ""}
+        onValueChange={(value) => field.handleChange(value)}
+        value={field.state.value ?? null}
         {...props}
       >
         {children}

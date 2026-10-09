@@ -10,7 +10,7 @@ import userEvent from "@zeno-lib/test/user-event"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
 import { SelectItem } from "@/components/ui/select"
-import { Form, FormProvider, useForm } from "./create-form"
+import { Form, FormProvider, RadioGroupFieldItem, useForm } from "./create-form"
 
 const CONTACT_EMAIL_LABEL = /Contact email/
 const PASSWORD_LABEL = /Password/
@@ -388,5 +388,40 @@ describe("popup fields", () => {
     expect(screen.queryByText(PICK_A_DAY)).toBeNull()
     await user.keyboard("{Escape}")
     expect(await screen.findByText(PICK_A_DAY)).toBeTruthy()
+  })
+})
+
+describe("RadioGroupField", () => {
+  test("stores each item's value as is", async () => {
+    const user = userEvent.setup()
+    const captured: { consent?: unknown } = {}
+    function H() {
+      const form = useForm({
+        defaultValues: { consent: undefined as boolean | undefined },
+        onSubmit: vi.fn(),
+      })
+      const { RadioGroupField, Subscribe } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <RadioGroupField label="Consent" name="consent">
+              <RadioGroupFieldItem value={true}>Yes</RadioGroupFieldItem>
+              <RadioGroupFieldItem value={false}>No</RadioGroupFieldItem>
+            </RadioGroupField>
+            <Subscribe selector={(state) => state.values.consent}>
+              {(consent) => {
+                captured.consent = consent
+                return null
+              }}
+            </Subscribe>
+          </Form>
+        </FormProvider>
+      )
+    }
+    render(<H />)
+    await user.click(screen.getByRole("radio", { name: "No" }))
+    expect(captured.consent).toBe(false)
+    await user.click(screen.getByRole("radio", { name: "Yes" }))
+    expect(captured.consent).toBe(true)
   })
 })

@@ -468,6 +468,9 @@ import { RadioGroupFieldItem } from "@zeno-lib/forms/create-form"
 
 </Preview>
 
+Each item's `value` is stored as is, so `value={true}` or `value={2}` gives a
+boolean or a number, not a string. Nothing picked is `undefined`.
+
 ## Slider field
 
 `SliderField` wraps `@zeno-lib/ui/slider`. The form value is a `number` for a
