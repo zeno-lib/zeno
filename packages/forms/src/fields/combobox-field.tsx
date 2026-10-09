@@ -49,6 +49,7 @@ type ComboboxFieldProps<T = string> = {
    * `required`), where clearing could only make the form invalid.
    */
   showClear?: boolean
+  disabled?: boolean
   className?: string
   /**
    * Mark the field required, or not, over the schema. Drives the `*`,
@@ -86,6 +87,7 @@ function isItemObject(item: unknown): item is ComboboxItemObject<unknown> {
 function ComboboxField<T = string>({
   className,
   description,
+  disabled,
   emptyMessage = "No results.",
   filter,
   inputValue,
@@ -127,6 +129,7 @@ function ComboboxField<T = string>({
         </FieldLabel>
       )}
       <Combobox
+        disabled={disabled}
         filter={filter}
         inputValue={inputValue}
         items={items}
@@ -148,6 +151,7 @@ function ComboboxField<T = string>({
           aria-invalid={isInvalid || undefined}
           aria-required={requiresValue || undefined}
           className={className}
+          disabled={disabled}
           id={id}
           name={field.name}
           onBlur={field.handleBlur}

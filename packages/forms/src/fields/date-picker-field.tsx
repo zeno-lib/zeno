@@ -40,6 +40,7 @@ type DatePickerFieldProps = {
     CalendarProps,
     "mode" | "onSelect" | "required" | "selected"
   >
+  disabled?: boolean
   /**
    * Mark the field required, or not, over the schema. A required date shows
    * the `*`, and picking its selected day again keeps it instead of clearing.
@@ -60,6 +61,7 @@ function defaultFormat(date: Date): string {
 function DatePickerField({
   calendarProps,
   description,
+  disabled,
   formatValue = defaultFormat,
   label,
   placeholder = FALLBACK_PLACEHOLDER,
@@ -102,6 +104,7 @@ function DatePickerField({
             triggerClassName
           )}
           data-empty={empty || undefined}
+          disabled={disabled}
           id={id}
           // Base UI's Popover handles open state — we still need blur on the
           // form's reactive store. Passing onBlur here mirrors how `<select>`

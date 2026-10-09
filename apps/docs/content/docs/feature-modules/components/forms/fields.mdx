@@ -514,7 +514,7 @@ string regex), or pass `children` to insert a separator between groups.
 The form value is `Date | undefined`. By default the trigger formats the
 selected date with `toLocaleDateString`. Pass `formatValue` to override it, or
 `calendarProps` to forward options (`disabled`, `locale`, …) to the
-underlying `<Calendar>`.
+underlying `<Calendar>`. `disabled` on the field itself disables the trigger.
 
 <Preview>
   <DatePickerFieldPreview />
@@ -566,6 +566,7 @@ const FRAMEWORKS = ["Next.js", "Remix", "SvelteKit", "Nuxt.js", "Astro"]
 | `onInputValueChange` | `(value: string) => void` | Fires on every keystroke in the search input. |
 | `filter` | `((item, query) => boolean) \| null` | Replace the built-in filter, or `null` for server-driven search. |
 | `loading` | `boolean` | Show a spinner inside the input while options load. |
+| `disabled` | `boolean` | Disable the input and its buttons. |
 
 For server-driven search with debouncing, see
 [Async-search combobox](/docs/feature-modules/components/forms/examples#async-search-combobox).
