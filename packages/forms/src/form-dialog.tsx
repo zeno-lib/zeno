@@ -1,7 +1,10 @@
 "use client"
 
 import { FormProvider } from "@zeno-lib/forms"
-import { focusFirstInvalid } from "@zeno-lib/forms/lib/focus-first-invalid"
+import {
+  findFirstInvalid,
+  focusFirstInvalid,
+} from "@zeno-lib/forms/lib/focus-first-invalid"
 import {
   type FormDialogController,
   findFieldElement,
@@ -11,6 +14,7 @@ import { useUnsavedChangesWarning } from "@zeno-lib/forms/lib/use-unsaved-change
 import { type AnyFormApi, useSelector } from "@zeno-lib/forms/tanstack"
 import {
   type FormEvent,
+  type KeyboardEvent,
   type ReactElement,
   type ReactNode,
   useId,
@@ -45,6 +49,8 @@ type DiscardPromptText = {
   description?: ReactNode
   confirmLabel?: ReactNode
   cancelLabel?: ReactNode
+  /** The Save action's label (`saveFromPrompt`). Defaults to `submitLabel`. */
+  saveLabel?: ReactNode
 }
 
 // The slice of the `useForm()` API the dialog uses. Structural, so any Zeno /
@@ -94,6 +100,16 @@ type FormDialogProps<TValues> = {
   guard?: boolean
   /** Copy for the discard prompt. */
   discardPrompt?: DiscardPromptText
+  /**
+   * Offer Save in the discard prompt, next to Discard: it submits, and closes
+   * the dialog if the submit succeeds. Defaults to `false`.
+   */
+  saveFromPrompt?: boolean
+  /**
+   * Disable Save, ⌘/Ctrl+Enter, and the native controls in the form (through
+   * a `<fieldset disabled>`). Defaults to `false`.
+   */
+  disabled?: boolean
   /** Class for the dialog popup (e.g. a wider `sm:max-w-lg`). */
   className?: string
   /** Class for the `<form>` element. */
@@ -103,9 +119,10 @@ type FormDialogProps<TValues> = {
 /**
  * A dialog-hosted form: opens with fresh values and fields per session,
  * submits from a footer button outside the `<form>` (via `form="id"`), shows a
- * spinner while submitting, focuses the first invalid field when the submit
- * fails, closes on success, and asks before discarding unsaved changes
- * (Cancel, ×, Escape, outside press) or leaving the page.
+ * spinner while submitting, also submits on ⌘/Ctrl+Enter, focuses the first
+ * invalid field when the submit fails, closes on success, and asks before
+ * discarding unsaved changes (Cancel, ×, Escape, outside press) or leaving the
+ * page.
  */
 function FormDialog<TValues>({
   cancelLabel = "Cancel",
@@ -114,25 +131,44 @@ function FormDialog<TValues>({
   closeOnSubmit = true,
   description,
   dialog,
+  disabled = false,
   discardPrompt,
   footer,
   form,
   formClassName,
   guard = true,
+  saveFromPrompt = false,
   submitLabel = "Save",
   title,
   trigger,
 }: FormDialogProps<TValues>) {
   const formId = useId()
   const popupRef = useRef<HTMLDivElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  // Set when a Save from the discard prompt fails, so the prompt hands focus
+  // to the first invalid field as it closes.
+  const focusInvalidOnPromptClose = useRef<boolean>(false)
   const { close, defaultValues, focus, isOpen, open, session } = dialog
 
   // `isDefaultValue`, not `isDirty`: `isDirty` stays true after the user
   // reverts an edit, `isDefaultValue` compares the values themselves.
   const hasChanges = useSelector(form.store, (state) => !state.isDefaultValue)
   const isSubmitting = useSelector(form.store, (state) => state.isSubmitting)
-  const { cancelLeave, confirmLeave, isConfirming, requestLeave } =
-    useLeaveGuard({ hasUnsavedChanges: guard && hasChanges })
+  const {
+    cancelLeave,
+    confirmLeave,
+    isConfirming,
+    isSaving,
+    requestLeave,
+    saveAndLeave,
+  } = useLeaveGuard({
+    hasUnsavedChanges: guard && hasChanges,
+    onSave: async () => {
+      const saved = await submit()
+      focusInvalidOnPromptClose.current = !saved
+      return saved
+    },
+  })
   useUnsavedChangesWarning(
     form as unknown as AnyFormApi,
     guard && isOpen ? "if-changed" : false
@@ -147,22 +183,46 @@ function FormDialog<TValues>({
     }
   }, [session])
 
+  // Resolves whether the form saved. A submit handler that throws leaves
+  // `isSubmitSuccessful` false, so the dialog stays open.
+  async function submit(): Promise<boolean> {
+    await Promise.resolve(form.handleSubmit()).catch(() => undefined)
+    const { isSubmitSuccessful, isValid } = form.state
+    return isValid && isSubmitSuccessful
+  }
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     event.stopPropagation()
     const node = event.currentTarget
-    // A submit handler that throws leaves `isSubmitSuccessful` false, so the
-    // dialog stays open.
-    await Promise.resolve(form.handleSubmit()).catch(() => undefined)
-    const { isSubmitSuccessful, isValid } = form.state
-    if (!isValid) {
+    const saved = await submit()
+    if (!form.state.isValid) {
       // A schema error, or a field error the server returned (`submitAction`).
       focusFirstInvalid(node)
-    } else if (closeOnSubmit && isSubmitSuccessful) {
+    } else if (saved && closeOnSubmit) {
       // Close directly, past the guard: the changes are saved. The form is
       // reset once the exit animation completes (see `onOpenChangeComplete`).
       close()
     }
+  }
+
+  // ⌘/Ctrl+Enter submits from anywhere in the popup, a textarea included
+  // (plain Enter there inserts a line break). The discard prompt is outside
+  // the popup, so its keys never get here.
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (
+      event.key !== "Enter" ||
+      !(event.metaKey || event.ctrlKey) ||
+      event.repeat ||
+      event.nativeEvent.isComposing ||
+      disabled ||
+      isSubmitting ||
+      isConfirming
+    ) {
+      return
+    }
+    event.preventDefault()
+    formRef.current?.requestSubmit()
   }
 
   return (
@@ -187,11 +247,14 @@ function FormDialog<TValues>({
       <DialogContent
         className={className}
         initialFocus={() => {
-          const target = focus
-            ? findFieldElement(popupRef.current, focus)
-            : null
+          // A disabled control can't take focus.
+          const target =
+            focus && !disabled
+              ? findFieldElement(popupRef.current, focus)
+              : null
           return target ?? true
         }}
+        onKeyDown={handleKeyDown}
         ref={popupRef}
       >
         <DialogHeader>
@@ -199,26 +262,36 @@ function FormDialog<TValues>({
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
         <FormProvider form={form}>
-          {/* Keyed on the session so every open mounts fresh fields. The
-              popup stays mounted through its exit animation, so reopening
-              before it ends would keep each field's local state (and any
-              custom child's) from the previous session. */}
-          <form
-            className={formClassName}
-            id={formId}
-            key={session}
-            noValidate
-            onSubmit={handleSubmit}
-          >
-            {children}
-          </form>
+          {/* Around the <form>, not inside it, so `formClassName` child
+              selectors (`space-y-4`) still reach the fields. `min-w-0` is
+              for a browser that ignores `contents` on a fieldset. */}
+          <fieldset className="contents min-w-0" disabled={disabled}>
+            {/* Keyed on the session so every open mounts fresh fields. The
+                popup stays mounted through its exit animation, so reopening
+                before it ends would keep each field's local state (and any
+                custom child's) from the previous session. */}
+            <form
+              className={formClassName}
+              id={formId}
+              key={session}
+              noValidate
+              onSubmit={handleSubmit}
+              ref={formRef}
+            >
+              {children}
+            </form>
+          </fieldset>
         </FormProvider>
         <DialogFooter>
           {footer}
           <DialogClose render={<Button type="button" variant="outline" />}>
             {cancelLabel}
           </DialogClose>
-          <Button disabled={isSubmitting} form={formId} type="submit">
+          <Button
+            disabled={disabled || isSubmitting}
+            form={formId}
+            type="submit"
+          >
             {isSubmitting && <Spinner />}
             {submitLabel}
           </Button>
@@ -228,29 +301,54 @@ function FormDialog<TValues>({
           popup (so it can finish its own exit animation). */}
       <AlertDialog
         onOpenChange={(next) => {
-          if (!next) {
+          // Stay open while a Save from the prompt is in flight.
+          if (!(next || isSaving)) {
             cancelLeave()
           }
         }}
         open={isConfirming}
       >
-        <AlertDialogContent size="sm">
+        <AlertDialogContent
+          // The prompt traps focus while open, so a failed Save's invalid
+          // field gets focus as the prompt closes, not from `submit`.
+          finalFocus={() => {
+            if (!focusInvalidOnPromptClose.current) {
+              return true
+            }
+            focusInvalidOnPromptClose.current = false
+            return findFirstInvalid(formRef.current) ?? true
+          }}
+          size={saveFromPrompt ? "default" : "sm"}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {discardPrompt?.title ?? "Discard changes?"}
+              {discardPrompt?.title ??
+                (saveFromPrompt ? "Save changes?" : "Discard changes?")}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {discardPrompt?.description ??
-                "Your unsaved changes will be lost."}
+                (saveFromPrompt
+                  ? "Your unsaved changes will be lost unless you save them."
+                  : "Your unsaved changes will be lost.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>
+            <AlertDialogCancel disabled={isSaving}>
               {discardPrompt?.cancelLabel ?? "Keep editing"}
             </AlertDialogCancel>
-            <AlertDialogAction onClick={confirmLeave} variant="destructive">
+            <AlertDialogAction
+              disabled={isSaving}
+              onClick={confirmLeave}
+              variant="destructive"
+            >
               {discardPrompt?.confirmLabel ?? "Discard"}
             </AlertDialogAction>
+            {saveFromPrompt && (
+              <AlertDialogAction disabled={isSaving} onClick={saveAndLeave}>
+                {isSaving && <Spinner />}
+                {discardPrompt?.saveLabel ?? submitLabel}
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

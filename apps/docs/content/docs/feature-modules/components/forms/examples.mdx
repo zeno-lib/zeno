@@ -194,6 +194,9 @@ details the hand-rolled version above leaves out:
   "Changed" means the values differ from the session's defaults
   (`!form.state.isDefaultValue`), so reverting an edit by hand counts as
   unchanged. The form resets once the close animation ends.
+  With `saveFromPrompt`, the prompt also offers Save: it submits, and the
+  dialog closes if the submit succeeds. If it fails, the prompt closes, the
+  dialog stays open, and focus moves to the first invalid field.
 - **Footer submit**: the Save button sits outside the `<form>` (it targets
   it with `form="id"`), shows a spinner while submitting, and the dialog
   closes when the submit succeeds (`closeOnSubmit`, default `true`). A
@@ -203,6 +206,14 @@ details the hand-rolled version above leaves out:
   as [`<Form>` does](/docs/feature-modules/components/forms#focus-on-submit).
   That includes a field error a server action returns through
   [`submitAction`](/docs/feature-modules/components/forms/examples#server-actions).
+  ⌘/Ctrl+Enter submits from anywhere in the dialog, a textarea included,
+  where a plain Enter still inserts a line break.
+- **`disabled`**: turns off Save and ⌘/Ctrl+Enter, and wraps the `<form>` in
+  a `<fieldset disabled>`, which disables the native controls: inputs,
+  textareas, and the select, combobox and date picker buttons. The
+  checkbox, checkbox group, switch, radio and slider fields draw their own
+  controls, which a fieldset doesn't reach, so pass `disabled` to those
+  fields too.
 
 ```bash
 pnpm dlx shadcn@latest add zeno-lib/zeno/form-dialog
@@ -268,14 +279,19 @@ export function Members({ members }: { members: Member[] }) {
 | `footer` | `ReactNode` | Extra footer content, before the buttons. |
 | `closeOnSubmit` | `boolean` | Close after a successful submit. Defaults to `true`. |
 | `guard` | `boolean` | The unsaved-changes prompt and unload warning. Defaults to `true`. |
-| `discardPrompt` | `{ title?, description?, confirmLabel?, cancelLabel? }` | Copy for the discard prompt. |
+| `discardPrompt` | `{ title?, description?, confirmLabel?, cancelLabel?, saveLabel? }` | Copy for the discard prompt. `saveLabel` defaults to `submitLabel`. |
+| `saveFromPrompt` | `boolean` | Offer Save in the discard prompt. Defaults to `false`. |
+| `disabled` | `boolean` | Turn off Save, ⌘/Ctrl+Enter and the native controls. Defaults to `false`. |
 | `className` / `formClassName` | `string` | Classes for the popup / the `<form>`. |
 
 `useFormDialog({ defaultValues? })` returns `{ isOpen, open, close,
 defaultValues, focus, session }`. `close()` skips the guard (use it after
 an out-of-band save). The same package exports `useLeaveGuard` for your
 own editors: `requestLeave(proceed)` runs `proceed` right away when there's
-nothing to lose, or holds it until `confirmLeave()` / `cancelLeave()`.
+nothing to lose, or holds it until `confirmLeave()` / `cancelLeave()`. Pass
+`onSave` (resolving whether it saved) to offer Save as well:
+`saveAndLeave()` runs it, then the held leave if it saved, and `isSaving` is
+`true` meanwhile. Either way the confirm UI closes.
 
 > **Pitfall: let the dialog own `defaultValues`.** TanStack Form ignores new
 > `defaultValues` once a form is touched, and a `form.reset(values)` is

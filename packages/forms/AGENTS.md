@@ -37,7 +37,8 @@ A typed layer over [TanStack Form](https://tanstack.com/form) and Zod. The user 
 - **Submit-invalid focus is `focusFirstInvalid`** (`lib/focus-first-invalid.ts`), which `<Form>`
   and `FormDialog` call right after `await form.handleSubmit()`. It relies on
   `useSyncExternalStore` flushing `aria-invalid`, `submitAction`'s field errors included, before
-  that continuation. Don't add a timer.
+  that continuation. Don't add a timer. A Save from `FormDialog`'s leave prompt is the exception:
+  the open prompt traps focus, so its `finalFocus` returns `findFirstInvalid` instead.
 - **What a required field does follows `useIsFieldRequiredBySchema`; only the `*` follows
   `useIsFieldRequired`**, and the field's `required` prop overrides both. `useIsFieldRequired`
   is `false` under `requiredIndicator: false`, so using it for `aria-required` or the clear
