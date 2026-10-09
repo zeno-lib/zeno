@@ -41,6 +41,9 @@ A typed layer over [TanStack Form](https://tanstack.com/form) and Zod. The user 
   `useIsFieldRequired`**, and the field's `required` prop overrides both. `useIsFieldRequired`
   is `false` under `requiredIndicator: false`, so using it for `aria-required` or the clear
   button would drop them along with the `*`.
+- **A field that can be emptied stores `getEmptyValue(field, fallback)`**
+  (`lib/empty-value.ts`), never a hard-coded `undefined` or `null`. The schema
+  decides it, as it decides the `*`.
 - **Field names use TanStack's syntax** (`members[0].name`). Required paths are stored with indices
   normalised to `[0]`, so one entry covers every array row.
 - **Type tests (`*.test-d.ts`) pin the field DX.** Update them with any factory type change.

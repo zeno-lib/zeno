@@ -1,6 +1,7 @@
 "use client"
 
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { getEmptyValue } from "@zeno-lib/forms/lib/empty-value"
 import type { ChangeEvent } from "react"
 import { InputField, type InputFieldProps } from "./input-field"
 
@@ -20,7 +21,9 @@ function NumberField({ inputMode = "decimal", ...props }: NumberFieldProps) {
       inputMode={inputMode}
       onChange={(event: ChangeEvent<HTMLInputElement>) => {
         const next = event.target.valueAsNumber
-        field.handleChange(Number.isNaN(next) ? undefined : next)
+        field.handleChange(
+          Number.isNaN(next) ? getEmptyValue(field, undefined) : next
+        )
       }}
       type="number"
       value={inputValue}

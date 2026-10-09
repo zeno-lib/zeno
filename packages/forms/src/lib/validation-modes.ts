@@ -2,7 +2,7 @@
 
 import type { AnyFormApi } from "@tanstack/react-form"
 
-import { toRequiredPathKey } from "./schema-required"
+import { type StandardSchemaLike, toRequiredPathKey } from "./schema-required"
 
 type ValidationMode = "change" | "blur" | "submit" | "blur-then-change"
 
@@ -13,6 +13,7 @@ type ZenoFormState = {
   hideFieldErrors: boolean
   requiredIndicator: boolean
   requiredFields: ReadonlySet<string>
+  schema: StandardSchemaLike | undefined
 }
 
 const EMPTY_REQUIRED_FIELDS: ReadonlySet<string> = new Set<string>()
@@ -21,6 +22,7 @@ const DEFAULT_FORM_STATE: ZenoFormState = {
   hideFieldErrors: false,
   requiredFields: EMPTY_REQUIRED_FIELDS,
   requiredIndicator: true,
+  schema: undefined,
   validation: DEFAULT_VALIDATION_MODE,
 }
 
@@ -58,6 +60,10 @@ function getFormHideFieldErrors(form: AnyFormApi): boolean {
 }
 
 // Whether the schema requires the field, whatever `requiredIndicator` says.
+function getFormSchema(form: AnyFormApi): StandardSchemaLike | undefined {
+  return getFormZenoState(form).schema
+}
+
 function isFieldRequiredBySchema(form: AnyFormApi, name: string): boolean {
   return getFormZenoState(form).requiredFields.has(toRequiredPathKey(name))
 }
@@ -72,6 +78,7 @@ function isFieldRequired(form: AnyFormApi, name: string): boolean {
 export {
   DEFAULT_VALIDATION_MODE,
   getFormHideFieldErrors,
+  getFormSchema,
   getFormValidationMode,
   isFieldRequired,
   isFieldRequiredBySchema,

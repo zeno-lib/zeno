@@ -139,7 +139,9 @@ a signup form. It defaults `label` to `"Password"`; `name` is required.
 
 ## Number field
 
-`NumberField` stores the input as a `number` (or `undefined` when empty), so
+`NumberField` stores the input as a `number` (its
+[empty value](/docs/feature-modules/components/forms/validation#empty-values)
+when emptied), so
 you never convert the input's string yourself. It sets `inputMode="decimal"`,
 so phone keypads keep the decimal key; pass `inputMode="numeric"` for whole
 numbers.
@@ -157,7 +159,9 @@ numbers.
 
 `MoneyField` is a text input that shows the currency as an addon. It
 re-inserts the locale's thousands separators as the user types and keeps the
-caret in place. The form value is `number | null` (`null` when empty). The
+caret in place. The form value is a `number`, or the field's
+[empty value](/docs/feature-modules/components/forms/validation#empty-values)
+when emptied (`null` when the schema allows nothing else). The
 field also accepts pasted amounts in other locales' formats: `CHF 1'234.50`,
 `1.234,50 €` and `1,234.50` all become `1234.5`, whatever the input's locale.
 On blur, the field pads a non-integer amount to the currency's minor units

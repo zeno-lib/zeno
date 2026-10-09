@@ -58,6 +58,22 @@ describe("getRequiredPaths", () => {
     expect(required.has("members[0].name")).toBe(true)
   })
 
+  test("a field that accepts null is not required", () => {
+    const schema = z.object({
+      count: z.number(),
+      day: z.date().nullable(),
+      kind: z.enum(["a", "b"]).nullable(),
+      ownerId: z.uuid().nullable(),
+      total: z.number().nullable(),
+    })
+    const required = getRequiredPaths(schema)
+    expect(required.has("count")).toBe(true)
+    expect(required.has("day")).toBe(false)
+    expect(required.has("kind")).toBe(false)
+    expect(required.has("ownerId")).toBe(false)
+    expect(required.has("total")).toBe(false)
+  })
+
   test("nested z.object reports the parent and its required children", () => {
     const schema = z.object({
       profile: z.object({

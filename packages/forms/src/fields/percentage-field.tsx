@@ -1,6 +1,7 @@
 "use client"
 
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { getEmptyValue } from "@zeno-lib/forms/lib/empty-value"
 import { useFormattedNumber } from "@zeno-lib/forms/lib/use-formatted-number"
 import { InputGroupAddon, InputGroupText } from "@/components/ui/input-group"
 import { InputField, type InputFieldProps } from "./input-field"
@@ -54,7 +55,8 @@ function PercentageField({
     maximumFractionDigits: fractionDigits,
     min,
     onBlur: field.handleBlur,
-    onValueChange: (next) => field.handleChange(next),
+    onValueChange: (next) =>
+      field.handleChange(next ?? getEmptyValue(field, null)),
     value: field.state.value,
     ...(isFraction ? { fromDisplay: fromPercent, toDisplay: toPercent } : {}),
   })

@@ -1,6 +1,7 @@
 "use client"
 
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { getEmptyValue } from "@zeno-lib/forms/lib/empty-value"
 import { useFormattedNumber } from "@zeno-lib/forms/lib/use-formatted-number"
 import { type ReactNode, useMemo } from "react"
 import { InputGroupAddon, InputGroupText } from "@/components/ui/input-group"
@@ -95,7 +96,8 @@ function MoneyField({
     maximumFractionDigits: digits,
     min,
     onBlur: field.handleBlur,
-    onValueChange: (next) => field.handleChange(next),
+    onValueChange: (next) =>
+      field.handleChange(next ?? getEmptyValue(field, null)),
     padFraction: true,
     value: field.state.value,
   })
