@@ -372,9 +372,10 @@ export function SignUp() {
 
 </Preview>
 
-Fields wrapped in `.optional()`, `.nullable()`, or `.default(...)` get no
-`*`, and neither does a bare `z.string()` or `z.array()`, which accepts the
-`""` or `[]` the form starts it at. Everything else gets one. Detection also covers required children of
+A field gets no `*` when its schema accepts an
+[empty value](#empty-values): `null` (`.nullable()`), `undefined`
+(`.optional()`, `.default(...)`), or the `""` or `[]` a bare `z.string()` or
+`z.array()` starts at. Everything else gets one. Detection also covers required children of
 nested objects and array rows: `members[0].name`, `members[3].name`, … all
 get the `*` when the row schema requires `name`. Detection skips async
 schemas, so pass `required` on the field to set it explicitly:
@@ -386,6 +387,28 @@ schemas, so pass `required` on the field to set it explicitly:
 {/* Force off, even if schema marks it required */}
 <InputField label="Notes" name="notes" required={false} />
 ```
+
+## Empty values
+
+A field's empty value is the first one its schema accepts of `null`,
+`undefined`, and the type's own empty value (`""` for a string, `[]` for an
+array):
+
+| Schema | Empty value |
+|---|---|
+| `z.string()` | `""` |
+| `z.string().optional()` | `undefined` |
+| `z.uuid().nullable()`, `z.number().nullable()` | `null` |
+| `z.array(z.string())` | `[]` |
+| `z.string().min(1)`, `z.number()` | none, so the field is required |
+
+Clearing a field (the combobox clear button, an emptied number, money,
+percentage or year input, an unpicked date) stores its empty value, so the
+form stays valid. A field also starts at it when the schema rejects `""` or
+`[]` (`z.email().optional()` starts at `undefined`, `z.uuid().nullable()` at
+`null`), so an untouched optional field passes. Text inputs keep `""`, which
+the user typed. A custom field reads the value with `getEmptyValue(field,
+fallback)` from `@zeno-lib/forms/lib/empty-value`.
 
 ## Where the error message lives
 

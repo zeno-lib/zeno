@@ -2,6 +2,7 @@
 
 import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { getEmptyValue } from "@zeno-lib/forms/lib/empty-value"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
@@ -140,7 +141,7 @@ function ComboboxField<T = string>({
         onInputValueChange={onInputValueChange}
         onValueChange={(next) => {
           if (next === null) {
-            field.handleChange(undefined)
+            field.handleChange(getEmptyValue(field, undefined))
             return
           }
           field.handleChange(isItemObject(next) ? next.value : next)

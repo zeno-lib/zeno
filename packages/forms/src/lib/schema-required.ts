@@ -15,10 +15,11 @@
 // `members[0].name` in the set matches every row's `members[3].name` via
 // `toRequiredPathKey`.
 //
-// A missing string or array is first probed as `""` or `[]`, the value the
-// form starts it at (`extractZodDefaults`). A field that accepts that value (a
-// bare `z.string()` or `z.array()`) can't fail while untouched, so it leaves
-// the set; one that rejects it (`.min(1)`, `z.email()`) stays.
+// A missing field is then probed with an empty value: `""` for a string, then
+// `null`; `[]` for an array; `null` for anything else. A field that accepts one
+// (a bare `z.string()` or `z.array()`, anything `.nullable()`) leaves the set,
+// matching `lib/empty-value.ts`; one that rejects them all (`.min(1)`,
+// `z.email()`, a bare `z.number()`) stays.
 //
 // Paths use TanStack Form's field-name syntax: dots for object keys, brackets
 // for array indices (`members[0].name`, not `members.0.name`).
@@ -95,10 +96,7 @@ function toRequiredPathKey(name: string): string {
 }
 
 function probeValue(expected: unknown): unknown {
-  if (typeof expected !== "string") {
-    return
-  }
-  switch (expected.toLowerCase()) {
+  switch (typeof expected === "string" ? expected.toLowerCase() : undefined) {
     case "object":
       return {}
     case "array":
@@ -106,15 +104,17 @@ function probeValue(expected: unknown): unknown {
     case "string":
       return ""
     default:
-      return
+      return null
   }
 }
 
-// Write `value` at `keys` inside `root`, only where nothing is set yet.
+// Write `value` at `keys` inside `root`, only where nothing is set yet unless
+// `replace` is set.
 function fillAt(
   root: Record<PropertyKey, unknown>,
   keys: readonly PropertyKey[],
-  value: unknown
+  value: unknown,
+  replace = false
 ): boolean {
   let node: Record<PropertyKey, unknown> = root
   for (const key of keys.slice(0, -1)) {
@@ -125,7 +125,7 @@ function fillAt(
     node = next as Record<PropertyKey, unknown>
   }
   const last = keys.at(-1) as PropertyKey
-  if (node[last] !== undefined) {
+  if (!replace && node[last] !== undefined) {
     return false
   }
   node[last] = value
@@ -149,6 +149,7 @@ function validateSync(
 }
 
 type ProbeFill = {
+  readonly keys: readonly PropertyKey[]
   readonly path: string
   readonly value: unknown
 }
@@ -180,18 +181,52 @@ function recordPass(
     }
     const value = probeValue(issue.expected)
     if (value !== undefined && fillAt(probe, keys, value)) {
-      filled.push({ path, value })
+      filled.push({ keys, path, value })
     }
   }
   return { failing, filled }
+}
+
+function isEmptyProbe(value: unknown): boolean {
+  return value === "" || value === null || Array.isArray(value)
+}
+
+// Settle what the previous pass filled with an empty value: a path that now
+// passes leaves the required set. A string that rejects `""` gets `null` next,
+// and an array checked empty gets one missing row, so the row is probed.
+function settleEmptied(
+  emptied: readonly ProbeFill[],
+  failing: ReadonlySet<string>,
+  probe: Record<PropertyKey, unknown>,
+  required: Set<string>,
+  cleared: Set<string>
+): { readonly next: ProbeFill[]; readonly descended: boolean } {
+  const next: ProbeFill[] = []
+  let descended = false
+  for (const fill of emptied) {
+    const passed = !failing.has(fill.path)
+    if (passed) {
+      required.delete(fill.path)
+      cleared.add(fill.path)
+    }
+    if (Array.isArray(fill.value)) {
+      fill.value.push(undefined)
+      descended = true
+    } else if (!passed && fill.value === "") {
+      fillAt(probe, fill.keys, null, true)
+      next.push({ ...fill, value: null })
+      descended = true
+    }
+  }
+  return { descended, next }
 }
 
 function getRequiredPaths(schema: StandardSchemaLike): Set<string> {
   const required = new Set<string>()
   const cleared = new Set<string>()
   const probe: Record<PropertyKey, unknown> = {}
-  // What the previous pass filled with an empty value (`""` or `[]`): each
-  // stays required only if it still fails.
+  // What the previous pass filled with an empty value: each stays required
+  // only if it still fails.
   let emptied: readonly ProbeFill[] = []
   for (let depth = 0; depth < MAX_PROBE_DEPTH; depth += 1) {
     const issues = validateSync(schema, probe)
@@ -199,20 +234,12 @@ function getRequiredPaths(schema: StandardSchemaLike): Set<string> {
       return required
     }
     const { failing, filled } = recordPass(issues, probe, required, cleared)
-    let descended = filled.length > 0
-    for (const { path, value } of emptied) {
-      if (!failing.has(path)) {
-        required.delete(path)
-        cleared.add(path)
-      }
-      // The array was checked empty; give it one missing row to probe next.
-      if (Array.isArray(value)) {
-        value.push(undefined)
-        descended = true
-      }
-    }
-    emptied = filled.filter(({ value }) => value === "" || Array.isArray(value))
-    if (!descended) {
+    const settled = settleEmptied(emptied, failing, probe, required, cleared)
+    emptied = [
+      ...filled.filter(({ value }) => isEmptyProbe(value)),
+      ...settled.next,
+    ]
+    if (filled.length === 0 && !settled.descended) {
       break
     }
   }
@@ -220,4 +247,4 @@ function getRequiredPaths(schema: StandardSchemaLike): Set<string> {
 }
 
 export type { StandardSchemaLike }
-export { getRequiredPaths, toRequiredPathKey }
+export { getRequiredPaths, toRequiredPathKey, validateSync }

@@ -425,3 +425,52 @@ describe("RadioGroupField", () => {
     expect(captured.consent).toBe(true)
   })
 })
+
+describe("clearing a field", () => {
+  test("empties it to a value its schema accepts", async () => {
+    const user = userEvent.setup()
+    const OWNER_ID = "00000000-0000-4000-8000-000000000001"
+    const schema = z.object({ kind: z.string(), ownerId: z.uuid().nullable() })
+    const captured: { values?: unknown } = {}
+    function H() {
+      const form = useForm({
+        defaultValues: { kind: "a", ownerId: OWNER_ID },
+        onSubmit: vi.fn(),
+        schema,
+      })
+      const { ComboboxField, Subscribe } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <ComboboxField items={["a", "b"]} label="Kind" name="kind" />
+            <ComboboxField
+              items={[{ label: "Ada Lovelace", value: OWNER_ID }]}
+              label="Owner"
+              name="ownerId"
+            />
+            <Subscribe selector={(state) => state.values}>
+              {(values) => {
+                captured.values = values
+                return null
+              }}
+            </Subscribe>
+          </Form>
+        </FormProvider>
+      )
+    }
+    const { container } = render(<H />)
+    const clearButton = (name: string) => {
+      const root = container.querySelector<HTMLElement>(
+        `[data-field="${name}"]`
+      )
+      if (!root) {
+        throw new Error(`no ${name} field`)
+      }
+      return within(root).getByRole("button", { name: "Clear" })
+    }
+    await user.click(clearButton("kind"))
+    await user.click(clearButton("ownerId"))
+    expect(captured.values).toEqual({ kind: "", ownerId: null })
+    expect(schema.safeParse(captured.values).success).toBe(true)
+  })
+})

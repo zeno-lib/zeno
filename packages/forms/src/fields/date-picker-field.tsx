@@ -2,6 +2,7 @@
 
 import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { getEmptyValue } from "@zeno-lib/forms/lib/empty-value"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
@@ -129,7 +130,9 @@ function DatePickerField({
         <PopoverContent className="w-auto p-0">
           <Calendar
             mode="single"
-            onSelect={(next: Date | undefined) => field.handleChange(next)}
+            onSelect={(next: Date | undefined) =>
+              field.handleChange(next ?? getEmptyValue(field, undefined))
+            }
             required={requiresValue}
             selected={value}
             {...calendarProps}
