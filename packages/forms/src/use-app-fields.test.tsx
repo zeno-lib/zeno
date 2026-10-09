@@ -3,11 +3,14 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
+  within,
 } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
-import { Form, FormProvider, useForm } from "./create-form"
+import { SelectItem } from "@/components/ui/select"
+import { Form, FormProvider, RadioGroupFieldItem, useForm } from "./create-form"
 
 const CONTACT_EMAIL_LABEL = /Contact email/
 const PASSWORD_LABEL = /Password/
@@ -17,6 +20,10 @@ const TITLE_LABEL = /Title/
 const NOTE_LABEL = /Note/
 const DAY_LABEL = /Day/
 const PICKED_DAY = /October 9/
+const ROLE_LABEL = /Role/
+const OWNER_LABEL = /Owner/
+const PICK_A_ROLE = "Pick a role"
+const PICK_A_DAY = "Pick a day"
 
 afterEach(() => {
   cleanup()
@@ -202,10 +209,14 @@ describe("ComboboxField", () => {
       )
     }
     const { container } = render(<H />)
-    const hasClear = (name: string) =>
-      container.querySelector(
-        `[data-field="${name}"] [data-slot="combobox-clear"]`
-      ) !== null
+    const hasClear = (name: string) => {
+      const root = container.querySelector<HTMLElement>(
+        `[data-field="${name}"]`
+      )
+      return root
+        ? within(root).queryByRole("button", { name: "Clear" }) !== null
+        : false
+    }
     expect(hasClear("note")).toBe(true)
     expect(hasClear("kind")).toBe(false)
     expect(hasClear("forced")).toBe(false)
@@ -297,5 +308,120 @@ describe("DatePickerField", () => {
 
   test("picking an optional date's day again clears it", async () => {
     expect(await pickSelectedDayAgain(false)).toBeUndefined()
+  })
+})
+
+describe("ComboboxField with items still loading", () => {
+  test("shows a stored id's label once its item arrives, never the raw id", () => {
+    function H({ items }: { items: { label: string; value: string }[] }) {
+      const form = useForm({
+        defaultValues: { ownerId: "user-7" },
+        onSubmit: vi.fn(),
+      })
+      const { ComboboxField } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <ComboboxField items={items} label="Owner" name="ownerId" />
+          </Form>
+        </FormProvider>
+      )
+    }
+    const { rerender } = render(<H items={[]} />)
+    const input = screen.getByRole("combobox", { name: OWNER_LABEL })
+    expect(input).toHaveProperty("value", "")
+    rerender(<H items={[{ label: "Ada Lovelace", value: "user-7" }]} />)
+    expect(input).toHaveProperty("value", "Ada Lovelace")
+  })
+})
+
+describe("popup fields", () => {
+  test("a required select shows its error once the popup closes, not while it is open", async () => {
+    const user = userEvent.setup()
+    function H() {
+      const form = useForm({
+        onSubmit: vi.fn(),
+        schema: z.object({ role: z.string().min(1, PICK_A_ROLE) }),
+      })
+      const { SelectField } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <SelectField label="Role" name="role">
+              <SelectItem value="admin">Admin</SelectItem>
+            </SelectField>
+          </Form>
+        </FormProvider>
+      )
+    }
+    render(<H />)
+    await user.click(screen.getByRole("combobox", { name: ROLE_LABEL }))
+    await screen.findByRole("option", { name: "Admin" })
+    expect(screen.queryByText(PICK_A_ROLE)).toBeNull()
+    await user.keyboard("{Escape}")
+    expect(await screen.findByText(PICK_A_ROLE)).toBeTruthy()
+  })
+
+  test("a required date shows its error once the popover closes, not while it is open", async () => {
+    const user = userEvent.setup()
+    function H() {
+      const form = useForm({
+        onSubmit: vi.fn(),
+        schema: z.object({ day: z.date({ error: PICK_A_DAY }) }),
+      })
+      const { DatePickerField } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <DatePickerField label="Day" name="day" />
+          </Form>
+        </FormProvider>
+      )
+    }
+    render(<H />)
+    const trigger = screen.getByRole("button", { name: DAY_LABEL })
+    trigger.focus()
+    fireEvent.click(trigger)
+    await screen.findByRole("grid")
+    // The trigger's blur is what used to mark the field touched.
+    await waitFor(() => expect(document.activeElement).not.toBe(trigger))
+    expect(screen.queryByText(PICK_A_DAY)).toBeNull()
+    await user.keyboard("{Escape}")
+    expect(await screen.findByText(PICK_A_DAY)).toBeTruthy()
+  })
+})
+
+describe("RadioGroupField", () => {
+  test("stores each item's value as is", async () => {
+    const user = userEvent.setup()
+    const captured: { consent?: unknown } = {}
+    function H() {
+      const form = useForm({
+        defaultValues: { consent: undefined as boolean | undefined },
+        onSubmit: vi.fn(),
+      })
+      const { RadioGroupField, Subscribe } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <RadioGroupField label="Consent" name="consent">
+              <RadioGroupFieldItem value={true}>Yes</RadioGroupFieldItem>
+              <RadioGroupFieldItem value={false}>No</RadioGroupFieldItem>
+            </RadioGroupField>
+            <Subscribe selector={(state) => state.values.consent}>
+              {(consent) => {
+                captured.consent = consent
+                return null
+              }}
+            </Subscribe>
+          </Form>
+        </FormProvider>
+      )
+    }
+    render(<H />)
+    await user.click(screen.getByRole("radio", { name: "No" }))
+    expect(captured.consent).toBe(false)
+    await user.click(screen.getByRole("radio", { name: "Yes" }))
+    expect(captured.consent).toBe(true)
   })
 })

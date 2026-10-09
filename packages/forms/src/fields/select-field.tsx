@@ -9,7 +9,7 @@ import {
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
 import type { ComponentProps, ReactNode } from "react"
-import { Children, isValidElement, useId, useMemo } from "react"
+import { Children, isValidElement, useId, useMemo, useRef } from "react"
 import {
   Field,
   FieldDescription,
@@ -45,6 +45,7 @@ function SelectField({
   children,
   description,
   label,
+  onOpenChange,
   placeholder,
   required,
   triggerClassName,
@@ -52,6 +53,10 @@ function SelectField({
   ...props
 }: SelectFieldProps) {
   const field = useFieldContext()
+  // Opening the popup moves focus into it, so the trigger's blur would mark
+  // the field touched, and show a required error, before anything is picked.
+  // The field is touched once the popup closes, or focus leaves it closed.
+  const isOpen = useRef<boolean>(false)
   const id = useId()
   const errorId = `${id}-error`
   const descriptionId = `${id}-description`
@@ -87,6 +92,13 @@ function SelectField({
       <Select
         items={items}
         name={field.name}
+        onOpenChange={(open, eventDetails) => {
+          isOpen.current = open
+          if (!open) {
+            field.handleBlur()
+          }
+          onOpenChange?.(open, eventDetails)
+        }}
         onValueChange={(value) => field.handleChange(value)}
         value={field.state.value ?? null}
         {...props}
@@ -100,7 +112,11 @@ function SelectField({
           aria-required={requiresValue || undefined}
           className={triggerClassName}
           id={id}
-          onBlur={field.handleBlur}
+          onBlur={() => {
+            if (!isOpen.current) {
+              field.handleBlur()
+            }
+          }}
           size={triggerSize}
         >
           <SelectValue placeholder={placeholder} />

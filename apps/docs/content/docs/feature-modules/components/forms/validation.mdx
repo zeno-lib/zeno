@@ -56,7 +56,7 @@ user corrects the value:
 | Stage | Behavior |
 |---|---|
 | Pristine, user is typing | No error UI |
-| User blurs the field | Schema runs; if invalid, the error appears |
+| User blurs the field | Schema runs; if invalid, the error appears. For `SelectField` and `DatePickerField`, closing the popup counts as the blur; opening it doesn't. |
 | User edits to fix it | Schema runs on every keystroke; error clears the moment the value passes |
 | User edits a valid field into invalid | Error reappears immediately |
 | User submits without ever blurring a required field | Errors appear for every invalid field, then update live |

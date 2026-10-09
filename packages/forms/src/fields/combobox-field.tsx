@@ -114,11 +114,15 @@ function ComboboxField<T = string>({
   const canClear = showClear ?? !requiresValue
 
   const fieldValue = field.state.value
-  const hasObjectItems = items.some(isItemObject)
-  const value = hasObjectItems
-    ? ((items.find((item) => isItemObject(item) && item.value === fieldValue) ??
-        null) as T | null)
-    : ((fieldValue ?? null) as T | null)
+  // Base UI shows the value it gets as text, so a stored id whose item isn't
+  // in `items` (options still loading, or a search that dropped it) would
+  // show raw. Only a plain string or number item is its own label.
+  const match = items.find(
+    (item) => (isItemObject(item) ? item.value : item) === fieldValue
+  )
+  const plainItems = items.length > 0 && !items.some(isItemObject)
+  const value = (match ??
+    (plainItems ? (fieldValue ?? null) : null)) as T | null
 
   return (
     <Field data-field={field.name} data-invalid={isInvalid}>

@@ -468,6 +468,9 @@ import { RadioGroupFieldItem } from "@zeno-lib/forms/create-form"
 
 </Preview>
 
+Each item's `value` is stored as is, so `value={true}` or `value={2}` gives a
+boolean or a number, not a string. Nothing picked is `undefined`.
+
 ## Slider field
 
 `SliderField` wraps `@zeno-lib/ui/slider`. The form value is a `number` for a
@@ -573,6 +576,12 @@ const FRAMEWORKS = ["Next.js", "Remix", "SvelteKit", "Nuxt.js", "Astro"]
 
 For server-driven search with debouncing, see
 [Async-search combobox](/docs/feature-modules/components/forms/examples#async-search-combobox).
+
+With `{ value, label }` items, the input shows a stored value only once
+`items` holds its item, so an id never shows raw while options load.
+
+shadcn's `ComboboxClear` is an icon with no accessible name. Give it one in
+your copy of `combobox.tsx` (`aria-label="Clear"`), as Zeno's does.
 
 ## Multi-select field
 
