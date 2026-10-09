@@ -85,8 +85,8 @@ const myPosts = await db.query.posts.findMany()
 ### Multiple statements in one transaction
 
 When you need several statements to share one atomic RLS transaction (for
-example a read followed by a dependent write), use `db.transaction(...)`. Every
-statement on the `tx` argument runs under the same claims and role:
+example a read followed by a dependent write), use `db.transaction(...)` and run
+each statement on its `tx` argument, which runs under the same claims and role:
 
 ```typescript title="app/posts/route.ts"
 const created = await db.transaction(async (tx) => {
@@ -99,15 +99,28 @@ const created = await db.transaction(async (tx) => {
 })
 ```
 
-While the callback runs, a statement on `db` itself joins the transaction too,
-even from code that never sees `tx`, such as a server action the callback calls.
-So a page can load its parallel reads with one `begin`, one claims setup and one
-`commit`, instead of one transaction per read:
+Parallel reads work the same way. Pass `tx` to each query function, and they
+share one `begin`, one claims setup and one `commit` instead of opening a
+transaction each:
 
 ```typescript title="app/posts/[id]/page.tsx"
-// getRequestDb() is the request-scoped client (see below).
+const [post, comments] = await db.transaction((tx) =>
+  Promise.all([selectPost(tx, id), selectComments(tx, id)])
+)
+```
+
+#### Reads that cannot take `tx`
+
+Some reads sit behind code that has no way to receive `tx`, such as a query
+factory that calls a server action, which builds its own client with
+`getRequestDb()` (see below). For those, a statement on `db` itself, awaited
+while the callback runs, joins the transaction too:
+
+```typescript title="app/posts/[id]/page.tsx"
 const db = await getRequestDb()
 await db.transaction(() =>
+  // The server actions behind these queries reach the transaction through
+  // getRequestDb(), not through tx.
   Promise.all([
     queryClient.prefetchQuery(postQueryOptions(id)),
     queryClient.prefetchQuery(commentsQueryOptions(id)),
@@ -115,12 +128,16 @@ await db.transaction(() =>
 )
 ```
 
-The reads then run one after another on one connection. Only statements on the
-same client join; another client keeps its own transactions. A `db.transaction`
-inside another one is a savepoint of it, so never run two of those in parallel.
-Postgres aborts a transaction at its first failed statement, so the statements
-after it fail too, and `db.transaction` rejects with that first error even when
-the callback caught it, as `prefetchQuery` does.
+This goes through the async context, so it covers only the same client, and
+only while the callback runs: another client keeps its own transactions, and a
+statement started after the callback ends opens its own. Pass `tx` whenever you
+can, because then the code shows which statements share the transaction.
+
+Either way, the statements run one after another on one connection. A
+`db.transaction` inside another one is a savepoint of it, so never run two of
+those in parallel. Postgres aborts a transaction at its first failed statement,
+so the statements after it fail too, and `db.transaction` rejects with that
+first error even when the callback caught it, as `prefetchQuery` does.
 
 Use `db.transaction` only when a single statement is not enough; one direct
 statement is the common case.
