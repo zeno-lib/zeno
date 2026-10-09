@@ -189,6 +189,11 @@ TanStack Form unchanged. The `form-dialog` item does the same for its own
 `focusFirstInvalid(formElement)` from `@zeno-lib/forms/lib/focus-first-invalid`
 once the submit leaves `form.state.isValid` false.
 
+A submit that fails with no invalid field, on a
+[form-level error](/docs/feature-modules/components/forms/examples#form-level-errors)
+or because `onSubmit` threw, leaves focus where it was, and
+`<FormError />` announces the error.
+
 ## Custom fields
 
 When the field kit doesn't cover what you need, `AppField` and

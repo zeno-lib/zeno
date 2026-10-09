@@ -62,7 +62,7 @@ export function ServerActionExample() {
     },
     schema,
   })
-  const { InputField, EmailField, ResetButton, SubmitButton, Subscribe } = form
+  const { EmailField, FormError, InputField, ResetButton, SubmitButton } = form
 
   return (
     <FormProvider form={form}>
@@ -81,15 +81,7 @@ export function ServerActionExample() {
               <InputField label="Team" name="team" />
               <EmailField label="Member 1" name="members[0].email" />
               <EmailField label="Member 2" name="members[1].email" />
-              <Subscribe selector={(state) => state.errorMap.onSubmit}>
-                {(formError) =>
-                  typeof formError === "string" ? (
-                    <p className="text-destructive text-sm" role="alert">
-                      {formError}
-                    </p>
-                  ) : null
-                }
-              </Subscribe>
+              <FormError />
             </FieldGroup>
           </Form>
         </CardContent>

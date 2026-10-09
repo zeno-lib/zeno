@@ -208,6 +208,12 @@ details the hand-rolled version above leaves out:
   [`submitAction`](/docs/feature-modules/components/forms/examples#server-actions).
   ⌘/Ctrl+Enter submits from anywhere in the dialog, a textarea included,
   where a plain Enter still inserts a line break.
+- **Form-level errors**: the dialog renders
+  [`FormError`](/docs/feature-modules/components/forms/examples#form-level-errors)
+  between the fields and the footer, so a save that fails with no field to
+  blame still says so: the `formErrors` an action returns, or "Something went
+  wrong. Try again." when `onSubmit` throws (`submitErrorMessage` rewords
+  it). Focus stays on Save, so retrying is one keypress.
 - **`disabled`**: turns off Save and ⌘/Ctrl+Enter, and wraps the `<form>` in
   a `<fieldset disabled>`, which disables the native controls: inputs,
   textareas, and the select, combobox and date picker buttons. The
@@ -278,6 +284,7 @@ export function Members({ members }: { members: Member[] }) {
 | `submitLabel` / `cancelLabel` | `ReactNode` | Default to `"Save"` / `"Cancel"`. |
 | `footer` | `ReactNode` | Extra footer content, before the buttons. |
 | `closeOnSubmit` | `boolean` | Close after a successful submit. Defaults to `true`. |
+| `submitErrorMessage` | `ReactNode \| ((error) => ReactNode)` | Shown when `onSubmit` throws. Defaults to `"Something went wrong. Try again."`. |
 | `guard` | `boolean` | The unsaved-changes prompt and unload warning. Defaults to `true`. |
 | `discardPrompt` | `{ title?, description?, confirmLabel?, cancelLabel?, saveLabel? }` | Copy for the discard prompt. `saveLabel` defaults to `submitLabel`. |
 | `saveFromPrompt` | `boolean` | Offer Save in the discard prompt. Defaults to `false`. |
@@ -1157,7 +1164,9 @@ export function CreateAccount() {
 You can throw `ValidationError` from any code `onSubmit` calls: the API
 client, an async refinement, a custom guard. Pass an array of strings to
 show several messages on the same field, and an optional `formError` for
-a top-level message:
+a top-level message, which
+[`FormError`](/docs/feature-modules/components/forms/examples#form-level-errors)
+shows:
 
 ```tsx
 throw new ValidationError(
@@ -1210,7 +1219,9 @@ What `submitAction(submit, action, options?)` does:
   form-level message instead, so it can't block the submit button without
   showing anywhere.
 - **`formErrors`** become the form-level error, at `form.state.errorMap.onSubmit`
-  (one message per line).
+  (one message per line), which
+  [`FormError`](/docs/feature-modules/components/forms/examples#form-level-errors)
+  shows.
 - **`schema`** (optional): `onSubmit` receives the form's *input* values. For a
   schema that transforms (`z.string().transform(Number)`), pass it here:
   `submitAction` validates the values on the client and hands the schema's
@@ -1263,7 +1274,7 @@ export function InviteTeam() {
     onSubmit: (submit) => submitAction(submit, inviteTeam),
     schema,
   })
-  const { EmailField, InputField, SubmitButton, Subscribe } = form
+  const { EmailField, FormError, InputField, SubmitButton } = form
 
   return (
     <FormProvider form={form}>
@@ -1272,11 +1283,7 @@ export function InviteTeam() {
           <InputField label="Team" name="team" />
           <EmailField label="Member 1" name="members[0].email" />
           <EmailField label="Member 2" name="members[1].email" />
-          <Subscribe selector={(state) => state.errorMap.onSubmit}>
-            {(formError) =>
-              typeof formError === "string" ? <p role="alert">{formError}</p> : null
-            }
-          </Subscribe>
+          <FormError />
         </FieldGroup>
         <SubmitButton>Invite</SubmitButton>
       </Form>
@@ -1297,6 +1304,58 @@ next render while the form is untouched. It sticks when `defaultValues`
 follows the saved record, which is what happens when the action calls
 `revalidatePath` and the page passes the fresh record down. With
 `defaultValues` fixed in the component, the next render restores them.
+
+## Form-level errors
+
+A submit can fail with no field to blame: the server rejects the whole
+record, or `onSubmit` throws because the network is down. `FormError`, on
+`form` like `SubmitButton`, shows that error as a `role="alert"` message
+styled like a field error, so screen readers announce it. It renders nothing
+otherwise.
+
+```tsx lineNumbers
+const { FormError, InputField, SubmitButton } = form
+
+return (
+  <FormProvider form={form}>
+    <Form id="profile">
+      <InputField label="Name" name="name" />
+    </Form>
+    <FormError />
+    <SubmitButton form="profile">Save</SubmitButton>
+  </FormProvider>
+)
+```
+
+It shows two kinds of error:
+
+- **A form-level message**: the `formErrors` an action returns through
+  [`submitAction`](#server-actions) (with any message keyed by a field that
+  isn't mounted), a `ValidationError`'s `formError`, or a string from a
+  form-level `validators.onSubmit`. Several messages render as a list. Like a
+  server error on a field, it blocks `SubmitButton` and clears on the next
+  edit that validates.
+- **A thrown submit**: when `onSubmit` throws, `FormError` shows "Something
+  went wrong. Try again." It never shows what was thrown, because that can
+  leak internals, and in production Next.js replaces a server action's error
+  message anyway. Pass `submitErrorMessage` to reword it, or a function to
+  word it from the error. The form stays valid, so `SubmitButton` stays
+  enabled for a retry. The message clears on the next edit, and when the
+  next submit starts.
+
+Place it yourself: `<Form>` doesn't render it, so a form that already shows
+`form.state.errorMap.onSubmit` by hand doesn't show it twice. Put it next to
+the submit button, inside or outside the `<form>`; it finds the form through
+`<FormProvider>`. After a failed submit with no invalid field to focus,
+focus stays where it was. A `SubmitButton` loses focus in browsers when it
+disables itself for the submit, so `<Form>` gives focus back to it once it
+is enabled again: after a thrown submit, but not after a form-level message,
+which keeps it disabled. [`FormDialog`](#form-dialog) renders `FormError`
+for you, above its footer.
+
+`<Form>` and `FormDialog` record a thrown submit with `setSubmitError(form,
+error)` from `@zeno-lib/forms/lib/submit-error`. Call it from a submit path of
+your own, and read the error with `useSubmitError(form)`.
 
 ## Unsaved-changes warning
 

@@ -4,7 +4,8 @@ import type { AnyFormApi } from "@tanstack/react-form"
 import type { ComponentProps, FormEvent, ReactNode } from "react"
 
 import { FormProvider as RawFormProvider, useFormContext } from "./lib/contexts"
-import { focusFirstInvalid } from "./lib/focus-first-invalid"
+import { focusFirstInvalid, restoreFocus } from "./lib/focus-first-invalid"
+import { setSubmitError } from "./lib/submit-error"
 
 type FormProviderProps = {
   children: ReactNode
@@ -29,9 +30,19 @@ function Form({ children, className, ...props }: FormProps) {
         event.preventDefault()
         event.stopPropagation()
         const node = event.currentTarget
-        await Promise.resolve(form.handleSubmit()).catch(() => undefined)
-        if (!form.state.isValid) {
-          focusFirstInvalid(node)
+        const focused = node.ownerDocument.activeElement
+        // A thrown submit becomes the form-level error `FormError` shows.
+        await Promise.resolve(form.handleSubmit()).catch((error: unknown) =>
+          setSubmitError(form, error)
+        )
+        const { isSubmitSuccessful, isValid } = form.state
+        if (!isValid && focusFirstInvalid(node)) {
+          return
+        }
+        // A form-level failure has no field to fix, so focus stays where it
+        // was, or goes back there if the submit button's disabling dropped it.
+        if (!(isValid && isSubmitSuccessful)) {
+          restoreFocus(focused)
         }
       }}
       {...props}

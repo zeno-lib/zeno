@@ -8,6 +8,7 @@ import { CheckboxGroupField } from "./fields/checkbox-group-field"
 import { ComboboxField } from "./fields/combobox-field"
 import { DatePickerField } from "./fields/date-picker-field"
 import { EmailField } from "./fields/email-field"
+import { FormError } from "./fields/form-error"
 import { InputField } from "./fields/input-field"
 import { MoneyField } from "./fields/money-field"
 import { MultiSelectField } from "./fields/multi-select-field"
@@ -48,6 +49,7 @@ const { useAppForm, useForm, withFieldGroup, withForm } = createZenoForm({
     YearField,
   },
   formComponents: {
+    FormError,
     ResetButton,
     SubmitButton,
   },
