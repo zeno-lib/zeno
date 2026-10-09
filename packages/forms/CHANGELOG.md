@@ -1,5 +1,31 @@
 # @zeno-lib/forms
 
+## 0.3.0
+
+### Minor Changes
+
+- 1729c42: Export TanStack's `useSelector` from `@zeno-lib/forms`, so a component can read
+  form state in a hook, for example
+  `useSelector(form.store, (state) => state.values.country)`, without depending
+  on `@tanstack/react-form` itself. The registry `create-form` re-exports it.
+
+### Patch Changes
+
+- 1af55ea: The registry fields now take their control, description and error ids from
+  `useId()` instead of the field name. Two forms on one page with the same field
+  name, such as a page form and a dialog form, used to render duplicate ids, so
+  the dialog's label focused the page's control and its textbox lost its
+  accessible name. `useFormDialog().open({ focus })` now finds the control through
+  the field's label. Re-add the fields with the shadcn CLI to pick this up.
+- 5e00dac: `zod` is now an optional peer dependency, since the package reads schemas
+  through Standard Schema and never imports zod. The unused
+  `@tanstack/react-form-nextjs` dependency is gone, along with the
+  `decode-formdata` it pulled into every install.
+- 063a77a: Required-field detection no longer marks a string field whose schema accepts
+  `""`, the value the form starts it at. A bare `z.string()` or
+  `z.string().nullable()` can't fail while untouched, so it gets no `*`;
+  `z.string().min(1)` and `z.email()` keep theirs.
+
 ## 0.2.2
 
 ### Patch Changes

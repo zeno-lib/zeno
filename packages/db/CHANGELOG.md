@@ -1,5 +1,11 @@
 # @zeno-lib/db
 
+## 0.9.0
+
+### Minor Changes
+
+- 09e6a02: A statement on an RLS client awaited inside `db.transaction(cb)` now runs in that transaction, even when it goes through `db` rather than `tx`, for example from a server action the callback calls. A page can load its parallel reads in one transaction by wrapping its prefetch in `db.transaction`. A `db.transaction` inside another one is now a savepoint of it, instead of a separate transaction.
+
 ## 0.8.0
 
 ### Minor Changes
