@@ -80,20 +80,26 @@ describe("getRequiredPaths", () => {
 
   test("array rows are reported with TanStack bracket syntax", () => {
     const schema = z.object({
+      emails: z.array(z.email()),
       members: z.array(
         z.object({
           name: z.string().min(1),
           note: z.string().optional(),
         })
       ),
+      picked: z.array(z.string()).min(1),
       tags: z.array(z.string()),
     })
     const required = getRequiredPaths(schema)
-    expect(required.has("members")).toBe(true)
     expect(required.has("members[0].name")).toBe(true)
     expect(required.has("members.0.name")).toBe(false)
     expect(required.has("members[0].note")).toBe(false)
-    expect(required.has("tags[0]")).toBe(true)
+    expect(required.has("emails[0]")).toBe(true)
+    expect(required.has("picked")).toBe(true)
+    // `[]` and `""` are what the form starts them at, and both pass.
+    expect(required.has("members")).toBe(false)
+    expect(required.has("tags")).toBe(false)
+    expect(required.has("tags[0]")).toBe(false)
   })
 
   test("nested arrays descend through every level", () => {

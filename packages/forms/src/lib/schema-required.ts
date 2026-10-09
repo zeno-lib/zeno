@@ -9,14 +9,16 @@
 // A missing parent hides its children (the schema stops at the missing key), so
 // the probe descends: when an issue says it expected an object or an array
 // (Zod and Valibot both put that on `issue.expected`), the next pass fills that
-// path with `{}` / `[{}]` and validates again. Array rows are probed through
-// index `0` and recorded index-agnostically, so `members[0].name` in the set
-// matches every row's `members[3].name` via `toRequiredPathKey`.
+// path and validates again. An object gets `{}`. An array gets one missing row
+// (`[undefined]`), so the following pass probes the row's own schema. Rows are
+// probed through index `0` and recorded index-agnostically, so
+// `members[0].name` in the set matches every row's `members[3].name` via
+// `toRequiredPathKey`.
 //
-// A missing string is probed again as `""`, the value the form starts it at
-// (`extractZodDefaults`). A field that accepts `""` (a bare `z.string()`)
-// can't fail while untouched, so it leaves the set; one that rejects it
-// (`.min(1)`, `z.email()`) stays.
+// A missing string or array is first probed as `""` or `[]`, the value the
+// form starts it at (`extractZodDefaults`). A field that accepts that value (a
+// bare `z.string()` or `z.array()`) can't fail while untouched, so it leaves
+// the set; one that rejects it (`.min(1)`, `z.email()`) stays.
 //
 // Paths use TanStack Form's field-name syntax: dots for object keys, brackets
 // for array indices (`members[0].name`, not `members.0.name`).
@@ -47,7 +49,8 @@ type StandardSchemaLike = {
   }
 }
 
-const MAX_PROBE_DEPTH = 8
+// Each level can take two passes: the empty value, then the descent.
+const MAX_PROBE_DEPTH = 16
 
 const INDEX_SEGMENT = /^\d+$/
 
@@ -99,7 +102,7 @@ function probeValue(expected: unknown): unknown {
     case "object":
       return {}
     case "array":
-      return [{}]
+      return []
     case "string":
       return ""
     default:
@@ -145,22 +148,26 @@ function validateSync(
   return "issues" in result && result.issues ? result.issues : []
 }
 
+type ProbeFill = {
+  readonly path: string
+  readonly value: unknown
+}
+
 type ProbePass = {
-  readonly descended: boolean
   readonly failing: ReadonlySet<string>
-  readonly filledStrings: readonly string[]
+  readonly filled: readonly ProbeFill[]
 }
 
 // Record one pass's failing paths, and fill the probe at each of them for the
-// next pass.
+// next pass. A path whose empty value already passed stays out of the set.
 function recordPass(
   issues: readonly StandardIssue[],
   probe: Record<PropertyKey, unknown>,
-  required: Set<string>
+  required: Set<string>,
+  cleared: ReadonlySet<string>
 ): ProbePass {
   const failing = new Set<string>()
-  const filledStrings: string[] = []
-  let descended = false
+  const filled: ProbeFill[] = []
   for (const issue of issues) {
     const keys = issue.path?.map(pathKey) ?? []
     if (keys.length === 0) {
@@ -168,39 +175,43 @@ function recordPass(
     }
     const path = joinPath(keys)
     failing.add(path)
-    required.add(path)
+    if (!cleared.has(path)) {
+      required.add(path)
+    }
     const value = probeValue(issue.expected)
     if (value !== undefined && fillAt(probe, keys, value)) {
-      descended = true
-      if (value === "") {
-        filledStrings.push(path)
-      }
+      filled.push({ path, value })
     }
   }
-  return { descended, failing, filledStrings }
+  return { failing, filled }
 }
 
 function getRequiredPaths(schema: StandardSchemaLike): Set<string> {
   const required = new Set<string>()
+  const cleared = new Set<string>()
   const probe: Record<PropertyKey, unknown> = {}
-  // Paths the previous pass filled with `""`: they stay only if they still fail.
-  let filledStrings: readonly string[] = []
+  // What the previous pass filled with an empty value (`""` or `[]`): each
+  // stays required only if it still fails.
+  let emptied: readonly ProbeFill[] = []
   for (let depth = 0; depth < MAX_PROBE_DEPTH; depth += 1) {
     const issues = validateSync(schema, probe)
     if (!issues) {
       return required
     }
-    const {
-      descended,
-      failing,
-      filledStrings: filled,
-    } = recordPass(issues, probe, required)
-    for (const path of filledStrings) {
+    const { failing, filled } = recordPass(issues, probe, required, cleared)
+    let descended = filled.length > 0
+    for (const { path, value } of emptied) {
       if (!failing.has(path)) {
         required.delete(path)
+        cleared.add(path)
+      }
+      // The array was checked empty; give it one missing row to probe next.
+      if (Array.isArray(value)) {
+        value.push(undefined)
+        descended = true
       }
     }
-    filledStrings = filled
+    emptied = filled.filter(({ value }) => value === "" || Array.isArray(value))
     if (!descended) {
       break
     }

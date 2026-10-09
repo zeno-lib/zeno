@@ -367,8 +367,8 @@ export function SignUp() {
 </Preview>
 
 Fields wrapped in `.optional()`, `.nullable()`, or `.default(...)` get no
-`*`, and neither does a bare `z.string()`, which accepts the `""` the form
-starts it at. Everything else gets one. Detection also covers required children of
+`*`, and neither does a bare `z.string()` or `z.array()`, which accepts the
+`""` or `[]` the form starts it at. Everything else gets one. Detection also covers required children of
 nested objects and array rows: `members[0].name`, `members[3].name`, … all
 get the `*` when the row schema requires `name`. Detection skips async
 schemas, so pass `required` on the field to set it explicitly:
