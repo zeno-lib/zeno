@@ -81,7 +81,6 @@ following an upstream rename.
     `version` of `supabase/setup-cli` in `.github/workflows/turbo.yml`. After a bump, restart the
     stack on the new CLI (`pnpm exec supabase stop`, then `start`, in `packages/db`) and regenerate
     `src/auth-schema.ts` as `packages/db/AGENTS.md` describes.
-  - `@tanstack/react-form` and `@tanstack/react-form-nextjs` stay on the same version.
 - **`pnpm ci` is not the pipeline.** It is pnpm's built-in clean install. Run `pnpm run ci`.
 - **A green local run can still fail CI's install.** pnpm skips verifying a lockfile that matches
   `node_modules`, so only step 5 catches a lockfile GitHub's frozen install rejects. A
