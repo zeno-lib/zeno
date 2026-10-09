@@ -55,9 +55,9 @@ const myPosts = await db.select().from(schema.posts)
 Awaiting a query calls `supabase.auth.getClaims()`, opens a transaction,
 installs the verified JWT claims into transaction-local Postgres settings (so
 `auth.uid()` and `auth.jwt()` work inside RLS policies), and runs the query as
-the claims' role. The client re-resolves claims on **every** awaited statement,
-so a single client always reflects the live session. Each awaited statement is
-its own transaction.
+the claims' role. Each awaited statement is its own transaction unless it runs
+inside `db.transaction` (below), and the client re-resolves claims for **every**
+transaction, so a single client always reflects the live session.
 
 `createAuthClient(...)` does not take a `schema`. The client resolves types from
 the tables you reference in the query itself. Pass a `relations` object only when
@@ -98,6 +98,29 @@ const created = await db.transaction(async (tx) => {
   return post
 })
 ```
+
+While the callback runs, a statement on `db` itself joins the transaction too,
+even from code that never sees `tx`, such as a server action the callback calls.
+So a page can load its parallel reads with one `begin`, one claims setup and one
+`commit`, instead of one transaction per read:
+
+```typescript title="app/posts/[id]/page.tsx"
+// getRequestDb() is the request-scoped client (see below).
+const db = await getRequestDb()
+await db.transaction(() =>
+  Promise.all([
+    queryClient.prefetchQuery(postQueryOptions(id)),
+    queryClient.prefetchQuery(commentsQueryOptions(id)),
+  ])
+)
+```
+
+The reads then run one after another on one connection. Only statements on the
+same client join; another client keeps its own transactions. A `db.transaction`
+inside another one is a savepoint of it, so never run two of those in parallel.
+Postgres aborts a transaction at its first failed statement, so the statements
+after it fail too, and `db.transaction` rejects with that first error even when
+the callback caught it, as `prefetchQuery` does.
 
 Use `db.transaction` only when a single statement is not enough; one direct
 statement is the common case.
@@ -226,7 +249,8 @@ transaction back before `defineFormAction` converts it. On the client,
 ## Other RLS clients
 
 When you already hold the verified, decoded claims (for example from a prior
-`supabase.auth.getClaims()` call), skip the per-query `getClaims()` call with
+`supabase.auth.getClaims()` call), skip the `getClaims()` call each transaction
+makes with
 `createSupabaseClient(accessToken, config?)`. It accepts a decoded
 `SupabaseToken` (the `role` and `sub` claims), not a raw JWT string, and does not
 re-verify it:
@@ -250,8 +274,8 @@ const db = createAnonClient()
 ```
 
 Prefer `createAuthClient` when you have a Supabase client. It resolves and
-verifies claims through `auth.getClaims()` on every statement, so it always
-reflects the live session.
+verifies claims through `auth.getClaims()` before every transaction, so it
+always reflects the live session.
 
 ## Use admin and service queries carefully
 
