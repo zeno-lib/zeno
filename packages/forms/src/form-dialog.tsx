@@ -4,7 +4,9 @@ import { FormProvider } from "@zeno-lib/forms"
 import {
   findFirstInvalid,
   focusFirstInvalid,
+  restoreFocus,
 } from "@zeno-lib/forms/lib/focus-first-invalid"
+import { setSubmitError } from "@zeno-lib/forms/lib/submit-error"
 import {
   type FormDialogController,
   findFieldElement,
@@ -20,6 +22,7 @@ import {
   useId,
   useLayoutEffect,
   useRef,
+  useState,
 } from "react"
 import {
   AlertDialog,
@@ -43,6 +46,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Spinner } from "@/components/ui/spinner"
+import { FormError } from "./fields/form-error"
 
 type DiscardPromptText = {
   title?: ReactNode
@@ -60,6 +64,8 @@ type DialogFormState = {
   isSubmitSuccessful: boolean
   isSubmitting: boolean
   isValid: boolean
+  submissionAttempts: number
+  values: unknown
 }
 
 type DialogForm<TValues> = {
@@ -94,6 +100,12 @@ type FormDialogProps<TValues> = {
   /** Close after a successful submit. Defaults to `true`. */
   closeOnSubmit?: boolean
   /**
+   * Shown above the footer when the submit handler throws. Defaults to
+   * `FormError`'s `"Something went wrong. Try again."`. A function gets what
+   * was thrown.
+   */
+  submitErrorMessage?: ReactNode | ((error: unknown) => ReactNode)
+  /**
    * Ask before closing with unsaved changes, and warn on page unload while
    * open. Defaults to `true`.
    */
@@ -120,9 +132,9 @@ type FormDialogProps<TValues> = {
  * A dialog-hosted form: opens with fresh values and fields per session,
  * submits from a footer button outside the `<form>` (via `form="id"`), shows a
  * spinner while submitting, also submits on ⌘/Ctrl+Enter, focuses the first
- * invalid field when the submit fails, closes on success, and asks before
- * discarding unsaved changes (Cancel, ×, Escape, outside press) or leaving the
- * page.
+ * invalid field when the submit fails, shows a form-level error (or a thrown
+ * submit) above the footer, closes on success, and asks before discarding
+ * unsaved changes (Cancel, ×, Escape, outside press) or leaving the page.
  */
 function FormDialog<TValues>({
   cancelLabel = "Cancel",
@@ -138,6 +150,7 @@ function FormDialog<TValues>({
   formClassName,
   guard = true,
   saveFromPrompt = false,
+  submitErrorMessage,
   submitLabel = "Save",
   title,
   trigger,
@@ -148,6 +161,11 @@ function FormDialog<TValues>({
   // Set when a Save from the discard prompt fails, so the prompt hands focus
   // to the first invalid field as it closes.
   const focusInvalidOnPromptClose = useRef<boolean>(false)
+  // The open prompt hides the dialog from assistive tech, so the form-level
+  // error a failed Save from it renders is never announced. Remount the
+  // error once the prompt has closed, which announces it.
+  const announceOnPromptClosed = useRef<boolean>(false)
+  const [formErrorKey, setFormErrorKey] = useState(0)
   const { close, defaultValues, focus, isOpen, open, session } = dialog
 
   // `isDefaultValue`, not `isDirty`: `isDirty` stays true after the user
@@ -166,6 +184,7 @@ function FormDialog<TValues>({
     onSave: async () => {
       const saved = await submit()
       focusInvalidOnPromptClose.current = !saved
+      announceOnPromptClosed.current = !saved
       return saved
     },
   })
@@ -184,9 +203,12 @@ function FormDialog<TValues>({
   }, [session])
 
   // Resolves whether the form saved. A submit handler that throws leaves
-  // `isSubmitSuccessful` false, so the dialog stays open.
+  // `isSubmitSuccessful` false, so the dialog stays open, and becomes the
+  // form-level error `FormError` shows.
   async function submit(): Promise<boolean> {
-    await Promise.resolve(form.handleSubmit()).catch(() => undefined)
+    await Promise.resolve(form.handleSubmit()).catch((error: unknown) =>
+      setSubmitError(form, error)
+    )
     const { isSubmitSuccessful, isValid } = form.state
     return isValid && isSubmitSuccessful
   }
@@ -195,15 +217,24 @@ function FormDialog<TValues>({
     event.preventDefault()
     event.stopPropagation()
     const node = event.currentTarget
+    const focused = node.ownerDocument.activeElement
     const saved = await submit()
-    if (!form.state.isValid) {
-      // A schema error, or a field error the server returned (`submitAction`).
-      focusFirstInvalid(node)
-    } else if (saved && closeOnSubmit) {
-      // Close directly, past the guard: the changes are saved. The form is
-      // reset once the exit animation completes (see `onOpenChangeComplete`).
-      close()
+    if (saved) {
+      if (closeOnSubmit) {
+        // Close directly, past the guard: the changes are saved. The form is
+        // reset once the exit animation completes (see `onOpenChangeComplete`).
+        close()
+      }
+      return
     }
+    // A schema error, or a field error the server returned (`submitAction`).
+    if (!form.state.isValid && focusFirstInvalid(node)) {
+      return
+    }
+    // A form-level error has no field to fix, so focus stays where it was:
+    // on Save, or the field ⌘/Ctrl+Enter was pressed in. Disabling Save while
+    // submitting drops its focus to the body, so give it back.
+    restoreFocus(focused)
   }
 
   // ⌘/Ctrl+Enter submits from anywhere in the popup, a textarea included
@@ -281,6 +312,13 @@ function FormDialog<TValues>({
               {children}
             </form>
           </fieldset>
+          {/* Next to the Save button that failed, and outside the <form>, so
+              it stays in view when the fields scroll and adds no child for
+              `formClassName` selectors to match. */}
+          <FormError
+            key={formErrorKey}
+            submitErrorMessage={submitErrorMessage}
+          />
         </FormProvider>
         <DialogFooter>
           {footer}
@@ -304,6 +342,12 @@ function FormDialog<TValues>({
           // Stay open while a Save from the prompt is in flight.
           if (!(next || isSaving)) {
             cancelLeave()
+          }
+        }}
+        onOpenChangeComplete={(opened) => {
+          if (!opened && announceOnPromptClosed.current) {
+            announceOnPromptClosed.current = false
+            setFormErrorKey((key) => key + 1)
           }
         }}
         open={isConfirming}

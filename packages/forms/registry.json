@@ -44,6 +44,11 @@
           "type": "registry:component"
         },
         {
+          "path": "src/fields/form-error.tsx",
+          "target": "@components/form/fields/form-error.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/fields/input-field.tsx",
           "target": "@components/form/fields/input-field.tsx",
           "type": "registry:component"
@@ -152,6 +157,11 @@
       "description": "A dialog-hosted form: per-session defaults and focus, submit from the footer, close on success, and a discard prompt for unsaved changes. Pair with useFormDialog from @zeno-lib/forms.",
       "files": [
         {
+          "path": "src/fields/form-error.tsx",
+          "target": "@components/form/fields/form-error.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/form-dialog.tsx",
           "target": "@components/form/form-dialog.tsx",
           "type": "registry:component"
@@ -162,6 +172,7 @@
         "alert-dialog",
         "button",
         "dialog",
+        "field",
         "spinner"
       ],
       "title": "Form dialog",

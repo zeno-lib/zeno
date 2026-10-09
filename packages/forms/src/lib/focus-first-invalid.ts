@@ -31,4 +31,23 @@ function focusFirstInvalid(
   return target
 }
 
-export { findFirstInvalid, focusFirstInvalid }
+/**
+ * Give focus back to `element`, what had it when the submit started, if the
+ * submit dropped it to the body. A submit button that disables itself while
+ * submitting does that in browsers, so a failed submit with no invalid field
+ * to focus would otherwise leave the user nowhere. Returns whether it moved
+ * focus.
+ */
+function restoreFocus(element: Element | null): boolean {
+  if (!(element instanceof HTMLElement && element.isConnected)) {
+    return false
+  }
+  const active = element.ownerDocument.activeElement
+  if (active !== null && active !== element.ownerDocument.body) {
+    return false
+  }
+  element.focus()
+  return element.ownerDocument.activeElement === element
+}
+
+export { findFirstInvalid, focusFirstInvalid, restoreFocus }
