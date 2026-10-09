@@ -1,5 +1,19 @@
 # @zeno-lib/docs
 
+## 0.0.7
+
+### Patch Changes
+
+- Updated dependencies [1bab820]
+- Updated dependencies [862197d]
+- Updated dependencies [54e886b]
+- Updated dependencies [50f08cd]
+- Updated dependencies [22b64ba]
+- Updated dependencies [07a4009]
+- Updated dependencies [4a88f17]
+- Updated dependencies [a963b88]
+  - @zeno-lib/forms@0.4.0
+
 ## 0.0.6
 
 ### Patch Changes

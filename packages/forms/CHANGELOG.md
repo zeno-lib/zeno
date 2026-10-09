@@ -1,5 +1,68 @@
 # @zeno-lib/forms
 
+## 0.4.0
+
+### Minor Changes
+
+- 22b64ba: One empty value per field, picked by its schema: the first it accepts of
+  `null`, `undefined` and the type's own (`""` for a string, `[]` for an array).
+  So `.nullable()` empties to `null`, `.optional()` to `undefined`, and a bare
+  `z.string()` to `""`.
+  
+  - Clearing a `ComboboxField`, emptying a `NumberField`, `MoneyField`,
+    `PercentageField` or `YearField`, and unpicking a `DatePickerField` store the
+    field's empty value, instead of a fixed `undefined` or `null` that the
+    schema could reject (a cleared bare-string combobox used to fail
+    validation).
+  - A field that accepts an empty value gets no `*`, so `.nullable()` fields
+    (`z.number().nullable()`, `z.uuid().nullable()`) no longer show one, as the
+    docs said.
+  - A field whose schema rejects `""` or `[]` starts at its empty value instead
+    (`z.email().optional()` at `undefined`, `z.uuid().nullable()` at `null`), so
+    an untouched optional field passes.
+  - New `getEmptyValue(field, fallback)` in `@zeno-lib/forms/lib/empty-value`
+    for custom fields.
+  
+  Re-add the fields with the shadcn CLI to pick this up.
+- 4a88f17: `RadioGroupField` stores each item's `value` as is. It converted every value
+  with `String()`, so `value={true}` or `value={2}` came back as `"true"` or
+  `"2"`. String items are unchanged. With nothing picked, Base UI now gets
+  `null` instead of `""`, so an item whose value is `""` no longer shows as
+  picked.
+- a963b88: A field's required-ness now shapes its control, not only its label. A required
+  control gets `aria-required` (the `*` is `aria-hidden`), a required
+  `ComboboxField` hides its clear button (an explicit `showClear` still wins),
+  and a required `DatePickerField` keeps its date when the selected day is
+  picked again. Required-ness comes from the schema even under
+  `requiredIndicator: false`, which now hides only the `*`, and the field's
+  `required` prop overrides it. Custom fields read it with the new
+  `useIsFieldRequiredBySchema`. Re-add the fields with the shadcn CLI to pick
+  this up.
+
+### Patch Changes
+
+- 1bab820: Required-field detection no longer marks a bare `z.array()`, or the rows of a
+  bare `z.array(z.string())`. The form starts an array at `[]` and a string at
+  `""`, and both pass, so neither can fail while untouched. `.min(1)` arrays,
+  rows that reject `""` (`z.array(z.email())`) and required row fields
+  (`members[0].name`) keep their `*`.
+- 862197d: `ComboboxField` and `DatePickerField` take `disabled`. The combobox disables
+  its input and buttons, and the date picker its trigger. Neither had a way to
+  be disabled before; the date picker's `calendarProps.disabled` only disables
+  days.
+- 54e886b: `ComboboxField` no longer shows a stored value as raw text when `items` has
+  no item for it, such as an id while its options are still loading. With
+  `{ value, label }` items the input stays empty until the item arrives, then
+  shows its label. A plain string or number item is still its own label.
+- 50f08cd: `EmailField` turns off auto-capitalisation, autocorrect and spell check, each
+  overridable. `NumberField` sets `inputMode="decimal"` instead of `"numeric"`,
+  so phone keypads keep the decimal key, and takes an `inputMode` override
+  (`"numeric"` for whole numbers).
+- 07a4009: `SelectField` and `DatePickerField` mark the field touched when their popup
+  closes, not when it opens. Opening moved focus into the popup, and the
+  trigger's blur showed a required field's error while the user was still
+  choosing. Leaving the closed trigger still counts, as before.
+
 ## 0.3.0
 
 ### Minor Changes

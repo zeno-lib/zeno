@@ -1,6 +1,6 @@
 {
   "name": "@zeno-lib/forms",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "repository": {
     "url": "https://github.com/zeno-lib/zeno.git",
     "directory": "packages/forms"
