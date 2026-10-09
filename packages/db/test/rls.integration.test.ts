@@ -255,6 +255,43 @@ describe("db.transaction (multi-statement)", () => {
   })
 })
 
+describe("db.transaction (statements on db)", () => {
+  const context = sql`select txid_current()::text as txid, auth.uid() as uid`
+
+  it("runs the statements awaited on db inside the callback in the transaction", async () => {
+    const db = authClient(USER_A)
+    const { inner, outer } = await db.transaction(async (tx) => ({
+      inner: await Promise.all([db.execute(context), db.execute(context)]),
+      outer: (await tx.execute(context))[0],
+    }))
+    const [after] = await db.execute(context)
+
+    expect(inner.map((rows) => rows[0])).toEqual([outer, outer])
+    expect(outer).toMatchObject({ uid: USER_A })
+    expect(after?.txid).not.toBe(outer?.txid)
+  })
+
+  it("never runs another client's statement in it", async () => {
+    const [outer, other] = await authClient(USER_A).transaction(async (tx) => [
+      (await tx.execute(context))[0],
+      (await authClient(USER_B).execute(context))[0],
+    ])
+
+    expect(other).toMatchObject({ uid: USER_B })
+    expect(other?.txid).not.toBe(outer?.txid)
+  })
+
+  it("runs a nested db.transaction as a savepoint of the outer one", async () => {
+    const db = authClient(USER_A)
+    const [outer, nested] = await db.transaction(async (tx) => [
+      (await tx.execute(context))[0],
+      await db.transaction(async (inner) => (await inner.execute(context))[0]),
+    ])
+
+    expect(nested).toEqual(outer)
+  })
+})
+
 describe("audit triggers", () => {
   // The Drizzle-side `$onUpdateFn` only fires for statements Drizzle builds, so
   // it misses PostgREST, the dashboard and psql. The `moddatetime` trigger from

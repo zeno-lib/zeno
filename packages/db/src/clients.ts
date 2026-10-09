@@ -179,7 +179,7 @@ function buildDrizzle<TRelations extends AnyRelations>(
 
 // Wraps a drizzle instance in the lazy RLS query proxy. Claims are resolved
 // before each transaction opens (so `createAuthClient` re-checks the live
-// session per query), then installed transaction-locally with
+// session for each one), then installed transaction-locally with
 // `set_config(..., true)`, which auto-resets at commit. The role goes through
 // `set_config('role', ...)`, which is what `set local role` does, so claims and
 // role cost one round trip, and the role is a bound parameter.
@@ -231,8 +231,8 @@ export function createSupabaseClient<
 
 /**
  * RLS client bound to a Supabase client. Verified claims are resolved via
- * `supabase.auth.getClaims()` on every query, so it always reflects the live
- * session.
+ * `supabase.auth.getClaims()` before every transaction (every query outside
+ * `db.transaction`), so it always reflects the live session.
  */
 export function createAuthClient<
   TRelations extends AnyRelations = EmptyRelations,
