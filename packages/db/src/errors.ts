@@ -38,6 +38,38 @@ const INTEGRITY_CONSTRAINT_CLASS = "23"
 // more level. The bound only stops a cyclic `cause` chain.
 const MAX_CAUSE_DEPTH = 5
 
+/** A SQLSTATE: five digits or upper-case letters. */
+const SQLSTATE_PATTERN = /^[0-9A-Z]{5}$/
+
+/**
+ * Whether `error` is a postgres.js server error, judged by its shape.
+ *
+ * The name is only a fast path. postgres.js names its errors after
+ * `this.constructor.name`, and a minifier renames the class, so in a
+ * production bundle the name can be `"a"`. `instanceof` misses as soon as
+ * the tree holds a second copy of `postgres`. What holds everywhere is the
+ * shape of the server's error response: a SQLSTATE `code` and the severity
+ * field Postgres always sends (`S`, which postgres.js reads into
+ * `severity_local`; the unlocalised `severity` only exists from 9.6).
+ *
+ * An error that only shares a `code` doesn't match: a Node system error
+ * (`EPIPE`) and the errors postgres.js raises itself (`CONNECTION_CLOSED`, or
+ * `57014` for a query cancelled before it was sent) carry no severity.
+ */
+const isPostgresError = (error: Error): error is PostgresError => {
+  if (error.name === "PostgresError") {
+    return true
+  }
+
+  const fields = error as Partial<Record<keyof PostgresError, unknown>>
+
+  return (
+    typeof fields.code === "string" &&
+    SQLSTATE_PATTERN.test(fields.code) &&
+    typeof fields.severity_local === "string"
+  )
+}
+
 /**
  * The postgres.js error underneath whatever Drizzle threw, or `undefined`.
  *
@@ -49,8 +81,9 @@ const MAX_CAUSE_DEPTH = 5
  * depth 1: PostgresError      code=23505      "duplicate key value violates …"
  * ```
  *
- * Matched by `name` rather than `instanceof`, so a second copy of `postgres`
- * in the tree cannot make it miss.
+ * Recognised by shape, not by `instanceof` or by `name`, so neither a second
+ * copy of `postgres` in the tree nor a minified production build can make it
+ * miss.
  */
 export const toPostgresError = (error: unknown): PostgresError | undefined => {
   let current: unknown = error
@@ -60,8 +93,8 @@ export const toPostgresError = (error: unknown): PostgresError | undefined => {
     current instanceof Error && depth < MAX_CAUSE_DEPTH;
     depth += 1
   ) {
-    if (current.name === "PostgresError") {
-      return current as PostgresError
+    if (isPostgresError(current)) {
+      return current
     }
     // `Error.cause` is ES2022, past this package's `lib`.
     current = (current as Error & { cause?: unknown }).cause
