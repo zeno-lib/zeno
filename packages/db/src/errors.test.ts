@@ -18,6 +18,22 @@ const duplicate = postgresError({
   message: "duplicate key value violates unique constraint",
 })
 
+// A minifier renames postgres.js's class, and the error takes its name from
+// `this.constructor.name`, so a production bundle's error is named "a".
+const MinifiedPostgresError = Object.defineProperty(
+  class extends postgres.PostgresError {},
+  "name",
+  { value: "a" }
+)
+
+const minifiedDuplicate = Object.assign(new MinifiedPostgresError("failed"), {
+  code: SqlState.uniqueViolation,
+  constraint_name: "contacts_email_key",
+  message: "duplicate key value violates unique constraint",
+  severity: "ERROR",
+  severity_local: "ERROR",
+})
+
 describe("toPostgresError", () => {
   it("unwraps Drizzle's DrizzleQueryError", () => {
     const error = wrapped(duplicate)
@@ -42,6 +58,33 @@ describe("toPostgresError", () => {
     expect(toPostgresError(new Error("nope"))).toBeUndefined()
     expect(toPostgresError("nope")).toBeUndefined()
     expect(toPostgresError(undefined)).toBeUndefined()
+  })
+
+  it("recognises a minified build's error by its shape", () => {
+    expect(minifiedDuplicate.name).toBe("a")
+    expect(toPostgresError(wrapped(minifiedDuplicate))).toBe(minifiedDuplicate)
+  })
+
+  it("ignores errors that only share a code", () => {
+    // A Node system error, five characters like a SQLSTATE.
+    const systemError = Object.assign(new Error("write EPIPE"), {
+      code: "EPIPE",
+      errno: -32,
+      syscall: "write",
+    })
+    // What postgres.js raises itself, with no server response behind it.
+    const connectionClosed = Object.assign(
+      new Error("write CONNECTION_CLOSED 127.0.0.1:5432"),
+      { address: "127.0.0.1", code: "CONNECTION_CLOSED", port: 5432 }
+    )
+    const cancelledBeforeSent = Object.assign(
+      new Error("57014: canceling statement due to user request"),
+      { code: "57014" }
+    )
+
+    for (const error of [systemError, connectionClosed, cancelledBeforeSent]) {
+      expect(toPostgresError(wrapped(error))).toBeUndefined()
+    }
   })
 
   it("stops on a cyclic cause chain", () => {
@@ -78,6 +121,15 @@ describe("isConstraintViolation", () => {
         "contacts_email_key",
       ])
     ).toBeUndefined()
+  })
+
+  it("matches a minified build's error by code and constraint", () => {
+    const error = wrapped(minifiedDuplicate)
+    const options = { code: SqlState.uniqueViolation }
+
+    expect(isConstraintViolation(error, ["contacts_email_key"], options)).toBe(
+      minifiedDuplicate
+    )
   })
 
   it("narrows to one code", () => {
