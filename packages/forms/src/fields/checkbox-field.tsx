@@ -7,7 +7,7 @@ import {
   useIsFieldRequired,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
-import type { ComponentProps, ReactNode } from "react"
+import { type ComponentProps, type ReactNode, useId } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Field,
@@ -35,8 +35,9 @@ function CheckboxField({
   ...props
 }: CheckboxFieldProps) {
   const field = useFieldContext<boolean>()
-  const errorId = `${field.name}-error`
-  const descriptionId = `${field.name}-description`
+  const id = useId()
+  const errorId = `${id}-error`
+  const descriptionId = `${id}-description`
   const isInvalid = useIsInvalid(field)
   const hideErrors = useHideFieldErrors(field)
   const showError = isInvalid && !hideErrors
@@ -56,7 +57,7 @@ function CheckboxField({
         )}
         aria-invalid={isInvalid || undefined}
         checked={field.state.value ?? false}
-        id={field.name}
+        id={id}
         name={field.name}
         onBlur={field.handleBlur}
         onCheckedChange={(value) => field.handleChange(value === true)}
@@ -64,7 +65,7 @@ function CheckboxField({
       />
       <FieldContent>
         {label && (
-          <FieldLabel className="font-normal" htmlFor={field.name}>
+          <FieldLabel className="font-normal" htmlFor={id}>
             {label}
             {isRequired && <RequiredIndicator />}
           </FieldLabel>

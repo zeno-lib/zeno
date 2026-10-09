@@ -8,7 +8,7 @@ import {
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
 import type { ComponentProps, ReactNode } from "react"
-import { Children, isValidElement, useMemo } from "react"
+import { Children, isValidElement, useId, useMemo } from "react"
 import {
   Field,
   FieldDescription,
@@ -48,8 +48,9 @@ function SelectField({
   ...props
 }: SelectFieldProps) {
   const field = useFieldContext()
-  const errorId = `${field.name}-error`
-  const descriptionId = `${field.name}-description`
+  const id = useId()
+  const errorId = `${id}-error`
+  const descriptionId = `${id}-description`
   const isInvalid = useIsInvalid(field)
   const hideErrors = useHideFieldErrors(field)
   const showError = isInvalid && !hideErrors
@@ -72,7 +73,7 @@ function SelectField({
   return (
     <Field data-field={field.name} data-invalid={isInvalid}>
       {label && (
-        <FieldLabel htmlFor={field.name}>
+        <FieldLabel htmlFor={id}>
           {label}
           {isRequired && <RequiredIndicator />}
         </FieldLabel>
@@ -91,7 +92,7 @@ function SelectField({
           )}
           aria-invalid={isInvalid || undefined}
           className={triggerClassName}
-          id={field.name}
+          id={id}
           onBlur={field.handleBlur}
           size={triggerSize}
         >

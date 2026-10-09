@@ -7,7 +7,7 @@ import {
   useIsFieldRequired,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
-import type { ReactNode } from "react"
+import { type ReactNode, useId } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Field,
@@ -64,8 +64,9 @@ function CheckboxGroupField<V = string>({
   required,
 }: CheckboxGroupFieldProps<V>) {
   const field = useFieldContext<V[] | null | undefined>()
-  const errorId = `${field.name}-error`
-  const descriptionId = `${field.name}-description`
+  const id = useId()
+  const errorId = `${id}-error`
+  const descriptionId = `${id}-description`
   const isInvalid = useIsInvalid(field)
   const hideErrors = useHideFieldErrors(field)
   const showError = isInvalid && !hideErrors
@@ -116,7 +117,7 @@ function CheckboxGroupField<V = string>({
         data-slot="checkbox-group"
       >
         {options.map((option, index) => {
-          const id = `${field.name}-${index}`
+          const optionId = `${id}-${index}`
           return (
             <Field
               data-invalid={isInvalid}
@@ -127,7 +128,7 @@ function CheckboxGroupField<V = string>({
                 aria-invalid={isInvalid || undefined}
                 checked={checked.includes(option.value)}
                 disabled={disabled || option.disabled}
-                id={id}
+                id={optionId}
                 name={field.name}
                 onBlur={field.handleBlur}
                 onCheckedChange={(on) => toggle(option.value, on === true)}
@@ -135,13 +136,13 @@ function CheckboxGroupField<V = string>({
               />
               {option.description ? (
                 <FieldContent>
-                  <FieldLabel className="font-normal" htmlFor={id}>
+                  <FieldLabel className="font-normal" htmlFor={optionId}>
                     {option.label}
                   </FieldLabel>
                   <FieldDescription>{option.description}</FieldDescription>
                 </FieldContent>
               ) : (
-                <FieldLabel className="w-auto font-normal" htmlFor={id}>
+                <FieldLabel className="w-auto font-normal" htmlFor={optionId}>
                   {option.label}
                 </FieldLabel>
               )}

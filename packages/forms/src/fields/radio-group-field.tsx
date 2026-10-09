@@ -36,8 +36,9 @@ function RadioGroupField({
   ...props
 }: RadioGroupFieldProps) {
   const field = useFieldContext<string>()
-  const errorId = `${field.name}-error`
-  const descriptionId = `${field.name}-description`
+  const id = useId()
+  const errorId = `${id}-error`
+  const descriptionId = `${id}-description`
   const isInvalid = useIsInvalid(field)
   const hideErrors = useHideFieldErrors(field)
   const showError = isInvalid && !hideErrors
