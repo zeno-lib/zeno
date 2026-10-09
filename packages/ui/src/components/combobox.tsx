@@ -38,6 +38,8 @@ function ComboboxTrigger({
 function ComboboxClear({ className, ...props }: ComboboxPrimitive.Clear.Props) {
   return (
     <ComboboxPrimitive.Clear
+      // Not in shadcn's base-nova: the button is an icon, so it needs a name.
+      aria-label="Clear"
       className={cn(className)}
       data-slot="combobox-clear"
       render={<InputGroupButton size="icon-xs" variant="ghost" />}

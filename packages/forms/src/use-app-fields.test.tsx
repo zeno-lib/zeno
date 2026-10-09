@@ -3,6 +3,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
 } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
 import { afterEach, describe, expect, test, vi } from "vitest"
@@ -202,10 +203,14 @@ describe("ComboboxField", () => {
       )
     }
     const { container } = render(<H />)
-    const hasClear = (name: string) =>
-      container.querySelector(
-        `[data-field="${name}"] [data-slot="combobox-clear"]`
-      ) !== null
+    const hasClear = (name: string) => {
+      const root = container.querySelector<HTMLElement>(
+        `[data-field="${name}"]`
+      )
+      return root
+        ? within(root).queryByRole("button", { name: "Clear" }) !== null
+        : false
+    }
     expect(hasClear("note")).toBe(true)
     expect(hasClear("kind")).toBe(false)
     expect(hasClear("forced")).toBe(false)
