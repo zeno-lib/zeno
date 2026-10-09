@@ -1,6 +1,6 @@
 {
   "name": "@zeno-lib/db",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "repository": {
     "url": "https://github.com/zeno-lib/zeno.git",
     "directory": "packages/db"
