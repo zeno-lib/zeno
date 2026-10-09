@@ -574,6 +574,9 @@ const FRAMEWORKS = ["Next.js", "Remix", "SvelteKit", "Nuxt.js", "Astro"]
 For server-driven search with debouncing, see
 [Async-search combobox](/docs/feature-modules/components/forms/examples#async-search-combobox).
 
+With `{ value, label }` items, the input shows a stored value only once
+`items` holds its item, so an id never shows raw while options load.
+
 shadcn's `ComboboxClear` is an icon with no accessible name. Give it one in
 your copy of `combobox.tsx` (`aria-label="Clear"`), as Zeno's does.
 

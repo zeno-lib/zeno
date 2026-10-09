@@ -18,6 +18,7 @@ const TITLE_LABEL = /Title/
 const NOTE_LABEL = /Note/
 const DAY_LABEL = /Day/
 const PICKED_DAY = /October 9/
+const OWNER_LABEL = /Owner/
 
 afterEach(() => {
   cleanup()
@@ -302,5 +303,29 @@ describe("DatePickerField", () => {
 
   test("picking an optional date's day again clears it", async () => {
     expect(await pickSelectedDayAgain(false)).toBeUndefined()
+  })
+})
+
+describe("ComboboxField with items still loading", () => {
+  test("shows a stored id's label once its item arrives, never the raw id", () => {
+    function H({ items }: { items: { label: string; value: string }[] }) {
+      const form = useForm({
+        defaultValues: { ownerId: "user-7" },
+        onSubmit: vi.fn(),
+      })
+      const { ComboboxField } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <ComboboxField items={items} label="Owner" name="ownerId" />
+          </Form>
+        </FormProvider>
+      )
+    }
+    const { rerender } = render(<H items={[]} />)
+    const input = screen.getByRole("combobox", { name: OWNER_LABEL })
+    expect(input).toHaveProperty("value", "")
+    rerender(<H items={[{ label: "Ada Lovelace", value: "user-7" }]} />)
+    expect(input).toHaveProperty("value", "Ada Lovelace")
   })
 })
