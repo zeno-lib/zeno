@@ -13,6 +13,11 @@
 // index `0` and recorded index-agnostically, so `members[0].name` in the set
 // matches every row's `members[3].name` via `toRequiredPathKey`.
 //
+// A missing string is probed again as `""`, the value the form starts it at
+// (`extractZodDefaults`). A field that accepts `""` (a bare `z.string()`)
+// can't fail while untouched, so it leaves the set; one that rejects it
+// (`.min(1)`, `z.email()`) stays.
+//
 // Paths use TanStack Form's field-name syntax: dots for object keys, brackets
 // for array indices (`members[0].name`, not `members.0.name`).
 //
@@ -86,15 +91,20 @@ function toRequiredPathKey(name: string): string {
   return name.replace(INDEX_IN_NAME, "[0]")
 }
 
-function probeContainer(expected: unknown): unknown {
+function probeValue(expected: unknown): unknown {
   if (typeof expected !== "string") {
     return
   }
-  const kind = expected.toLowerCase()
-  if (kind === "object") {
-    return {}
+  switch (expected.toLowerCase()) {
+    case "object":
+      return {}
+    case "array":
+      return [{}]
+    case "string":
+      return ""
+    default:
+      return
   }
-  return kind === "array" ? [{}] : undefined
 }
 
 // Write `value` at `keys` inside `root`, only where nothing is set yet.
@@ -135,26 +145,62 @@ function validateSync(
   return "issues" in result && result.issues ? result.issues : []
 }
 
+type ProbePass = {
+  readonly descended: boolean
+  readonly failing: ReadonlySet<string>
+  readonly filledStrings: readonly string[]
+}
+
+// Record one pass's failing paths, and fill the probe at each of them for the
+// next pass.
+function recordPass(
+  issues: readonly StandardIssue[],
+  probe: Record<PropertyKey, unknown>,
+  required: Set<string>
+): ProbePass {
+  const failing = new Set<string>()
+  const filledStrings: string[] = []
+  let descended = false
+  for (const issue of issues) {
+    const keys = issue.path?.map(pathKey) ?? []
+    if (keys.length === 0) {
+      continue
+    }
+    const path = joinPath(keys)
+    failing.add(path)
+    required.add(path)
+    const value = probeValue(issue.expected)
+    if (value !== undefined && fillAt(probe, keys, value)) {
+      descended = true
+      if (value === "") {
+        filledStrings.push(path)
+      }
+    }
+  }
+  return { descended, failing, filledStrings }
+}
+
 function getRequiredPaths(schema: StandardSchemaLike): Set<string> {
   const required = new Set<string>()
   const probe: Record<PropertyKey, unknown> = {}
+  // Paths the previous pass filled with `""`: they stay only if they still fail.
+  let filledStrings: readonly string[] = []
   for (let depth = 0; depth < MAX_PROBE_DEPTH; depth += 1) {
     const issues = validateSync(schema, probe)
     if (!issues) {
       return required
     }
-    let descended = false
-    for (const issue of issues) {
-      const keys = issue.path?.map(pathKey) ?? []
-      if (keys.length === 0) {
-        continue
-      }
-      required.add(joinPath(keys))
-      const container = probeContainer(issue.expected)
-      if (container !== undefined && fillAt(probe, keys, container)) {
-        descended = true
+    const {
+      descended,
+      failing,
+      filledStrings: filled,
+    } = recordPass(issues, probe, required)
+    for (const path of filledStrings) {
+      if (!failing.has(path)) {
+        required.delete(path)
       }
     }
+    filledStrings = filled
     if (!descended) {
       break
     }
