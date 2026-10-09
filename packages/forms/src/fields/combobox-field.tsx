@@ -7,7 +7,7 @@ import {
   useIsFieldRequired,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
-import type { ReactNode } from "react"
+import { type ReactNode, useId } from "react"
 import {
   Combobox,
   ComboboxContent,
@@ -95,8 +95,9 @@ function ComboboxField<T = string>({
   showClear = true,
 }: ComboboxFieldProps<T>) {
   const field = useFieldContext()
-  const errorId = `${field.name}-error`
-  const descriptionId = `${field.name}-description`
+  const id = useId()
+  const errorId = `${id}-error`
+  const descriptionId = `${id}-description`
   const isInvalid = useIsInvalid(field)
   const hideErrors = useHideFieldErrors(field)
   const showError = isInvalid && !hideErrors
@@ -113,7 +114,7 @@ function ComboboxField<T = string>({
   return (
     <Field data-field={field.name} data-invalid={isInvalid}>
       {label && (
-        <FieldLabel htmlFor={field.name}>
+        <FieldLabel htmlFor={id}>
           {label}
           {isRequired && <RequiredIndicator />}
         </FieldLabel>
@@ -139,7 +140,7 @@ function ComboboxField<T = string>({
           )}
           aria-invalid={isInvalid || undefined}
           className={className}
-          id={field.name}
+          id={id}
           name={field.name}
           onBlur={field.handleBlur}
           placeholder={placeholder}

@@ -7,7 +7,7 @@ import {
   useIsFieldRequired,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
-import type { ReactNode } from "react"
+import { type ReactNode, useId } from "react"
 import {
   Field,
   FieldDescription,
@@ -57,8 +57,9 @@ function OtpField({
   required,
 }: OtpFieldProps) {
   const field = useFieldContext<string>()
-  const errorId = `${field.name}-error`
-  const descriptionId = `${field.name}-description`
+  const id = useId()
+  const errorId = `${id}-error`
+  const descriptionId = `${id}-description`
   const isInvalid = useIsInvalid(field)
   const hideErrors = useHideFieldErrors(field)
   const showError = isInvalid && !hideErrors
@@ -68,7 +69,7 @@ function OtpField({
   return (
     <Field data-field={field.name} data-invalid={isInvalid}>
       {label && (
-        <FieldLabel htmlFor={field.name}>
+        <FieldLabel htmlFor={id}>
           {label}
           {isRequired && <RequiredIndicator />}
         </FieldLabel>
@@ -83,7 +84,7 @@ function OtpField({
         className={className}
         containerClassName={containerClassName}
         disabled={disabled}
-        id={field.name}
+        id={id}
         maxLength={maxLength}
         name={field.name}
         onBlur={field.handleBlur}

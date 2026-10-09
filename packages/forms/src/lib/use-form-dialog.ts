@@ -156,8 +156,9 @@ function attributeSelector(attribute: string, value: string): string {
 
 /**
  * Find the element to focus for field `name` inside `root`: the control with
- * `id={name}` (what the shipped fields render), else the first focusable
- * element inside the field root marked `data-field={name}`.
+ * `id={name}` (fields that use the name as their id), else, inside the field
+ * root marked `data-field={name}`, the control its label points at (the shipped
+ * fields' ids come from `useId`), else that root's first focusable element.
  */
 function findFieldElement(
   root: ParentNode | null | undefined,
@@ -171,7 +172,14 @@ function findFieldElement(
     return byId
   }
   const fieldRoot = root.querySelector(attributeSelector("data-field", name))
-  return fieldRoot?.querySelector<HTMLElement>(FOCUSABLE) ?? null
+  if (!fieldRoot) {
+    return null
+  }
+  const labelFor = fieldRoot.querySelector("label[for]")?.getAttribute("for")
+  const labelled = labelFor
+    ? fieldRoot.querySelector<HTMLElement>(attributeSelector("id", labelFor))
+    : null
+  return labelled ?? fieldRoot.querySelector<HTMLElement>(FOCUSABLE)
 }
 
 export type {

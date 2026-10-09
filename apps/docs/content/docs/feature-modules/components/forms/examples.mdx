@@ -549,7 +549,9 @@ export function TeamInvites() {
 `form.Subscribe` reads another field's value and re-renders only its own
 children when that value changes, not the whole form. Here, switching the
 country swaps the second field between a `SelectField` and an
-`InputField`.
+`InputField`. To read state in a hook instead, such as to debounce a value,
+use `useSelector(form.store, (state) => state.values.country)`, also
+exported by `create-form`.
 
 <Preview>
   <ConditionalExample />

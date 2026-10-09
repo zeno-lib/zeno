@@ -38,8 +38,7 @@
     "types:check": "tsc --noEmit"
   },
   "dependencies": {
-    "@tanstack/react-form": "1.33.5",
-    "@tanstack/react-form-nextjs": "1.33.5"
+    "@tanstack/react-form": "1.33.5"
   },
   "devDependencies": {
     "@types/node": "26.6.4",
@@ -68,6 +67,9 @@
       "optional": true
     },
     "@tanstack/react-form-devtools": {
+      "optional": true
+    },
+    "zod": {
       "optional": true
     }
   },

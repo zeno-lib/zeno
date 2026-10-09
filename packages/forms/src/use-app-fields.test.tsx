@@ -30,7 +30,6 @@ describe("EmailField / PasswordField", () => {
     }
     render(<H />)
     const input = screen.getByLabelText(CONTACT_EMAIL_LABEL) as HTMLInputElement
-    expect(input.id).toBe("contactEmail")
     expect(input.name).toBe("contactEmail")
     await user.type(input, "u@example.com")
     expect(input.value).toBe("u@example.com")
@@ -54,7 +53,6 @@ describe("EmailField / PasswordField", () => {
     }
     render(<H />)
     const input = screen.getByLabelText(PASSWORD_LABEL) as HTMLInputElement
-    expect(input.id).toBe("password")
     expect(input.name).toBe("password")
     expect(input.type).toBe("password")
   })
@@ -135,5 +133,34 @@ describe("CheckboxField — boolean state wrapper", () => {
     expect(checkbox.getAttribute("aria-checked")).toBe("false")
     await user.click(checkbox)
     expect(checkbox.getAttribute("aria-checked")).toBe("true")
+  })
+})
+
+describe("field ids", () => {
+  test("two forms with the same field name label their own controls", () => {
+    const schema = z.object({ description: z.string().min(1) })
+    function H({ label }: { label: string }) {
+      const form = useForm({ onSubmit: vi.fn(), schema })
+      const { InputField } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <InputField description="Hint" label={label} name="description" />
+          </Form>
+        </FormProvider>
+      )
+    }
+    render(
+      <>
+        <H label="Page description" />
+        <H label="Dialog description" />
+      </>
+    )
+    const page = screen.getByRole("textbox", { name: "Page description" })
+    const dialog = screen.getByRole("textbox", { name: "Dialog description" })
+    expect(dialog).not.toBe(page)
+    const hints = screen.getAllByText("Hint")
+    expect(page.getAttribute("aria-describedby")).toBe(hints[0]?.id)
+    expect(dialog.getAttribute("aria-describedby")).toBe(hints[1]?.id)
   })
 })

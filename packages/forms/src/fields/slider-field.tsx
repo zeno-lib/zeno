@@ -7,7 +7,7 @@ import {
   useIsFieldRequired,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
-import type { ComponentProps, ReactNode } from "react"
+import { type ComponentProps, type ReactNode, useId } from "react"
 import {
   Field,
   FieldContent,
@@ -43,8 +43,9 @@ function SliderField({
   ...props
 }: SliderFieldProps) {
   const field = useFieldContext<SliderValue>()
-  const errorId = `${field.name}-error`
-  const descriptionId = `${field.name}-description`
+  const id = useId()
+  const errorId = `${id}-error`
+  const descriptionId = `${id}-description`
   const isInvalid = useIsInvalid(field)
   const hideErrors = useHideFieldErrors(field)
   const showError = isInvalid && !hideErrors
@@ -61,7 +62,7 @@ function SliderField({
       {(label || hasReadout) && (
         <FieldContent className="flex-row items-center justify-between">
           {label && (
-            <FieldLabel htmlFor={field.name}>
+            <FieldLabel htmlFor={id}>
               {label}
               {isRequired && <RequiredIndicator />}
             </FieldLabel>
@@ -79,7 +80,7 @@ function SliderField({
           [showError, errorId]
         )}
         aria-invalid={isInvalid || undefined}
-        id={field.name}
+        id={id}
         name={field.name}
         onBlur={field.handleBlur}
         onValueChange={(next) => {

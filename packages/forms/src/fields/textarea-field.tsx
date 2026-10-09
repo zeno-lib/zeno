@@ -7,7 +7,7 @@ import {
   useIsFieldRequired,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
-import { Children, type ComponentProps, type ReactNode } from "react"
+import { Children, type ComponentProps, type ReactNode, useId } from "react"
 import {
   Field,
   FieldDescription,
@@ -37,8 +37,9 @@ function TextAreaField({
   ...props
 }: TextAreaFieldProps) {
   const field = useFieldContext<string>()
-  const errorId = `${field.name}-error`
-  const descriptionId = `${field.name}-description`
+  const id = useId()
+  const errorId = `${id}-error`
+  const descriptionId = `${id}-description`
   const isInvalid = useIsInvalid(field)
   const hideErrors = useHideFieldErrors(field)
   const showError = isInvalid && !hideErrors
@@ -52,7 +53,7 @@ function TextAreaField({
       [showError, errorId]
     ),
     "aria-invalid": isInvalid || undefined,
-    id: field.name,
+    id,
     name: field.name,
     onBlur: field.handleBlur,
     onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) =>
@@ -64,7 +65,7 @@ function TextAreaField({
   return (
     <Field data-field={field.name} data-invalid={isInvalid}>
       {label && (
-        <FieldLabel htmlFor={field.name}>
+        <FieldLabel htmlFor={id}>
           {label}
           {isRequired && <RequiredIndicator />}
         </FieldLabel>

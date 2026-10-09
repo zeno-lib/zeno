@@ -38,6 +38,26 @@ describe("getRequiredPaths", () => {
     expect(required.has("role")).toBe(false)
   })
 
+  test("a string that accepts the empty value it starts at is not required", () => {
+    const schema = z.object({
+      email: z.email(),
+      members: z.array(z.object({ name: z.string().min(1), note: z.string() })),
+      name: z.string().trim().min(1),
+      notes: z.string(),
+      profile: z.object({ bio: z.string(), title: z.string().min(1) }),
+      subtitle: z.string().nullable(),
+    })
+    const required = getRequiredPaths(schema)
+    expect(required.has("notes")).toBe(false)
+    expect(required.has("subtitle")).toBe(false)
+    expect(required.has("profile.bio")).toBe(false)
+    expect(required.has("members[0].note")).toBe(false)
+    expect(required.has("email")).toBe(true)
+    expect(required.has("name")).toBe(true)
+    expect(required.has("profile.title")).toBe(true)
+    expect(required.has("members[0].name")).toBe(true)
+  })
+
   test("nested z.object reports the parent and its required children", () => {
     const schema = z.object({
       profile: z.object({
@@ -79,7 +99,7 @@ describe("getRequiredPaths", () => {
   test("nested arrays descend through every level", () => {
     const schema = z.object({
       groups: z.array(
-        z.object({ members: z.array(z.object({ name: z.string() })) })
+        z.object({ members: z.array(z.object({ name: z.string().min(1) })) })
       ),
     })
     const required = getRequiredPaths(schema)

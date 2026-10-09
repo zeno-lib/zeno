@@ -1,5 +1,6 @@
 /* biome-ignore-all lint/performance/noBarrelFile: single npm entry for the headless form API. */
 
+export { useSelector } from "@tanstack/react-form"
 export { createZenoForm } from "./create-zeno-form"
 export { Form, FormProvider } from "./form-element"
 export {

@@ -7,7 +7,7 @@ import {
   useIsFieldRequired,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
-import type { ComponentProps, ReactNode } from "react"
+import { type ComponentProps, type ReactNode, useId } from "react"
 import { buttonVariants } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -60,8 +60,9 @@ function DatePickerField({
   triggerClassName,
 }: DatePickerFieldProps) {
   const field = useFieldContext<Date | undefined>()
-  const errorId = `${field.name}-error`
-  const descriptionId = `${field.name}-description`
+  const id = useId()
+  const errorId = `${id}-error`
+  const descriptionId = `${id}-description`
   const isInvalid = useIsInvalid(field)
   const hideErrors = useHideFieldErrors(field)
   const showError = isInvalid && !hideErrors
@@ -74,7 +75,7 @@ function DatePickerField({
   return (
     <Field data-field={field.name} data-invalid={isInvalid}>
       {label && (
-        <FieldLabel htmlFor={field.name}>
+        <FieldLabel htmlFor={id}>
           {label}
           {isRequired && <RequiredIndicator />}
         </FieldLabel>
@@ -92,7 +93,7 @@ function DatePickerField({
             triggerClassName
           )}
           data-empty={empty || undefined}
-          id={field.name}
+          id={id}
           // Base UI's Popover handles open state — we still need blur on the
           // form's reactive store. Passing onBlur here mirrors how `<select>`
           // commits on close.

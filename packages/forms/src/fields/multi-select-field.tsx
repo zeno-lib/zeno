@@ -8,7 +8,7 @@ import {
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
 import { XIcon } from "lucide-react"
-import type { ReactNode } from "react"
+import { type ReactNode, useId } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Combobox,
@@ -96,8 +96,9 @@ function MultiSelectField<T = string>({
 }: MultiSelectFieldProps<T>) {
   const field = useFieldContext<MultiSelectValue<T>[] | null | undefined>()
   const anchor = useComboboxAnchor()
-  const errorId = `${field.name}-error`
-  const descriptionId = `${field.name}-description`
+  const id = useId()
+  const errorId = `${id}-error`
+  const descriptionId = `${id}-description`
   const isInvalid = useIsInvalid(field)
   const hideErrors = useHideFieldErrors(field)
   const showError = isInvalid && !hideErrors
@@ -114,7 +115,7 @@ function MultiSelectField<T = string>({
   return (
     <Field data-field={field.name} data-invalid={isInvalid}>
       {label && (
-        <FieldLabel htmlFor={field.name}>
+        <FieldLabel htmlFor={id}>
           {label}
           {isRequired && <RequiredIndicator />}
         </FieldLabel>
@@ -143,7 +144,7 @@ function MultiSelectField<T = string>({
                     [showError, errorId]
                   )}
                   aria-invalid={isInvalid || undefined}
-                  id={field.name}
+                  id={id}
                   name={field.name}
                   onBlur={field.handleBlur}
                   placeholder={chips.length === 0 ? placeholder : undefined}
