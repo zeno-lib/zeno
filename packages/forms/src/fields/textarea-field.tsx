@@ -5,6 +5,7 @@ import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
+  useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
 import { Children, type ComponentProps, type ReactNode, useId } from "react"
@@ -25,7 +26,10 @@ type TextAreaFieldProps = Omit<
   children?: ReactNode
   description?: ReactNode
   label?: ReactNode
-  /** Force the required `*` indicator on or off. Defaults to schema-derived. */
+  /**
+   * Mark the field required, or not, over the schema. Drives the `*` and
+   * `aria-required`.
+   */
   required?: boolean
 }
 
@@ -46,6 +50,8 @@ function TextAreaField({
   const hasAddons = Children.count(children) > 0
   const schemaRequired = useIsFieldRequired(field)
   const isRequired = required ?? schemaRequired
+  const schemaRequiresValue = useIsFieldRequiredBySchema(field)
+  const requiresValue = required ?? schemaRequiresValue
 
   const textareaProps = {
     "aria-describedby": describedBy(
@@ -53,6 +59,7 @@ function TextAreaField({
       [showError, errorId]
     ),
     "aria-invalid": isInvalid || undefined,
+    "aria-required": requiresValue || undefined,
     id,
     name: field.name,
     onBlur: field.handleBlur,

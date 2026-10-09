@@ -2,12 +2,14 @@
 
 import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { getEmptyValue } from "@zeno-lib/forms/lib/empty-value"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
+  useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
-import { type ComponentProps, type ReactNode, useId } from "react"
+import { type ComponentProps, type ReactNode, useId, useRef } from "react"
 import { buttonVariants } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -35,8 +37,15 @@ type DatePickerFieldProps = {
   formatValue?: (date: Date) => string
   triggerClassName?: string
   /** Pass-through to the underlying `<Calendar>` (e.g. `disabled`, `locale`). */
-  calendarProps?: Omit<CalendarProps, "mode" | "onSelect" | "selected">
-  /** Force the required `*` indicator on or off. Defaults to schema-derived. */
+  calendarProps?: Omit<
+    CalendarProps,
+    "mode" | "onSelect" | "required" | "selected"
+  >
+  disabled?: boolean
+  /**
+   * Mark the field required, or not, over the schema. A required date shows
+   * the `*`, and picking its selected day again keeps it instead of clearing.
+   */
   required?: boolean
 }
 
@@ -53,6 +62,7 @@ function defaultFormat(date: Date): string {
 function DatePickerField({
   calendarProps,
   description,
+  disabled,
   formatValue = defaultFormat,
   label,
   placeholder = FALLBACK_PLACEHOLDER,
@@ -60,6 +70,10 @@ function DatePickerField({
   triggerClassName,
 }: DatePickerFieldProps) {
   const field = useFieldContext<Date | undefined>()
+  // Opening the popover moves focus into it, so the trigger's blur would mark
+  // the field touched, and show a required error, before a day is picked.
+  // The field is touched once the popover closes, or focus leaves it closed.
+  const isOpen = useRef<boolean>(false)
   const id = useId()
   const errorId = `${id}-error`
   const descriptionId = `${id}-description`
@@ -68,6 +82,8 @@ function DatePickerField({
   const showError = isInvalid && !hideErrors
   const schemaRequired = useIsFieldRequired(field)
   const isRequired = required ?? schemaRequired
+  const schemaRequiresValue = useIsFieldRequiredBySchema(field)
+  const requiresValue = required ?? schemaRequiresValue
 
   const { value } = field.state
   const empty = !value
@@ -80,7 +96,14 @@ function DatePickerField({
           {isRequired && <RequiredIndicator />}
         </FieldLabel>
       )}
-      <Popover>
+      <Popover
+        onOpenChange={(open) => {
+          isOpen.current = open
+          if (!open) {
+            field.handleBlur()
+          }
+        }}
+      >
         <PopoverTrigger
           aria-describedby={describedBy(
             [description, descriptionId],
@@ -93,11 +116,13 @@ function DatePickerField({
             triggerClassName
           )}
           data-empty={empty || undefined}
+          disabled={disabled}
           id={id}
-          // Base UI's Popover handles open state — we still need blur on the
-          // form's reactive store. Passing onBlur here mirrors how `<select>`
-          // commits on close.
-          onBlur={field.handleBlur}
+          onBlur={() => {
+            if (!isOpen.current) {
+              field.handleBlur()
+            }
+          }}
         >
           <CalendarIcon />
           {empty ? <span>{placeholder}</span> : formatValue(value)}
@@ -105,7 +130,10 @@ function DatePickerField({
         <PopoverContent className="w-auto p-0">
           <Calendar
             mode="single"
-            onSelect={(next) => field.handleChange(next)}
+            onSelect={(next: Date | undefined) =>
+              field.handleChange(next ?? getEmptyValue(field, undefined))
+            }
+            required={requiresValue}
             selected={value}
             {...calendarProps}
           />

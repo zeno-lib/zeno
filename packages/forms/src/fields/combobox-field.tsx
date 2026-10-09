@@ -2,9 +2,11 @@
 
 import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { getEmptyValue } from "@zeno-lib/forms/lib/empty-value"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
+  useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
 import { type ReactNode, useId } from "react"
@@ -43,13 +45,17 @@ type ComboboxFieldProps<T = string> = {
   /** Override per-row rendering. Default: plain `<ComboboxItem>{label}</ComboboxItem>`. */
   renderItem?: (item: T) => ReactNode
   /**
-   * If `true`, show the clear button when a value is selected. Defaults to
-   * `true` — pass `false` for required-style comboboxes where clearing is
-   * disallowed.
+   * Show the clear button when a value is selected. Defaults to `true` on an
+   * optional field and `false` on a required one (from the schema or
+   * `required`), where clearing could only make the form invalid.
    */
   showClear?: boolean
+  disabled?: boolean
   className?: string
-  /** Force the required `*` indicator on or off. Defaults to schema-derived. */
+  /**
+   * Mark the field required, or not, over the schema. Drives the `*`,
+   * `aria-required` and the `showClear` default.
+   */
   required?: boolean
   /**
    * Controlled input text — pair with `onInputValueChange` for server-side
@@ -82,6 +88,7 @@ function isItemObject(item: unknown): item is ComboboxItemObject<unknown> {
 function ComboboxField<T = string>({
   className,
   description,
+  disabled,
   emptyMessage = "No results.",
   filter,
   inputValue,
@@ -92,7 +99,7 @@ function ComboboxField<T = string>({
   placeholder,
   renderItem,
   required,
-  showClear = true,
+  showClear,
 }: ComboboxFieldProps<T>) {
   const field = useFieldContext()
   const id = useId()
@@ -103,13 +110,20 @@ function ComboboxField<T = string>({
   const showError = isInvalid && !hideErrors
   const schemaRequired = useIsFieldRequired(field)
   const isRequired = required ?? schemaRequired
+  const schemaRequiresValue = useIsFieldRequiredBySchema(field)
+  const requiresValue = required ?? schemaRequiresValue
+  const canClear = showClear ?? !requiresValue
 
   const fieldValue = field.state.value
-  const hasObjectItems = items.some(isItemObject)
-  const value = hasObjectItems
-    ? ((items.find((item) => isItemObject(item) && item.value === fieldValue) ??
-        null) as T | null)
-    : ((fieldValue ?? null) as T | null)
+  // Base UI shows the value it gets as text, so a stored id whose item isn't
+  // in `items` (options still loading, or a search that dropped it) would
+  // show raw. Only a plain string or number item is its own label.
+  const match = items.find(
+    (item) => (isItemObject(item) ? item.value : item) === fieldValue
+  )
+  const plainItems = items.length > 0 && !items.some(isItemObject)
+  const value = (match ??
+    (plainItems ? (fieldValue ?? null) : null)) as T | null
 
   return (
     <Field data-field={field.name} data-invalid={isInvalid}>
@@ -120,13 +134,14 @@ function ComboboxField<T = string>({
         </FieldLabel>
       )}
       <Combobox
+        disabled={disabled}
         filter={filter}
         inputValue={inputValue}
         items={items}
         onInputValueChange={onInputValueChange}
         onValueChange={(next) => {
           if (next === null) {
-            field.handleChange(undefined)
+            field.handleChange(getEmptyValue(field, undefined))
             return
           }
           field.handleChange(isItemObject(next) ? next.value : next)
@@ -139,12 +154,14 @@ function ComboboxField<T = string>({
             [showError, errorId]
           )}
           aria-invalid={isInvalid || undefined}
+          aria-required={requiresValue || undefined}
           className={className}
+          disabled={disabled}
           id={id}
           name={field.name}
           onBlur={field.handleBlur}
           placeholder={placeholder}
-          showClear={showClear && value !== null && value !== "" && !loading}
+          showClear={canClear && value !== null && value !== "" && !loading}
         >
           {loading && (
             <InputGroupAddon align="inline-end">

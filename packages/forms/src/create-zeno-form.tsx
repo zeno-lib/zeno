@@ -12,8 +12,12 @@ import { createFormHook } from "@tanstack/react-form"
 import { type ComponentProps, type ReactNode, useMemo } from "react"
 import { applyValidationError } from "./lib/apply-validation-error"
 import { fieldContext, formContext } from "./lib/contexts"
+import { withEmptyStartValues } from "./lib/empty-value"
 import { deepMergeDefaults, extractZodDefaults } from "./lib/schema-defaults"
-import { getRequiredPaths } from "./lib/schema-required"
+import {
+  getRequiredPaths,
+  type StandardSchemaLike,
+} from "./lib/schema-required"
 import { useRebasedDefaultValues } from "./lib/use-rebased-default-values"
 import { useUnsavedChangesWarning } from "./lib/use-unsaved-changes-warning"
 import { ValidationError } from "./lib/validation-error"
@@ -453,17 +457,20 @@ export function createZenoForm<
 
     const requiredFields = useMemo(
       () =>
-        schema && requiredIndicator
+        schema
           ? getRequiredPaths(schema as Parameters<typeof getRequiredPaths>[0])
           : new Set<string>(),
-      [schema, requiredIndicator]
+      [schema]
     )
 
     const schemaDefaults = useMemo(
       () =>
         schema
-          ? extractZodDefaults(
-              schema as Parameters<typeof extractZodDefaults>[0]
+          ? withEmptyStartValues(
+              schema as StandardSchemaLike,
+              extractZodDefaults(
+                schema as Parameters<typeof extractZodDefaults>[0]
+              )
             )
           : undefined,
       [schema]
@@ -515,6 +522,7 @@ export function createZenoForm<
       hideFieldErrors,
       requiredFields,
       requiredIndicator,
+      schema: schema as StandardSchemaLike | undefined,
       ...(schemaMode === undefined ? {} : { validation: schemaMode }),
     })
 

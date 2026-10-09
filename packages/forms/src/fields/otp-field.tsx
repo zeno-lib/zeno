@@ -5,6 +5,7 @@ import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
+  useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
 import { type ReactNode, useId } from "react"
@@ -40,7 +41,10 @@ type OtpFieldProps = {
    * you need a separator between segments.
    */
   children?: ReactNode
-  /** Force the required `*` indicator on or off. Defaults to schema-derived. */
+  /**
+   * Mark the field required, or not, over the schema. Drives the `*` and
+   * `aria-required`.
+   */
   required?: boolean
 }
 
@@ -65,6 +69,8 @@ function OtpField({
   const showError = isInvalid && !hideErrors
   const schemaRequired = useIsFieldRequired(field)
   const isRequired = required ?? schemaRequired
+  const schemaRequiresValue = useIsFieldRequiredBySchema(field)
+  const requiresValue = required ?? schemaRequiresValue
 
   return (
     <Field data-field={field.name} data-invalid={isInvalid}>
@@ -80,6 +86,7 @@ function OtpField({
           [showError, errorId]
         )}
         aria-invalid={isInvalid || undefined}
+        aria-required={requiresValue || undefined}
         autoFocus={autoFocus}
         className={className}
         containerClassName={containerClassName}

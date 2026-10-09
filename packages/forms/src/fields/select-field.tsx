@@ -5,10 +5,11 @@ import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
+  useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
 import type { ComponentProps, ReactNode } from "react"
-import { Children, isValidElement, useId, useMemo } from "react"
+import { Children, isValidElement, useId, useMemo, useRef } from "react"
 import {
   Field,
   FieldDescription,
@@ -31,7 +32,10 @@ type SelectFieldProps = Omit<
   description?: ReactNode
   label?: ReactNode
   placeholder?: string
-  /** Force the required `*` indicator on or off. Defaults to schema-derived. */
+  /**
+   * Mark the field required, or not, over the schema. Drives the `*` and
+   * `aria-required`.
+   */
   required?: boolean
   triggerClassName?: string
   triggerSize?: ComponentProps<typeof SelectTrigger>["size"]
@@ -41,6 +45,7 @@ function SelectField({
   children,
   description,
   label,
+  onOpenChange,
   placeholder,
   required,
   triggerClassName,
@@ -48,6 +53,10 @@ function SelectField({
   ...props
 }: SelectFieldProps) {
   const field = useFieldContext()
+  // Opening the popup moves focus into it, so the trigger's blur would mark
+  // the field touched, and show a required error, before anything is picked.
+  // The field is touched once the popup closes, or focus leaves it closed.
+  const isOpen = useRef<boolean>(false)
   const id = useId()
   const errorId = `${id}-error`
   const descriptionId = `${id}-description`
@@ -56,6 +65,8 @@ function SelectField({
   const showError = isInvalid && !hideErrors
   const schemaRequired = useIsFieldRequired(field)
   const isRequired = required ?? schemaRequired
+  const schemaRequiresValue = useIsFieldRequiredBySchema(field)
+  const requiresValue = required ?? schemaRequiresValue
 
   const items = useMemo(() => {
     const map: Record<string, ReactNode> = {}
@@ -81,6 +92,13 @@ function SelectField({
       <Select
         items={items}
         name={field.name}
+        onOpenChange={(open, eventDetails) => {
+          isOpen.current = open
+          if (!open) {
+            field.handleBlur()
+          }
+          onOpenChange?.(open, eventDetails)
+        }}
         onValueChange={(value) => field.handleChange(value)}
         value={field.state.value ?? null}
         {...props}
@@ -91,9 +109,14 @@ function SelectField({
             [showError, errorId]
           )}
           aria-invalid={isInvalid || undefined}
+          aria-required={requiresValue || undefined}
           className={triggerClassName}
           id={id}
-          onBlur={field.handleBlur}
+          onBlur={() => {
+            if (!isOpen.current) {
+              field.handleBlur()
+            }
+          }}
           size={triggerSize}
         >
           <SelectValue placeholder={placeholder} />

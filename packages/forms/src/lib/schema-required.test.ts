@@ -58,6 +58,22 @@ describe("getRequiredPaths", () => {
     expect(required.has("members[0].name")).toBe(true)
   })
 
+  test("a field that accepts null is not required", () => {
+    const schema = z.object({
+      count: z.number(),
+      day: z.date().nullable(),
+      kind: z.enum(["a", "b"]).nullable(),
+      ownerId: z.uuid().nullable(),
+      total: z.number().nullable(),
+    })
+    const required = getRequiredPaths(schema)
+    expect(required.has("count")).toBe(true)
+    expect(required.has("day")).toBe(false)
+    expect(required.has("kind")).toBe(false)
+    expect(required.has("ownerId")).toBe(false)
+    expect(required.has("total")).toBe(false)
+  })
+
   test("nested z.object reports the parent and its required children", () => {
     const schema = z.object({
       profile: z.object({
@@ -80,20 +96,26 @@ describe("getRequiredPaths", () => {
 
   test("array rows are reported with TanStack bracket syntax", () => {
     const schema = z.object({
+      emails: z.array(z.email()),
       members: z.array(
         z.object({
           name: z.string().min(1),
           note: z.string().optional(),
         })
       ),
+      picked: z.array(z.string()).min(1),
       tags: z.array(z.string()),
     })
     const required = getRequiredPaths(schema)
-    expect(required.has("members")).toBe(true)
     expect(required.has("members[0].name")).toBe(true)
     expect(required.has("members.0.name")).toBe(false)
     expect(required.has("members[0].note")).toBe(false)
-    expect(required.has("tags[0]")).toBe(true)
+    expect(required.has("emails[0]")).toBe(true)
+    expect(required.has("picked")).toBe(true)
+    // `[]` and `""` are what the form starts them at, and both pass.
+    expect(required.has("members")).toBe(false)
+    expect(required.has("tags")).toBe(false)
+    expect(required.has("tags[0]")).toBe(false)
   })
 
   test("nested arrays descend through every level", () => {

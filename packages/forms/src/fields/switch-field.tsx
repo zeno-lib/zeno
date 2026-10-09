@@ -5,6 +5,7 @@ import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
+  useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
 import { type ComponentProps, type ReactNode, useId } from "react"
@@ -24,7 +25,10 @@ type SwitchFieldProps = Omit<
 > & {
   description?: ReactNode
   label?: ReactNode
-  /** Force the required `*` indicator on or off. Defaults to schema-derived. */
+  /**
+   * Mark the field required, or not, over the schema. Drives the `*` and
+   * `aria-required`.
+   */
   required?: boolean
 }
 
@@ -43,6 +47,8 @@ function SwitchField({
   const showError = isInvalid && !hideErrors
   const schemaRequired = useIsFieldRequired(field)
   const isRequired = required ?? schemaRequired
+  const schemaRequiresValue = useIsFieldRequiredBySchema(field)
+  const requiresValue = required ?? schemaRequiresValue
 
   return (
     <Field
@@ -70,6 +76,7 @@ function SwitchField({
           [showError, errorId]
         )}
         aria-invalid={isInvalid || undefined}
+        aria-required={requiresValue || undefined}
         checked={field.state.value ?? false}
         id={id}
         name={field.name}

@@ -21,6 +21,7 @@ export {
 export {
   useHideFieldErrors,
   useIsFieldRequired,
+  useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "./lib/use-is-invalid"
 export { type FieldMessage, ValidationError } from "./lib/validation-error"

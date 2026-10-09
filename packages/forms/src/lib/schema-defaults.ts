@@ -24,6 +24,7 @@ type SchemaDef = {
   readonly innerType?: SchemaNode
   readonly shape?: Record<string, SchemaNode>
   readonly in?: SchemaNode
+  readonly element?: SchemaNode
   readonly defaultValue?: unknown
 }
 
@@ -91,6 +92,54 @@ function extractZodDefaults(schema: SchemaNode): Record<string, unknown> {
   }
 }
 
+// Step from an object or array schema into its `key` child, through any
+// wrapper around it. `null` when there is none.
+function childAt(node: SchemaNode, key: PropertyKey): SchemaNode | null {
+  let current: SchemaNode | undefined = node
+  for (let depth = 0; depth < MAX_WRAPPER_DEPTH; depth += 1) {
+    const def: SchemaDef | undefined = getDef(current)
+    switch (def?.type) {
+      case "object":
+        return (typeof key === "string" && def.shape?.[key]) || null
+      case "array":
+        return (typeof key === "number" && def.element) || null
+      case "default":
+      case "nonoptional":
+      case "nullable":
+      case "optional":
+      case "prefault":
+      case "readonly":
+        current = def.innerType
+        continue
+      case "pipe":
+        current = def.in
+        continue
+      default:
+        return null
+    }
+  }
+  return null
+}
+
+// The value `extractZodDefaults` starts the field at `keys` at, array rows
+// included (`["members", 2, "name"]`). `{ ok: false }` when it gives none.
+function extractZodDefaultAt(
+  schema: SchemaNode,
+  keys: readonly PropertyKey[]
+): ExtractResult {
+  try {
+    let node: SchemaNode | null = schema
+    for (const key of keys) {
+      node = node && childAt(node, key)
+    }
+    return node && keys.length > 0
+      ? extractDefaultForField(node)
+      : { ok: false }
+  } catch {
+    return { ok: false }
+  }
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return (
     typeof value === "object" &&
@@ -124,4 +173,4 @@ function deepMergeDefaults(
   return result
 }
 
-export { deepMergeDefaults, extractZodDefaults }
+export { deepMergeDefaults, extractZodDefaultAt, extractZodDefaults }

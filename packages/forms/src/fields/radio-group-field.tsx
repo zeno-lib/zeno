@@ -5,6 +5,7 @@ import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
+  useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
 import { type ComponentProps, type ReactNode, useId } from "react"
@@ -24,7 +25,10 @@ type RadioGroupFieldProps = Omit<
 > & {
   description?: ReactNode
   label?: ReactNode
-  /** Force the required `*` indicator on or off. Defaults to schema-derived. */
+  /**
+   * Mark the field required, or not, over the schema. Drives the `*` and
+   * `aria-required`.
+   */
   required?: boolean
 }
 
@@ -35,7 +39,7 @@ function RadioGroupField({
   required,
   ...props
 }: RadioGroupFieldProps) {
-  const field = useFieldContext<string>()
+  const field = useFieldContext()
   const id = useId()
   const errorId = `${id}-error`
   const descriptionId = `${id}-description`
@@ -44,6 +48,8 @@ function RadioGroupField({
   const showError = isInvalid && !hideErrors
   const schemaRequired = useIsFieldRequired(field)
   const isRequired = required ?? schemaRequired
+  const schemaRequiresValue = useIsFieldRequiredBySchema(field)
+  const requiresValue = required ?? schemaRequiresValue
 
   return (
     <Field data-field={field.name} data-invalid={isInvalid}>
@@ -59,9 +65,10 @@ function RadioGroupField({
           [showError, errorId]
         )}
         aria-invalid={isInvalid || undefined}
+        aria-required={requiresValue || undefined}
         name={field.name}
-        onValueChange={(value) => field.handleChange(String(value))}
-        value={field.state.value ?? ""}
+        onValueChange={(value) => field.handleChange(value)}
+        value={field.state.value ?? null}
         {...props}
       >
         {children}

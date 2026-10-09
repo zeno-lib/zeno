@@ -93,7 +93,8 @@ The root also carries `data-invalid`, and the control inside carries
 ## Email field
 
 `EmailField` is a preset over `InputField` that sets `type="email"`,
-`inputMode="email"`, and `autoComplete="email"`. It defaults `label` to
+`inputMode="email"`, and `autoComplete="email"`, and turns off
+auto-capitalisation, autocorrect and spell check. It defaults `label` to
 `"Email"`; `name` is required, as on every other field.
 
 <Preview>
@@ -138,8 +139,12 @@ a signup form. It defaults `label` to `"Password"`; `name` is required.
 
 ## Number field
 
-`NumberField` stores the input as a `number` (or `undefined` when empty), so
-you never convert the input's string yourself.
+`NumberField` stores the input as a `number` (its
+[empty value](/docs/feature-modules/components/forms/validation#empty-values)
+when emptied), so
+you never convert the input's string yourself. It sets `inputMode="decimal"`,
+so phone keypads keep the decimal key; pass `inputMode="numeric"` for whole
+numbers.
 
 <Preview>
   <NumberFieldPreview />
@@ -154,7 +159,9 @@ you never convert the input's string yourself.
 
 `MoneyField` is a text input that shows the currency as an addon. It
 re-inserts the locale's thousands separators as the user types and keeps the
-caret in place. The form value is `number | null` (`null` when empty). The
+caret in place. The form value is a `number`, or the field's
+[empty value](/docs/feature-modules/components/forms/validation#empty-values)
+when emptied (`null` when the schema allows nothing else). The
 field also accepts pasted amounts in other locales' formats: `CHF 1'234.50`,
 `1.234,50 €` and `1,234.50` all become `1234.5`, whatever the input's locale.
 On blur, the field pads a non-integer amount to the currency's minor units
@@ -465,6 +472,9 @@ import { RadioGroupFieldItem } from "@zeno-lib/forms/create-form"
 
 </Preview>
 
+Each item's `value` is stored as is, so `value={true}` or `value={2}` gives a
+boolean or a number, not a string. Nothing picked is `undefined`.
+
 ## Slider field
 
 `SliderField` wraps `@zeno-lib/ui/slider`. The form value is a `number` for a
@@ -514,7 +524,7 @@ string regex), or pass `children` to insert a separator between groups.
 The form value is `Date | undefined`. By default the trigger formats the
 selected date with `toLocaleDateString`. Pass `formatValue` to override it, or
 `calendarProps` to forward options (`disabled`, `locale`, …) to the
-underlying `<Calendar>`.
+underlying `<Calendar>`. `disabled` on the field itself disables the trigger.
 
 <Preview>
   <DatePickerFieldPreview />
@@ -560,15 +570,22 @@ const FRAMEWORKS = ["Next.js", "Remix", "SvelteKit", "Nuxt.js", "Astro"]
 | `items` | `T[]` (`string` or `{ value, label }`) | Options shown in the dropdown. Filtered client-side unless `filter={null}`. |
 | `renderItem` | `(item: T) => ReactNode` | Override per-row rendering. |
 | `emptyMessage` | `ReactNode` | Shown when filtering produces zero matches. |
-| `showClear` | `boolean` | Show the clear button when a value is selected. Defaults to `true`. |
+| `showClear` | `boolean` | Show the clear button when a value is selected. Defaults to `true` on an optional field and `false` on a required one. |
 | `placeholder` | `string` | Input placeholder when the field is empty. |
 | `inputValue` | `string` | Controlled search text. Pair with `onInputValueChange`. |
 | `onInputValueChange` | `(value: string) => void` | Fires on every keystroke in the search input. |
 | `filter` | `((item, query) => boolean) \| null` | Replace the built-in filter, or `null` for server-driven search. |
 | `loading` | `boolean` | Show a spinner inside the input while options load. |
+| `disabled` | `boolean` | Disable the input and its buttons. |
 
 For server-driven search with debouncing, see
 [Async-search combobox](/docs/feature-modules/components/forms/examples#async-search-combobox).
+
+With `{ value, label }` items, the input shows a stored value only once
+`items` holds its item, so an id never shows raw while options load.
+
+shadcn's `ComboboxClear` is an icon with no accessible name. Give it one in
+your copy of `combobox.tsx` (`aria-label="Clear"`), as Zeno's does.
 
 ## Multi-select field
 
