@@ -8,7 +8,7 @@ import {
   useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
-import { type ComponentProps, type ReactNode, useId } from "react"
+import { type ComponentProps, type ReactNode, useId, useRef } from "react"
 import { buttonVariants } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -69,6 +69,10 @@ function DatePickerField({
   triggerClassName,
 }: DatePickerFieldProps) {
   const field = useFieldContext<Date | undefined>()
+  // Opening the popover moves focus into it, so the trigger's blur would mark
+  // the field touched, and show a required error, before a day is picked.
+  // The field is touched once the popover closes, or focus leaves it closed.
+  const isOpen = useRef<boolean>(false)
   const id = useId()
   const errorId = `${id}-error`
   const descriptionId = `${id}-description`
@@ -91,7 +95,14 @@ function DatePickerField({
           {isRequired && <RequiredIndicator />}
         </FieldLabel>
       )}
-      <Popover>
+      <Popover
+        onOpenChange={(open) => {
+          isOpen.current = open
+          if (!open) {
+            field.handleBlur()
+          }
+        }}
+      >
         <PopoverTrigger
           aria-describedby={describedBy(
             [description, descriptionId],
@@ -106,10 +117,11 @@ function DatePickerField({
           data-empty={empty || undefined}
           disabled={disabled}
           id={id}
-          // Base UI's Popover handles open state — we still need blur on the
-          // form's reactive store. Passing onBlur here mirrors how `<select>`
-          // commits on close.
-          onBlur={field.handleBlur}
+          onBlur={() => {
+            if (!isOpen.current) {
+              field.handleBlur()
+            }
+          }}
         >
           <CalendarIcon />
           {empty ? <span>{placeholder}</span> : formatValue(value)}

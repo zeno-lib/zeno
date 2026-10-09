@@ -3,11 +3,13 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
+import { SelectItem } from "@/components/ui/select"
 import { Form, FormProvider, useForm } from "./create-form"
 
 const CONTACT_EMAIL_LABEL = /Contact email/
@@ -18,7 +20,10 @@ const TITLE_LABEL = /Title/
 const NOTE_LABEL = /Note/
 const DAY_LABEL = /Day/
 const PICKED_DAY = /October 9/
+const ROLE_LABEL = /Role/
 const OWNER_LABEL = /Owner/
+const PICK_A_ROLE = "Pick a role"
+const PICK_A_DAY = "Pick a day"
 
 afterEach(() => {
   cleanup()
@@ -327,5 +332,61 @@ describe("ComboboxField with items still loading", () => {
     expect(input).toHaveProperty("value", "")
     rerender(<H items={[{ label: "Ada Lovelace", value: "user-7" }]} />)
     expect(input).toHaveProperty("value", "Ada Lovelace")
+  })
+})
+
+describe("popup fields", () => {
+  test("a required select shows its error once the popup closes, not while it is open", async () => {
+    const user = userEvent.setup()
+    function H() {
+      const form = useForm({
+        onSubmit: vi.fn(),
+        schema: z.object({ role: z.string().min(1, PICK_A_ROLE) }),
+      })
+      const { SelectField } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <SelectField label="Role" name="role">
+              <SelectItem value="admin">Admin</SelectItem>
+            </SelectField>
+          </Form>
+        </FormProvider>
+      )
+    }
+    render(<H />)
+    await user.click(screen.getByRole("combobox", { name: ROLE_LABEL }))
+    await screen.findByRole("option", { name: "Admin" })
+    expect(screen.queryByText(PICK_A_ROLE)).toBeNull()
+    await user.keyboard("{Escape}")
+    expect(await screen.findByText(PICK_A_ROLE)).toBeTruthy()
+  })
+
+  test("a required date shows its error once the popover closes, not while it is open", async () => {
+    const user = userEvent.setup()
+    function H() {
+      const form = useForm({
+        onSubmit: vi.fn(),
+        schema: z.object({ day: z.date({ error: PICK_A_DAY }) }),
+      })
+      const { DatePickerField } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <DatePickerField label="Day" name="day" />
+          </Form>
+        </FormProvider>
+      )
+    }
+    render(<H />)
+    const trigger = screen.getByRole("button", { name: DAY_LABEL })
+    trigger.focus()
+    fireEvent.click(trigger)
+    await screen.findByRole("grid")
+    // The trigger's blur is what used to mark the field touched.
+    await waitFor(() => expect(document.activeElement).not.toBe(trigger))
+    expect(screen.queryByText(PICK_A_DAY)).toBeNull()
+    await user.keyboard("{Escape}")
+    expect(await screen.findByText(PICK_A_DAY)).toBeTruthy()
   })
 })
