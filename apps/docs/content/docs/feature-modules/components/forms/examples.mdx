@@ -185,6 +185,9 @@ details the hand-rolled version above leaves out:
 
 - **One session per `open()`**: open it blank, or with a row's values and a
   field to focus, as in `dialog.open({ defaultValues: row, focus: "email" })`.
+  Each session mounts fresh fields, so state kept inside a field or a custom
+  child (a toggle, an expanded section) starts over too, even when the dialog
+  reopens before its close animation ends.
 - **Unsaved-changes guard**: the dialog asks before discarding changes on
   Cancel, ×, Escape or an outside press, and the page warns on unload while
   the dialog is open.
@@ -196,7 +199,10 @@ details the hand-rolled version above leaves out:
   closes when the submit succeeds (`closeOnSubmit`, default `true`). A
   failed validation, a thrown error, or a
   [`ValidationError`](/docs/feature-modules/components/forms/examples#server-side-error-handler)
-  keeps it open.
+  keeps it open, and an invalid save moves focus to the first invalid field,
+  as [`<Form>` does](/docs/feature-modules/components/forms#focus-on-submit).
+  That includes a field error a server action returns through
+  [`submitAction`](/docs/feature-modules/components/forms/examples#server-actions).
 
 ```bash
 pnpm dlx shadcn@latest add zeno-lib/zeno/form-dialog

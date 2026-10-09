@@ -5,18 +5,33 @@ import {
   waitFor,
 } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
+import { type ReactNode, useState } from "react"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
 import { useForm } from "./create-form"
 import { FormDialog } from "./form-dialog"
+import type { ActionResult } from "./lib/action-result"
+import { submitAction } from "./lib/submit-action"
 import { useFormDialog } from "./lib/use-form-dialog"
 
 const NAME = /Name/
 const EMAIL = /Email/
 
+const animatable = HTMLElement.prototype as {
+  getAnimations?: () => unknown[]
+}
+
 afterEach(() => {
+  animatable.getAnimations = undefined
   cleanup()
 })
+
+// jsdom runs no CSS animations, so Base UI unmounts a closing popup at once.
+// Report an animation that never ends, as a browser does while the exit
+// animation plays, so the popup stays mounted after it closes.
+function holdExitAnimation() {
+  animatable.getAnimations = () => [{ finished: new Promise(() => undefined) }]
+}
 
 const schema = z.object({
   email: z.string(),
@@ -27,16 +42,22 @@ const BLANK: Values = { email: "", name: "" }
 const ROW: Values = { email: "ada@example.com", name: "Ada" }
 
 function Harness({
+  action,
+  children,
   onSubmit = vi.fn(),
   closeOnSubmit,
 }: {
+  /** Submit through `submitAction` with this server action instead. */
+  action?: (values: Values) => Promise<ActionResult<unknown>>
+  children?: ReactNode
   onSubmit?: (values: Values) => unknown
   closeOnSubmit?: boolean
 }) {
   const dialog = useFormDialog({ defaultValues: BLANK })
   const form = useForm({
     defaultValues: dialog.defaultValues,
-    onSubmit: ({ value }) => onSubmit(value),
+    onSubmit: (submit) =>
+      action ? submitAction(submit, action) : onSubmit(submit.value),
     schema,
   })
   const { InputField } = form
@@ -59,6 +80,7 @@ function Harness({
       >
         <InputField label="Name" name="name" />
         <InputField label="Email" name="email" />
+        {children}
       </FormDialog>
     </>
   )
@@ -157,5 +179,76 @@ describe("FormDialog", () => {
     await user.click(screen.getByRole("button", { name: "Save" }))
     await waitFor(() => expect(onSubmit).toHaveBeenCalled())
     expect(screen.getByRole("dialog")).toBeTruthy()
+  })
+
+  test("a failed Save focuses the first invalid field", async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.click(screen.getByRole("button", { name: "New" }))
+    const name = await screen.findByLabelText(NAME)
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    expect(await screen.findByText("Required")).toBeTruthy()
+    await waitFor(() => expect(document.activeElement).toBe(name))
+  })
+
+  test("a field error from the server focuses that field", async () => {
+    const user = userEvent.setup()
+    const action = vi.fn(() =>
+      Promise.resolve<ActionResult<never>>({
+        error: { fieldErrors: { email: ["Already taken"] }, formErrors: [] },
+        ok: false,
+      })
+    )
+    render(<Harness action={action} />)
+    await user.click(screen.getByRole("button", { name: "New" }))
+    await user.type(await screen.findByLabelText(NAME), "Bob")
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    expect(await screen.findByText("Already taken")).toBeTruthy()
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByLabelText(EMAIL))
+    )
+    expect(screen.getByRole("dialog")).toBeTruthy()
+  })
+
+  test("reopening during the close animation mounts fresh fields", async () => {
+    const user = userEvent.setup()
+    function Details() {
+      const [shown, setShown] = useState(false)
+      return (
+        <button
+          aria-pressed={shown}
+          onClick={() => setShown(true)}
+          type="button"
+        >
+          Details
+        </button>
+      )
+    }
+    render(
+      <Harness>
+        <Details />
+      </Harness>
+    )
+    await openEdit(user)
+    await user.click(screen.getByRole("button", { name: "Details" }))
+    expect(
+      screen
+        .getByRole("button", { name: "Details" })
+        .getAttribute("aria-pressed")
+    ).toBe("true")
+
+    holdExitAnimation()
+    await user.click(screen.getByRole("button", { name: "Cancel" }))
+    // Still mounted: the exit animation is running.
+    expect(
+      screen.queryByRole("button", { hidden: true, name: "Details" })
+    ).not.toBeNull()
+    const name = await openEdit(user)
+    expect(name.value).toBe("Ada")
+    expect(
+      screen
+        .getByRole("button", { name: "Details" })
+        .getAttribute("aria-pressed")
+    ).toBe("false")
   })
 })

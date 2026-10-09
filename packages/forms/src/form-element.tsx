@@ -4,6 +4,7 @@ import type { AnyFormApi } from "@tanstack/react-form"
 import type { ComponentProps, FormEvent, ReactNode } from "react"
 
 import { FormProvider as RawFormProvider, useFormContext } from "./lib/contexts"
+import { focusFirstInvalid } from "./lib/focus-first-invalid"
 
 type FormProviderProps = {
   children: ReactNode
@@ -30,15 +31,7 @@ function Form({ children, className, ...props }: FormProps) {
         const node = event.currentTarget
         await Promise.resolve(form.handleSubmit()).catch(() => undefined)
         if (!form.state.isValid) {
-          // First invalid control in *this* form; a group root (radio group,
-          // slider) hands focus to its first tabbable child.
-          const invalid = node.querySelector<HTMLElement>(
-            '[aria-invalid="true"]'
-          )
-          const targets = invalid
-            ? [invalid, ...invalid.querySelectorAll<HTMLElement>("*")]
-            : []
-          targets.find((el) => el.tabIndex >= 0)?.focus()
+          focusFirstInvalid(node)
         }
       }}
       {...props}
