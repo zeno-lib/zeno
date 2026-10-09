@@ -181,9 +181,13 @@ Because the lookup only searches the submitted form, a form in a dialog
 never moves focus to the page behind it, and a submit from an external
 `<button form="…">` works the same way. When the invalid element is a
 group root that can't take focus itself (radio group, slider), `<Form>`
-focuses its first tabbable child. An `onSubmitInvalid` you pass goes to
-TanStack Form unchanged. Forms rendered without `<Form>` (your own
-`<form>` calling `handleSubmit`) don't get this behaviour.
+focuses its first tabbable child. Field errors that
+[`submitAction`](/docs/feature-modules/components/forms/examples#server-actions)
+puts on fields count too. An `onSubmitInvalid` you pass goes to
+TanStack Form unchanged. The `form-dialog` item does the same for its own
+`<form>`. In a `<form>` of your own that calls `handleSubmit`, call
+`focusFirstInvalid(formElement)` from `@zeno-lib/forms/lib/focus-first-invalid`
+once the submit leaves `form.state.isValid` false.
 
 ## Custom fields
 

@@ -34,8 +34,9 @@ A typed layer over [TanStack Form](https://tanstack.com/form) and Zod. The user 
 - **Every registry field puts `data-field={field.name}` and `data-invalid` on its `<Field>` root, and
   `aria-invalid={isInvalid || undefined}` on its focusable control** (or on the group root, whose
   first focusable child then gets focus). Submit-invalid focus depends on it.
-- **Submit-invalid focus lives in `<Form>`'s `onSubmit`** (`form-element.tsx`), after
-  `await form.handleSubmit()`. It relies on `useSyncExternalStore` flushing `aria-invalid` before
+- **Submit-invalid focus is `focusFirstInvalid`** (`lib/focus-first-invalid.ts`), which `<Form>`
+  and `FormDialog` call right after `await form.handleSubmit()`. It relies on
+  `useSyncExternalStore` flushing `aria-invalid`, `submitAction`'s field errors included, before
   that continuation. Don't add a timer.
 - **What a required field does follows `useIsFieldRequiredBySchema`; only the `*` follows
   `useIsFieldRequired`**, and the field's `required` prop overrides both. `useIsFieldRequired`

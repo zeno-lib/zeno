@@ -1,6 +1,7 @@
 "use client"
 
 import { FormProvider } from "@zeno-lib/forms"
+import { focusFirstInvalid } from "@zeno-lib/forms/lib/focus-first-invalid"
 import {
   type FormDialogController,
   findFieldElement,
@@ -100,9 +101,10 @@ type FormDialogProps<TValues> = {
 }
 
 /**
- * A dialog-hosted form: opens with fresh values per session, submits from a
- * footer button outside the `<form>` (via `form="id"`), shows a spinner while
- * submitting, closes on success, and asks before discarding unsaved changes
+ * A dialog-hosted form: opens with fresh values and fields per session,
+ * submits from a footer button outside the `<form>` (via `form="id"`), shows a
+ * spinner while submitting, focuses the first invalid field when the submit
+ * fails, closes on success, and asks before discarding unsaved changes
  * (Cancel, ×, Escape, outside press) or leaving the page.
  */
 function FormDialog<TValues>({
@@ -148,13 +150,15 @@ function FormDialog<TValues>({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     event.stopPropagation()
-    try {
-      await form.handleSubmit()
-    } catch {
-      return // the submit handler threw; keep the dialog open
-    }
+    const node = event.currentTarget
+    // A submit handler that throws leaves `isSubmitSuccessful` false, so the
+    // dialog stays open.
+    await Promise.resolve(form.handleSubmit()).catch(() => undefined)
     const { isSubmitSuccessful, isValid } = form.state
-    if (closeOnSubmit && isSubmitSuccessful && isValid) {
+    if (!isValid) {
+      // A schema error, or a field error the server returned (`submitAction`).
+      focusFirstInvalid(node)
+    } else if (closeOnSubmit && isSubmitSuccessful) {
       // Close directly, past the guard: the changes are saved. The form is
       // reset once the exit animation completes (see `onOpenChangeComplete`).
       close()
@@ -195,9 +199,14 @@ function FormDialog<TValues>({
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
         <FormProvider form={form}>
+          {/* Keyed on the session so every open mounts fresh fields. The
+              popup stays mounted through its exit animation, so reopening
+              before it ends would keep each field's local state (and any
+              custom child's) from the previous session. */}
           <form
             className={formClassName}
             id={formId}
+            key={session}
             noValidate
             onSubmit={handleSubmit}
           >
