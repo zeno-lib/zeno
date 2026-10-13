@@ -18,6 +18,7 @@ import {
   getRequiredPaths,
   type StandardSchemaLike,
 } from "./lib/schema-required"
+import { setSubmitError } from "./lib/submit-error"
 import { useRebasedDefaultValues } from "./lib/use-rebased-default-values"
 import { useUnsavedChangesWarning } from "./lib/use-unsaved-changes-warning"
 import { ValidationError } from "./lib/validation-error"
@@ -439,6 +440,7 @@ export function createZenoForm<
 
     const wrappedOnSubmit = userOnSubmit
       ? ((async (props: { formApi: AnyFormApi; value: TFormData }) => {
+          const { submissionAttempts } = props.formApi.state
           try {
             await (
               userOnSubmit as unknown as (
@@ -449,6 +451,16 @@ export function createZenoForm<
             if (error instanceof ValidationError) {
               applyValidationError(props.formApi, error)
               return
+            }
+            // Kept for `FormError`, unless an edit, a reset (a dialog closed
+            // meanwhile) or a newer submit came first: then it is about
+            // values no longer on screen.
+            const { state } = props.formApi
+            if (
+              state.values === props.value &&
+              state.submissionAttempts === submissionAttempts
+            ) {
+              setSubmitError(props.formApi, error)
             }
             throw error
           }
