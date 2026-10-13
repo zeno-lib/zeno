@@ -38,7 +38,7 @@ A typed layer over [TanStack Form](https://tanstack.com/form) and Zod. The user 
   and `FormDialog` call right after `await form.handleSubmit()`. It relies on
   `useSyncExternalStore` flushing `aria-invalid`, `submitAction`'s field errors included, before
   that continuation. Don't add a timer. A Save from `FormDialog`'s leave prompt is the exception:
-  the open prompt traps focus, so its `finalFocus` returns `findFirstInvalid` instead.
+  the open prompt traps focus, so its `finalFocus` calls it as the prompt closes instead.
 - **A failed submit with no invalid field calls `restoreFocus`**, because a submit button that
   disables itself while submitting drops focus to the body in browsers. jsdom keeps focus on a
   disabled button and can't `blur()` it, so a test drops focus by focusing an element it then

@@ -25,9 +25,11 @@ animation ends.
 
 The focus logic is now `focusFirstInvalid(formElement)` in
 `@zeno-lib/forms/lib/focus-first-invalid`, for a `<form>` of your own that
-calls `handleSubmit`. The module also exports `findFirstInvalid`.
+calls `handleSubmit`.
 `useLeaveGuard` takes an `onSave` that resolves whether it saved, and returns
 `saveAndLeave()` and `isSaving`, so other editors can offer Save in their own
 confirm UI.
 
-Re-add the `form-dialog` item with the shadcn CLI to pick this up.
+Update `@zeno-lib/forms` first, then re-add the `form-dialog` item with the
+shadcn CLI: the new item imports `focusFirstInvalid`, which older versions
+don't have.

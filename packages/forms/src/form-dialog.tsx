@@ -2,7 +2,6 @@
 
 import { FormProvider } from "@zeno-lib/forms"
 import {
-  findFirstInvalid,
   focusFirstInvalid,
   restoreFocus,
 } from "@zeno-lib/forms/lib/focus-first-invalid"
@@ -168,6 +167,10 @@ function FormDialog<TValues>({
   const announceOnPromptClosed = useRef<boolean>(false)
   const [formErrorKey, setFormErrorKey] = useState(0)
   const { close, defaultValues, focus, isOpen, open, session } = dialog
+  // Read after a submit's await: the dialog may have closed, or reopened on
+  // another record, while a slow save was in flight.
+  const latest = useRef({ isOpen, session })
+  latest.current = { isOpen, session }
 
   // `isDefaultValue`, not `isDirty`: `isDirty` stays true after the user
   // reverts an edit, `isDefaultValue` compares the values themselves.
@@ -238,6 +241,9 @@ function FormDialog<TValues>({
     const node = event.currentTarget
     const focused = node.ownerDocument.activeElement
     const saved = await submit()
+    if (!latest.current.isOpen || latest.current.session !== session) {
+      return // the session this submit belongs to is over
+    }
     if (saved) {
       if (closeOnSubmit) {
         // Close directly, past the guard: the changes are saved. The form is
@@ -382,7 +388,9 @@ function FormDialog<TValues>({
               return true
             }
             focusInvalidOnPromptClose.current = false
-            return findFirstInvalid(formRef.current) ?? true
+            // Base UI focuses what this returns too; focusing here first
+            // finds a field that takes focus, skipping disabled or hidden ones.
+            return focusFirstInvalid(formRef.current) ?? true
           }}
           size={saveFromPrompt ? "default" : "sm"}
         >
