@@ -10,4 +10,7 @@ in a production server bundle `toPostgresError` returned `undefined`, and
 message fell through to a generic error, in production only. An error now counts
 when its `code` is a SQLSTATE and it carries the severity Postgres sends with
 every error. A Node system error (`EPIPE`) or an error postgres.js raises itself
-(`CONNECTION_CLOSED`) still doesn't match.
+(`CONNECTION_CLOSED`) still doesn't match. Neither does an error that only has
+the name, so a `PostgresError` you build in a test now needs a `severity_local`
+next to its `code`; one with no `code` no longer makes `isConstraintViolation`
+throw.

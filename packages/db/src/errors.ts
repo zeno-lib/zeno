@@ -44,23 +44,21 @@ const SQLSTATE_PATTERN = /^[0-9A-Z]{5}$/
 /**
  * Whether `error` is a postgres.js server error, judged by its shape.
  *
- * The name is only a fast path. postgres.js names its errors after
- * `this.constructor.name`, and a minifier renames the class, so in a
- * production bundle the name can be `"a"`. `instanceof` misses as soon as
- * the tree holds a second copy of `postgres`. What holds everywhere is the
- * shape of the server's error response: a SQLSTATE `code` and the severity
- * field Postgres always sends (`S`, which postgres.js reads into
- * `severity_local`; the unlocalised `severity` only exists from 9.6).
+ * Never by name: postgres.js names its errors after `this.constructor.name`,
+ * and a minifier renames the class, so in a production bundle the name can be
+ * `"a"`. `instanceof` misses as soon as the tree holds a second copy of
+ * `postgres`. What holds everywhere is the shape of the server's error
+ * response: a SQLSTATE `code` and the severity field Postgres always sends
+ * (`S`, which postgres.js reads into `severity_local`; the unlocalised
+ * `severity` only exists from 9.6).
  *
  * An error that only shares a `code` doesn't match: a Node system error
  * (`EPIPE`) and the errors postgres.js raises itself (`CONNECTION_CLOSED`, or
- * `57014` for a query cancelled before it was sent) carry no severity.
+ * `57014` for a query cancelled before it was sent) carry no severity. Nor
+ * does one that only shares the name, such as a hand-built mock with no
+ * `code`, which `isConstraintViolation` would otherwise read as a string.
  */
 const isPostgresError = (error: Error): error is PostgresError => {
-  if (error.name === "PostgresError") {
-    return true
-  }
-
   const fields = error as Partial<Record<keyof PostgresError, unknown>>
 
   return (
@@ -81,9 +79,11 @@ const isPostgresError = (error: Error): error is PostgresError => {
  * depth 1: PostgresError      code=23505      "duplicate key value violates …"
  * ```
  *
- * Recognised by shape, not by `instanceof` or by `name`, so neither a second
- * copy of `postgres` in the tree nor a minified production build can make it
- * miss.
+ * Recognised by the shape of the server's error response, not by `instanceof`
+ * or by `name`, so neither a second copy of `postgres` in the tree nor a
+ * minified production build can make it miss. An error postgres.js raises
+ * itself (a closed connection, a query cancelled before it was sent) has no
+ * server response behind it, so it gives `undefined`.
  */
 export const toPostgresError = (error: unknown): PostgresError | undefined => {
   let current: unknown = error
