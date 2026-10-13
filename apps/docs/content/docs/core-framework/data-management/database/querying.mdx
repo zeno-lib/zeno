@@ -389,7 +389,11 @@ try {
 ```
 
 `toPostgresError(error)` returns the `PostgresError` (with `code`,
-`constraint_name`, `detail`, …) or `undefined`. `isConstraintViolation(error,
+`constraint_name`, `detail`, …) or `undefined`. It only returns errors the
+server sent: one postgres.js raises itself, such as a closed connection or a
+query cancelled before it was sent (`57014`), gives `undefined`. A
+`PostgresError` you build in a test needs a SQLSTATE `code` and a
+`severity_local`, like the real one. `isConstraintViolation(error,
 constraints?, { code? })` returns it only for an integrity-constraint violation
 (any class `23` code unless `code` narrows it) and, when you pass
 `constraints`, only for one of those. `SqlState` names the codes an application
