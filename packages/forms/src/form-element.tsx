@@ -5,7 +5,7 @@ import type { ComponentProps, FormEvent, ReactNode } from "react"
 
 import { FormProvider as RawFormProvider, useFormContext } from "./lib/contexts"
 import { focusFirstInvalid, restoreFocus } from "./lib/focus-first-invalid"
-import { setSubmitError } from "./lib/submit-error"
+import { reportSubmitError } from "./lib/submit-error"
 
 type FormProviderProps = {
   children: ReactNode
@@ -31,10 +31,8 @@ function Form({ children, className, ...props }: FormProps) {
         event.stopPropagation()
         const node = event.currentTarget
         const focused = node.ownerDocument.activeElement
-        // A thrown submit becomes the form-level error `FormError` shows.
-        await Promise.resolve(form.handleSubmit()).catch((error: unknown) =>
-          setSubmitError(form, error)
-        )
+        // Caught so the user can retry; `useForm` keeps it for `FormError`.
+        await Promise.resolve(form.handleSubmit()).catch(reportSubmitError)
         const { isSubmitSuccessful, isValid } = form.state
         if (!isValid && focusFirstInvalid(node)) {
           return

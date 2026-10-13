@@ -33,26 +33,27 @@ function FormError({
   const formError = useSelector(form.store, (state) => state.errorMap.onSubmit)
   const submitError = useSubmitError(form)
 
-  if (submitError) {
+  // `submitAction` joins several messages with a line break. A schema's
+  // form-level result is an object, not a message, and isn't shown here. It
+  // wins over a thrown submit: it says what went wrong.
+  if (typeof formError === "string" && formError !== "") {
     return (
-      <FieldError data-slot="form-error" {...props}>
-        {typeof submitErrorMessage === "function"
-          ? submitErrorMessage(submitError.error)
-          : submitErrorMessage}
-      </FieldError>
+      <FieldError
+        data-slot="form-error"
+        errors={formError.split("\n").map((message) => ({ message }))}
+        {...props}
+      />
     )
   }
-  // `submitAction` joins several messages with a line break. A schema's
-  // form-level result is an object, not a message, and isn't shown here.
-  if (typeof formError !== "string" || formError === "") {
+  if (!submitError) {
     return null
   }
   return (
-    <FieldError
-      data-slot="form-error"
-      errors={formError.split("\n").map((message) => ({ message }))}
-      {...props}
-    />
+    <FieldError data-slot="form-error" {...props}>
+      {typeof submitErrorMessage === "function"
+        ? submitErrorMessage(submitError.error)
+        : submitErrorMessage}
+    </FieldError>
   )
 }
 

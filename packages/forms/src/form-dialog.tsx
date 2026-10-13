@@ -6,7 +6,7 @@ import {
   focusFirstInvalid,
   restoreFocus,
 } from "@zeno-lib/forms/lib/focus-first-invalid"
-import { setSubmitError } from "@zeno-lib/forms/lib/submit-error"
+import { reportSubmitError } from "@zeno-lib/forms/lib/submit-error"
 import {
   type FormDialogController,
   findFieldElement,
@@ -161,9 +161,10 @@ function FormDialog<TValues>({
   // Set when a Save from the discard prompt fails, so the prompt hands focus
   // to the first invalid field as it closes.
   const focusInvalidOnPromptClose = useRef<boolean>(false)
-  // The open prompt hides the dialog from assistive tech, so the form-level
-  // error a failed Save from it renders is never announced. Remount the
-  // error once the prompt has closed, which announces it.
+  // The open prompt hides the dialog from assistive tech, so a form-level
+  // error that shows up meanwhile (a Save from the prompt, or a footer Save
+  // still running when it opened) is never announced. Remount the error once
+  // the prompt has closed, which announces it.
   const announceOnPromptClosed = useRef<boolean>(false)
   const [formErrorKey, setFormErrorKey] = useState(0)
   const { close, defaultValues, focus, isOpen, open, session } = dialog
@@ -184,10 +185,12 @@ function FormDialog<TValues>({
     onSave: async () => {
       const saved = await submit()
       focusInvalidOnPromptClose.current = !saved
-      announceOnPromptClosed.current = !saved
       return saved
     },
   })
+  // Read once a submit settles, so it sees a prompt that opened meanwhile.
+  const isConfirmingRef = useRef(isConfirming)
+  isConfirmingRef.current = isConfirming
   useUnsavedChangesWarning(
     form as unknown as AnyFormApi,
     guard && isOpen ? "if-changed" : false
@@ -203,14 +206,16 @@ function FormDialog<TValues>({
   }, [session])
 
   // Resolves whether the form saved. A submit handler that throws leaves
-  // `isSubmitSuccessful` false, so the dialog stays open, and becomes the
-  // form-level error `FormError` shows.
+  // `isSubmitSuccessful` false, so the dialog stays open, and `useForm` keeps
+  // the error for `FormError`.
   async function submit(): Promise<boolean> {
-    await Promise.resolve(form.handleSubmit()).catch((error: unknown) =>
-      setSubmitError(form, error)
-    )
+    await Promise.resolve(form.handleSubmit()).catch(reportSubmitError)
     const { isSubmitSuccessful, isValid } = form.state
-    return isValid && isSubmitSuccessful
+    const saved = isValid && isSubmitSuccessful
+    if (!saved && isConfirmingRef.current) {
+      announceOnPromptClosed.current = true
+    }
+    return saved
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {

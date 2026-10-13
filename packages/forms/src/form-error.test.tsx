@@ -14,6 +14,7 @@ import { submitAction } from "./lib/submit-action"
 
 afterEach(() => {
   cleanup()
+  vi.unstubAllGlobals()
 })
 
 const NAME = /Name/
@@ -21,6 +22,7 @@ const SUBMIT = { name: "Submit" }
 
 const schema = z.object({ name: z.string().min(1, "Required") })
 type Values = z.infer<typeof schema>
+const ADA: Values = { name: "Ada" }
 
 // Browsers drop focus to the body when the focused submit button is disabled
 // for the submit; jsdom keeps it there (and can't blur a disabled button).
@@ -34,11 +36,11 @@ function dropFocus() {
 
 function Profile({ onSubmit }: { onSubmit: (values: Values) => unknown }) {
   const form = useForm({
-    defaultValues: { name: "Ada" },
+    defaultValues: ADA,
     onSubmit: ({ value }) => onSubmit(value),
     schema,
   })
-  const { FormError, InputField, SubmitButton } = form
+  const { FormError, InputField, ResetButton, SubmitButton } = form
   return (
     <FormProvider form={form}>
       <Form id="profile">
@@ -46,6 +48,7 @@ function Profile({ onSubmit }: { onSubmit: (values: Values) => unknown }) {
       </Form>
       {/* Outside the <form>: FormError finds the form through context. */}
       <FormError />
+      <ResetButton />
       <SubmitButton form="profile">Submit</SubmitButton>
     </FormProvider>
   )
@@ -95,12 +98,15 @@ describe("<FormError> with <Form>", () => {
 
   test("a thrown submit shows a generic message and leaves the submit button usable", async () => {
     const user = userEvent.setup()
+    const report = vi.fn()
+    vi.stubGlobal("reportError", report)
+    const refused = new Error("connect ECONNREFUSED 10.0.0.1:5432")
     let rejectRetry: (error: Error) => void = () => undefined
     const onSubmit = vi
       .fn<(values: Values) => unknown>()
       .mockImplementationOnce(() => {
         dropFocus()
-        throw new Error("connect ECONNREFUSED 10.0.0.1:5432")
+        throw refused
       })
       .mockImplementationOnce(
         () =>
@@ -116,6 +122,8 @@ describe("<FormError> with <Form>", () => {
     expect(alert.textContent).toBe("Something went wrong. Try again.")
     expect(submit.matches(":disabled")).toBe(false)
     await waitFor(() => expect(document.activeElement).toBe(submit))
+    // Caught for the retry, but still logged and seen by error monitoring.
+    expect(report).toHaveBeenCalledWith(refused)
 
     // A retry clears the message while it runs; it comes back if it fails.
     await user.click(submit)
@@ -126,5 +134,122 @@ describe("<FormError> with <Form>", () => {
 
     await user.type(screen.getByLabelText(NAME), "!")
     expect(screen.queryByRole("alert")).toBeNull()
+  })
+
+  test("a reset drops a thrown submit's error, even when it restores the same values", async () => {
+    const user = userEvent.setup()
+    let resolveRetry: () => void = () => undefined
+    const onSubmit = vi
+      .fn<(values: Values) => unknown>()
+      .mockImplementationOnce(() => {
+        throw new Error("offline")
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveRetry = resolve
+          })
+      )
+    render(<Profile onSubmit={onSubmit} />)
+    await user.click(screen.getByRole("button", SUBMIT))
+    expect(await screen.findByRole("alert")).toBeTruthy()
+
+    await user.click(screen.getByRole("button", { name: "Reset" }))
+    expect(screen.queryByRole("alert")).toBeNull()
+    // Back to the failed submit's values and attempt count.
+    await user.click(screen.getByRole("button", SUBMIT))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2))
+    expect(screen.queryByRole("alert")).toBeNull()
+    resolveRetry()
+    await waitFor(() =>
+      expect(screen.getByRole("button", SUBMIT).matches(":disabled")).toBe(
+        false
+      )
+    )
+    expect(screen.queryByRole("alert")).toBeNull()
+  })
+
+  test("a Next.js redirect from onSubmit is no error", async () => {
+    const user = userEvent.setup()
+    const report = vi.fn()
+    vi.stubGlobal("reportError", report)
+    const onSubmit = vi.fn(() => {
+      throw Object.assign(new Error("NEXT_REDIRECT"), {
+        digest: "NEXT_REDIRECT;push;/people/1;307;",
+      })
+    })
+    render(<Profile onSubmit={onSubmit} />)
+    await user.click(screen.getByRole("button", SUBMIT))
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    expect(screen.queryByRole("alert")).toBeNull()
+    expect(report).not.toHaveBeenCalled()
+  })
+
+  test("a form-level message wins over a thrown submit", async () => {
+    const user = userEvent.setup()
+    const action = () =>
+      Promise.resolve<ActionResult<never>>({
+        error: { fieldErrors: {}, formErrors: ["Record is locked"] },
+        ok: false,
+      })
+    function Harness() {
+      const form = useForm({
+        defaultValues: ADA,
+        onSubmit: async (submit) => {
+          await submitAction(submit, action)
+          throw new Error("Not saved")
+        },
+        schema,
+      })
+      const { FormError, SubmitButton } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <FormError />
+            <SubmitButton>Submit</SubmitButton>
+          </Form>
+        </FormProvider>
+      )
+    }
+    render(<Harness />)
+
+    await user.click(screen.getByRole("button", SUBMIT))
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Record is locked"
+    )
+  })
+})
+
+describe("<FormError> with a <form> of your own", () => {
+  test("shows a thrown submit too", async () => {
+    const user = userEvent.setup()
+    function Harness() {
+      const form = useForm({
+        defaultValues: ADA,
+        onSubmit: () => {
+          throw new Error("offline")
+        },
+        schema,
+      })
+      const { FormError } = form
+      return (
+        <FormProvider form={form}>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault()
+              form.handleSubmit().catch(() => undefined)
+            }}
+          >
+            <FormError />
+            <button type="submit">Submit</button>
+          </form>
+        </FormProvider>
+      )
+    }
+    render(<Harness />)
+
+    await user.click(screen.getByRole("button", SUBMIT))
+    expect(await screen.findByRole("alert")).toBeTruthy()
   })
 })

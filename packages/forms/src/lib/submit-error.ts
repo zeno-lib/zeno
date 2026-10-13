@@ -1,6 +1,5 @@
 "use client"
 
-import { useSelector } from "@tanstack/react-form"
 import { useCallback, useSyncExternalStore } from "react"
 
 // A submit whose handler threw (a network failure, an unexpected server
@@ -22,10 +21,7 @@ type SubmitErrorState = {
 type SubmitErrorForm = {
   readonly state: SubmitErrorState
   readonly store: {
-    get: () => SubmitErrorState
-    subscribe: (listener: (state: SubmitErrorState) => void) => {
-      unsubscribe: () => void
-    }
+    subscribe: (listener: () => void) => { unsubscribe: () => void }
   }
 }
 
@@ -34,29 +30,85 @@ type SubmitError = {
   readonly error: unknown
 }
 
-type Entry = SubmitError & SubmitErrorState
+type Entry = {
+  readonly submitError: SubmitError
+  readonly unsubscribe: () => void
+}
 
 const entries = new WeakMap<object, Entry>()
 const listeners = new WeakMap<object, Set<() => void>>()
 
-/**
- * Record that `form`'s submit threw `error`. `<Form>` and `FormDialog` call it
- * when `handleSubmit()` rejects; call it from a submit path of your own. The
- * error lasts until the values change or the next submit starts, so an edit
- * or a retry clears it.
- */
-function setSubmitError(form: SubmitErrorForm, error: unknown): void {
-  const { submissionAttempts, values } = form.state
-  entries.set(form.store, { error, submissionAttempts, values })
-  for (const listener of listeners.get(form.store) ?? []) {
+function notify(key: object): void {
+  for (const listener of listeners.get(key) ?? []) {
     listener()
   }
 }
 
+function clear(key: object): void {
+  const entry = entries.get(key)
+  if (entry) {
+    entry.unsubscribe()
+    entries.delete(key)
+    notify(key)
+  }
+}
+
+// Next.js `redirect()`, `notFound()`, `forbidden()` and `unauthorized()` throw
+// an error whose `digest` starts with `NEXT_`, and a server action that calls
+// one rejects with it on the client. Next navigates on its own: no failure.
+function isNavigationError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || !("digest" in error)) {
+    return false
+  }
+  return typeof error.digest === "string" && error.digest.startsWith("NEXT_")
+}
+
 /**
- * The error `form`'s last submit threw, or `undefined` once the values have
- * changed or another submit has started since.
+ * Record that `form`'s submit threw `error`. `useForm` calls it for what
+ * `onSubmit` throws; call it for a failure your own submit code catches
+ * outside `onSubmit`. The error lasts until the values change or the next
+ * submit starts (`reset()` does both), so an edit or a retry clears it. A
+ * Next.js navigation (`redirect()`, `notFound()`) is ignored.
  */
+function setSubmitError(form: SubmitErrorForm, error: unknown): void {
+  if (isNavigationError(error)) {
+    return
+  }
+  const key = form.store
+  entries.get(key)?.unsubscribe()
+  const { submissionAttempts, values } = form.state
+  // Dropped, not just hidden, once stale: a reset restores the attempt count
+  // and can restore the same values object, which would bring it back.
+  const subscription = form.store.subscribe(() => {
+    const { state } = form
+    if (
+      state.values !== values ||
+      state.submissionAttempts !== submissionAttempts
+    ) {
+      clear(key)
+    }
+  })
+  entries.set(key, {
+    submitError: { error },
+    unsubscribe: subscription.unsubscribe,
+  })
+  notify(key)
+}
+
+/**
+ * Report a submit rejection that is caught so the user can retry, as
+ * `<Form>` and `FormDialog` do: `reportError` logs it and passes it to the
+ * page's `error` listeners (where error monitoring hooks in), as if it were
+ * uncaught. A Next.js navigation is skipped.
+ */
+function reportSubmitError(error: unknown): void {
+  if (!isNavigationError(error)) {
+    // Missing in jsdom and older browsers.
+    globalThis.reportError?.(error)
+  }
+}
+
+/** The error `form`'s last submit threw, until it went stale. */
 function useSubmitError(form: SubmitErrorForm): SubmitError | undefined {
   const key = form.store
   const subscribe = useCallback(
@@ -70,22 +122,12 @@ function useSubmitError(form: SubmitErrorForm): SubmitError | undefined {
     },
     [key]
   )
-  const entry = useSyncExternalStore(
+  return useSyncExternalStore(
     subscribe,
-    () => entries.get(key),
+    () => entries.get(key)?.submitError,
     () => undefined
   )
-  // An edit replaces `values`, and every submit, valid or not, counts an
-  // attempt; `reset()` does both.
-  const isCurrent = useSelector(
-    form.store,
-    (state) =>
-      entry !== undefined &&
-      state.values === entry.values &&
-      state.submissionAttempts === entry.submissionAttempts
-  )
-  return isCurrent ? entry : undefined
 }
 
 export type { SubmitError, SubmitErrorForm }
-export { setSubmitError, useSubmitError }
+export { reportSubmitError, setSubmitError, useSubmitError }

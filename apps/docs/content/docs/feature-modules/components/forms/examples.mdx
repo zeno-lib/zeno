@@ -1340,8 +1340,15 @@ It shows two kinds of error:
   leak internals, and in production Next.js replaces a server action's error
   message anyway. Pass `submitErrorMessage` to reword it, or a function to
   word it from the error. The form stays valid, so `SubmitButton` stays
-  enabled for a retry. The message clears on the next edit, and when the
-  next submit starts.
+  enabled for a retry. The message clears on the next edit or reset, and
+  when the next submit starts. A form-level message, if there is one too,
+  shows instead.
+
+`<Form>` and `FormDialog` catch what `onSubmit` throws so the user can
+retry, and pass it to `reportError`, so it still reaches the console and
+your error monitoring. A server action that calls `redirect()` or
+`notFound()` rejects too, but that is Next.js navigating, so it shows and
+reports nothing.
 
 Place it yourself: `<Form>` doesn't render it, so a form that already shows
 `form.state.errorMap.onSubmit` by hand doesn't show it twice. Put it next to
@@ -1353,9 +1360,12 @@ is enabled again: after a thrown submit, but not after a form-level message,
 which keeps it disabled. [`FormDialog`](#form-dialog) renders `FormError`
 for you, above its footer.
 
-`<Form>` and `FormDialog` record a thrown submit with `setSubmitError(form,
-error)` from `@zeno-lib/forms/lib/submit-error`. Call it from a submit path of
-your own, and read the error with `useSubmitError(form)`.
+`useForm` records what `onSubmit` throws, whatever submits the form, with
+`setSubmitError(form, error)` from `@zeno-lib/forms/lib/submit-error`, and
+`useSubmitError(form)` reads it. A failure that settles after an edit, a
+reset or a newer submit is about values no longer on screen, so it isn't
+recorded. Call `setSubmitError` yourself for a failure your own submit code
+catches outside `onSubmit`.
 
 ## Unsaved-changes warning
 

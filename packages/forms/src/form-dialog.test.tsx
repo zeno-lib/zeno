@@ -25,6 +25,7 @@ const animatable = HTMLElement.prototype as {
 afterEach(() => {
   animatable.getAnimations = undefined
   cleanup()
+  vi.unstubAllGlobals()
 })
 
 // jsdom runs no CSS animations, so Base UI unmounts a closing popup at once.
@@ -437,6 +438,64 @@ describe("FormDialog", () => {
     await waitFor(() =>
       expect(announced).toContain("Something went wrong. Try again.")
     )
+  })
+
+  test("a Save still running when the leave prompt opens is announced once it closes", async () => {
+    const user = userEvent.setup()
+    let rejectSave: (error: Error) => void = () => undefined
+    const onSubmit = vi.fn(
+      () =>
+        new Promise((_, reject) => {
+          rejectSave = reject
+        })
+    )
+    render(<Harness onSubmit={onSubmit} />)
+    const name = await openEdit(user)
+    await user.type(name, "!")
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    await user.keyboard("{Escape}")
+    const prompt = await screen.findByRole("alertdialog")
+    const announced = watchAnnouncedAlerts()
+
+    rejectSave(new Error("offline"))
+    await waitFor(() =>
+      expect(document.querySelector('[data-slot="form-error"]')).not.toBeNull()
+    )
+    await user.click(
+      within(prompt).getByRole("button", { name: "Keep editing" })
+    )
+    await waitFor(() =>
+      expect(announced).toContain("Something went wrong. Try again.")
+    )
+  })
+
+  test("a Save that fails after a discard doesn't show in the next session", async () => {
+    const user = userEvent.setup()
+    const report = vi.fn()
+    vi.stubGlobal("reportError", report)
+    let rejectSave: (error: Error) => void = () => undefined
+    const onSubmit = vi.fn(
+      () =>
+        new Promise((_, reject) => {
+          rejectSave = reject
+        })
+    )
+    render(<Harness onSubmit={onSubmit} />)
+    await user.click(screen.getByRole("button", { name: "New" }))
+    await user.type(await screen.findByLabelText(NAME), "Ada")
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    await user.keyboard("{Escape}")
+    const prompt = await screen.findByRole("alertdialog")
+    await user.click(within(prompt).getByRole("button", { name: "Discard" }))
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+    await user.click(screen.getByRole("button", { name: "New" }))
+    await screen.findByRole("dialog")
+
+    rejectSave(new Error("offline"))
+    await waitFor(() => expect(report).toHaveBeenCalled())
+    expect(screen.queryByRole("alert")).toBeNull()
   })
 
   for (const key of ["Control", "Meta"]) {
