@@ -126,6 +126,10 @@ function FormDialog<TValues>({
   const formId = useId()
   const popupRef = useRef<HTMLDivElement>(null)
   const { close, defaultValues, focus, isOpen, open, session } = dialog
+  // Read after a submit's await: the dialog may have closed, or reopened on
+  // another record, while a slow save was in flight.
+  const latest = useRef({ isOpen, session })
+  latest.current = { isOpen, session }
 
   // `isDefaultValue`, not `isDirty`: `isDirty` stays true after the user
   // reverts an edit, `isDefaultValue` compares the values themselves.
@@ -154,6 +158,9 @@ function FormDialog<TValues>({
     // A submit handler that throws leaves `isSubmitSuccessful` false, so the
     // dialog stays open.
     await Promise.resolve(form.handleSubmit()).catch(() => undefined)
+    if (!latest.current.isOpen || latest.current.session !== session) {
+      return // the session this submit belongs to is over
+    }
     const { isSubmitSuccessful, isValid } = form.state
     if (!isValid) {
       // A schema error, or a field error the server returned (`submitAction`).

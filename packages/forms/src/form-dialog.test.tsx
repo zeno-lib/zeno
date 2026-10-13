@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   render,
   screen,
@@ -186,9 +187,37 @@ describe("FormDialog", () => {
     render(<Harness />)
     await user.click(screen.getByRole("button", { name: "New" }))
     const name = await screen.findByLabelText(NAME)
+    // The dialog's initial focus also lands on Name; let it settle so only
+    // the failed Save can bring focus back from the Save button.
+    await waitFor(() => expect(document.activeElement).toBe(name))
     await user.click(screen.getByRole("button", { name: "Save" }))
     expect(await screen.findByText("Required")).toBeTruthy()
     await waitFor(() => expect(document.activeElement).toBe(name))
+  })
+
+  test("a save that ends after the dialog reopened leaves the new session open", async () => {
+    const user = userEvent.setup()
+    let finishSave: () => void = () => undefined
+    const onSubmit = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSave = resolve
+        })
+    )
+    render(<Harness onSubmit={onSubmit} />)
+    await openEdit(user)
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    await user.click(screen.getByRole("button", { name: "Cancel" }))
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+
+    await user.click(screen.getByRole("button", { name: "New" }))
+    await screen.findByRole("dialog")
+    await act(async () => {
+      finishSave()
+      await Promise.resolve()
+    })
+    expect(screen.getByRole("dialog")).toBeTruthy()
   })
 
   test("a field error from the server focuses that field", async () => {

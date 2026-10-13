@@ -13,4 +13,6 @@ The focus logic is now `focusFirstInvalid(formElement)` in
 `@zeno-lib/forms/lib/focus-first-invalid`, for a `<form>` of your own that
 calls `handleSubmit`.
 
-Re-add the `form-dialog` item with the shadcn CLI to pick this up.
+Update `@zeno-lib/forms` first, then re-add the `form-dialog` item with the
+shadcn CLI: the new item imports `focusFirstInvalid`, which older versions
+don't have.
