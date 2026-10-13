@@ -291,7 +291,9 @@ own editors: `requestLeave(proceed)` runs `proceed` right away when there's
 nothing to lose, or holds it until `confirmLeave()` / `cancelLeave()`. Pass
 `onSave` (resolving whether it saved) to offer Save as well:
 `saveAndLeave()` runs it, then the held leave if it saved, and `isSaving` is
-`true` meanwhile. Either way the confirm UI closes.
+`true` meanwhile. Saved or not, the confirm UI closes. If `onSave` rejects,
+the leave stays held and the rejection propagates, so resolve `false` for a
+failure you handle.
 
 > **Pitfall: let the dialog own `defaultValues`.** TanStack Form ignores new
 > `defaultValues` once a form is touched, and a `form.reset(values)` is

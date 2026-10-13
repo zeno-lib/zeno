@@ -164,6 +164,9 @@ function FormDialog<TValues>({
   } = useLeaveGuard({
     hasUnsavedChanges: guard && hasChanges,
     onSave: async () => {
+      if (!canSubmit()) {
+        return false
+      }
       const saved = await submit()
       focusInvalidOnPromptClose.current = !saved
       return saved
@@ -183,6 +186,14 @@ function FormDialog<TValues>({
     }
   }, [session])
 
+  // Every way to submit (footer Save, ⌘/Ctrl+Enter, the prompt's Save) checks
+  // this first. TanStack only refuses a second `handleSubmit` while one runs on
+  // the very first attempt, and `isOpen` is false through the exit animation,
+  // while the fields still hold the values just saved.
+  function canSubmit(): boolean {
+    return isOpen && !(disabled || form.state.isSubmitting)
+  }
+
   // Resolves whether the form saved. A submit handler that throws leaves
   // `isSubmitSuccessful` false, so the dialog stays open.
   async function submit(): Promise<boolean> {
@@ -194,6 +205,9 @@ function FormDialog<TValues>({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     event.stopPropagation()
+    if (!canSubmit()) {
+      return
+    }
     const node = event.currentTarget
     const saved = await submit()
     if (!form.state.isValid) {
@@ -213,16 +227,19 @@ function FormDialog<TValues>({
     if (
       event.key !== "Enter" ||
       !(event.metaKey || event.ctrlKey) ||
-      event.repeat ||
       event.nativeEvent.isComposing ||
-      disabled ||
-      isSubmitting ||
-      isConfirming
+      event.defaultPrevented
     ) {
       return
     }
+    // Claimed even when it won't submit: it shouldn't click the focused
+    // button, nor reach a dialog this one is nested in (React events bubble
+    // through portals). `handleSubmit` refuses a disabled or busy dialog.
     event.preventDefault()
-    formRef.current?.requestSubmit()
+    event.stopPropagation()
+    if (!(event.repeat || isConfirming)) {
+      formRef.current?.requestSubmit()
+    }
   }
 
   return (
@@ -344,7 +361,10 @@ function FormDialog<TValues>({
               {discardPrompt?.confirmLabel ?? "Discard"}
             </AlertDialogAction>
             {saveFromPrompt && (
-              <AlertDialogAction disabled={isSaving} onClick={saveAndLeave}>
+              <AlertDialogAction
+                disabled={disabled || isSaving || isSubmitting}
+                onClick={saveAndLeave}
+              >
                 {isSaving && <Spinner />}
                 {discardPrompt?.saveLabel ?? submitLabel}
               </AlertDialogAction>

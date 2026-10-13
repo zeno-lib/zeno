@@ -17,6 +17,7 @@ import { useFormDialog } from "./lib/use-form-dialog"
 
 const NAME = /Name/
 const EMAIL = /Email/
+const INNER_NAME = /Inner name/
 
 const animatable = HTMLElement.prototype as {
   getAnimations?: () => unknown[]
@@ -342,5 +343,82 @@ describe("FormDialog", () => {
     await user.click(screen.getByRole("button", { name: "Save" }))
     expect(onSubmit).not.toHaveBeenCalled()
     expect(screen.getByRole("dialog")).toBeTruthy()
+  })
+
+  test("disabled also turns off Save in the leave prompt", async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const { rerender } = render(<Harness onSubmit={onSubmit} saveFromPrompt />)
+    const name = await openEdit(user)
+    await user.type(name, "!")
+    rerender(<Harness disabled onSubmit={onSubmit} saveFromPrompt />)
+    await user.click(screen.getByRole("button", { name: "Cancel" }))
+    const prompt = await screen.findByRole("alertdialog")
+    await user.click(within(prompt).getByRole("button", { name: "Save" }))
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  test("Save in the leave prompt doesn't submit again while a submit runs", async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn(() => new Promise(() => undefined))
+    render(<Harness onSubmit={onSubmit} saveFromPrompt />)
+    const name = await openEdit(user)
+    await user.type(name, "!")
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    await user.keyboard("{Escape}")
+    const prompt = await screen.findByRole("alertdialog")
+    await user.click(within(prompt).getByRole("button", { name: "Save" }))
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+  })
+
+  test("Ctrl+Enter during the close animation doesn't submit again", async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(<Harness onSubmit={onSubmit} />)
+    const name = await openEdit(user)
+    await user.type(name, "!")
+    holdExitAnimation()
+    await user.keyboard("{Control>}{Enter}{/Control}")
+    const dialog = screen.getByRole("dialog")
+    await waitFor(() => expect(dialog.hasAttribute("data-closed")).toBe(true))
+    await user.keyboard("{Control>}{Enter}{/Control}")
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+  })
+
+  test("Ctrl+Enter in a nested dialog submits only that dialog", async () => {
+    const user = userEvent.setup()
+    const outer = vi.fn()
+    const inner = vi.fn()
+    function Inner() {
+      const dialog = useFormDialog({ defaultValues: ROW })
+      const form = useForm({
+        defaultValues: dialog.defaultValues,
+        onSubmit: ({ value }) => inner(value),
+        schema,
+      })
+      return (
+        <FormDialog
+          dialog={dialog}
+          form={form}
+          title="Inner"
+          trigger={<button type="button">Open inner</button>}
+        >
+          <form.InputField label="Inner name" name="name" />
+        </FormDialog>
+      )
+    }
+    render(
+      <Harness onSubmit={outer}>
+        <Inner />
+      </Harness>
+    )
+    await openEdit(user)
+    await user.click(screen.getByRole("button", { name: "Open inner" }))
+    const innerName = await screen.findByLabelText(INNER_NAME)
+    await user.type(innerName, "!")
+    await user.keyboard("{Control>}{Enter}{/Control}")
+    await waitFor(() => expect(inner).toHaveBeenCalled())
+    expect(outer).not.toHaveBeenCalled()
   })
 })
