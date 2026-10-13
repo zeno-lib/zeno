@@ -4,6 +4,8 @@ import type { AnyFormApi } from "@tanstack/react-form"
 import type { ComponentProps, FormEvent, ReactNode } from "react"
 
 import { FormProvider as RawFormProvider, useFormContext } from "./lib/contexts"
+import { focusFirstInvalid, restoreFocus } from "./lib/focus-first-invalid"
+import { reportSubmitError } from "./lib/submit-error"
 
 type FormProviderProps = {
   children: ReactNode
@@ -28,17 +30,17 @@ function Form({ children, className, ...props }: FormProps) {
         event.preventDefault()
         event.stopPropagation()
         const node = event.currentTarget
-        await Promise.resolve(form.handleSubmit()).catch(() => undefined)
-        if (!form.state.isValid) {
-          // First invalid control in *this* form; a group root (radio group,
-          // slider) hands focus to its first tabbable child.
-          const invalid = node.querySelector<HTMLElement>(
-            '[aria-invalid="true"]'
-          )
-          const targets = invalid
-            ? [invalid, ...invalid.querySelectorAll<HTMLElement>("*")]
-            : []
-          targets.find((el) => el.tabIndex >= 0)?.focus()
+        const focused = node.ownerDocument.activeElement
+        // Caught so the user can retry; `useForm` keeps it for `FormError`.
+        await Promise.resolve(form.handleSubmit()).catch(reportSubmitError)
+        const { isSubmitSuccessful, isValid } = form.state
+        if (!isValid && focusFirstInvalid(node)) {
+          return
+        }
+        // A form-level failure has no field to fix, so focus stays where it
+        // was, or goes back there if the submit button's disabling dropped it.
+        if (!(isValid && isSubmitSuccessful)) {
+          restoreFocus(focused)
         }
       }}
       {...props}

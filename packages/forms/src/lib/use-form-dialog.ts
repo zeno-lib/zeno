@@ -97,6 +97,11 @@ function useFormDialog<TValues>(
 type UseLeaveGuardOptions = {
   /** Whether leaving now would lose changes. */
   hasUnsavedChanges: boolean
+  /**
+   * Save the changes and resolve whether that worked. Backs `saveAndLeave`,
+   * so the confirm UI can offer Save next to Discard.
+   */
+  onSave?: () => boolean | Promise<boolean>
 }
 
 type LeaveGuard = {
@@ -111,14 +116,25 @@ type LeaveGuard = {
   confirmLeave: () => void
   /** The user chose to stay: drop the held leave. */
   cancelLeave: () => void
+  /**
+   * The user chose to save: run `onSave`, then the held leave if it saved.
+   * Either way the confirm UI closes; after a failed save the user stays.
+   * Resolves whether it saved. A rejection from `onSave` keeps the leave held
+   * and propagates.
+   */
+  saveAndLeave: () => Promise<boolean>
+  /** Whether `saveAndLeave` is waiting on `onSave`. */
+  isSaving: boolean
 }
 
 /** Ask before a leave (close, navigate, switch record) drops unsaved changes. */
 function useLeaveGuard({
   hasUnsavedChanges,
+  onSave,
 }: UseLeaveGuardOptions): LeaveGuard {
   const pending = useRef<(() => void) | null>(null)
   const [isConfirming, setIsConfirming] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   const requestLeave = useCallback(
     (proceed: () => void) => {
@@ -144,7 +160,39 @@ function useLeaveGuard({
     setIsConfirming(false)
   }, [])
 
-  return { cancelLeave, confirmLeave, isConfirming, requestLeave }
+  const saveAndLeave = useCallback(async () => {
+    const proceed = pending.current
+    if (!(proceed && onSave)) {
+      return false
+    }
+    setIsSaving(true)
+    let saved = false
+    try {
+      saved = await onSave()
+    } finally {
+      setIsSaving(false)
+    }
+    // Answered otherwise while saving (cancelled, or a newer leave replaced
+    // this one): leave that answer alone.
+    if (pending.current !== proceed) {
+      return saved
+    }
+    pending.current = null
+    setIsConfirming(false)
+    if (saved) {
+      proceed()
+    }
+    return saved
+  }, [onSave])
+
+  return {
+    cancelLeave,
+    confirmLeave,
+    isConfirming,
+    isSaving,
+    requestLeave,
+    saveAndLeave,
+  }
 }
 
 const FOCUSABLE =

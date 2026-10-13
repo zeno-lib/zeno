@@ -9,6 +9,7 @@ import type { ReactNode } from "react"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
 import { Form, FormProvider, RadioGroupFieldItem, useForm } from "./create-form"
+import { submitAction } from "./lib/submit-action"
 
 afterEach(() => {
   cleanup()
@@ -98,6 +99,39 @@ describe("<Form> — focus the first invalid field on a failed submit", () => {
     const user = userEvent.setup()
     render(<ProfileForm id="profile-form" label="Profile" outsideSubmit />)
     await user.click(screen.getByRole("button", { name: "Profile submit" }))
+    await waitFor(() =>
+      expect(document.activeElement).toBe(control("Profile", "name"))
+    )
+  })
+
+  test("focuses a field error returned through submitAction", async () => {
+    const user = userEvent.setup()
+    function Harness() {
+      const form = useForm({
+        defaultValues: { email: "ada@example.com", name: "Ada" },
+        onSubmit: (submit) =>
+          submitAction(submit, () =>
+            Promise.resolve({
+              error: { fieldErrors: { name: ["Taken"] }, formErrors: [] },
+              ok: false as const,
+            })
+          ),
+        schema,
+      })
+      const { EmailField, InputField, SubmitButton } = form
+      return (
+        <FormProvider form={form}>
+          <Form aria-label="Profile">
+            <EmailField name="email" />
+            <InputField label="Name" name="name" />
+            <SubmitButton>Save</SubmitButton>
+          </Form>
+        </FormProvider>
+      )
+    }
+    render(<Harness />)
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    expect(await screen.findByText("Taken")).toBeTruthy()
     await waitFor(() =>
       expect(document.activeElement).toBe(control("Profile", "name"))
     )
