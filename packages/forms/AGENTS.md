@@ -39,6 +39,10 @@ A typed layer over [TanStack Form](https://tanstack.com/form) and Zod. The user 
   `useSyncExternalStore` flushing `aria-invalid`, `submitAction`'s field errors included, before
   that continuation. Don't add a timer. A Save from `FormDialog`'s leave prompt is the exception:
   the open prompt traps focus, so its `finalFocus` returns `findFirstInvalid` instead.
+- **A failed submit with no invalid field calls `restoreFocus`**, because a submit button that
+  disables itself while submitting drops focus to the body in browsers. jsdom keeps focus on a
+  disabled button and can't `blur()` it, so a test drops focus by focusing an element it then
+  removes.
 - **What a required field does follows `useIsFieldRequiredBySchema`; only the `*` follows
   `useIsFieldRequired`**, and the field's `required` prop overrides both. `useIsFieldRequired`
   is `false` under `requiredIndicator: false`, so using it for `aria-required` or the clear
@@ -59,6 +63,9 @@ A typed layer over [TanStack Form](https://tanstack.com/form) and Zod. The user 
 - **`FormDialog` detects unsaved changes with `!state.isDefaultValue`, never `isDirty`**, which stays
   true after an edit is reverted. It resets in `onOpenChangeComplete`, after the exit animation;
   don't `reset` inside the consumer's `onSubmit` either.
+- **Never write a thrown submit to the `errorMap`.** Any entry makes the form invalid, so
+  `SubmitButton` disables itself and `handleSubmit` skips `onSubmit` until an edit clears it: the
+  user couldn't retry a failed save as is. `lib/submit-error.ts` keeps it beside the form.
 - **Never write server errors to `errorMap.onServer`.** `blurThenChangeLogic` never clears it.
   `applyValidationError` writes `errorMap.onChange` and subscribes to the store to clear each entry
   when that field's value first moves.

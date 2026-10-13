@@ -7,7 +7,7 @@ import {
 } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
 import { type ReactNode, useState } from "react"
-import { afterEach, describe, expect, test, vi } from "vitest"
+import { afterEach, describe, expect, onTestFinished, test, vi } from "vitest"
 import { z } from "zod"
 import { useForm } from "./create-form"
 import { FormDialog } from "./form-dialog"
@@ -26,6 +26,7 @@ const animatable = HTMLElement.prototype as {
 afterEach(() => {
   animatable.getAnimations = undefined
   cleanup()
+  vi.unstubAllGlobals()
 })
 
 // jsdom runs no CSS animations, so Base UI unmounts a closing popup at once.
@@ -50,6 +51,7 @@ function Harness({
   closeOnSubmit,
   disabled,
   saveFromPrompt,
+  submitErrorMessage,
 }: {
   /** Submit through `submitAction` with this server action instead. */
   action?: (values: Values) => Promise<ActionResult<unknown>>
@@ -58,6 +60,7 @@ function Harness({
   closeOnSubmit?: boolean
   disabled?: boolean
   saveFromPrompt?: boolean
+  submitErrorMessage?: (error: unknown) => ReactNode
 }) {
   const dialog = useFormDialog({ defaultValues: BLANK })
   const form = useForm({
@@ -84,6 +87,7 @@ function Harness({
         disabled={disabled}
         form={form}
         saveFromPrompt={saveFromPrompt}
+        submitErrorMessage={submitErrorMessage}
         title="Person"
       >
         <InputField label="Name" name="name" />
@@ -92,6 +96,41 @@ function Harness({
       </FormDialog>
     </>
   )
+}
+
+// Browsers drop focus to the body when the focused Save button is disabled
+// for the submit; jsdom keeps it there (and can't blur a disabled button).
+// Drop it as a browser would: through an element that is then removed.
+function dropFocus() {
+  const sink = document.createElement("input")
+  document.body.append(sink)
+  sink.focus()
+  sink.remove()
+}
+
+// The alerts added where assistive tech could see them. One added under an
+// `aria-hidden` ancestor (the dialog, while the leave prompt is open) is never
+// announced, not even once that ancestor is shown again.
+function watchAnnouncedAlerts(): string[] {
+  const announced: string[] = []
+  const observer = new MutationObserver((records) => {
+    for (const node of records.flatMap((record) => [...record.addedNodes])) {
+      if (!(node instanceof Element)) {
+        continue
+      }
+      for (const alert of [node, ...node.querySelectorAll("*")]) {
+        if (
+          alert.getAttribute("role") === "alert" &&
+          !alert.closest('[aria-hidden="true"]')
+        ) {
+          announced.push(alert.textContent ?? "")
+        }
+      }
+    }
+  })
+  observer.observe(document.body, { childList: true, subtree: true })
+  onTestFinished(() => observer.disconnect())
+  return announced
 }
 
 // Open the "Edit" session and wait for its initial focus (on Email) to land,
@@ -218,6 +257,88 @@ describe("FormDialog", () => {
     expect(screen.getByRole("dialog")).toBeTruthy()
   })
 
+  test("an action's form-level error shows in the dialog, focus back on Save", async () => {
+    const user = userEvent.setup()
+    const action = vi.fn(() => {
+      dropFocus()
+      return Promise.resolve<ActionResult<never>>({
+        error: { fieldErrors: {}, formErrors: ["Record is locked"] },
+        ok: false,
+      })
+    })
+    render(<Harness action={action} />)
+    const name = await openEdit(user)
+    const save = screen.getByRole("button", { name: "Save" })
+    await user.click(save)
+
+    const alert = await screen.findByRole("alert")
+    expect(alert.textContent).toBe("Record is locked")
+    expect(screen.getByRole("dialog")).toBeTruthy()
+    await waitFor(() => expect(document.activeElement).toBe(save))
+
+    await user.type(name, "!")
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull())
+  })
+
+  test("a thrown submit shows a generic message until an edit or a resubmit", async () => {
+    const user = userEvent.setup()
+    let rejectRetry: (error: Error) => void = () => undefined
+    const onSubmit = vi
+      .fn<(values: Values) => unknown>()
+      .mockImplementationOnce(() => {
+        dropFocus()
+        throw new Error("connect ECONNREFUSED 10.0.0.1:5432")
+      })
+      .mockImplementationOnce(() => {
+        throw new Error("offline")
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise((_, reject) => {
+            rejectRetry = reject
+          })
+      )
+    render(<Harness onSubmit={onSubmit} />)
+    const name = await openEdit(user)
+    const save = screen.getByRole("button", { name: "Save" })
+    await user.click(save)
+
+    const alert = await screen.findByRole("alert")
+    expect(alert.textContent).toBe("Something went wrong. Try again.")
+    expect(screen.getByRole("dialog")).toBeTruthy()
+    await waitFor(() => expect(document.activeElement).toBe(save))
+
+    await user.type(name, "!")
+    expect(screen.queryByRole("alert")).toBeNull()
+
+    await user.click(save)
+    expect(await screen.findByRole("alert")).toBeTruthy()
+
+    // The retry clears the message while it runs; it comes back if it fails.
+    await user.click(save)
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(3))
+    expect(screen.queryByRole("alert")).toBeNull()
+    rejectRetry(new Error("offline"))
+    expect(await screen.findByRole("alert")).toBeTruthy()
+  })
+
+  test("submitErrorMessage words the thrown-submit message from the error", async () => {
+    const user = userEvent.setup()
+    render(
+      <Harness
+        onSubmit={() => {
+          throw new Error("Quota reached")
+        }}
+        submitErrorMessage={(error) => `Not saved: ${(error as Error).message}`}
+      />
+    )
+    await openEdit(user)
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Not saved: Quota reached"
+    )
+  })
+
   test("reopening during the close animation mounts fresh fields", async () => {
     const user = userEvent.setup()
     function Details() {
@@ -298,6 +419,84 @@ describe("FormDialog", () => {
     expect(onSubmit).not.toHaveBeenCalled()
     expect(screen.getByRole("dialog")).toBeTruthy()
     await waitFor(() => expect(document.activeElement).toBe(name))
+  })
+
+  test("a Save in the leave prompt that throws is announced once the prompt closes", async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn(() => {
+      throw new Error("offline")
+    })
+    render(<Harness onSubmit={onSubmit} saveFromPrompt />)
+    const name = await openEdit(user)
+    await user.type(name, "!")
+    await user.keyboard("{Escape}")
+    const prompt = await screen.findByRole("alertdialog")
+    const announced = watchAnnouncedAlerts()
+
+    await user.click(within(prompt).getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+    expect(screen.getByRole("dialog")).toBeTruthy()
+    await waitFor(() =>
+      expect(announced).toContain("Something went wrong. Try again.")
+    )
+  })
+
+  test("a Save still running when the leave prompt opens is announced once it closes", async () => {
+    const user = userEvent.setup()
+    let rejectSave: (error: Error) => void = () => undefined
+    const onSubmit = vi.fn(
+      () =>
+        new Promise((_, reject) => {
+          rejectSave = reject
+        })
+    )
+    render(<Harness onSubmit={onSubmit} />)
+    const name = await openEdit(user)
+    await user.type(name, "!")
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    await user.keyboard("{Escape}")
+    const prompt = await screen.findByRole("alertdialog")
+    const announced = watchAnnouncedAlerts()
+
+    rejectSave(new Error("offline"))
+    await waitFor(() =>
+      expect(document.querySelector('[data-slot="form-error"]')).not.toBeNull()
+    )
+    await user.click(
+      within(prompt).getByRole("button", { name: "Keep editing" })
+    )
+    await waitFor(() =>
+      expect(announced).toContain("Something went wrong. Try again.")
+    )
+  })
+
+  test("a Save that fails after a discard doesn't show in the next session", async () => {
+    const user = userEvent.setup()
+    const report = vi.fn()
+    vi.stubGlobal("reportError", report)
+    let rejectSave: (error: Error) => void = () => undefined
+    const onSubmit = vi.fn(
+      () =>
+        new Promise((_, reject) => {
+          rejectSave = reject
+        })
+    )
+    render(<Harness onSubmit={onSubmit} />)
+    await user.click(screen.getByRole("button", { name: "New" }))
+    await user.type(await screen.findByLabelText(NAME), "Ada")
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    await user.keyboard("{Escape}")
+    const prompt = await screen.findByRole("alertdialog")
+    await user.click(within(prompt).getByRole("button", { name: "Discard" }))
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+    await user.click(screen.getByRole("button", { name: "New" }))
+    await screen.findByRole("dialog")
+
+    rejectSave(new Error("offline"))
+    await waitFor(() => expect(report).toHaveBeenCalled())
+    expect(screen.queryByRole("alert")).toBeNull()
   })
 
   for (const key of ["Control", "Meta"]) {
