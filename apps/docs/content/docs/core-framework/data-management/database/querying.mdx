@@ -369,6 +369,91 @@ column keys). When the caller supplied nothing else, the set falls back to
 statement. A table without that column (a junction keyed by its foreign keys)
 gets an empty set; use `onConflictDoNothing` there.
 
+### Syncing a parent's rows
+
+A form that edits a parent with its child rows, such as an order and its lines,
+sends back the whole list. `syncRows(db, table, { parent, rows })` makes that
+list the parent's rows: it removes the stored rows that left the list, updates
+the ones still in it and inserts the new ones. It resolves to the saved rows in
+input order, so the form can take up the new ids.
+
+```typescript title="app/orders/queries.ts"
+import { one, syncRows } from "@zeno-lib/db/query"
+
+export const updateOrder = (db: Db, { id, lines, ...values }: OrderInput) =>
+  db.transaction(async (tx) => {
+    const order = one(
+      await tx.update(orders).set(values).where(eq(orders.id, id)).returning()
+    )
+    const saved = await syncRows(tx, orderLines, {
+      parent: { orderId: id },
+      rows: lines,
+    })
+    return { ...order, lines: saved }
+  })
+```
+
+`parent` holds the columns that make a row the parent's. The sync reads, updates
+and removes only the rows that match all of them, and writes them onto every
+row, so a row leaves them out and can't land under another parent. A `null`
+value matches `null`.
+
+By default, rows are told apart by their `id`; pass `id` to name another column.
+A row without an id is new. A row whose id the parent doesn't hold, because it
+belongs to another parent or was deleted since the form loaded it, is inserted
+as a new row, so a sync never writes another parent's row.
+
+A junction table, or any table whose rows are told apart by what they point at,
+takes `key`, the natural key columns within the parent. Each row carries them,
+and a `null` key part matches a stored `null`:
+
+```typescript
+await syncRows(tx, postsTags, {
+  key: ["tagId"],
+  parent: { postId },
+  rows: tagIds.map((tagId) => ({ tagId })),
+})
+```
+
+- The rows that left the list are removed before anything is written, so a row
+  the user removes and adds back doesn't hit a unique index.
+- An update sets only the columns a row carries, and a property holding
+  `undefined` keeps its stored value. A kept row with nothing else to set is returned as it
+  is, unwritten.
+- An empty list removes every row of the parent.
+- Two rows with the same key reject before anything is written.
+- It runs in `db.transaction`, which is a savepoint inside a `tx`. A failure
+  undoes every write the sync made, and nothing else.
+- Each row is one statement, which suits the lists a form edits. For a bulk
+  load, use `insert` with `onConflictDoUpdate`.
+
+The rows that left the list are deleted. To soft-delete or unlink them instead,
+or to delete only the ones nothing else references, pass `remove`. It gets the
+transaction and the removed rows, and runs before any update or insert:
+
+```typescript
+await syncRows(tx, orderLines, {
+  parent: { archivedAt: null, orderId },
+  remove: (tx, removed) =>
+    tx
+      .update(orderLines)
+      .set({ archivedAt: new Date() })
+      .where(inArray(orderLines.id, removed.map(({ id }) => id))),
+  rows: lines,
+})
+```
+
+With `archivedAt: null` in `parent`, archived rows stay out of the sync, and new
+rows are written unarchived.
+
+The sync reads the parent's rows before it writes, so two syncs of one parent
+at the same time can both insert the same new row. A unique index on the parent
+and key columns makes the second one fail instead. Add `.nullsNotDistinct()`
+when a key part is nullable, because Postgres otherwise treats two `NULL`s as
+different and lets both rows in. Updating the parent row first in the same
+transaction, as `updateOrder` does, makes the second sync wait for the first to
+commit.
+
 ## Errors
 
 Drizzle wraps every driver error in a `DrizzleQueryError` whose own `code` is

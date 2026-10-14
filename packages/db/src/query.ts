@@ -1,8 +1,27 @@
 // Query-side helpers: the PostgREST conveniences Drizzle has no equivalent for
-// (`.single()`, `.maybeSingle()`, a default upsert `set`), plus the read side
-// of `functionPolicies`.
-import { getColumns, is, type SQL, sql } from "drizzle-orm"
-import { getTableConfig, PgTable } from "drizzle-orm/pg-core"
+// (`.single()`, `.maybeSingle()`, a default upsert `set`), syncing a parent's
+// rows, plus the read side of `functionPolicies`.
+import {
+  type AnyRelations,
+  and,
+  eq,
+  getColumns,
+  getTableName,
+  type InferInsertModel,
+  type InferSelectModel,
+  is,
+  isNull,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm"
+import {
+  getTableConfig,
+  type PgAsyncDatabase,
+  type PgColumn,
+  type PgQueryResultHKT,
+  PgTable,
+} from "drizzle-orm/pg-core"
 import {
   DEFAULT_FUNCTION_PREFIX,
   FUNCTION_POLICY_OPERATIONS,
@@ -110,6 +129,272 @@ export const definedValues = <T extends Record<string, unknown>>(
   Object.fromEntries(
     Object.entries(values).filter(([, value]) => value !== undefined)
   ) as T
+
+type InsertModel<TTable extends PgTable> = InferInsertModel<TTable>
+type SelectModel<TTable extends PgTable> = InferSelectModel<TTable>
+
+type SyncRowsBaseOptions<
+  TQueryResult extends PgQueryResultHKT,
+  TRelations extends AnyRelations,
+  TTable extends PgTable,
+  TParent,
+> = {
+  /**
+   * The columns that make a row the parent's, with their values, such as
+   * `{ orderId }`. Only rows matching all of them are read, updated or
+   * removed, and every row is written with them.
+   */
+  parent: TParent
+  /**
+   * Removes the stored rows that left the list, instead of deleting them: to
+   * unlink, soft-delete, or delete only what nothing else references. Called
+   * once, before any update or insert, and only when there is a row to remove.
+   */
+  remove?: (
+    tx: PgAsyncDatabase<TQueryResult, TRelations>,
+    rows: SelectModel<TTable>[]
+  ) => Promise<unknown>
+}
+
+export type SyncRowsByIdOptions<
+  TQueryResult extends PgQueryResultHKT,
+  TRelations extends AnyRelations,
+  TTable extends PgTable,
+  TParent,
+  TId extends ColumnKey<TTable>,
+> = SyncRowsBaseOptions<TQueryResult, TRelations, TTable, TParent> & {
+  /** The surrogate key column. Default `"id"`. */
+  id?: TId
+  key?: undefined
+  /**
+   * The parent's rows, in the order to return them. A row without an id is
+   * new.
+   */
+  rows: readonly (Omit<InsertModel<TTable>, keyof TParent | NoInfer<TId>> & {
+    [K in NoInfer<TId>]?:
+      | (K extends keyof SelectModel<TTable> ? SelectModel<TTable>[K] : never)
+      | null
+  })[]
+}
+
+export type SyncRowsByKeyOptions<
+  TQueryResult extends PgQueryResultHKT,
+  TRelations extends AnyRelations,
+  TTable extends PgTable,
+  TParent,
+  TKey extends ColumnKey<TTable>,
+> = SyncRowsBaseOptions<TQueryResult, TRelations, TTable, TParent> & {
+  id?: undefined
+  /**
+   * The natural key columns that tell the parent's rows apart, such as
+   * `["productId"]`. Each row must carry them; a `null` matches a `null`.
+   */
+  key: readonly TKey[]
+  /** The parent's rows, in the order to return them. */
+  rows: readonly (Omit<InsertModel<TTable>, keyof TParent> &
+    Required<
+      Pick<
+        InsertModel<TTable>,
+        Extract<
+          Exclude<NoInfer<TKey>, keyof TParent>,
+          keyof InsertModel<TTable>
+        >
+      >
+    >)[]
+}
+
+type Row = Record<string, unknown>
+
+// A key value as JSON, for a `Map` key: a Date becomes its instant, since two
+// Dates are never `===`, and a bigint its digits, since JSON can't hold one.
+const keyPart = (value: unknown): unknown => {
+  if (value instanceof Date) {
+    return value.toISOString()
+  }
+  if (typeof value === "bigint") {
+    return value.toString()
+  }
+  return value ?? null
+}
+
+/**
+ * Makes `rows` the parent's whole set of rows in `table`: the stored rows that
+ * left the list are removed first, so a removed key can come straight back,
+ * then each row updates the stored row it matches or is inserted. Resolves to
+ * the resulting rows in input order, so a form can take up the new ids.
+ *
+ * Rows are told apart by one of:
+ *
+ * - `id` (the default, on `"id"`): a surrogate key. A row without one is
+ *   inserted. An id the parent doesn't hold (another parent's row, or one
+ *   deleted since the form loaded it) is dropped and the row inserted anew, so
+ *   a sync never writes another parent's row.
+ * - `key`: natural key columns, compared as the driver returns them. A key
+ *   another parent holds fails on the table's unique index rather than moving
+ *   that row over.
+ *
+ * An update sets only the columns the row carries, skipping `undefined`, and a
+ * stored row with nothing to set is returned as it is, unwritten. An empty
+ * list removes every row the parent has. Two rows with the same key throw
+ * before anything is written.
+ *
+ * Everything runs in `db.transaction`: its own transaction on a client, a
+ * savepoint inside a `tx`. A failure undoes every write the sync made and
+ * nothing else, so a caller that catches it keeps a usable transaction.
+ *
+ * ```ts
+ * const lines = await syncRows(tx, orderLines, {
+ *   parent: { orderId: order.id },
+ *   rows: input.lines,
+ * })
+ *
+ * await syncRows(tx, postsTags, {
+ *   key: ["tagId"],
+ *   parent: { postId: post.id },
+ *   rows: input.tagIds.map((tagId) => ({ tagId })),
+ * })
+ * ```
+ */
+export const syncRows = <
+  TQueryResult extends PgQueryResultHKT,
+  TRelations extends AnyRelations,
+  TTable extends PgTable,
+  TParent extends Partial<InsertModel<TTable>>,
+  TId extends ColumnKey<TTable> = Extract<"id", ColumnKey<TTable>>,
+  TKey extends ColumnKey<TTable> = never,
+>(
+  db: PgAsyncDatabase<TQueryResult, TRelations>,
+  table: TTable,
+  options:
+    | SyncRowsByIdOptions<TQueryResult, TRelations, TTable, TParent, TId>
+    | SyncRowsByKeyOptions<TQueryResult, TRelations, TTable, TParent, TKey>
+): Promise<SelectModel<TTable>[]> =>
+  sync(db as AnyDatabase, table, options as SyncOptions) as Promise<
+    SelectModel<TTable>[]
+  >
+
+type AnyDatabase = PgAsyncDatabase<PgQueryResultHKT, AnyRelations>
+
+type SyncOptions = {
+  id?: string
+  key?: readonly string[]
+  parent: Row
+  remove?: (tx: AnyDatabase, rows: Row[]) => Promise<unknown>
+  rows: readonly Row[]
+}
+
+// Async, so a bad argument rejects like a failed statement instead of throwing.
+const sync = async (
+  db: AnyDatabase,
+  table: PgTable,
+  { id = "id", key, parent, remove, rows }: SyncOptions
+): Promise<Row[]> => {
+  const columns: Record<string, PgColumn> = getColumns(table)
+  const column = (name: string) => {
+    const found = columns[name]
+    if (!found) {
+      throw new Error(
+        `"${name}" is not a column of table "${getTableName(table)}"`
+      )
+    }
+    return found
+  }
+  // `null` matches `null`, which `=` never does.
+  const matching = (row: Row, names: readonly string[]) =>
+    and(
+      ...names.map((name) =>
+        row[name] === null ? isNull(column(name)) : eq(column(name), row[name])
+      )
+    )
+
+  const parentNames = Object.keys(parent)
+  // A missing parent column would widen the sync to other parents' rows.
+  if (
+    parentNames.length === 0 ||
+    parentNames.some((name) => parent[name] === undefined)
+  ) {
+    throw new Error("syncRows needs a value for every parent column")
+  }
+  const scope = matching(parent, parentNames)
+  const keyNames = key ?? [id]
+  for (const name of keyNames) {
+    column(name)
+  }
+
+  // A row without an id is new. A natural key part reads `undefined` as null.
+  const identity = (row: Row) =>
+    key === undefined && (row[id] === undefined || row[id] === null)
+      ? undefined
+      : JSON.stringify(keyNames.map((name) => keyPart(row[name])))
+
+  const wanted = rows.map((row) => ({ ...row, ...parent }))
+  const listed = new Map<string, number>()
+  for (const [index, row] of wanted.entries()) {
+    const rowKey = identity(row)
+    if (rowKey === undefined) {
+      continue
+    }
+    const first = listed.get(rowKey)
+    if (first !== undefined) {
+      throw new Error(`Rows ${first} and ${index} have the same key`)
+    }
+    listed.set(rowKey, index)
+  }
+
+  return await db.transaction(async (tx) => {
+    const stored: Row[] = await tx.select().from(table).where(scope)
+    const byKey = new Map(stored.map((row) => [identity(row), row]))
+    const removed = stored.filter((row) => !listed.has(identity(row) ?? ""))
+
+    if (removed.length > 0) {
+      await (remove
+        ? remove(tx, removed)
+        : tx
+            .delete(table)
+            .where(
+              and(scope, or(...removed.map((row) => matching(row, keyNames))))
+            ))
+    }
+
+    const save = async (row: Row): Promise<Row> => {
+      const rowKey = identity(row)
+      const match = rowKey === undefined ? undefined : byKey.get(rowKey)
+
+      if (!match) {
+        // An id the parent doesn't hold is never written: the row is new.
+        const values = key === undefined ? { ...row, [id]: undefined } : row
+        const inserted = await tx.insert(table).values(values).returning()
+        return one(inserted as Row[])
+      }
+
+      const set = Object.fromEntries(
+        Object.entries(definedValues(row)).filter(
+          ([name]) =>
+            name in columns &&
+            !keyNames.includes(name) &&
+            !parentNames.includes(name)
+        )
+      )
+      if (Object.keys(set).length === 0) {
+        return match
+      }
+      return one(
+        await tx
+          .update(table)
+          .set(set)
+          .where(and(scope, matching(match, keyNames)))
+          .returning()
+      )
+    }
+
+    const saved: Row[] = []
+    for (const row of wanted) {
+      // biome-ignore lint/performance/noAwaitInLoops: a transaction is one connection, so its writes run one at a time, and in input order
+      saved.push(await save(row))
+    }
+    return saved
+  })
+}
 
 /** Table name to the schema its `<prefix>_<operation>_<table>` functions live in. */
 export type FunctionPermissionTables = ReadonlyMap<string, string>
