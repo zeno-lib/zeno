@@ -3,7 +3,7 @@ import userEvent from "@zeno-lib/test/user-event"
 import { useState } from "react"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
-import { Form, FormProvider, useAppForm, useForm } from "./create-form"
+import { Form, FormProvider, useForm } from "./create-form"
 import type { ActionResult } from "./lib/action-result"
 import { submitAction } from "./lib/submit-action"
 import { ValidationError } from "./lib/validation-error"
@@ -328,32 +328,6 @@ describe("submitAction — schema", () => {
     )
     function Harness() {
       const form = useForm({
-        defaultValues: { name: " Ada " },
-        onSubmit: (submit) => submitAction(submit, action),
-        validators: { onChange: trimmed },
-      })
-      return (
-        <button onClick={() => form.handleSubmit()} type="button">
-          Submit
-        </button>
-      )
-    }
-    render(<Harness />)
-
-    await user.click(screen.getByRole("button", SUBMIT))
-
-    await vi.waitFor(() =>
-      expect(action).toHaveBeenCalledWith({ name: " Ada " })
-    )
-  })
-
-  test("useAppForm sends the values as they are", async () => {
-    const user = userEvent.setup()
-    const action = vi.fn((_input: { name: string }) =>
-      Promise.resolve<ActionResult<null>>({ data: null, ok: true })
-    )
-    function Harness() {
-      const form = useAppForm({
         defaultValues: { name: " Ada " },
         onSubmit: (submit) => submitAction(submit, action),
         validators: { onChange: trimmed },

@@ -1228,7 +1228,10 @@ What `submitAction(submit, action, options?)` does:
   *input* values, so `submitAction` parses them with the form's own `schema`
   and hands the *output* to the action: trimmed strings, coerced numbers. A
   form with no `schema` (`useForm` without one, or `useAppForm`) sends its
-  values as they are.
+  values as they are. A `defineFormAction` built on the same schema parses
+  that output again on the server, so keep the schema's transforms idempotent
+  (`.trim()` is, `.transform((n) => n * 100)` is not). A key the schema doesn't
+  declare (a record's `id`) is stripped by `z.object` before the action sees it.
 - **`schema`** (optional) replaces the form's schema for this call. Pass one
   only when the action takes a different schema than the form, say a share
   the form edits as text and the action takes as a number

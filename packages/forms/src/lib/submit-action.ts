@@ -111,9 +111,9 @@ type SubmitActionSchemaOptions<TValues, TOutput, TData> = SubmitActionOptions<
   /**
    * Parsed on the client before the call: `onSubmit` receives the form's
    * input values, and the action gets the schema's output. A failure is
-   * applied to the form and the action is never called. Defaults to the
-   * `schema` the form was created with; pass one only when the action takes
-   * a different schema than the form.
+   * applied to the form and the action is never called. Replaces the form's
+   * own `schema` for this call; pass one only when the action takes a
+   * different schema than the form.
    */
   schema: SubmitActionSchema<TOutput>
 }
