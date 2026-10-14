@@ -1,17 +1,18 @@
 "use client"
 
 import type { AnyFieldMeta } from "@tanstack/react-form"
-import { type ReactNode, useId } from "react"
+import { type ReactNode, useCallback, useId } from "react"
 
 import { describedBy } from "./aria"
 import { useFieldContext } from "./contexts"
-import { getEmptyValue } from "./empty-value"
+import { emptyValueFor } from "./empty-value"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
   useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "./use-is-invalid"
+import { getFormSchema } from "./validation-modes"
 
 type UseFieldControlOptions = {
   /**
@@ -45,10 +46,17 @@ type FieldControlProps<TValue = unknown> = {
   /** Marks the field touched. */
   onBlur: () => void
   /**
-   * Stores `value`. An empty one (`null`, `undefined`, `""` or `[]`) stores
-   * the field's empty value instead, which its schema picks.
+   * Stores `value`, not a change event: a control that reports one maps it
+   * (`onChange(event.target.value)`). An empty value (`null`, `undefined`,
+   * `""`, `NaN` or `[]`) stores the field's empty value instead, which its
+   * schema picks. Stable across renders.
    */
   onChange: (value: TValue) => void
+  /**
+   * The value as stored, the field's empty value (`undefined` or `null`)
+   * included. A control that needs a defined value maps it
+   * (`value={value ?? ""}`), or it turns uncontrolled once the field empties.
+   */
   value: TValue
 }
 
@@ -78,7 +86,19 @@ function isEmpty(value: unknown): boolean {
     value === null ||
     value === undefined ||
     value === "" ||
+    Number.isNaN(value) ||
     (Array.isArray(value) && value.length === 0)
+  )
+}
+
+// A React synthetic event, from spreading the control props on a native input
+// or an event-emitting component. Storing it would put the event in the form.
+function isSyntheticEvent(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "nativeEvent" in value &&
+    "target" in value
   )
 }
 
@@ -105,6 +125,29 @@ function useFieldControl<TValue = unknown>({
   const schemaRequired = useIsFieldRequired(field)
   const schemaRequiresValue = useIsFieldRequiredBySchema(field)
   const isRequired = required ?? schemaRequiresValue
+  // `field` is rebuilt on every value change; these members aren't, so a
+  // control that memoizes on `onChange` doesn't see a new one each render.
+  const { form, handleBlur, handleChange, name } = field
+  const onChange = useCallback(
+    (value: TValue) => {
+      if (isSyntheticEvent(value)) {
+        throw new TypeError(
+          `Field "${name}" got a change event, not a value. Map it in the control: onChange(event.target.value).`
+        )
+      }
+      handleChange(
+        isEmpty(value)
+          ? (emptyValueFor(
+              getFormSchema(form),
+              form.state.values,
+              name,
+              value
+            ) as TValue)
+          : value
+      )
+    },
+    [form, handleChange, name]
+  )
 
   return {
     controlProps: {
@@ -117,12 +160,9 @@ function useFieldControl<TValue = unknown>({
       "aria-required": isRequired || undefined,
       disabled,
       id,
-      name: field.name,
-      onBlur: field.handleBlur,
-      onChange: (value) =>
-        field.handleChange(
-          isEmpty(value) ? getEmptyValue(field, value) : value
-        ),
+      name,
+      onBlur: handleBlur,
+      onChange,
       value: field.state.value,
     },
     descriptionId,
@@ -132,7 +172,7 @@ function useFieldControl<TValue = unknown>({
     isInvalid,
     isRequired,
     labelId,
-    name: field.name,
+    name,
     showRequiredIndicator: required ?? schemaRequired,
   }
 }

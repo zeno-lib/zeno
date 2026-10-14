@@ -15,7 +15,9 @@ type ControlFieldProps<TValue = unknown> = {
    * Renders the control, given the props that bind it to the field: `id`,
    * `name`, `value`, `onChange(value)`, `onBlur`, `disabled` and the
    * `aria-*`. Spread them on a control that takes its value that way, or map
-   * them for one that doesn't.
+   * them for one that doesn't. Keep `aria-invalid` on the focusable element
+   * (or a group root around it): a failed submit focuses the first invalid
+   * field by it.
    */
   render: (control: FieldControlProps<TValue>) => ReactNode
   /**

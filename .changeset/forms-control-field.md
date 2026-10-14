@@ -12,8 +12,9 @@ a copy of a kit field's internals.
   The control gets `id`, `name`, `value`, `onChange(value)`, `onBlur`,
   `disabled`, `aria-labelledby`, `aria-describedby`, `aria-invalid` and
   `aria-required`, typed with the value at `name`. `onChange` stores the
-  field's empty value when given an empty one (`null`, `undefined`, `""` or
-  `[]`), and `onBlur` marks the field touched. The field renders the label
+  field's empty value when given an empty one (`null`, `undefined`, `""`,
+  `NaN` or `[]`), throws on a change event rather than storing it, and keeps
+  its identity across renders. `onBlur` marks the field touched. The field renders the label
   with its `*`, the description, the error and `data-field`, like the others.
 - `useFieldControl` (`@zeno-lib/forms/lib/use-field-control`, also exported
   from `@zeno-lib/forms`) is the headless hook behind it. It returns those

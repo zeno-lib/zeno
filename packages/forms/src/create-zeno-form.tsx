@@ -275,15 +275,19 @@ type WithValidators = {
 // biome-ignore lint/suspicious/noExplicitAny: field components accept arbitrary props.
 type AnyComponent = React.ComponentType<any>
 
-// A field that hands its control to `render` (the kit's `ControlField`) gets
-// the control typed with the value at `name`, which its own generic can't see.
+// A field that hands `render` a `FieldControlProps` (the kit's `ControlField`)
+// gets the control typed with the value at `name`, which its own generic
+// can't see. Matching on the parameter, not on `render` as a whole, leaves a
+// field whose `render` takes something else (or nothing) as declared.
 type WithControlValue<P, V> = P extends {
-  // biome-ignore lint/suspicious/noExplicitAny: matches any value type.
-  render: (control: FieldControlProps<any>) => ReactNode
+  render: (control: infer C) => ReactNode
 }
-  ? Omit<P, "render"> & {
-      render: (control: FieldControlProps<V>) => ReactNode
-    }
+  ? // biome-ignore lint/suspicious/noExplicitAny: matches any value type.
+    [C] extends [FieldControlProps<any>]
+    ? Omit<P, "render"> & {
+        render: (control: FieldControlProps<V>) => ReactNode
+      }
+    : P
   : P
 
 type FieldWrappers<FC extends Record<string, AnyComponent>, T> = {

@@ -184,6 +184,7 @@ describe("ControlField", () => {
   test("clearing stores the value the schema accepts as empty", async () => {
     const user = userEvent.setup()
     const schema = z.object({
+      count: z.number().nullable(),
       nullable: z.string().min(1).nullable(),
       optional: z.string().min(1).optional(),
       tags: z.array(z.string()),
@@ -192,7 +193,13 @@ describe("ControlField", () => {
     const captured: { values?: unknown } = {}
     function H() {
       const form = useForm({
-        defaultValues: { nullable: "a", optional: "b", tags: ["c"], text: "d" },
+        defaultValues: {
+          count: 1,
+          nullable: "a",
+          optional: "b",
+          tags: ["c"],
+          text: "d",
+        },
         onSubmit: vi.fn(),
         schema,
       })
@@ -219,6 +226,16 @@ describe("ControlField", () => {
                 </button>
               )}
             />
+            {/* A number control reports `NaN` once cleared. */}
+            <ControlField
+              label="Count"
+              name="count"
+              render={({ onChange }) => (
+                <button onClick={() => onChange(Number.NaN)} type="button">
+                  Clear count
+                </button>
+              )}
+            />
             <Subscribe selector={(state) => state.values}>
               {(values) => {
                 captured.values = values
@@ -234,7 +251,9 @@ describe("ControlField", () => {
     await user.clear(screen.getByLabelText("optional"))
     await user.clear(screen.getByLabelText("text"))
     await user.click(screen.getByRole("button", { name: "Clear tags" }))
+    await user.click(screen.getByRole("button", { name: "Clear count" }))
     expect(captured.values).toStrictEqual({
+      count: null,
       nullable: null,
       optional: undefined,
       tags: [],
@@ -243,26 +262,77 @@ describe("ControlField", () => {
     expect(schema.safeParse(captured.values).success).toBe(true)
   })
 
-  test("disables its control", () => {
+  test("keeps one `onChange` across renders, so a control can memoize on it", async () => {
+    const user = userEvent.setup()
+    const handlers = new Set<unknown>()
     function H() {
-      const form = useForm({ defaultValues: { rating: 1 }, onSubmit: vi.fn() })
+      const form = useForm({ defaultValues: { phone: "" }, onSubmit: vi.fn() })
       const { ControlField } = form
       return (
         <FormProvider form={form}>
           <Form>
             <ControlField
-              disabled
-              label="Rating"
-              name="rating"
-              render={(control) => <StarRating {...control} />}
+              label="Phone"
+              name="phone"
+              render={(control) => {
+                handlers.add(control.onChange)
+                return <PhoneInput {...control} />
+              }}
             />
           </Form>
         </FormProvider>
       )
     }
     render(<H />)
-    for (const star of screen.getAllByRole("radio")) {
-      expect((star as HTMLButtonElement).disabled).toBe(true)
+    await user.type(screen.getByLabelText(PHONE), "079")
+    expect(handlers.size).toBe(1)
+  })
+
+  test("refuses a change event, rather than storing it", async () => {
+    const user = userEvent.setup()
+    const errors: unknown[] = []
+    const onError = (event: ErrorEvent) => {
+      event.preventDefault()
+      errors.push(event.error)
     }
+    window.addEventListener("error", onError)
+    const captured: { values?: unknown } = {}
+    function H() {
+      const form = useForm({ defaultValues: { phone: "" }, onSubmit: vi.fn() })
+      const { ControlField, Subscribe } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <ControlField
+              label="Phone"
+              name="phone"
+              render={({ onChange }) => (
+                // The mistake: an event handed to `onChange` as the value.
+                <button
+                  onClick={(event) => onChange(event as never)}
+                  type="button"
+                >
+                  Set
+                </button>
+              )}
+            />
+            <Subscribe selector={(state) => state.values}>
+              {(values) => {
+                captured.values = values
+                return null
+              }}
+            </Subscribe>
+          </Form>
+        </FormProvider>
+      )
+    }
+    try {
+      render(<H />)
+      await user.click(screen.getByRole("button", { name: "Set" }))
+    } finally {
+      window.removeEventListener("error", onError)
+    }
+    expect(errors).toEqual([expect.any(TypeError)])
+    expect(captured.values).toStrictEqual({ phone: "" })
   })
 })

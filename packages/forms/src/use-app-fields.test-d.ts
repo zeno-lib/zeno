@@ -1,6 +1,8 @@
+import type { ReactNode } from "react"
 import { expectTypeOf, test } from "vitest"
 import { z } from "zod"
 import { useForm } from "./create-form"
+import { createZenoForm } from "./create-zeno-form"
 
 const schema = z.object({
   accept: z.boolean(),
@@ -120,4 +122,24 @@ test("ControlField types its control with the value at `name`", () => {
   })
   // @ts-expect-error — not a valid path
   form.ControlField({ name: "nonexistent", render: () => null })
+})
+
+test("a field whose `render` takes another argument keeps its own type", () => {
+  const { useForm: useListForm } = createZenoForm({
+    fieldComponents: {
+      ListField: (_: { render: (row: { id: string }) => ReactNode }) => null,
+    },
+    formComponents: {},
+  })
+  const form = useListForm({
+    onSubmit: () => undefined,
+    schema: z.object({ rows: z.array(z.string()) }),
+  })
+  form.ListField({
+    name: "rows",
+    render: (row) => {
+      expectTypeOf(row).toEqualTypeOf<{ id: string }>()
+      return null
+    },
+  })
 })

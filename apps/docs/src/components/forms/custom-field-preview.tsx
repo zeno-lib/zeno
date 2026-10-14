@@ -13,7 +13,7 @@ import { Field, FieldGroup } from "@zeno-lib/ui/field"
 import { cn } from "@zeno-lib/ui/lib/utils"
 import { toast } from "@zeno-lib/ui/sonner"
 import { StarIcon } from "lucide-react"
-import type { ComponentProps } from "react"
+import { type ComponentProps, type KeyboardEvent, useRef } from "react"
 import { z } from "zod"
 
 type StarRatingProps = Omit<ComponentProps<"div">, "onChange"> & {
@@ -23,8 +23,17 @@ type StarRatingProps = Omit<ComponentProps<"div">, "onChange"> & {
   value?: number | null
 }
 
+const STARS = [1, 2, 3, 4, 5]
+const STEPS: Record<string, number> = {
+  ArrowDown: 1,
+  ArrowLeft: -1,
+  ArrowRight: 1,
+  ArrowUp: -1,
+}
+
 // A controlled component the field kit has no field for: it takes `value` and
-// reports `onChange(value)`.
+// reports `onChange(value)`. As a radio group, it is one tab stop (the checked
+// star, or the first), and the arrow keys move and select.
 function StarRating({
   className,
   disabled,
@@ -33,9 +42,28 @@ function StarRating({
   value,
   ...props
 }: StarRatingProps) {
+  const buttons = useRef<(HTMLButtonElement | null)[]>([])
+  const current = value ?? 1
+
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const step = STEPS[event.key]
+    if (!step || disabled) {
+      return
+    }
+    event.preventDefault()
+    const next = ((current - 1 + step + STARS.length) % STARS.length) + 1
+    onChange(next)
+    buttons.current[next - 1]?.focus()
+  }
+
   return (
-    <div className={cn("flex gap-1", className)} role="radiogroup" {...props}>
-      {[1, 2, 3, 4, 5].map((star) => (
+    <div
+      className={cn("flex gap-1", className)}
+      onKeyDown={onKeyDown}
+      role="radiogroup"
+      {...props}
+    >
+      {STARS.map((star) => (
         // biome-ignore lint/a11y/useSemanticElements: a star is a radio drawn as a button.
         <button
           aria-checked={value === star}
@@ -44,7 +72,11 @@ function StarRating({
           disabled={disabled}
           key={star}
           onClick={() => onChange(star)}
+          ref={(button) => {
+            buttons.current[star - 1] = button
+          }}
           role="radio"
+          tabIndex={star === current ? 0 : -1}
           type="button"
         >
           <StarIcon
