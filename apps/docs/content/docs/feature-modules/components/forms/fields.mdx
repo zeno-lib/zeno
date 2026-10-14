@@ -630,53 +630,109 @@ For grouped options or on-the-fly creation, compose your own; see
 
 ## Custom fields
 
-When the gallery doesn't fit, build your own on top of `useFieldContext<T>()`
-and drop it inside `<AppField>` (destructured from `form`). You get the
-same typed field state the shipped fields use, and `useIsInvalid` applies
-their rules for when an error shows.
+### Control field
+
+`ControlField` binds a controlled component the kit has no field for (a
+phone input, a star rating, a color picker) in one line, in the same layout
+as the other fields: the label with its `*`, the description, the error,
+`data-field`, and the ids and `aria-*` that tie them to the control.
 
 <Preview>
   <CustomFieldPreview />
 
-```tsx lineNumbers
-"use client"
+```tsx
+import { StarRating } from "@/components/star-rating"
 
-import { useFieldContext, useIsInvalid } from "@zeno-lib/forms/create-form"
-import { Field, FieldError, FieldLabel } from "@zeno-lib/ui/field"
-import { Slider } from "@zeno-lib/ui/slider"
-
-function VolumeField({ label }: { label: string }) {
-  const field = useFieldContext<number>()
-  const isInvalid = useIsInvalid(field)
-  const value = field.state.value ?? 0
-  return (
-    <Field data-invalid={isInvalid}>
-      <FieldLabel htmlFor={field.name}>
-        {label}: {value}
-      </FieldLabel>
-      <Slider
-        id={field.name}
-        max={100}
-        min={0}
-        onValueChange={(next) =>
-          field.handleChange(Array.isArray(next) ? (next[0] ?? 0) : next)
-        }
-        value={[value]}
-      />
-      {isInvalid && <FieldError errors={field.state.meta.errors} />}
-    </Field>
-  )
-}
-
-// In a form:
-const { AppField } = form
-
-<AppField name="volume">
-  {() => <VolumeField label="Volume" />}
-</AppField>
+<ControlField
+  description="Tap a star."
+  label="Rating"
+  name="rating"
+  render={(control) => <StarRating {...control} />}
+/>
 ```
 
 </Preview>
 
-Use `AppField` too when you want direct access to a shipped field's
+`render` gets the props that bind the control to the field. They are typed
+with the value at `name`, so a control whose value type doesn't match the
+field's fails to compile.
+
+| Prop | What it does |
+|---|---|
+| `value` | The field's value, as stored, its empty value (`undefined` or `null`) included. A control that needs a defined value maps it (`value ?? ""`), or it turns uncontrolled once the field empties. |
+| `onChange(value)` | Stores the value. An empty one (`null`, `undefined`, `""`, `NaN` or `[]`) stores the field's [empty value](/docs/feature-modules/components/forms/validation#empty-values) instead. It takes a value, not a change event, and throws on one. It is stable across renders. |
+| `onBlur` | Marks the field touched, so its error can show. |
+| `id`, `name`, `disabled` | For the control's focusable element. The label's `htmlFor` points at `id`. |
+| `aria-labelledby` | The label, for a control a `<label htmlFor>` can't name (a `role="radiogroup"`). |
+| `aria-describedby`, `aria-invalid`, `aria-required` | The description and error, and the field's state. Keep `aria-invalid` on the focusable element, or a group root around it: a failed submit focuses the first invalid field by it. |
+
+A control that reports a change event, or holds a value of another shape,
+maps them in `render`:
+
+```tsx
+<ControlField
+  label="Phone"
+  name="phone"
+  render={({ onChange, value, ...control }) => (
+    <PhoneInput
+      {...control}
+      onChange={(event) => onChange(event.target.value)}
+      value={value ?? ""}
+    />
+  )}
+/>
+```
+
+`ControlField` also takes `description`, `label`, `disabled` and `required`,
+like the other fields. Inside `<AppField>`, it is `field.ControlField`, and
+its value type comes from the control's annotation
+(`render={(control: FieldControlProps<string>) => …}`) or a type argument.
+
+### Your own field component
+
+To reuse a control across forms, write a field component with the hook
+`ControlField` is built on, `useFieldControl` from
+`@zeno-lib/forms/lib/use-field-control`, and the kit's `FieldShell`. Put it
+next to the kit's fields and add it to `fieldComponents` in your
+`create-form`, and `form.RatingField` gets a typed `name` like the others.
+
+```tsx lineNumbers
+"use client"
+
+import { useFieldControl } from "@zeno-lib/forms/lib/use-field-control"
+import type { ReactNode } from "react"
+import { StarRating } from "@/components/star-rating"
+import { FieldShell } from "./field-shell"
+
+type RatingFieldProps = {
+  description?: ReactNode
+  label?: ReactNode
+  required?: boolean
+}
+
+function RatingField({ description, label, required }: RatingFieldProps) {
+  const { controlProps, ...shell } = useFieldControl<number | null>({
+    description,
+    label,
+    required,
+  })
+  return (
+    <FieldShell {...shell} description={description} label={label}>
+      <StarRating {...controlProps} />
+    </FieldShell>
+  )
+}
+```
+
+Pass the hook the `description` and `label` you render, so the control points
+at them. It returns `controlProps` for the control, and for the layout the
+ids, `isInvalid`, `isRequired`, `showRequiredIndicator` (off under
+`requiredIndicator: false`) and the `errors` to show (none while the form's
+[validation mode](/docs/feature-modules/components/forms/validation) or
+`hideFieldErrors` hides them). `InputField` and `TextAreaField` are built
+the same way.
+
+For markup of your own, `useFieldContext<T>()` gives the typed field
+state, and `useIsInvalid(field)` applies the kit's rules for when an error
+shows. Use `AppField` too when you want direct access to a shipped field's
 instance.

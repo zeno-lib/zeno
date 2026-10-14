@@ -34,6 +34,11 @@
           "type": "registry:component"
         },
         {
+          "path": "src/fields/control-field.tsx",
+          "target": "@components/form/fields/control-field.tsx",
+          "type": "registry:component"
+        },
+        {
           "path": "src/fields/date-picker-field.tsx",
           "target": "@components/form/fields/date-picker-field.tsx",
           "type": "registry:component"
@@ -41,6 +46,11 @@
         {
           "path": "src/fields/email-field.tsx",
           "target": "@components/form/fields/email-field.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/fields/field-shell.tsx",
+          "target": "@components/form/fields/field-shell.tsx",
           "type": "registry:component"
         },
         {

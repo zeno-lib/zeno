@@ -4,6 +4,7 @@
 import type {
   AnyFormApi,
   DeepKeys,
+  DeepValue,
   FormAsyncValidateOrFn,
   FormOptions,
   FormValidateOrFn,
@@ -19,6 +20,7 @@ import {
   type StandardSchemaLike,
 } from "./lib/schema-required"
 import { setSubmitError } from "./lib/submit-error"
+import type { FieldControlProps } from "./lib/use-field-control"
 import { useRebasedDefaultValues } from "./lib/use-rebased-default-values"
 import { useUnsavedChangesWarning } from "./lib/use-unsaved-changes-warning"
 import { ValidationError } from "./lib/validation-error"
@@ -273,9 +275,26 @@ type WithValidators = {
 // biome-ignore lint/suspicious/noExplicitAny: field components accept arbitrary props.
 type AnyComponent = React.ComponentType<any>
 
+// A field that hands `render` a `FieldControlProps` (the kit's `ControlField`)
+// gets the control typed with the value at `name`, which its own generic
+// can't see. Matching on the parameter, not on `render` as a whole, leaves a
+// field whose `render` takes something else (or nothing) as declared.
+type WithControlValue<P, V> = P extends {
+  render: (control: infer C) => ReactNode
+}
+  ? // biome-ignore lint/suspicious/noExplicitAny: matches any value type.
+    [C] extends [FieldControlProps<any>]
+    ? Omit<P, "render"> & {
+        render: (control: FieldControlProps<V>) => ReactNode
+      }
+    : P
+  : P
+
 type FieldWrappers<FC extends Record<string, AnyComponent>, T> = {
   [K in keyof FC]: <N extends DeepKeys<T>>(
-    props: ComponentProps<FC[K]> & { name: N } & WithValidators
+    props: WithControlValue<ComponentProps<FC[K]>, DeepValue<T, N>> & {
+      name: N
+    } & WithValidators
   ) => ReactNode
 }
 

@@ -1,23 +1,11 @@
 "use client"
 
-import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
-import {
-  useHideFieldErrors,
-  useIsFieldRequired,
-  useIsFieldRequiredBySchema,
-  useIsInvalid,
-} from "@zeno-lib/forms/lib/use-is-invalid"
-import { Children, type ComponentProps, type ReactNode, useId } from "react"
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldLabel,
-} from "@/components/ui/field"
+import { useFieldControl } from "@zeno-lib/forms/lib/use-field-control"
+import { Children, type ComponentProps, type ReactNode } from "react"
 import { Input } from "@/components/ui/input"
 import { InputGroup, InputGroupInput } from "@/components/ui/input-group"
-import { RequiredIndicator } from "../lib/required-indicator"
+import { FieldShell } from "./field-shell"
 
 type InputFieldProps = Omit<
   ComponentProps<typeof Input>,
@@ -41,28 +29,18 @@ function InputField({
   ...props
 }: InputFieldProps) {
   const field = useFieldContext<string>()
-  const id = useId()
-  const errorId = `${id}-error`
-  const descriptionId = `${id}-description`
-  const isInvalid = useIsInvalid(field)
-  const hideErrors = useHideFieldErrors(field)
-  const showError = isInvalid && !hideErrors
+  // The label names the input through `htmlFor`, so the input needs no
+  // `aria-labelledby` and the hook doesn't get `label`.
+  const { controlProps, ...shell } = useFieldControl<string>({
+    description,
+    required,
+  })
   const hasAddons = Children.count(children) > 0
-  const schemaRequired = useIsFieldRequired(field)
-  const isRequired = required ?? schemaRequired
-  const schemaRequiresValue = useIsFieldRequiredBySchema(field)
-  const requiresValue = required ?? schemaRequiresValue
 
+  // A text input keeps the `""` the user typed, where `controlProps.onChange`
+  // would store the field's empty value.
   const inputProps = {
-    "aria-describedby": describedBy(
-      [description, descriptionId],
-      [showError, errorId]
-    ),
-    "aria-invalid": isInvalid || undefined,
-    "aria-required": requiresValue || undefined,
-    id,
-    name: field.name,
-    onBlur: field.handleBlur,
+    ...controlProps,
     onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
       field.handleChange(event.target.value),
     value: field.state.value ?? "",
@@ -70,13 +48,7 @@ function InputField({
   }
 
   return (
-    <Field data-field={field.name} data-invalid={isInvalid}>
-      {label && (
-        <FieldLabel htmlFor={id}>
-          {label}
-          {isRequired && <RequiredIndicator />}
-        </FieldLabel>
-      )}
+    <FieldShell {...shell} description={description} label={label}>
       {hasAddons ? (
         <InputGroup>
           <InputGroupInput {...inputProps} />
@@ -85,13 +57,7 @@ function InputField({
       ) : (
         <Input {...inputProps} />
       )}
-      {description && (
-        <FieldDescription id={descriptionId}>{description}</FieldDescription>
-      )}
-      {showError && (
-        <FieldError errors={field.state.meta.errors} id={errorId} />
-      )}
-    </Field>
+    </FieldShell>
   )
 }
 

@@ -19,6 +19,12 @@ export {
   submitAction,
 } from "./lib/submit-action"
 export {
+  type FieldControl,
+  type FieldControlProps,
+  type UseFieldControlOptions,
+  useFieldControl,
+} from "./lib/use-field-control"
+export {
   useHideFieldErrors,
   useIsFieldRequired,
   useIsFieldRequiredBySchema,

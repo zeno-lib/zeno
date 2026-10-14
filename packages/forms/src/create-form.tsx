@@ -6,6 +6,7 @@ import { createZenoForm } from "@zeno-lib/forms"
 import { CheckboxField } from "./fields/checkbox-field"
 import { CheckboxGroupField } from "./fields/checkbox-group-field"
 import { ComboboxField } from "./fields/combobox-field"
+import { ControlField } from "./fields/control-field"
 import { DatePickerField } from "./fields/date-picker-field"
 import { EmailField } from "./fields/email-field"
 import { FormError } from "./fields/form-error"
@@ -32,6 +33,7 @@ const { useAppForm, useForm, withFieldGroup, withForm } = createZenoForm({
     CheckboxField,
     CheckboxGroupField,
     ComboboxField,
+    ControlField,
     DatePickerField,
     EmailField,
     InputField,
@@ -57,5 +59,6 @@ const { useAppForm, useForm, withFieldGroup, withForm } = createZenoForm({
 
 export * from "@zeno-lib/forms"
 export { ValidationSpinner } from "./addons/validation-spinner"
+export { FieldShell } from "./fields/field-shell"
 export { RadioGroupFieldItem } from "./fields/radio-group-field"
 export { useAppForm, useForm, withFieldGroup, withForm }
