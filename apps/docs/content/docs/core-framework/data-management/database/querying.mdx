@@ -396,16 +396,20 @@ export const updateOrder = (db: Db, { id, lines, ...values }: OrderInput) =>
 `parent` holds the columns that make a row the parent's. The sync reads, updates
 and removes only the rows that match all of them, and writes them onto every
 row, so a row leaves them out and can't land under another parent. A `null`
-value matches `null`.
+value matches `null`, but at least one value must not be `null`: a parent that
+isn't saved yet would otherwise reach every orphaned row in the table.
 
 By default, rows are told apart by their `id`; pass `id` to name another column.
 A row without an id is new. A row whose id the parent doesn't hold, because it
 belongs to another parent or was deleted since the form loaded it, is inserted
-as a new row, so a sync never writes another parent's row.
+as a new row, so a sync never writes another parent's row. When the id column
+has no default (`primaryId("assigned")`), the caller assigns ids: a new row
+keeps its id, and one another row already holds fails on the primary key.
 
 A junction table, or any table whose rows are told apart by what they point at,
 takes `key`, the natural key columns within the parent. Each row carries them,
-and a `null` key part matches a stored `null`:
+since a missing one would be stored as the column default and never match
+again, and a `null` key part matches a stored `null`:
 
 ```typescript
 await syncRows(tx, postsTags, {
@@ -417,11 +421,13 @@ await syncRows(tx, postsTags, {
 
 - The rows that left the list are removed before anything is written, so a row
   the user removes and adds back doesn't hit a unique index.
-- An update sets only the columns a row carries, and a property holding
-  `undefined` keeps its stored value. A kept row with nothing else to set is returned as it
-  is, unwritten.
+- An update sets only the columns a row carries and changes, and a property
+  holding `undefined` keeps its stored value. A kept row with nothing changed is
+  returned as it is, unwritten, so its `updated_at` stays put.
 - An empty list removes every row of the parent.
-- Two rows with the same key reject before anything is written.
+- Two rows with the same key reject before anything is written. Next redacts
+  that error in production, so reject duplicates in the form's schema too, where
+  the user sees them on the field.
 - It runs in `db.transaction`, which is a savepoint inside a `tx`. A failure
   undoes every write the sync made, and nothing else.
 - Each row is one statement, which suits the lists a form edits. For a bulk
@@ -444,7 +450,14 @@ await syncRows(tx, orderLines, {
 ```
 
 With `archivedAt: null` in `parent`, archived rows stay out of the sync, and new
-rows are written unarchived.
+rows are written unarchived. An archived row still holds its key, so make the
+unique index partial, or a removed key can't come back:
+
+```typescript
+uniqueIndex()
+  .on(table.orderId, table.product)
+  .where(sql`${table.archivedAt} is null`)
+```
 
 The sync reads the parent's rows before it writes, so two syncs of one parent
 at the same time can both insert the same new row. A unique index on the parent

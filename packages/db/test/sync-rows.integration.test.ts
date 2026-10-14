@@ -32,6 +32,13 @@ const members = unsecureTable("members", {
   teamId: bigint({ mode: "number" }).notNull(),
 })
 
+// Ids the caller assigns: the column has no default.
+const codes = unsecureTable("codes", {
+  id: primaryId("assigned"),
+  label: text().notNull(),
+  listId: bigint({ mode: "number" }).notNull(),
+})
+
 // The plain `unique` treats nulls as distinct, so it never stops a duplicate
 // `(team, person, null)`: only syncRows' own matching does.
 const tables = [
@@ -49,6 +56,11 @@ const tables = [
     group_id text,
     role text not null default 'member',
     unique (team_id, person_id, group_id)
+  )`,
+  sql`create temp table codes (
+    id varchar primary key,
+    list_id bigint not null,
+    label text not null
   )`,
 ]
 
@@ -137,6 +149,39 @@ describe("syncRows by id", () => {
       })
 
       expect(saved).toMatchObject({ note: "gift wrap", quantity: 2 })
+    }))
+
+  it("doesn't write a kept row whose values haven't changed", () =>
+    withTables(async (tx) => {
+      const { apple, pear } = await seedLines(tx)
+      // An update writes a new row version, which moves the row's ctid.
+      const ctids = () =>
+        tx.execute<{ ctid: string }>(
+          sql`select ctid::text from lines where order_id = 1 order by id`
+        )
+      const before = await ctids()
+
+      await syncRows(tx, lines, {
+        parent: { orderId: 1 },
+        rows: [
+          { id: apple.id, product: "apple", quantity: 2 },
+          { id: pear.id, note: "gift wrap", product: "pear", quantity: 1 },
+        ],
+      })
+
+      const after = await ctids()
+      expect(after[0]?.ctid).not.toBe(before[0]?.ctid)
+      expect(after[1]?.ctid).toBe(before[1]?.ctid)
+    }))
+
+  it("keeps a new row's id when the id column has no default", () =>
+    withTables(async (tx) => {
+      const [saved] = await syncRows(tx, codes, {
+        parent: { listId: 1 },
+        rows: [{ id: "net-30", label: "Net 30" }],
+      })
+
+      expect(saved).toEqual({ id: "net-30", label: "Net 30", listId: 1 })
     }))
 
   it("inserts a row whose id belongs to another parent, leaving that row alone", () =>
@@ -248,6 +293,16 @@ describe("syncRows by id", () => {
         syncRows(tx, lines, { parent: { orderId: undefined }, rows: [] })
       ).rejects.toThrow("syncRows needs a value for every parent column")
     }))
+
+  it("refuses a parent of nulls alone, which would sync every orphaned row", () =>
+    withTables(async (tx) => {
+      await expect(
+        syncRows(tx, lines, {
+          parent: { orderId: null as unknown as number },
+          rows: [],
+        })
+      ).rejects.toThrow("syncRows needs a parent column that isn't null")
+    }))
 })
 
 describe("syncRows by key", () => {
@@ -304,5 +359,16 @@ describe("syncRows by key", () => {
           ],
         })
       ).rejects.toThrow("Rows 0 and 1 have the same key")
+    }))
+
+  it("rejects a row without a key part, which the insert would store as the default", () =>
+    withTables(async (tx) => {
+      await expect(
+        syncRows(tx, members, {
+          key: ["personId", "groupId"],
+          parent: { teamId: 1 },
+          rows: [{ personId: "ada" } as { groupId: null; personId: string }],
+        })
+      ).rejects.toThrow('Row 0 has no value for key column "groupId"')
     }))
 })

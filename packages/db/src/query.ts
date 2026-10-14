@@ -9,6 +9,7 @@ import {
   getTableName,
   type InferInsertModel,
   type InferSelectModel,
+  inArray,
   is,
   isNull,
   or,
@@ -142,7 +143,7 @@ type SyncRowsBaseOptions<
   /**
    * The columns that make a row the parent's, with their values, such as
    * `{ orderId }`. Only rows matching all of them are read, updated or
-   * removed, and every row is written with them.
+   * removed, and every row is written with them. At least one isn't `null`.
    */
   parent: TParent
   /**
@@ -217,6 +218,9 @@ const keyPart = (value: unknown): unknown => {
   return value ?? null
 }
 
+const sameValue = (a: unknown, b: unknown) =>
+  JSON.stringify(keyPart(a)) === JSON.stringify(keyPart(b))
+
 /**
  * Makes `rows` the parent's whole set of rows in `table`: the stored rows that
  * left the list are removed first, so a removed key can come straight back,
@@ -228,15 +232,16 @@ const keyPart = (value: unknown): unknown => {
  * - `id` (the default, on `"id"`): a surrogate key. A row without one is
  *   inserted. An id the parent doesn't hold (another parent's row, or one
  *   deleted since the form loaded it) is dropped and the row inserted anew, so
- *   a sync never writes another parent's row.
+ *   a sync never writes another parent's row. On a column without a default,
+ *   the id is kept and a taken one fails on the primary key.
  * - `key`: natural key columns, compared as the driver returns them. A key
  *   another parent holds fails on the table's unique index rather than moving
  *   that row over.
  *
- * An update sets only the columns the row carries, skipping `undefined`, and a
- * stored row with nothing to set is returned as it is, unwritten. An empty
- * list removes every row the parent has. Two rows with the same key throw
- * before anything is written.
+ * An update sets only the columns the row carries and changes, skipping
+ * `undefined`, and a stored row with nothing to change is returned as it is,
+ * unwritten. An empty list removes every row the parent has. Two rows with the
+ * same key throw before anything is written.
  *
  * Everything runs in `db.transaction`: its own transaction on a client, a
  * savepoint inside a `tx`. A failure undoes every write the sync made and
@@ -289,9 +294,10 @@ const sync = async (
   table: PgTable,
   { id = "id", key, parent, remove, rows }: SyncOptions
 ): Promise<Row[]> => {
-  const columns: Record<string, PgColumn> = getColumns(table)
+  // A Map, so an inherited name such as `constructor` is never a column.
+  const columns = new Map<string, PgColumn>(Object.entries(getColumns(table)))
   const column = (name: string) => {
-    const found = columns[name]
+    const found = columns.get(name)
     if (!found) {
       throw new Error(
         `"${name}" is not a column of table "${getTableName(table)}"`
@@ -308,12 +314,16 @@ const sync = async (
     )
 
   const parentNames = Object.keys(parent)
-  // A missing parent column would widen the sync to other parents' rows.
+  // A missing parent column would widen the sync to other parents' rows, and
+  // so would a parent of nulls alone, which matches every orphaned row.
   if (
     parentNames.length === 0 ||
     parentNames.some((name) => parent[name] === undefined)
   ) {
     throw new Error("syncRows needs a value for every parent column")
+  }
+  if (parentNames.every((name) => parent[name] === null)) {
+    throw new Error("syncRows needs a parent column that isn't null")
   }
   const scope = matching(parent, parentNames)
   const keyNames = key ?? [id]
@@ -321,7 +331,7 @@ const sync = async (
     column(name)
   }
 
-  // A row without an id is new. A natural key part reads `undefined` as null.
+  // A row without an id is new.
   const identity = (row: Row) =>
     key === undefined && (row[id] === undefined || row[id] === null)
       ? undefined
@@ -330,6 +340,12 @@ const sync = async (
   const wanted = rows.map((row) => ({ ...row, ...parent }))
   const listed = new Map<string, number>()
   for (const [index, row] of wanted.entries()) {
+    // The insert would store the column default instead, so the saved row
+    // would never match its own key again.
+    const missing = key?.find((name) => row[name] === undefined)
+    if (missing !== undefined) {
+      throw new Error(`Row ${index} has no value for key column "${missing}"`)
+    }
     const rowKey = identity(row)
     if (rowKey === undefined) {
       continue
@@ -347,12 +363,20 @@ const sync = async (
     const removed = stored.filter((row) => !listed.has(identity(row) ?? ""))
 
     if (removed.length > 0) {
+      // One `IN` list for a single key column, which can't match a null.
+      const only = keyNames.length === 1 ? keyNames[0] : undefined
+      const values = only === undefined ? [] : removed.map((row) => row[only])
       await (remove
         ? remove(tx, removed)
         : tx
             .delete(table)
             .where(
-              and(scope, or(...removed.map((row) => matching(row, keyNames))))
+              and(
+                scope,
+                only !== undefined && !values.includes(null)
+                  ? inArray(column(only), values)
+                  : or(...removed.map((row) => matching(row, keyNames)))
+              )
             ))
     }
 
@@ -361,18 +385,26 @@ const sync = async (
       const match = rowKey === undefined ? undefined : byKey.get(rowKey)
 
       if (!match) {
-        // An id the parent doesn't hold is never written: the row is new.
-        const values = key === undefined ? { ...row, [id]: undefined } : row
+        // An id the parent doesn't hold is dropped, so the row is new, unless
+        // the column has no default to fill in: then the caller assigns ids,
+        // and a taken one fails on the primary key rather than moving a row.
+        const values =
+          key === undefined && column(id).hasDefault
+            ? { ...row, [id]: undefined }
+            : row
         const inserted = await tx.insert(table).values(values).returning()
         return one(inserted as Row[])
       }
 
+      // An unchanged column isn't set, so an untouched row isn't written and
+      // its `updated_at` trigger doesn't fire.
       const set = Object.fromEntries(
         Object.entries(definedValues(row)).filter(
-          ([name]) =>
-            name in columns &&
+          ([name, value]) =>
+            columns.has(name) &&
             !keyNames.includes(name) &&
-            !parentNames.includes(name)
+            !parentNames.includes(name) &&
+            !sameValue(value, match[name])
         )
       )
       if (Object.keys(set).length === 0) {
