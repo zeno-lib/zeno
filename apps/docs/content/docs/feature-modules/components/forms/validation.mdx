@@ -407,8 +407,10 @@ percentage or year input, an unpicked date) stores its empty value, so the
 form stays valid. A field also starts at it when the schema rejects `""` or
 `[]` (`z.email().optional()` starts at `undefined`, `z.uuid().nullable()` at
 `null`), so an untouched optional field passes. Text inputs keep `""`, which
-the user typed. A custom field reads the value with `getEmptyValue(field,
-fallback)` from `@zeno-lib/forms/lib/empty-value`.
+the user typed. The `onChange` that `ControlField` and `useFieldControl` hand
+a control stores it when given an empty value, and markup of your own reads
+it with `getEmptyValue(field, fallback)` from
+`@zeno-lib/forms/lib/empty-value`.
 
 ## Where the error message lives
 

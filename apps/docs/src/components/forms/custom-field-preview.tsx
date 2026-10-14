@@ -1,12 +1,6 @@
 "use client"
 
-import {
-  Form,
-  FormProvider,
-  useFieldContext,
-  useForm,
-  useIsInvalid,
-} from "@zeno-lib/forms/create-form"
+import { Form, FormProvider, useForm } from "@zeno-lib/forms/create-form"
 import {
   Card,
   CardContent,
@@ -15,78 +9,94 @@ import {
   CardHeader,
   CardTitle,
 } from "@zeno-lib/ui/card"
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@zeno-lib/ui/field"
-import { Slider } from "@zeno-lib/ui/slider"
+import { Field, FieldGroup } from "@zeno-lib/ui/field"
+import { cn } from "@zeno-lib/ui/lib/utils"
 import { toast } from "@zeno-lib/ui/sonner"
+import { StarIcon } from "lucide-react"
+import type { ComponentProps } from "react"
 import { z } from "zod"
 
-function VolumeField({ label }: { label: string }) {
-  const field = useFieldContext<number>()
-  const isInvalid = useIsInvalid(field)
-  const value = field.state.value ?? 0
+type StarRatingProps = Omit<ComponentProps<"div">, "onChange"> & {
+  disabled?: boolean
+  name?: string
+  onChange: (value: number) => void
+  value?: number | null
+}
+
+// A controlled component the field kit has no field for: it takes `value` and
+// reports `onChange(value)`.
+function StarRating({
+  className,
+  disabled,
+  name,
+  onChange,
+  value,
+  ...props
+}: StarRatingProps) {
   return (
-    <Field data-invalid={isInvalid}>
-      <FieldLabel htmlFor={field.name}>
-        {label}: {value}
-      </FieldLabel>
-      <Slider
-        id={field.name}
-        max={100}
-        min={0}
-        onValueChange={(next) =>
-          field.handleChange(Array.isArray(next) ? (next[0] ?? 0) : next)
-        }
-        step={1}
-        value={[value]}
-      />
-      <FieldDescription>Drag to set the master volume.</FieldDescription>
-      {isInvalid && <FieldError errors={field.state.meta.errors} />}
-    </Field>
+    <div className={cn("flex gap-1", className)} role="radiogroup" {...props}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        // biome-ignore lint/a11y/useSemanticElements: a star is a radio drawn as a button.
+        <button
+          aria-checked={value === star}
+          aria-label={`${star} of 5`}
+          className="rounded-sm text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 aria-checked:text-foreground"
+          disabled={disabled}
+          key={star}
+          onClick={() => onChange(star)}
+          role="radio"
+          type="button"
+        >
+          <StarIcon
+            className={cn("size-6", value && star <= value && "fill-current")}
+          />
+        </button>
+      ))}
+      <input name={name} type="hidden" value={value ?? ""} />
+    </div>
   )
 }
 
-const audioSchema = z.object({
-  volume: z.number().min(0).max(100),
+const reviewSchema = z.object({
+  rating: z.number("Pick a rating"),
 })
 
 export function CustomFieldPreview() {
   const form = useForm({
-    defaultValues: { volume: 35 },
     onSubmit: ({ value }) => {
-      toast.success("Volume applied", { description: String(value.volume) })
+      toast.success("Thanks for the review", {
+        description: `${value.rating} of 5`,
+      })
     },
-    schema: audioSchema,
+    schema: reviewSchema,
   })
-  const { AppField, ResetButton, SubmitButton } = form
+  const { ControlField, ResetButton, SubmitButton } = form
 
   return (
     <FormProvider form={form}>
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Audio settings</CardTitle>
+          <CardTitle>Review</CardTitle>
           <CardDescription>
-            Custom slider field built on top of `useFieldContext`.
+            A custom star rating, bound with `ControlField`.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Form id="audio-form">
+          <Form id="review-form">
             <FieldGroup>
-              <AppField name="volume">
-                {() => <VolumeField label="Volume" />}
-              </AppField>
+              <ControlField
+                description="Tap a star."
+                label="Rating"
+                name="rating"
+                render={(control) => <StarRating {...control} />}
+              />
             </FieldGroup>
           </Form>
         </CardContent>
         <CardFooter>
           <Field orientation="horizontal">
             <ResetButton />
-            <SubmitButton form="audio-form">Apply</SubmitButton>
+            <SubmitButton form="review-form">Send</SubmitButton>
           </Field>
         </CardFooter>
       </Card>

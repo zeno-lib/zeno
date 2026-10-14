@@ -1,4 +1,4 @@
-import { test } from "vitest"
+import { expectTypeOf, test } from "vitest"
 import { z } from "zod"
 import { useForm } from "./create-form"
 
@@ -92,4 +92,32 @@ test("listeners prop is accepted on every field wrapper", () => {
     listeners: { onChange: () => undefined, onChangeDebounceMs: 50 },
     name: "email",
   })
+})
+
+test("ControlField types its control with the value at `name`", () => {
+  const form = useForm({
+    onSubmit: () => undefined,
+    schema: z.object({
+      phone: z.string().nullable(),
+      rating: z.number(),
+    }),
+  })
+  form.ControlField({
+    name: "phone",
+    render: (control) => {
+      expectTypeOf(control.value).toEqualTypeOf<string | null>()
+      return null
+    },
+  })
+  form.ControlField({
+    name: "rating",
+    render: (control) => {
+      control.onChange(3)
+      // @ts-expect-error — the field holds a number
+      control.onChange("3")
+      return null
+    },
+  })
+  // @ts-expect-error — not a valid path
+  form.ControlField({ name: "nonexistent", render: () => null })
 })
