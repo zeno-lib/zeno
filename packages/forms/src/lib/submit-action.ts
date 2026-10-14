@@ -8,6 +8,7 @@ import {
 } from "./action-result"
 import { applyValidationError } from "./apply-validation-error"
 import { ValidationError } from "./validation-error"
+import { getFormSchema } from "./validation-modes"
 
 // Write an action's failure onto the form. Field messages go through
 // `applyValidationError`, so they live in `errorMap.onChange` and clear the
@@ -110,7 +111,9 @@ type SubmitActionSchemaOptions<TValues, TOutput, TData> = SubmitActionOptions<
   /**
    * Parsed on the client before the call: `onSubmit` receives the form's
    * input values, and the action gets the schema's output. A failure is
-   * applied to the form and the action is never called.
+   * applied to the form and the action is never called. Replaces the form's
+   * own `schema` for this call; pass one only when the action takes a
+   * different schema than the form.
    */
   schema: SubmitActionSchema<TOutput>
 }
@@ -120,8 +123,12 @@ type SubmitActionSchemaOptions<TValues, TOutput, TData> = SubmitActionOptions<
  * form. Pass `onSubmit`'s own argument straight through:
  *
  * ```ts
- * onSubmit: (submit) => submitAction(submit, saveProfile, { reset: true, schema })
+ * onSubmit: (submit) => submitAction(submit, saveProfile, { reset: true })
  * ```
+ *
+ * The values are parsed with `options.schema`, else with the form's own
+ * `useForm({ schema })`, and the action gets the schema's output. A form with
+ * no schema (`useForm` without one, `useAppForm`) sends its values as they are.
  *
  * On `{ ok: false }` the field errors land on their fields (array paths like
  * `owners[0].percentage` included) and clear as each field is edited. On
@@ -145,10 +152,17 @@ async function submitAction(
   options: { reset?: unknown; schema?: SubmitActionSchema<unknown> } = {}
 ): Promise<ActionResult<unknown>> {
   const { formApi, value } = props
+  // `useForm` types its schema as `StandardSchema<Values>`, so the output
+  // still fits the `TValues` the action is typed against.
+  const schema =
+    options.schema ??
+    (getFormSchema(formApi as AnyFormApi) as
+      | SubmitActionSchema<unknown>
+      | undefined)
   let input: unknown = value
 
-  if (options.schema) {
-    const parsed = await options.schema["~standard"].validate(value)
+  if (schema) {
+    const parsed = await schema["~standard"].validate(value)
     if (parsed.issues) {
       const error = toActionError(parsed.issues)
       applyActionError(formApi, error)
