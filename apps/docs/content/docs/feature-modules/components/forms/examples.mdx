@@ -1224,15 +1224,21 @@ What `submitAction(submit, action, options?)` does:
   (one message per line), which
   [`FormError`](/docs/feature-modules/components/forms/examples#form-level-errors)
   shows.
-- **`schema`** (optional): `onSubmit` receives the form's *input* values. For a
-  schema that transforms (`z.string().transform(Number)`), pass it here:
-  `submitAction` validates the values on the client and hands the schema's
-  *output* to the action. On a failure, it applies the errors to the form and
-  never calls the action.
+- **The action gets the schema's output.** `onSubmit` receives the form's
+  *input* values, so `submitAction` parses them with the form's own `schema`
+  and hands the *output* to the action: trimmed strings, coerced numbers. A
+  form with no `schema` (`useForm` without one, or `useAppForm`) sends its
+  values as they are.
+- **`schema`** (optional) replaces the form's schema for this call. Pass one
+  only when the action takes a different schema than the form, say a share
+  the form edits as text and the action takes as a number
+  (`z.string().transform(Number)`). On a failure, it applies the errors to the
+  form and never calls the action.
 - **`reset`** (optional): after a success, `true` calls `formApi.reset(data)`,
   so the returned record becomes the pristine baseline. The types only offer
   `true` when the data has the form's shape. `"values"` rebases on the
-  submitted values, and a function maps the data to the next values.
+  values as the form held them, before the schema parsed them, and a function
+  maps the data to the next values.
 - **It returns the result**, typed from the action, so you can redirect or
   toast on `result.ok`. A thrown error (network, auth, a bug) propagates as is.
 

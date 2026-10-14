@@ -3,7 +3,7 @@ import userEvent from "@zeno-lib/test/user-event"
 import { useState } from "react"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
-import { Form, FormProvider, useForm } from "./create-form"
+import { Form, FormProvider, useAppForm, useForm } from "./create-form"
 import type { ActionResult } from "./lib/action-result"
 import { submitAction } from "./lib/submit-action"
 import { ValidationError } from "./lib/validation-error"
@@ -244,6 +244,135 @@ describe("submitAction — field errors from the action", () => {
 })
 
 describe("submitAction — schema", () => {
+  test("parses with the form's own schema, and reset: true rebases on what the action saved", async () => {
+    const user = userEvent.setup()
+    const schema = z.object({ age: z.coerce.number(), name: z.string().trim() })
+    type Values = z.input<typeof schema>
+    const action = vi.fn((input: Values) =>
+      Promise.resolve<ActionResult<Values>>({ data: input, ok: true })
+    )
+    const formRef: { current: unknown } = { current: undefined }
+    function Harness() {
+      const form = useForm({
+        defaultValues: { age: "42", name: " Ada " },
+        onSubmit: (submit) => submitAction(submit, action, { reset: true }),
+        schema,
+      })
+      formRef.current = form
+      const { InputField, SubmitButton } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <InputField label="Name" name="name" />
+            <SubmitButton>Submit</SubmitButton>
+          </Form>
+        </FormProvider>
+      )
+    }
+    render(<Harness />)
+
+    await user.click(screen.getByRole("button", SUBMIT))
+
+    await vi.waitFor(() =>
+      expect(action).toHaveBeenCalledWith({ age: 42, name: "Ada" })
+    )
+    const form = formRef.current as {
+      state: { isDefaultValue: boolean; values: Values }
+    }
+    await vi.waitFor(() =>
+      expect(form.state.values).toEqual({ age: 42, name: "Ada" })
+    )
+    expect(form.state.isDefaultValue).toBe(true)
+  })
+
+  test("an explicit schema wins over the form's", async () => {
+    const user = userEvent.setup()
+    const action = vi.fn((_input: { name: string }) =>
+      Promise.resolve<ActionResult<null>>({ data: null, ok: true })
+    )
+    const actionSchema = z.object({ name: z.string().toUpperCase() })
+    function Harness() {
+      const form = useForm({
+        defaultValues: { name: " Ada " },
+        onSubmit: (submit) =>
+          submitAction(submit, action, { schema: actionSchema }),
+        schema: z.object({ name: z.string().trim() }),
+      })
+      const { InputField, SubmitButton } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <InputField label="Name" name="name" />
+            <SubmitButton>Submit</SubmitButton>
+          </Form>
+        </FormProvider>
+      )
+    }
+    render(<Harness />)
+
+    await user.click(screen.getByRole("button", SUBMIT))
+
+    await vi.waitFor(() =>
+      expect(action).toHaveBeenCalledWith({ name: " ADA " })
+    )
+  })
+
+  // A schema passed as a plain TanStack validator is not the form's schema:
+  // the action gets the values as they are, as before.
+  const trimmed = z.object({ name: z.string().trim() })
+
+  test("useForm without a schema sends the values as they are", async () => {
+    const user = userEvent.setup()
+    const action = vi.fn((_input: { name: string }) =>
+      Promise.resolve<ActionResult<null>>({ data: null, ok: true })
+    )
+    function Harness() {
+      const form = useForm({
+        defaultValues: { name: " Ada " },
+        onSubmit: (submit) => submitAction(submit, action),
+        validators: { onChange: trimmed },
+      })
+      return (
+        <button onClick={() => form.handleSubmit()} type="button">
+          Submit
+        </button>
+      )
+    }
+    render(<Harness />)
+
+    await user.click(screen.getByRole("button", SUBMIT))
+
+    await vi.waitFor(() =>
+      expect(action).toHaveBeenCalledWith({ name: " Ada " })
+    )
+  })
+
+  test("useAppForm sends the values as they are", async () => {
+    const user = userEvent.setup()
+    const action = vi.fn((_input: { name: string }) =>
+      Promise.resolve<ActionResult<null>>({ data: null, ok: true })
+    )
+    function Harness() {
+      const form = useAppForm({
+        defaultValues: { name: " Ada " },
+        onSubmit: (submit) => submitAction(submit, action),
+        validators: { onChange: trimmed },
+      })
+      return (
+        <button onClick={() => form.handleSubmit()} type="button">
+          Submit
+        </button>
+      )
+    }
+    render(<Harness />)
+
+    await user.click(screen.getByRole("button", SUBMIT))
+
+    await vi.waitFor(() =>
+      expect(action).toHaveBeenCalledWith({ name: " Ada " })
+    )
+  })
+
   test("passes the schema output to the action, not the input values", async () => {
     const user = userEvent.setup()
     const schema = z.object({
