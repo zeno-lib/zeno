@@ -87,6 +87,15 @@ describe("getRequiredPaths", () => {
     expect(required.has("profile.bio")).toBe(false)
   })
 
+  test("a nullable object is not required, though its own fields are", () => {
+    const schema = z.object({
+      payer: z.object({ id: z.number(), kind: z.string().min(1) }).nullable(),
+    })
+    const required = getRequiredPaths(schema)
+    expect(required.has("payer")).toBe(false)
+    expect(required.has("payer.kind")).toBe(true)
+  })
+
   test("optional nested object is not descended into", () => {
     const schema = z.object({
       profile: z.object({ email: z.email() }).optional(),
