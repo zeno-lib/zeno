@@ -13,10 +13,13 @@ import {
 import { type ReactNode, useId } from "react"
 import {
   Combobox,
+  ComboboxCollection,
   ComboboxContent,
   ComboboxEmpty,
+  ComboboxGroup,
   ComboboxInput,
   ComboboxItem,
+  ComboboxLabel,
   ComboboxList,
 } from "@/components/ui/combobox"
 import {
@@ -31,11 +34,26 @@ import { RequiredIndicator } from "../lib/required-indicator"
 
 type ComboboxItemObject<V> = { value: V; label: string }
 
+/** Items under a heading. */
+type ComboboxItemGroup<T> = { label: string; items: readonly T[] }
+
+/** An item of `items`, or of one of its groups. */
+type ComboboxOption<T> = T extends ComboboxItemGroup<infer I> ? I : T
+
+/** What picking an item stores: `item.value` for an object, else the item. */
+type ComboboxOptionValue<T> =
+  T extends ComboboxItemGroup<infer I>
+    ? ComboboxOptionValue<I>
+    : T extends ComboboxItemObject<infer V>
+      ? V
+      : T
+
 type ComboboxFieldProps<T = string> = {
   /**
    * Items shown in the dropdown. Pass plain strings (value === label) or
    * `{ value, label }` objects when the value isn't a string (e.g. numeric
-   * database IDs).
+   * database IDs, or an object). To show them under headings, pass
+   * `{ label, items }` groups instead.
    */
   items: readonly T[]
   description?: ReactNode
@@ -44,7 +62,18 @@ type ComboboxFieldProps<T = string> = {
   /** Message shown when filtering produces zero matches. */
   emptyMessage?: ReactNode
   /** Override per-row rendering. Default: plain `<ComboboxItem>{label}</ComboboxItem>`. */
-  renderItem?: (item: T) => ReactNode
+  renderItem?: (item: ComboboxOption<T>) => ReactNode
+  /**
+   * Whether an item's value is the stored value. Defaults to `Object.is`.
+   * Pass it when the values are objects (`{ kind, id }`), which a reload or a
+   * refetch rebuilds: `(a, b) => a.kind === b.kind && a.id === b.id`. Never
+   * called with an empty value.
+   */
+  // biome-ignore lint/style/useConsistentMethodSignatures: a method's parameters are bivariant, so a comparator typed with the value fits `form.<Field>`, whose props see the items as `unknown`.
+  isItemEqualToValue?(
+    itemValue: ComboboxOptionValue<T>,
+    value: ComboboxOptionValue<T>
+  ): boolean
   /**
    * Show the clear button when a value is selected. Defaults to `true` on an
    * optional field and `false` on a required one (from the schema or
@@ -69,7 +98,7 @@ type ComboboxFieldProps<T = string> = {
    * Replace Base UI's built-in client-side filter. Pass `null` for
    * server-driven search where `items` is already filtered by the consumer.
    */
-  filter?: ((item: T, query: string) => boolean) | null
+  filter?: ((item: ComboboxOption<T>, query: string) => boolean) | null
   /**
    * Show a spinner addon inside the input while options are being fetched.
    * Pair with `onInputValueChange` to drive a debounced server query.
@@ -86,6 +115,31 @@ function isItemObject(item: unknown): item is ComboboxItemObject<unknown> {
   )
 }
 
+// What Base UI takes for a group: an object with an `items` array.
+function isItemGroup(item: unknown): item is ComboboxItemGroup<unknown> {
+  return (
+    typeof item === "object" &&
+    item !== null &&
+    Array.isArray((item as { items?: unknown }).items)
+  )
+}
+
+function itemValue(item: unknown): unknown {
+  return isItemObject(item) ? item.value : item
+}
+
+// One key per value, objects included.
+function valueKey(value: unknown): string {
+  if (typeof value !== "object" || value === null) {
+    return String(value)
+  }
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
+}
+
 function ComboboxField<T = string>({
   className,
   description,
@@ -93,6 +147,7 @@ function ComboboxField<T = string>({
   emptyMessage = "No results.",
   filter,
   inputValue,
+  isItemEqualToValue,
   items,
   label,
   loading,
@@ -116,16 +171,45 @@ function ComboboxField<T = string>({
   const requiresValue = required ?? schemaRequiresValue
   const canClear = showClear ?? !requiresValue
 
+  const options = items.flatMap((item) =>
+    isItemGroup(item) ? item.items : [item]
+  ) as ComboboxOption<T>[]
+  const isSameValue = (a: unknown, b: unknown): boolean => {
+    if (Object.is(a, b)) {
+      return true
+    }
+    if (a === null || a === undefined || b === null || b === undefined) {
+      return false
+    }
+    return (
+      isItemEqualToValue?.(
+        a as ComboboxOptionValue<T>,
+        b as ComboboxOptionValue<T>
+      ) ?? false
+    )
+  }
+
   const fieldValue = field.state.value
   // Base UI shows the value it gets as text, so a stored id whose item isn't
   // in `items` (options still loading, or a search that dropped it) would
   // show raw. Only a plain string or number item is its own label.
-  const match = items.find(
-    (item) => (isItemObject(item) ? item.value : item) === fieldValue
+  const match = options.find((option) =>
+    isSameValue(itemValue(option), fieldValue)
   )
-  const plainItems = items.length > 0 && !items.some(isItemObject)
+  const plainItems = options.length > 0 && !options.some(isItemObject)
   const value = (match ??
-    (plainItems ? (fieldValue ?? null) : null)) as T | null
+    (plainItems ? (fieldValue ?? null) : null)) as ComboboxOption<T> | null
+
+  const renderOption = (option: ComboboxOption<T>) => {
+    if (renderItem) {
+      return renderItem(option)
+    }
+    return (
+      <ComboboxItem key={valueKey(itemValue(option))} value={option}>
+        {isItemObject(option) ? option.label : String(option)}
+      </ComboboxItem>
+    )
+  }
 
   return (
     <Field
@@ -139,7 +223,7 @@ function ComboboxField<T = string>({
           {isRequired && <RequiredIndicator />}
         </FieldLabel>
       )}
-      <Combobox
+      <Combobox<ComboboxOption<T>>
         disabled={isDisabled}
         filter={filter}
         inputValue={inputValue}
@@ -150,7 +234,7 @@ function ComboboxField<T = string>({
             field.handleChange(getEmptyValue(field, undefined))
             return
           }
-          field.handleChange(isItemObject(next) ? next.value : next)
+          field.handleChange(itemValue(next))
         }}
         value={value}
       >
@@ -178,23 +262,16 @@ function ComboboxField<T = string>({
         <ComboboxContent>
           <ComboboxEmpty>{emptyMessage}</ComboboxEmpty>
           <ComboboxList>
-            {(item: T) => {
-              if (renderItem) {
-                return renderItem(item)
-              }
-              if (isItemObject(item)) {
-                return (
-                  <ComboboxItem key={String(item.value)} value={item}>
-                    {item.label}
-                  </ComboboxItem>
-                )
-              }
-              return (
-                <ComboboxItem key={String(item)} value={item}>
-                  {String(item)}
-                </ComboboxItem>
+            {(item: T) =>
+              isItemGroup(item) ? (
+                <ComboboxGroup items={item.items} key={item.label}>
+                  <ComboboxLabel>{item.label}</ComboboxLabel>
+                  <ComboboxCollection>{renderOption}</ComboboxCollection>
+                </ComboboxGroup>
+              ) : (
+                renderOption(item as ComboboxOption<T>)
               )
-            }}
+            }
           </ComboboxList>
         </ComboboxContent>
       </Combobox>
@@ -208,5 +285,5 @@ function ComboboxField<T = string>({
   )
 }
 
-export type { ComboboxFieldProps, ComboboxItemObject }
+export type { ComboboxFieldProps, ComboboxItemGroup, ComboboxItemObject }
 export { ComboboxField }

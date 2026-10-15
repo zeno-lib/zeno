@@ -17,9 +17,12 @@ import {
   ComboboxChip,
   ComboboxChips,
   ComboboxChipsInput,
+  ComboboxCollection,
   ComboboxContent,
   ComboboxEmpty,
+  ComboboxGroup,
   ComboboxItem,
+  ComboboxLabel,
   ComboboxList,
   ComboboxValue,
   useComboboxAnchor,
@@ -34,14 +37,26 @@ import { RequiredIndicator } from "../lib/required-indicator"
 
 type MultiSelectItemObject<V> = { value: V; label: string }
 
+/** Items under a heading. */
+type MultiSelectItemGroup<T> = { label: string; items: readonly T[] }
+
+/** An item of `items`, or of one of its groups. */
+type MultiSelectOption<T> = T extends MultiSelectItemGroup<infer I> ? I : T
+
 /** The value stored per selected item: `item.value` for objects, else the item. */
-type MultiSelectValue<T> = T extends MultiSelectItemObject<infer V> ? V : T
+type MultiSelectValue<T> =
+  T extends MultiSelectItemGroup<infer I>
+    ? MultiSelectValue<I>
+    : T extends MultiSelectItemObject<infer V>
+      ? V
+      : T
 
 type MultiSelectFieldProps<T = string> = {
   /**
    * Options shown in the dropdown. Pass plain strings or numbers (value ===
    * label), or `{ value, label }` objects. The form value is an array of the
-   * selected values (`item.value` for objects).
+   * selected values (`item.value` for objects). To show them under headings,
+   * pass `{ label, items }` groups instead.
    */
   items: readonly T[]
   description?: ReactNode
@@ -51,7 +66,18 @@ type MultiSelectFieldProps<T = string> = {
   /** Message shown when filtering produces zero matches. */
   emptyMessage?: ReactNode
   /** Override per-row rendering. Default: the item's label. */
-  renderItem?: (item: T) => ReactNode
+  renderItem?: (item: MultiSelectOption<T>) => ReactNode
+  /**
+   * Whether an item's value is a stored value. Defaults to `Object.is`. Pass
+   * it when the values are objects (`{ kind, id }`), which a reload or a
+   * refetch rebuilds: `(a, b) => a.kind === b.kind && a.id === b.id`. Never
+   * called with an empty value.
+   */
+  // biome-ignore lint/style/useConsistentMethodSignatures: a method's parameters are bivariant, so a comparator typed with the value fits `form.<Field>`, whose props see the items as `unknown`.
+  isItemEqualToValue?(
+    itemValue: MultiSelectValue<T>,
+    value: MultiSelectValue<T>
+  ): boolean
   /** Show a button that clears every selection. Defaults to `true`. */
   showClear?: boolean
   /** Accessible label of the clear button. Defaults to `"Clear"`. */
@@ -74,12 +100,33 @@ function isItemObject(item: unknown): item is MultiSelectItemObject<unknown> {
   )
 }
 
+// What Base UI takes for a group: an object with an `items` array.
+function isItemGroup(item: unknown): item is MultiSelectItemGroup<unknown> {
+  return (
+    typeof item === "object" &&
+    item !== null &&
+    Array.isArray((item as { items?: unknown }).items)
+  )
+}
+
 function itemValue(item: unknown): unknown {
   return isItemObject(item) ? item.value : item
 }
 
 function itemLabel(item: unknown): string {
   return isItemObject(item) ? item.label : String(item)
+}
+
+// One key per value, objects included.
+function valueKey(value: unknown): string {
+  if (typeof value !== "object" || value === null) {
+    return String(value)
+  }
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
 }
 
 /**
@@ -92,6 +139,7 @@ function MultiSelectField<T = string>({
   description,
   disabled,
   emptyMessage = "No results.",
+  isItemEqualToValue,
   items,
   label,
   placeholder,
@@ -113,12 +161,41 @@ function MultiSelectField<T = string>({
   const schemaRequiresValue = useIsFieldRequiredBySchema(field)
   const requiresValue = required ?? schemaRequiresValue
 
+  const options = items.flatMap((item) =>
+    isItemGroup(item) ? item.items : [item]
+  ) as MultiSelectOption<T>[]
+  const isSameValue = (a: unknown, b: unknown): boolean => {
+    if (Object.is(a, b)) {
+      return true
+    }
+    if (a === null || a === undefined || b === null || b === undefined) {
+      return false
+    }
+    return (
+      isItemEqualToValue?.(
+        a as MultiSelectValue<T>,
+        b as MultiSelectValue<T>
+      ) ?? false
+    )
+  }
+
   const values = field.state.value ?? []
   // Map stored values back to item identities, in selection order, so Base UI
   // compares by reference and the chips keep the order the user picked.
   const selected = values
-    .map((value) => items.find((item) => Object.is(itemValue(item), value)))
-    .filter((item): item is T => item !== undefined)
+    .map((value) =>
+      options.find((option) => isSameValue(itemValue(option), value))
+    )
+    .filter((option): option is MultiSelectOption<T> => option !== undefined)
+
+  const renderOption = (option: MultiSelectOption<T>) =>
+    renderItem ? (
+      renderItem(option)
+    ) : (
+      <ComboboxItem key={valueKey(itemValue(option))} value={option}>
+        {itemLabel(option)}
+      </ComboboxItem>
+    )
 
   return (
     <Field
@@ -136,18 +213,18 @@ function MultiSelectField<T = string>({
         disabled={isDisabled}
         items={items}
         multiple
-        onValueChange={(next: T[]) =>
+        onValueChange={(next: MultiSelectOption<T>[]) =>
           field.handleChange(next.map(itemValue) as MultiSelectValue<T>[])
         }
         value={selected}
       >
         <ComboboxChips className={className} ref={anchor}>
           <ComboboxValue>
-            {(chips: T[]) => (
+            {(chips: MultiSelectOption<T>[]) => (
               <>
-                {chips.map((item) => (
-                  <ComboboxChip key={String(itemValue(item))}>
-                    {itemLabel(item)}
+                {chips.map((option) => (
+                  <ComboboxChip key={valueKey(itemValue(option))}>
+                    {itemLabel(option)}
                   </ComboboxChip>
                 ))}
                 <ComboboxChipsInput
@@ -182,12 +259,13 @@ function MultiSelectField<T = string>({
           <ComboboxEmpty>{emptyMessage}</ComboboxEmpty>
           <ComboboxList>
             {(item: T) =>
-              renderItem ? (
-                renderItem(item)
+              isItemGroup(item) ? (
+                <ComboboxGroup items={item.items} key={item.label}>
+                  <ComboboxLabel>{item.label}</ComboboxLabel>
+                  <ComboboxCollection>{renderOption}</ComboboxCollection>
+                </ComboboxGroup>
               ) : (
-                <ComboboxItem key={String(itemValue(item))} value={item}>
-                  {itemLabel(item)}
-                </ComboboxItem>
+                renderOption(item as MultiSelectOption<T>)
               )
             }
           </ComboboxList>
@@ -203,5 +281,10 @@ function MultiSelectField<T = string>({
   )
 }
 
-export type { MultiSelectFieldProps, MultiSelectItemObject, MultiSelectValue }
+export type {
+  MultiSelectFieldProps,
+  MultiSelectItemGroup,
+  MultiSelectItemObject,
+  MultiSelectValue,
+}
 export { MultiSelectField }
