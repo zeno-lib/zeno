@@ -419,8 +419,10 @@ await syncRows(tx, postsTags, {
 })
 ```
 
-- The rows that left the list are removed before anything is written, so a row
-  the user removes and adds back doesn't hit a unique index.
+- The rows that left the list are removed first, then the kept rows are
+  updated, then the new rows are inserted. A row the user removes and adds back
+  doesn't hit a unique index, and neither does a new row that takes a value a
+  kept row gives up.
 - An update sets only the columns a row carries and changes, and a property
   holding `undefined` keeps its stored value. A kept row with nothing changed is
   returned as it is, unwritten, so its `updated_at` stays put.
@@ -430,8 +432,6 @@ await syncRows(tx, postsTags, {
   the user sees them on the field.
 - It runs in `db.transaction`, which is a savepoint inside a `tx`. A failure
   undoes every write the sync made, and nothing else.
-- Each row is one statement, which suits the lists a form edits. For a bulk
-  load, use `insert` with `onConflictDoUpdate`.
 
 The rows that left the list are deleted. To soft-delete or unlink them instead,
 or to delete only the ones nothing else references, pass `remove`. It gets the
@@ -466,6 +466,34 @@ when a key part is nullable, because Postgres otherwise treats two `NULL`s as
 different and lets both rows in. Updating the parent row first in the same
 transaction, as `updateOrder` does, makes the second sync wait for the first to
 commit.
+
+A parent can hold thousands of rows, such as the grants on a shared folder. The
+removals and the inserts go many rows to a statement, split to stay under
+Postgres's limit of 65,535 bind parameters, so saving thousands of new grants
+or revoking thousands takes a few statements. Each kept row that changed is
+still one update. To change thousands of kept rows at once, use `insert` with
+`onConflictDoUpdate`.
+
+A trigger can rewrite the rows the sync keeps. Say a team's members hold shares
+that must sum to 1, and a delete trigger hands a leaving member's share to the
+members left. The sync compares the listed rows with the parent's rows as they
+stand after the removal, so a member whose listed share is the one she started
+with is written back too, and the save ends with the listed shares. That costs
+one more read of the parent's rows, and only when the sync removed something.
+`remove` gets the same treatment: a change it makes to the rows left counts. A
+trigger that an update or an insert fires runs after that comparison, so what it
+writes to the other rows stays.
+
+Between its statements, the sync leaves the rows in states the save doesn't end
+in, such as shares that sum to 0.8 once a member is removed. Check a rule across
+rows in a deferred constraint trigger, which runs at commit:
+
+```sql
+create constraint trigger team_members_shares_sum
+  after insert or update or delete on team_members
+  deferrable initially deferred
+  for each row execute function check_team_members_shares();
+```
 
 ## Errors
 
