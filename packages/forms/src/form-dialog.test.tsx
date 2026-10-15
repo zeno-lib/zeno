@@ -56,6 +56,7 @@ function Harness({
   closeOnSubmit,
   disabled,
   discardPrompt,
+  formDisabled,
   saveFromPrompt,
   submitErrorMessage,
   submitLabel,
@@ -67,6 +68,8 @@ function Harness({
   closeOnSubmit?: boolean
   disabled?: boolean
   discardPrompt?: DiscardPromptText
+  /** Disable the form through `useForm({ disabled })`. */
+  formDisabled?: boolean
   saveFromPrompt?: boolean
   submitErrorMessage?: (error: unknown) => ReactNode
   submitLabel?: ReactNode
@@ -74,6 +77,7 @@ function Harness({
   const dialog = useFormDialog({ defaultValues: BLANK })
   const form = useForm({
     defaultValues: dialog.defaultValues,
+    disabled: formDisabled,
     onSubmit: (submit) =>
       action ? submitAction(submit, action) : onSubmit(submit.value),
     schema,
@@ -117,6 +121,13 @@ function dropFocus() {
   document.body.append(sink)
   sink.focus()
   sink.remove()
+}
+
+// Whether leaving the page now would make the browser ask first.
+function warnsOnUnload(): boolean {
+  const event = new Event("beforeunload", { cancelable: true })
+  window.dispatchEvent(event)
+  return event.defaultPrevented
 }
 
 // The alerts added where assistive tech could see them. One added under an
@@ -276,6 +287,30 @@ describe("FormDialog", () => {
     })
     expect(screen.getByRole("dialog")).toBeTruthy()
   })
+
+  for (const closeOnSubmit of [true, false]) {
+    test(`a leave asked for while a Save runs goes through once it saves (closeOnSubmit: ${closeOnSubmit})`, async () => {
+      const user = userEvent.setup()
+      let finishSave: () => void = () => undefined
+      const onSubmit = vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finishSave = resolve
+          })
+      )
+      render(<Harness closeOnSubmit={closeOnSubmit} onSubmit={onSubmit} />)
+      const name = await openEdit(user)
+      await user.type(name, "!")
+      await user.click(screen.getByRole("button", { name: "Save" }))
+      await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+      await user.keyboard("{Escape}")
+      await screen.findByRole("alertdialog")
+
+      finishSave()
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+      expect(screen.queryByRole("alertdialog")).toBeNull()
+    })
+  }
 
   test("a field error from the server focuses that field", async () => {
     const user = userEvent.setup()
@@ -583,17 +618,43 @@ describe("FormDialog", () => {
     expect(screen.getByRole("dialog")).toBeTruthy()
   })
 
-  test("disabled also turns off Save in the leave prompt", async () => {
+  for (const via of ["disabled", "useForm({ disabled })"]) {
+    test(`with ${via}, a changed dialog closes without asking or warning`, async () => {
+      const user = userEvent.setup()
+      const { rerender } = render(<Harness saveFromPrompt />)
+      const name = await openEdit(user)
+      await user.type(name, "!")
+      expect(warnsOnUnload()).toBe(true)
+
+      rerender(
+        <Harness
+          disabled={via === "disabled"}
+          formDisabled={via !== "disabled"}
+          saveFromPrompt
+        />
+      )
+      expect(warnsOnUnload()).toBe(false)
+      await user.click(screen.getByRole("button", { name: "Cancel" }))
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+      expect(screen.queryByRole("alertdialog")).toBeNull()
+    })
+  }
+
+  test("disabled while the leave prompt asks keeps it, with its Save off", async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
     const { rerender } = render(<Harness onSubmit={onSubmit} saveFromPrompt />)
     const name = await openEdit(user)
     await user.type(name, "!")
-    rerender(<Harness disabled onSubmit={onSubmit} saveFromPrompt />)
     await user.click(screen.getByRole("button", { name: "Cancel" }))
     const prompt = await screen.findByRole("alertdialog")
+
+    rerender(<Harness disabled onSubmit={onSubmit} saveFromPrompt />)
     await user.click(within(prompt).getByRole("button", { name: "Save" }))
     expect(onSubmit).not.toHaveBeenCalled()
+    expect(screen.getByRole("alertdialog")).toBe(prompt)
+    await user.click(within(prompt).getByRole("button", { name: "Discard" }))
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
   })
 
   test("Save in the leave prompt doesn't submit again while a submit runs", async () => {

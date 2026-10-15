@@ -110,7 +110,10 @@ type FormDialogProps<TValues> = {
   cancelLabel?: ReactNode
   /** Extra footer content, rendered before Cancel / Save. */
   footer?: ReactNode
-  /** Close after a successful submit. Defaults to `true`. */
+  /**
+   * Close after a successful submit. Defaults to `true`. A close the user
+   * asked for while the submit ran goes through once it succeeds either way.
+   */
   closeOnSubmit?: boolean
   /**
    * Shown above the footer when the submit handler throws. Defaults to the
@@ -120,7 +123,7 @@ type FormDialogProps<TValues> = {
   submitErrorMessage?: ReactNode | ((error: unknown) => ReactNode)
   /**
    * Ask before closing with unsaved changes, and warn on page unload while
-   * open. Defaults to `true`.
+   * open. Defaults to `true`. Off while the dialog or its form is disabled.
    */
   guard?: boolean
   /** Copy for the discard prompt. */
@@ -133,7 +136,8 @@ type FormDialogProps<TValues> = {
   /**
    * Disable every field, Save and ⌘/Ctrl+Enter, as `useForm({ disabled })`
    * does. A `<fieldset disabled>` also disables native controls of your own.
-   * Defaults to `false`.
+   * Either way nothing can be saved, so the dialog also closes without the
+   * unsaved-changes prompt or warning. Defaults to `false`.
    */
   disabled?: boolean
   /** Class for the dialog popup (e.g. a wider `sm:max-w-lg`). */
@@ -278,6 +282,10 @@ function FormDialog<TValues>(props: FormDialogProps<TValues>) {
   // reverts an edit, `isDefaultValue` compares the values themselves.
   const hasChanges = useSelector(form.store, (state) => !state.isDefaultValue)
   const isSubmitting = useSelector(form.store, (state) => state.isSubmitting)
+  // A disabled dialog or form can't save, so it closes without asking. A
+  // prompt already open when it becomes disabled stays, its Save off, until
+  // answered.
+  const guarded = guard && !isDisabled
   const {
     cancelLeave,
     confirmLeave,
@@ -286,7 +294,7 @@ function FormDialog<TValues>(props: FormDialogProps<TValues>) {
     requestLeave,
     saveAndLeave,
   } = useLeaveGuard({
-    hasUnsavedChanges: guard && hasChanges,
+    hasUnsavedChanges: guarded && hasChanges,
     onSave: async () => {
       if (!canSubmit()) {
         return false
@@ -301,7 +309,7 @@ function FormDialog<TValues>(props: FormDialogProps<TValues>) {
   isConfirmingRef.current = isConfirming
   useUnsavedChangesWarning(
     form as unknown as AnyFormApi,
-    guard && isOpen ? "if-changed" : false
+    guarded && isOpen ? "if-changed" : false
   )
 
   // Start every session from its own defaults. `reset(values)` also rebases
@@ -347,7 +355,12 @@ function FormDialog<TValues>(props: FormDialogProps<TValues>) {
       return // the session this submit belongs to is over
     }
     if (saved) {
-      if (closeOnSubmit) {
+      if (isConfirmingRef.current) {
+        // The user asked to leave while the save ran, so the prompt now asks
+        // about changes already saved. Let that leave go through, which
+        // closes the prompt and the dialog, `closeOnSubmit` or not.
+        confirmLeave()
+      } else if (closeOnSubmit) {
         // Close directly, past the guard: the changes are saved. The form is
         // reset once the exit animation completes (see `onOpenChangeComplete`).
         close()
