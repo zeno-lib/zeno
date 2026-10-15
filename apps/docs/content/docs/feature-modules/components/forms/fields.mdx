@@ -74,6 +74,22 @@ await expect(page.locator('[data-field="members[1].name"]')).toBeVisible()
 The root also carries `data-invalid`, and the control inside carries
 `aria-invalid="true"` while its error is shown.
 
+### Disabling the form
+
+Disable the whole form with `useForm({ disabled })`, `<Form disabled>`,
+`<FormProvider disabled>` or `FormDialog`'s `disabled`. Every field turns off,
+the checkbox, switch, radio and slider fields included, and so do
+`SubmitButton` and `ResetButton`. `<Form disabled>` also ignores a submit.
+
+```tsx
+const form = useForm({ disabled: !canEdit, schema })
+```
+
+A field's own `disabled` still disables that field alone, and
+`disabled={false}` doesn't enable a field in a disabled form. A control of
+your own reads the same state with `useIsFormDisabled(form)`, or gets it in
+`disabled` through [`ControlField`](#control-field).
+
 ## Input field
 
 <Preview>
@@ -521,9 +537,11 @@ string regex), or pass `children` to insert a separator between groups.
 ## Date picker field
 
 `DatePickerField` composes `@zeno-lib/ui/popover` and `@zeno-lib/ui/calendar`.
-The form value is `Date | undefined`. By default the trigger formats the
-selected date with `toLocaleDateString`. Pass `formatValue` to override it, or
-`calendarProps` to forward options (`disabled`, `locale`, …) to the
+The form value is a `Date` at local midnight of the picked day, or the field's
+[empty value](/docs/feature-modules/components/forms/validation#empty-values).
+By default the trigger formats the selected date with `toLocaleDateString`,
+and the calendar opens on its month. Pass `formatValue` to override the
+format, or `calendarProps` to forward options (`disabled`, `locale`, …) to the
 underlying `<Calendar>`. `disabled` on the field itself disables the trigger.
 
 <Preview>
@@ -538,6 +556,27 @@ underlying `<Calendar>`. `disabled` on the field itself disables the trigger.
 ```
 
 </Preview>
+
+### Dates as strings
+
+Dates usually travel as ISO strings. Pick one with `valueType`:
+
+- `"iso-date"`: the day as `YYYY-MM-DD`, as a `date` column stores it and
+  `z.iso.date()` accepts it.
+- `"iso-datetime"`: the day's local midnight as an ISO 8601 timestamp, for a
+  timestamp column and `z.iso.datetime()`. October 9 picked in Zurich is
+  `2026-10-08T22:00:00.000Z`.
+
+```tsx
+<DatePickerField label="Due date" name="dueDate" valueType="iso-date" />
+```
+
+The field reads a `Date` or either string, whatever `valueType` says. It reads
+`YYYY-MM-DD` as that day in the user's time zone, where
+`new Date("2026-10-09")` would read UTC midnight, which is October 8 anywhere
+west of UTC. The helpers are in `@zeno-lib/forms/lib/date-value`
+(`parseDateValue`, `toDateValue`, `formatIsoDate`), for a date control of
+your own.
 
 ## Combobox field
 
@@ -567,7 +606,8 @@ const FRAMEWORKS = ["Next.js", "Remix", "SvelteKit", "Nuxt.js", "Astro"]
 
 | Prop | Type | What it does |
 |---|---|---|
-| `items` | `T[]` (`string` or `{ value, label }`) | Options shown in the dropdown. Filtered client-side unless `filter={null}`. |
+| `items` | `T[]` (`string`, `{ value, label }`, or `{ label, items }` groups) | Options shown in the dropdown. Filtered client-side unless `filter={null}`. |
+| `isItemEqualToValue` | `(itemValue, value) => boolean` | Whether an item's value is the stored one. Defaults to `Object.is`; pass it for object values. |
 | `renderItem` | `(item: T) => ReactNode` | Override per-row rendering. |
 | `emptyMessage` | `ReactNode` | Shown when filtering produces zero matches. |
 | `showClear` | `boolean` | Show the clear button when a value is selected. Defaults to `true` on an optional field and `false` on a required one. |
@@ -583,6 +623,41 @@ For server-driven search with debouncing, see
 
 With `{ value, label }` items, the input shows a stored value only once
 `items` holds its item, so an id never shows raw while options load.
+
+### Groups and object values
+
+Pass `{ label, items }` groups as `items` to show the options under headings.
+An item's `value` can be an object, such as a reference into one of several
+tables. A refetch rebuilds those objects, so pass `isItemEqualToValue` to
+compare them by what identifies them, as Base UI's Combobox does. Type its
+parameters: `form.ComboboxField` can't infer them from `items`.
+
+```tsx
+type Party = { kind: "company" | "person"; id: number }
+
+const parties = [
+  {
+    label: "People",
+    items: people.map((p) => ({ label: p.name, value: { kind: "person", id: p.id } })),
+  },
+  {
+    label: "Companies",
+    items: companies.map((c) => ({ label: c.name, value: { kind: "company", id: c.id } })),
+  },
+]
+
+<ComboboxField
+  isItemEqualToValue={(a: Party, b: Party) => a.kind === b.kind && a.id === b.id}
+  items={parties}
+  label="Payer"
+  name="payer"
+/>
+```
+
+Clearing stores the field's
+[empty value](/docs/feature-modules/components/forms/validation#empty-values),
+`null` for a `.nullable()` object. `MultiSelectField` takes the same `items`
+and `isItemEqualToValue`.
 
 shadcn's `ComboboxClear` is an icon with no accessible name. Give it one in
 your copy of `combobox.tsx` (`aria-label="Clear"`), as Zeno's does.
@@ -617,7 +692,8 @@ const LANGUAGES = [
 
 | Prop | Type | What it does |
 |---|---|---|
-| `items` | `T[]` (`string`, `number` or `{ value, label }`) | Options, filtered client-side as the user types. |
+| `items` | `T[]` (`string`, `number`, `{ value, label }`, or `{ label, items }` groups) | Options, filtered client-side as the user types. |
+| `isItemEqualToValue` | `(itemValue, value) => boolean` | Whether an item's value is a stored one. Defaults to `Object.is`; pass it for [object values](#groups-and-object-values). |
 | `renderItem` | `(item: T) => ReactNode` | Override per-row rendering. |
 | `emptyMessage` | `ReactNode` | Shown when filtering produces zero matches. |
 | `placeholder` | `string` | Shown while nothing is selected. |
@@ -625,7 +701,7 @@ const LANGUAGES = [
 | `clearLabel` | `string` | Accessible label of the clear button. Defaults to `"Clear"`. |
 | `disabled` | `boolean` | Disable the whole control. |
 
-For grouped options or on-the-fly creation, compose your own; see
+For on-the-fly creation, compose your own; see
 [Combobox: multi-select, grouped, creatable](/docs/feature-modules/components/forms/examples#combobox-multi-select-grouped-creatable).
 
 ## Custom fields
@@ -662,7 +738,7 @@ field's fails to compile.
 | `value` | The field's value, as stored, its empty value (`undefined` or `null`) included. A control that needs a defined value maps it (`value ?? ""`), or it turns uncontrolled once the field empties. |
 | `onChange(value)` | Stores the value. An empty one (`null`, `undefined`, `""`, `NaN` or `[]`) stores the field's [empty value](/docs/feature-modules/components/forms/validation#empty-values) instead. It takes a value, not a change event, and throws on one. It is stable across renders. |
 | `onBlur` | Marks the field touched, so its error can show. |
-| `id`, `name`, `disabled` | For the control's focusable element. The label's `htmlFor` points at `id`. |
+| `id`, `name`, `disabled` | For the control's focusable element. The label's `htmlFor` points at `id`. `disabled` is the field's own or the [form's](#disabling-the-form). |
 | `aria-labelledby` | The label, for a control a `<label htmlFor>` can't name (a `role="radiogroup"`). |
 | `aria-describedby`, `aria-invalid`, `aria-required` | The description and error, and the field's state. Keep `aria-invalid` on the focusable element, or a group root around it: a failed submit focuses the first invalid field by it. |
 
@@ -726,7 +802,7 @@ function RatingField({ description, label, required }: RatingFieldProps) {
 
 Pass the hook the `description` and `label` you render, so the control points
 at them. It returns `controlProps` for the control, and for the layout the
-ids, `isInvalid`, `isRequired`, `showRequiredIndicator` (off under
+ids, `isDisabled`, `isInvalid`, `isRequired`, `showRequiredIndicator` (off under
 `requiredIndicator: false`) and the `errors` to show (none while the form's
 [validation mode](/docs/feature-modules/components/forms/validation) or
 `hideFieldErrors` hides them). `InputField` and `TextAreaField` are built
