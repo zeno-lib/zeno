@@ -2,6 +2,7 @@
 
 import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { useIsFormDisabled } from "@zeno-lib/forms/lib/form-disabled"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
@@ -34,11 +35,13 @@ type CheckboxFieldProps = Omit<
 
 function CheckboxField({
   description,
+  disabled,
   label,
   required,
   ...props
 }: CheckboxFieldProps) {
   const field = useFieldContext<boolean>()
+  const isDisabled = useIsFormDisabled(field.form) || Boolean(disabled)
   const id = useId()
   const errorId = `${id}-error`
   const descriptionId = `${id}-description`
@@ -52,6 +55,7 @@ function CheckboxField({
 
   return (
     <Field
+      data-disabled={isDisabled || undefined}
       data-field={field.name}
       data-invalid={isInvalid}
       orientation="horizontal"
@@ -64,6 +68,7 @@ function CheckboxField({
         aria-invalid={isInvalid || undefined}
         aria-required={requiresValue || undefined}
         checked={field.state.value ?? false}
+        disabled={isDisabled}
         id={id}
         name={field.name}
         onBlur={field.handleBlur}

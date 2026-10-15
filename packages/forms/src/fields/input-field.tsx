@@ -24,6 +24,7 @@ type InputFieldProps = Omit<
 function InputField({
   children,
   description,
+  disabled,
   label,
   required,
   ...props
@@ -33,6 +34,7 @@ function InputField({
   // `aria-labelledby` and the hook doesn't get `label`.
   const { controlProps, ...shell } = useFieldControl<string>({
     description,
+    disabled,
     required,
   })
   const hasAddons = Children.count(children) > 0

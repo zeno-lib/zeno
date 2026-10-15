@@ -3,6 +3,7 @@
 import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import { getEmptyValue } from "@zeno-lib/forms/lib/empty-value"
+import { useIsFormDisabled } from "@zeno-lib/forms/lib/form-disabled"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
@@ -102,6 +103,7 @@ function ComboboxField<T = string>({
   showClear,
 }: ComboboxFieldProps<T>) {
   const field = useFieldContext()
+  const isDisabled = useIsFormDisabled(field.form) || Boolean(disabled)
   const id = useId()
   const errorId = `${id}-error`
   const descriptionId = `${id}-description`
@@ -126,7 +128,11 @@ function ComboboxField<T = string>({
     (plainItems ? (fieldValue ?? null) : null)) as T | null
 
   return (
-    <Field data-field={field.name} data-invalid={isInvalid}>
+    <Field
+      data-disabled={isDisabled || undefined}
+      data-field={field.name}
+      data-invalid={isInvalid}
+    >
       {label && (
         <FieldLabel htmlFor={id}>
           {label}
@@ -134,7 +140,7 @@ function ComboboxField<T = string>({
         </FieldLabel>
       )}
       <Combobox
-        disabled={disabled}
+        disabled={isDisabled}
         filter={filter}
         inputValue={inputValue}
         items={items}
@@ -156,7 +162,7 @@ function ComboboxField<T = string>({
           aria-invalid={isInvalid || undefined}
           aria-required={requiresValue || undefined}
           className={className}
-          disabled={disabled}
+          disabled={isDisabled}
           id={id}
           name={field.name}
           onBlur={field.handleBlur}

@@ -12,6 +12,7 @@ export {
 } from "./lib/action-result"
 export { applyValidationError } from "./lib/apply-validation-error"
 export { useFieldContext, useFormContext } from "./lib/contexts"
+export { useIsFormDisabled } from "./lib/form-disabled"
 export {
   applyActionError,
   type SubmitActionOptions,

@@ -9,6 +9,7 @@ type ValidationMode = "change" | "blur" | "submit" | "blur-then-change"
 const DEFAULT_VALIDATION_MODE: ValidationMode = "blur-then-change"
 
 type ZenoFormState = {
+  disabled: boolean
   validation: ValidationMode
   hideFieldErrors: boolean
   requiredIndicator: boolean
@@ -19,6 +20,7 @@ type ZenoFormState = {
 const EMPTY_REQUIRED_FIELDS: ReadonlySet<string> = new Set<string>()
 
 const DEFAULT_FORM_STATE: ZenoFormState = {
+  disabled: false,
   hideFieldErrors: false,
   requiredFields: EMPTY_REQUIRED_FIELDS,
   requiredIndicator: true,
@@ -55,6 +57,12 @@ function getFormValidationMode(form: AnyFormApi): ValidationMode {
   return getFormZenoState(form).validation
 }
 
+// `useForm({ disabled })`. The fields read it with the other ways to disable
+// the form through `useIsFormDisabled` (`lib/form-disabled.ts`).
+function getFormDisabled(form: AnyFormApi): boolean {
+  return getFormZenoState(form).disabled
+}
+
 function getFormHideFieldErrors(form: AnyFormApi): boolean {
   return getFormZenoState(form).hideFieldErrors
 }
@@ -77,6 +85,7 @@ function isFieldRequired(form: AnyFormApi, name: string): boolean {
 
 export {
   DEFAULT_VALIDATION_MODE,
+  getFormDisabled,
   getFormHideFieldErrors,
   getFormSchema,
   getFormValidationMode,

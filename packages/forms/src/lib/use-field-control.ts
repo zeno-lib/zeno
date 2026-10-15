@@ -6,6 +6,7 @@ import { type ReactNode, useCallback, useId } from "react"
 import { describedBy } from "./aria"
 import { useFieldContext } from "./contexts"
 import { emptyValueFor } from "./empty-value"
+import { useIsFormDisabled } from "./form-disabled"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
@@ -20,6 +21,10 @@ type UseFieldControlOptions = {
    * it, and by the error while one shows.
    */
   description?: ReactNode
+  /**
+   * Disable the control. A disabled form (`useForm({ disabled })`,
+   * `<Form disabled>`, `FormDialog`'s `disabled`) disables it either way.
+   */
   disabled?: boolean
   /**
    * The label the field renders, if any. The control gets `aria-labelledby`,
@@ -40,6 +45,7 @@ type FieldControlProps<TValue = unknown> = {
   "aria-invalid": true | undefined
   "aria-labelledby": string | undefined
   "aria-required": true | undefined
+  /** The field's own `disabled`, or the form's. */
   disabled: boolean | undefined
   id: string
   name: string
@@ -71,6 +77,8 @@ type FieldControl<TValue = unknown> = {
   errors: AnyFieldMeta["errors"]
   /** The control's id, for the label's `htmlFor`. */
   id: string
+  /** The field is disabled, by its own `disabled` or the form's. */
+  isDisabled: boolean
   isInvalid: boolean
   /** The field requires a value, by the schema or `required`. */
   isRequired: boolean
@@ -125,6 +133,7 @@ function useFieldControl<TValue = unknown>({
   const schemaRequired = useIsFieldRequired(field)
   const schemaRequiresValue = useIsFieldRequiredBySchema(field)
   const isRequired = required ?? schemaRequiresValue
+  const isDisabled = useIsFormDisabled(field.form) || Boolean(disabled)
   // `field` is rebuilt on every value change; these members aren't, so a
   // control that memoizes on `onChange` doesn't see a new one each render.
   const { form, handleBlur, handleChange, name } = field
@@ -158,7 +167,7 @@ function useFieldControl<TValue = unknown>({
       "aria-invalid": isInvalid || undefined,
       "aria-labelledby": labelId,
       "aria-required": isRequired || undefined,
-      disabled,
+      disabled: isDisabled,
       id,
       name,
       onBlur: handleBlur,
@@ -169,6 +178,7 @@ function useFieldControl<TValue = unknown>({
     errorId,
     errors: showError ? field.state.meta.errors : [],
     id,
+    isDisabled,
     isInvalid,
     isRequired,
     labelId,

@@ -34,6 +34,11 @@ A typed layer over [TanStack Form](https://tanstack.com/form) and Zod. The user 
 - **Every registry field puts `data-field={field.name}` and `data-invalid` on its `<Field>` root, and
   `aria-invalid={isInvalid || undefined}` on its focusable control** (or on the group root, whose
   first focusable child then gets focus). Submit-invalid focus depends on it.
+- **Every registry field disables its control with `useIsFormDisabled(field.form) || disabled`**
+  (or passes `disabled` to `useFieldControl`, which does), and puts `data-disabled` on its
+  `<Field>` root. A `<fieldset disabled>` doesn't reach Base UI's checkbox, switch and radio, which
+  are spans over a hidden input. `||`, never `??`: a field's `disabled={false}` must not enable it
+  in a disabled form.
 - **Submit-invalid focus is `focusFirstInvalid`** (`lib/focus-first-invalid.ts`), which `<Form>`
   and `FormDialog` call right after `await form.handleSubmit()`. It relies on
   `useSyncExternalStore` flushing `aria-invalid`, `submitAction`'s field errors included, before

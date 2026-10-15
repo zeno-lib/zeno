@@ -2,6 +2,7 @@
 
 import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { useIsFormDisabled } from "@zeno-lib/forms/lib/form-disabled"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
@@ -37,12 +38,14 @@ type SliderFieldProps = Omit<
 
 function SliderField({
   description,
+  disabled,
   formatValue,
   label,
   required,
   ...props
 }: SliderFieldProps) {
   const field = useFieldContext<SliderValue>()
+  const isDisabled = useIsFormDisabled(field.form) || Boolean(disabled)
   const id = useId()
   const errorId = `${id}-error`
   const descriptionId = `${id}-description`
@@ -58,7 +61,11 @@ function SliderField({
   const hasReadout = readout !== null && readout !== undefined
 
   return (
-    <Field data-field={field.name} data-invalid={isInvalid}>
+    <Field
+      data-disabled={isDisabled || undefined}
+      data-field={field.name}
+      data-invalid={isInvalid}
+    >
       {(label || hasReadout) && (
         <FieldContent className="flex-row items-center justify-between">
           {label && (
@@ -80,6 +87,7 @@ function SliderField({
           [showError, errorId]
         )}
         aria-invalid={isInvalid || undefined}
+        disabled={isDisabled}
         id={id}
         name={field.name}
         onBlur={field.handleBlur}

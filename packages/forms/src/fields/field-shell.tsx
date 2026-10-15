@@ -24,6 +24,8 @@ type FieldShellProps = Pick<
   /** The control, bound with `useFieldControl`'s `controlProps`. */
   children: ReactNode
   description?: ReactNode
+  /** Dims the label. `useFieldControl` returns it. */
+  isDisabled?: boolean
   label?: ReactNode
 }
 
@@ -46,6 +48,7 @@ function FieldShell({
   errorId,
   errors,
   id,
+  isDisabled,
   isInvalid,
   label,
   labelId,
@@ -53,7 +56,11 @@ function FieldShell({
   showRequiredIndicator,
 }: FieldShellProps) {
   return (
-    <Field data-field={name} data-invalid={isInvalid}>
+    <Field
+      data-disabled={isDisabled || undefined}
+      data-field={name}
+      data-invalid={isInvalid}
+    >
       {label && (
         <FieldLabel htmlFor={id} id={labelId}>
           {label}

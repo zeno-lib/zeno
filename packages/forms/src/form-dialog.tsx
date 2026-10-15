@@ -12,6 +12,7 @@ import {
   useLeaveGuard,
 } from "@zeno-lib/forms/lib/use-form-dialog"
 import { useUnsavedChangesWarning } from "@zeno-lib/forms/lib/use-unsaved-changes-warning"
+import { getFormDisabled } from "@zeno-lib/forms/lib/validation-modes"
 import { type AnyFormApi, useSelector } from "@zeno-lib/forms/tanstack"
 import {
   type FormEvent,
@@ -117,8 +118,9 @@ type FormDialogProps<TValues> = {
    */
   saveFromPrompt?: boolean
   /**
-   * Disable Save, ⌘/Ctrl+Enter, and the native controls in the form (through
-   * a `<fieldset disabled>`). Defaults to `false`.
+   * Disable every field, Save and ⌘/Ctrl+Enter, as `useForm({ disabled })`
+   * does. A `<fieldset disabled>` also disables native controls of your own.
+   * Defaults to `false`.
    */
   disabled?: boolean
   /** Class for the dialog popup (e.g. a wider `sm:max-w-lg`). */
@@ -155,6 +157,8 @@ function FormDialog<TValues>({
   trigger,
 }: FormDialogProps<TValues>) {
   const formId = useId()
+  // `useForm({ disabled })` locks the dialog as this prop does.
+  const isDisabled = disabled || getFormDisabled(form as unknown as AnyFormApi)
   const popupRef = useRef<HTMLDivElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   // Set when a Save from the discard prompt fails, so the prompt hands focus
@@ -216,7 +220,7 @@ function FormDialog<TValues>({
   // the very first attempt, and `isOpen` is false through the exit animation,
   // while the fields still hold the values just saved.
   function canSubmit(): boolean {
-    return isOpen && !(disabled || form.state.isSubmitting)
+    return isOpen && !(isDisabled || form.state.isSubmitting)
   }
 
   // Resolves whether the form saved. A submit handler that throws leaves
@@ -308,7 +312,7 @@ function FormDialog<TValues>({
         initialFocus={() => {
           // A disabled control can't take focus.
           const target =
-            focus && !disabled
+            focus && !isDisabled
               ? findFieldElement(popupRef.current, focus)
               : null
           return target ?? true
@@ -320,11 +324,11 @@ function FormDialog<TValues>({
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
-        <FormProvider form={form}>
+        <FormProvider disabled={disabled} form={form}>
           {/* Around the <form>, not inside it, so `formClassName` child
               selectors (`space-y-4`) still reach the fields. `min-w-0` is
               for a browser that ignores `contents` on a fieldset. */}
-          <fieldset className="contents min-w-0" disabled={disabled}>
+          <fieldset className="contents min-w-0" disabled={isDisabled}>
             {/* Keyed on the session so every open mounts fresh fields. The
                 popup stays mounted through its exit animation, so reopening
                 before it ends would keep each field's local state (and any
@@ -354,7 +358,7 @@ function FormDialog<TValues>({
             {cancelLabel}
           </DialogClose>
           <Button
-            disabled={disabled || isSubmitting}
+            disabled={isDisabled || isSubmitting}
             form={formId}
             type="submit"
           >
@@ -419,7 +423,7 @@ function FormDialog<TValues>({
             </AlertDialogAction>
             {saveFromPrompt && (
               <AlertDialogAction
-                disabled={disabled || isSaving || isSubmitting}
+                disabled={isDisabled || isSaving || isSubmitting}
                 onClick={saveAndLeave}
               >
                 {isSaving && <Spinner />}

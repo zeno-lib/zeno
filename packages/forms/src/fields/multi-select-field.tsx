@@ -2,6 +2,7 @@
 
 import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { useIsFormDisabled } from "@zeno-lib/forms/lib/form-disabled"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
@@ -99,6 +100,7 @@ function MultiSelectField<T = string>({
   showClear = true,
 }: MultiSelectFieldProps<T>) {
   const field = useFieldContext<MultiSelectValue<T>[] | null | undefined>()
+  const isDisabled = useIsFormDisabled(field.form) || Boolean(disabled)
   const anchor = useComboboxAnchor()
   const id = useId()
   const errorId = `${id}-error`
@@ -119,7 +121,11 @@ function MultiSelectField<T = string>({
     .filter((item): item is T => item !== undefined)
 
   return (
-    <Field data-field={field.name} data-invalid={isInvalid}>
+    <Field
+      data-disabled={isDisabled || undefined}
+      data-field={field.name}
+      data-invalid={isInvalid}
+    >
       {label && (
         <FieldLabel htmlFor={id}>
           {label}
@@ -127,7 +133,7 @@ function MultiSelectField<T = string>({
         </FieldLabel>
       )}
       <Combobox
-        disabled={disabled}
+        disabled={isDisabled}
         items={items}
         multiple
         onValueChange={(next: T[]) =>
@@ -159,7 +165,7 @@ function MultiSelectField<T = string>({
               </>
             )}
           </ComboboxValue>
-          {showClear && selected.length > 0 && !disabled && (
+          {showClear && selected.length > 0 && !isDisabled && (
             <Button
               aria-label={clearLabel}
               className="ml-auto"

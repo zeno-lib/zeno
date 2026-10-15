@@ -55,6 +55,11 @@ type PartialFormData<T> = T extends readonly unknown[]
 
 type ZenoFormExtras<TFormData> = {
   /**
+   * Disable every field of the form, its submit button and `FormDialog`'s
+   * Save. A field's own `disabled` still applies.
+   */
+  disabled?: boolean
+  /**
    * If `true`, shipped fields skip rendering their inline `<FieldError>`
    * message. Fields still flip `data-invalid` / `aria-invalid`.
    */
@@ -414,6 +419,7 @@ export function createZenoForm<
       schema,
       validators: validatorsInput,
       validationLogic: userValidationLogic,
+      disabled = false,
       hideFieldErrors = false,
       requiredIndicator = true,
       unsavedChangesWarning = false,
@@ -425,6 +431,7 @@ export function createZenoForm<
       validators?: ValidationMode | NativeValidators
       validationLogic?: NativeValidationLogic
       defaultValues?: PartialFormData<TFormData>
+      disabled?: boolean
       hideFieldErrors?: boolean
       requiredIndicator?: boolean
       unsavedChangesWarning?: boolean | "if-changed" | "if-touched"
@@ -550,6 +557,7 @@ export function createZenoForm<
     } as NativeFormOptions)
 
     setFormZenoState(form, {
+      disabled,
       hideFieldErrors,
       requiredFields,
       requiredIndicator,

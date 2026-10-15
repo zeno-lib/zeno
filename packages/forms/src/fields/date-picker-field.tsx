@@ -3,6 +3,7 @@
 import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import { getEmptyValue } from "@zeno-lib/forms/lib/empty-value"
+import { useIsFormDisabled } from "@zeno-lib/forms/lib/form-disabled"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
@@ -70,6 +71,7 @@ function DatePickerField({
   triggerClassName,
 }: DatePickerFieldProps) {
   const field = useFieldContext<Date | undefined>()
+  const isDisabled = useIsFormDisabled(field.form) || Boolean(disabled)
   // Opening the popover moves focus into it, so the trigger's blur would mark
   // the field touched, and show a required error, before a day is picked.
   // The field is touched once the popover closes, or focus leaves it closed.
@@ -89,7 +91,11 @@ function DatePickerField({
   const empty = !value
 
   return (
-    <Field data-field={field.name} data-invalid={isInvalid}>
+    <Field
+      data-disabled={isDisabled || undefined}
+      data-field={field.name}
+      data-invalid={isInvalid}
+    >
       {label && (
         <FieldLabel htmlFor={id}>
           {label}
@@ -116,7 +122,7 @@ function DatePickerField({
             triggerClassName
           )}
           data-empty={empty || undefined}
-          disabled={disabled}
+          disabled={isDisabled}
           id={id}
           onBlur={() => {
             if (!isOpen.current) {

@@ -2,6 +2,7 @@
 
 import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { useIsFormDisabled } from "@zeno-lib/forms/lib/form-disabled"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
@@ -61,6 +62,7 @@ function OtpField({
   required,
 }: OtpFieldProps) {
   const field = useFieldContext<string>()
+  const isDisabled = useIsFormDisabled(field.form) || Boolean(disabled)
   const id = useId()
   const errorId = `${id}-error`
   const descriptionId = `${id}-description`
@@ -73,7 +75,11 @@ function OtpField({
   const requiresValue = required ?? schemaRequiresValue
 
   return (
-    <Field data-field={field.name} data-invalid={isInvalid}>
+    <Field
+      data-disabled={isDisabled || undefined}
+      data-field={field.name}
+      data-invalid={isInvalid}
+    >
       {label && (
         <FieldLabel htmlFor={id}>
           {label}
@@ -90,7 +96,7 @@ function OtpField({
         autoFocus={autoFocus}
         className={className}
         containerClassName={containerClassName}
-        disabled={disabled}
+        disabled={isDisabled}
         id={id}
         maxLength={maxLength}
         name={field.name}
