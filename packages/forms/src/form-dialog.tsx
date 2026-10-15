@@ -1,6 +1,7 @@
 "use client"
 
 import { FormProvider } from "@zeno-lib/forms"
+import { withDefaultProps } from "@zeno-lib/forms/lib/default-props"
 import {
   focusFirstInvalid,
   restoreFocus,
@@ -14,10 +15,12 @@ import {
 import { useUnsavedChangesWarning } from "@zeno-lib/forms/lib/use-unsaved-changes-warning"
 import { type AnyFormApi, useSelector } from "@zeno-lib/forms/tanstack"
 import {
+  createContext,
   type FormEvent,
   type KeyboardEvent,
   type ReactElement,
   type ReactNode,
+  useContext,
   useId,
   useLayoutEffect,
   useRef,
@@ -127,6 +130,55 @@ type FormDialogProps<TValues> = {
   formClassName?: string
 }
 
+/** The `FormDialog` props a `FormDialogProvider` can set for every dialog. */
+type FormDialogDefaults = Omit<
+  FormDialogProps<unknown>,
+  | "children"
+  | "description"
+  | "dialog"
+  | "disabled"
+  | "footer"
+  | "form"
+  | "title"
+  | "trigger"
+>
+
+const FormDialogDefaultsContext = createContext<FormDialogDefaults | undefined>(
+  undefined
+)
+
+// `props` over `defaults`, with the discard prompt's copy merged key by key.
+function withDialogDefaults<P extends FormDialogDefaults>(
+  defaults: FormDialogDefaults | undefined,
+  props: P
+): P {
+  const merged = withDefaultProps(defaults as Partial<P> | undefined, props)
+  if (defaults?.discardPrompt && props.discardPrompt) {
+    merged.discardPrompt = withDefaultProps(
+      defaults.discardPrompt,
+      props.discardPrompt
+    )
+  }
+  return merged
+}
+
+/**
+ * Sets the default props of every `FormDialog` below it, such as its copy or
+ * `saveFromPrompt`. A prop passed to a dialog wins, and `discardPrompt` merges
+ * key by key. A nested provider merges over its parent the same way.
+ */
+function FormDialogProvider({
+  children,
+  ...defaults
+}: FormDialogDefaults & { children: ReactNode }) {
+  const parent = useContext(FormDialogDefaultsContext)
+  return (
+    <FormDialogDefaultsContext value={withDialogDefaults(parent, defaults)}>
+      {children}
+    </FormDialogDefaultsContext>
+  )
+}
+
 /**
  * A dialog-hosted form: opens with fresh values and fields per session,
  * submits from a footer button outside the `<form>` (via `form="id"`), shows a
@@ -135,25 +187,26 @@ type FormDialogProps<TValues> = {
  * submit) above the footer, closes on success, and asks before discarding
  * unsaved changes (Cancel, ×, Escape, outside press) or leaving the page.
  */
-function FormDialog<TValues>({
-  cancelLabel = "Cancel",
-  children,
-  className,
-  closeOnSubmit = true,
-  description,
-  dialog,
-  disabled = false,
-  discardPrompt,
-  footer,
-  form,
-  formClassName,
-  guard = true,
-  saveFromPrompt = false,
-  submitErrorMessage,
-  submitLabel = "Save",
-  title,
-  trigger,
-}: FormDialogProps<TValues>) {
+function FormDialog<TValues>(props: FormDialogProps<TValues>) {
+  const {
+    cancelLabel = "Cancel",
+    children,
+    className,
+    closeOnSubmit = true,
+    description,
+    dialog,
+    disabled = false,
+    discardPrompt,
+    footer,
+    form,
+    formClassName,
+    guard = true,
+    saveFromPrompt = false,
+    submitErrorMessage,
+    submitLabel = "Save",
+    title,
+    trigger,
+  } = withDialogDefaults(useContext(FormDialogDefaultsContext), props)
   const formId = useId()
   const popupRef = useRef<HTMLDivElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
@@ -433,5 +486,10 @@ function FormDialog<TValues>({
   )
 }
 
-export type { DialogForm, DiscardPromptText, FormDialogProps }
-export { FormDialog }
+export type {
+  DialogForm,
+  DiscardPromptText,
+  FormDialogDefaults,
+  FormDialogProps,
+}
+export { FormDialog, FormDialogProvider }

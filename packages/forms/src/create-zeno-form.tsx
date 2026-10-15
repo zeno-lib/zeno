@@ -13,6 +13,7 @@ import { createFormHook } from "@tanstack/react-form"
 import { type ComponentProps, type ReactNode, useMemo } from "react"
 import { applyValidationError } from "./lib/apply-validation-error"
 import { fieldContext, formContext } from "./lib/contexts"
+import { withDefaultProps } from "./lib/default-props"
 import { withEmptyStartValues } from "./lib/empty-value"
 import { deepMergeDefaults, extractZodDefaults } from "./lib/schema-defaults"
 import {
@@ -230,6 +231,9 @@ function withMountListener<L extends { onMount?: unknown } | undefined>(
   } as NonNullable<L>
 }
 
+type SyncValidator<TFormData> = undefined | FormValidateOrFn<TFormData>
+type AsyncValidator<TFormData> = undefined | FormAsyncValidateOrFn<TFormData>
+
 // --- typed field wrappers (generic over the injected field components) --------
 
 type FormDataOf<F> = F extends { state: { values: infer V } } ? V : never
@@ -298,12 +302,45 @@ type FieldWrappers<FC extends Record<string, AnyComponent>, T> = {
   ) => ReactNode
 }
 
+// Each component's defaults take only its own props.
+type DefaultProps<C extends Record<string, AnyComponent>> = {
+  [K in keyof C]?: Partial<ComponentProps<C[K]>>
+}
+
 type CreateZenoFormConfig<
   FC extends Record<string, AnyComponent>,
   FMC extends Record<string, AnyComponent>,
 > = {
   fieldComponents: FC
   formComponents: FMC
+  /**
+   * Default props for field and form components, keyed by component name,
+   * e.g. `{ MoneyField: { currency: "CHF", locale: "de-CH" } }`. A prop
+   * passed at the call site wins; one passed as `undefined` keeps the default.
+   */
+  defaultProps?: DefaultProps<NoInfer<FC> & NoInfer<FMC>>
+}
+
+// Wrap each component that has defaults, once, so they apply however it
+// renders: destructured from `useForm`, as `field.X` in `AppField`, or in
+// `withForm`.
+function withComponentDefaults<C extends Record<string, AnyComponent>>(
+  components: C,
+  defaultProps: Partial<Record<string, object>> | undefined
+): C {
+  const wrapped: Record<string, AnyComponent> = { ...components }
+  for (const [name, defaults] of Object.entries(defaultProps ?? {})) {
+    const Component = components[name]
+    if (Component === undefined || defaults === undefined) {
+      continue
+    }
+    const Defaulted = (props: object) => (
+      <Component {...withDefaultProps(defaults, props)} />
+    )
+    Defaulted.displayName = name
+    wrapped[name] = Defaulted
+  }
+  return wrapped as C
 }
 
 /**
@@ -318,10 +355,18 @@ export function createZenoForm<
   FC extends Record<string, AnyComponent>,
   FMC extends Record<string, AnyComponent>,
 >(config: CreateZenoFormConfig<FC, FMC>) {
+  const fieldComponents = withComponentDefaults(
+    config.fieldComponents,
+    config.defaultProps
+  )
+  const formComponents = withComponentDefaults(
+    config.formComponents,
+    config.defaultProps
+  )
   const { useAppForm, withFieldGroup, withForm } = createFormHook({
-    fieldComponents: config.fieldComponents,
+    fieldComponents,
     fieldContext,
-    formComponents: config.formComponents,
+    formComponents,
     formContext,
   })
 
@@ -335,8 +380,8 @@ export function createZenoForm<
         children: () => ReactNode
       }>
       const wrappers: Record<string, AnyComponent> = {}
-      for (const key of Object.keys(config.fieldComponents)) {
-        const Impl = config.fieldComponents[key] as AnyComponent
+      for (const key of Object.keys(fieldComponents)) {
+        const Impl = fieldComponents[key] as AnyComponent
         wrappers[key] = ({
           name,
           validators,
@@ -356,27 +401,25 @@ export function createZenoForm<
     }, [form])
   }
 
+  // An unset generic defaults to its constraint, which is what TanStack's own
+  // `useForm` infers, never to `undefined` or `never`: `withForm` rejects the
+  // form otherwise (`with-form.test-d.ts`).
   function useForm<
     TFormData,
-    TOnMount extends undefined | FormValidateOrFn<TFormData> = undefined,
-    TOnChange extends undefined | FormValidateOrFn<TFormData> = undefined,
+    TOnMount extends SyncValidator<TFormData> = SyncValidator<TFormData>,
+    TOnChange extends SyncValidator<TFormData> = SyncValidator<TFormData>,
     TOnChangeAsync extends
-      | undefined
-      | FormAsyncValidateOrFn<TFormData> = undefined,
-    TOnBlur extends undefined | FormValidateOrFn<TFormData> = undefined,
-    TOnBlurAsync extends
-      | undefined
-      | FormAsyncValidateOrFn<TFormData> = undefined,
-    TOnSubmit extends undefined | FormValidateOrFn<TFormData> = undefined,
+      AsyncValidator<TFormData> = AsyncValidator<TFormData>,
+    TOnBlur extends SyncValidator<TFormData> = SyncValidator<TFormData>,
+    TOnBlurAsync extends AsyncValidator<TFormData> = AsyncValidator<TFormData>,
+    TOnSubmit extends SyncValidator<TFormData> = SyncValidator<TFormData>,
     TOnSubmitAsync extends
-      | undefined
-      | FormAsyncValidateOrFn<TFormData> = undefined,
-    TOnDynamic extends undefined | FormValidateOrFn<TFormData> = undefined,
+      AsyncValidator<TFormData> = AsyncValidator<TFormData>,
+    TOnDynamic extends SyncValidator<TFormData> = SyncValidator<TFormData>,
     TOnDynamicAsync extends
-      | undefined
-      | FormAsyncValidateOrFn<TFormData> = undefined,
-    TOnServer extends undefined | FormAsyncValidateOrFn<TFormData> = undefined,
-    TSubmitMeta = never,
+      AsyncValidator<TFormData> = AsyncValidator<TFormData>,
+    TOnServer extends AsyncValidator<TFormData> = AsyncValidator<TFormData>,
+    TSubmitMeta = unknown,
   >(
     options: UseFormOptions<
       TFormData,
@@ -561,7 +604,7 @@ export function createZenoForm<
 
     const fields = useAppFields(form)
     return useMemo(
-      () => Object.assign(form, fields, config.formComponents),
+      () => Object.assign(form, fields, formComponents),
       [form, fields]
     )
   }

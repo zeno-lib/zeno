@@ -202,6 +202,117 @@ controlled component in the kit's field layout, and `useFieldControl` gives a
 field component of your own the same wiring. See
 [Custom fields](/docs/feature-modules/components/forms/fields#custom-fields).
 
+## Default props
+
+Set your app's defaults for a field or form component once, in the
+`createZenoForm` call of your `create-form` file, rather than wrapping the
+component or editing its file:
+
+```tsx title="create-form.tsx"
+const { useAppFields, useAppForm, useForm, withFieldGroup, withForm } =
+  createZenoForm({
+    defaultProps: {
+      FormError: { submitErrorMessage: "Not saved. Try again later." },
+      MoneyField: { currency: "CHF", locale: "de-CH" },
+      PercentageField: { scale: "fraction" },
+    },
+    fieldComponents: { /* … */ },
+    formComponents: { /* … */ },
+  })
+```
+
+- A prop passed at the call site wins, so `<MoneyField currency="EUR" />`
+  shows euros. A prop passed as `undefined` keeps the default, as a
+  destructuring default would.
+- Each component's defaults take only that component's props, so another
+  field's prop or a wrong value fails the type check.
+- The defaults apply however the component renders: destructured from
+  `useForm`, from `useAppFields`, or as `field.MoneyField` inside
+  `form.AppField`.
+- The field files stay as the registry ships them, so you can re-add them
+  with the shadcn CLI without losing your defaults.
+- A default is a fixed value. One that depends on another prop, such as a
+  `max` that follows `scale`, still belongs at the call site.
+
+Every string the kit renders is a prop: `submitErrorMessage`,
+`emptyMessage`, `clearLabel`, `placeholder`, `label` on `EmailField` and
+`PasswordField`, and `ResetButton`'s children. So the same defaults
+translate the kit for an app with one UI language. `FormDialog` takes its
+own defaults from
+[`FormDialogProvider`](/docs/feature-modules/components/forms/examples#form-dialog).
+
+## Splitting a large form
+
+Split a long form into sections with `withForm`, from TanStack Form's
+[form composition](https://tanstack.com/form/latest/docs/framework/react/guides/form-composition).
+A section declares the values it expects, and the parent passes it the form
+from `useForm`, with or without a `schema`:
+
+```tsx lineNumbers
+"use client"
+
+import {
+  Form,
+  FormProvider,
+  useAppFields,
+  useForm,
+  withForm,
+} from "@/components/form/create-form"
+import { z } from "zod"
+
+const schema = z.object({
+  address: z.object({ city: z.string(), street: z.string() }),
+  name: z.string(),
+})
+type Profile = z.infer<typeof schema>
+
+const AddressSection = withForm({
+  // Only types `form`: the section works on the form it is given.
+  defaultValues: {} as Profile,
+  props: { title: "Address" },
+  render: ({ form, title }) => {
+    const { InputField } = useAppFields(form)
+    return (
+      <FieldSet>
+        <FieldLegend>{title}</FieldLegend>
+        <InputField label="Street" name="address.street" />
+        <InputField label="City" name="address.city" />
+      </FieldSet>
+    )
+  },
+})
+
+export function ProfileForm() {
+  const form = useForm({
+    onSubmit: ({ value }) => saveProfile(value),
+    schema,
+  })
+  const { InputField, SubmitButton } = form
+
+  return (
+    <FormProvider form={form}>
+      <Form>
+        <InputField label="Name" name="name" />
+        <AddressSection form={form} title="Home address" />
+        <SubmitButton>Save</SubmitButton>
+      </Form>
+    </FormProvider>
+  )
+}
+```
+
+- TanStack never applies the section's `defaultValues`; they only type
+  `form`. Pass a value of the form's type, as above, or spread the
+  `formOptions` your `useForm` call shares.
+- A form with other values fails the type check where the parent renders
+  the section.
+- `useAppFields(form)` gives the section the same typed fields as `useForm`,
+  default props included. `render` runs inside a component, so it can call
+  hooks. Keep it an arrow function, because Biome's hook rule doesn't
+  recognize a `render() {}` method as a component.
+- For a group of fields that several forms reuse at different paths, such
+  as an address under both `billing` and `shipping`, use `withFieldGroup`.
+
 ## Devtools
 
 Install `@tanstack/react-devtools` and `@tanstack/react-form-devtools`

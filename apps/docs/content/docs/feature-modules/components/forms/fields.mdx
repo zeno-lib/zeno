@@ -190,6 +190,9 @@ While the user types, only the locale's decimal separator starts the
 fraction (`.` in `de-CH`, `,` in `de-DE`), and the field drops any other
 non-digit character.
 
+To give every `MoneyField` your app's currency and locale, set them once in
+[default props](/docs/feature-modules/components/forms#default-props).
+
 ## Percentage field
 
 `PercentageField` uses the same formatting hook as `MoneyField`, with a `%`

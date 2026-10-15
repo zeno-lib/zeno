@@ -291,6 +291,33 @@ export function Members({ members }: { members: Member[] }) {
 | `disabled` | `boolean` | Turn off Save, ⌘/Ctrl+Enter and the native controls. Defaults to `false`. |
 | `className` / `formClassName` | `string` | Classes for the popup / the `<form>`. |
 
+To give every dialog in your app the same copy and options, render
+`FormDialogProvider`, from the same file, once near your app root:
+
+```tsx
+import { FormDialogProvider } from "@/components/form/form-dialog"
+
+<FormDialogProvider
+  discardPrompt={{
+    description: "Save or discard them before you leave.",
+    title: "Unsaved changes",
+  }}
+  saveFromPrompt
+>
+  {children}
+</FormDialogProvider>
+```
+
+It takes every prop in the table except the ones that belong to a single
+dialog: `dialog`, `form`, `title`, `description`, `trigger`, `footer`,
+`disabled` and the children. A prop passed to a dialog wins. `discardPrompt`
+merges key by key, so a dialog can change the prompt's title and keep your
+labels, and a nested provider merges over its parent the same way. The
+provider is a React context, so its copy can come from your translation
+hook. The dialog renders its own `FormError`, so set its message here with
+`submitErrorMessage`, not in
+[`defaultProps`](/docs/feature-modules/components/forms#default-props).
+
 `useFormDialog({ defaultValues? })` returns `{ isOpen, open, close,
 defaultValues, focus, session }`. `close()` skips the guard (use it after
 an out-of-band save). The same package exports `useLeaveGuard` for your
