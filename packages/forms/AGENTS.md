@@ -79,6 +79,10 @@ A typed layer over [TanStack Form](https://tanstack.com/form) and Zod. The user 
 - **Don't import `@zeno-lib/db` for `ActionResult`.** It is declared in `lib/action-result.ts` and
   matched structurally by `defineFormAction`; `lib/submit-action.test-d.ts` pins the
   assignability. Change both sides together.
+- **Base UI's Combobox tells a grouped list by `items[0]` alone, and copies the selected label
+  into the input whenever `value` is a new object.** A combobox field passes Base UI
+  `toItemList(items).items` (`lib/item-options.ts`) and keeps its selected item stable while it
+  stands for the same value, as `ComboboxField`'s `useHeldOption` does.
 - **The formatted number fields keep their own text state** (`lib/use-formatted-number.ts`), so
   `"12."` survives typing. Their value is `number | null`, unlike `NumberField`'s `undefined`. Tests
   read the Swiss grouping character from `getNumberSeparators("de-CH")`, because the code point

@@ -76,19 +76,24 @@ The root also carries `data-invalid`, and the control inside carries
 
 ### Disabling the form
 
-Disable the whole form with `useForm({ disabled })`, `<Form disabled>`,
+Disable the whole form with `useForm({ disabled })`,
 `<FormProvider disabled>` or `FormDialog`'s `disabled`. Every field turns off,
 the checkbox, switch, radio and slider fields included, and so do
-`SubmitButton` and `ResetButton`. `<Form disabled>` also ignores a submit.
+`SubmitButton` and `ResetButton`. `<Form disabled>` does the same for what it
+wraps, and ignores a submit. A button outside the `<form>` (`form="profile"`)
+isn't wrapped, so reach it with one of the others.
 
 ```tsx
 const form = useForm({ disabled: !canEdit, schema })
 ```
 
 A field's own `disabled` still disables that field alone, and
-`disabled={false}` doesn't enable a field in a disabled form. A control of
-your own reads the same state with `useIsFormDisabled(form)`, or gets it in
-`disabled` through [`ControlField`](#control-field).
+`disabled={false}` doesn't enable a field in a disabled form. Each form keeps
+its own state: a form rendered inside a disabled one (a quick-add popover)
+stays enabled. A control of your own reads the state with
+`useIsFormDisabled()`, or gets it in `disabled` through
+[`ControlField`](#control-field). Only `FormDialog` also disables native
+controls of your own, through a `<fieldset disabled>`.
 
 ## Input field
 
@@ -565,7 +570,9 @@ Dates usually travel as ISO strings. Pick one with `valueType`:
   `z.iso.date()` accepts it.
 - `"iso-datetime"`: the day's local midnight as an ISO 8601 timestamp, for a
   timestamp column and `z.iso.datetime()`. October 9 picked in Zurich is
-  `2026-10-08T22:00:00.000Z`.
+  `2026-10-08T22:00:00.000Z`, which a viewer in New York reads as October 8,
+  as they would a `Date`. Store a day that must read the same everywhere as
+  `"iso-date"`.
 
 ```tsx
 <DatePickerField label="Due date" name="dueDate" valueType="iso-date" />
@@ -608,7 +615,7 @@ const FRAMEWORKS = ["Next.js", "Remix", "SvelteKit", "Nuxt.js", "Astro"]
 |---|---|---|
 | `items` | `T[]` (`string`, `{ value, label }`, or `{ label, items }` groups) | Options shown in the dropdown. Filtered client-side unless `filter={null}`. |
 | `isItemEqualToValue` | `(itemValue, value) => boolean` | Whether an item's value is the stored one. Defaults to `Object.is`; pass it for object values. |
-| `renderItem` | `(item: T) => ReactNode` | Override per-row rendering. |
+| `renderItem` | `(item) => ReactNode` | Override per-row rendering. Gets each item, a group's included, never the group. |
 | `emptyMessage` | `ReactNode` | Shown when filtering produces zero matches. |
 | `showClear` | `boolean` | Show the clear button when a value is selected. Defaults to `true` on an optional field and `false` on a required one. |
 | `placeholder` | `string` | Input placeholder when the field is empty. |
@@ -627,7 +634,7 @@ With `{ value, label }` items, the input shows a stored value only once
 ### Groups and object values
 
 Pass `{ label, items }` groups as `items` to show the options under headings.
-An item's `value` can be an object, such as a reference into one of several
+Plain items beside a group show under no heading. An item's `value` can be an object, such as a reference into one of several
 tables. A refetch rebuilds those objects, so pass `isItemEqualToValue` to
 compare them by what identifies them, as Base UI's Combobox does. Type its
 parameters: `form.ComboboxField` can't infer them from `items`.
@@ -657,7 +664,8 @@ const parties = [
 Clearing stores the field's
 [empty value](/docs/feature-modules/components/forms/validation#empty-values),
 `null` for a `.nullable()` object. `MultiSelectField` takes the same `items`
-and `isItemEqualToValue`.
+and `isItemEqualToValue`, and keeps a stored value whose item `items` doesn't
+hold yet (its group still loading) when the user picks another.
 
 shadcn's `ComboboxClear` is an icon with no accessible name. Give it one in
 your copy of `combobox.tsx` (`aria-label="Clear"`), as Zeno's does.
@@ -694,7 +702,7 @@ const LANGUAGES = [
 |---|---|---|
 | `items` | `T[]` (`string`, `number`, `{ value, label }`, or `{ label, items }` groups) | Options, filtered client-side as the user types. |
 | `isItemEqualToValue` | `(itemValue, value) => boolean` | Whether an item's value is a stored one. Defaults to `Object.is`; pass it for [object values](#groups-and-object-values). |
-| `renderItem` | `(item: T) => ReactNode` | Override per-row rendering. |
+| `renderItem` | `(item) => ReactNode` | Override per-row rendering. Gets each item, a group's included, never the group. |
 | `emptyMessage` | `ReactNode` | Shown when filtering produces zero matches. |
 | `placeholder` | `string` | Shown while nothing is selected. |
 | `showClear` | `boolean` | Show the clear-all button. Defaults to `true`. |
