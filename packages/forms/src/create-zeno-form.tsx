@@ -14,6 +14,7 @@ import { type ComponentProps, type ReactNode, useMemo } from "react"
 import { applyValidationError } from "./lib/apply-validation-error"
 import { fieldContext, formContext } from "./lib/contexts"
 import { withEmptyStartValues } from "./lib/empty-value"
+import { useDisabledOption } from "./lib/form-disabled"
 import { deepMergeDefaults, extractZodDefaults } from "./lib/schema-defaults"
 import {
   getRequiredPaths,
@@ -54,6 +55,11 @@ type PartialFormData<T> = T extends readonly unknown[]
       : T
 
 type ZenoFormExtras<TFormData> = {
+  /**
+   * Disable every field of the form, its submit button and `FormDialog`'s
+   * Save. A field's own `disabled` still applies.
+   */
+  disabled?: boolean
   /**
    * If `true`, shipped fields skip rendering their inline `<FieldError>`
    * message. Fields still flip `data-invalid` / `aria-invalid`.
@@ -414,6 +420,7 @@ export function createZenoForm<
       schema,
       validators: validatorsInput,
       validationLogic: userValidationLogic,
+      disabled = false,
       hideFieldErrors = false,
       requiredIndicator = true,
       unsavedChangesWarning = false,
@@ -425,6 +432,7 @@ export function createZenoForm<
       validators?: ValidationMode | NativeValidators
       validationLogic?: NativeValidationLogic
       defaultValues?: PartialFormData<TFormData>
+      disabled?: boolean
       hideFieldErrors?: boolean
       requiredIndicator?: boolean
       unsavedChangesWarning?: boolean | "if-changed" | "if-touched"
@@ -557,6 +565,7 @@ export function createZenoForm<
       ...(schemaMode === undefined ? {} : { validation: schemaMode }),
     })
 
+    useDisabledOption(form, disabled)
     useUnsavedChangesWarning(form, unsavedChangesWarning)
 
     const fields = useAppFields(form)

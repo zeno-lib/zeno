@@ -2,6 +2,7 @@
 
 import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { useIsFormDisabled } from "@zeno-lib/forms/lib/form-disabled"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
@@ -35,11 +36,13 @@ type RadioGroupFieldProps = Omit<
 function RadioGroupField({
   children,
   description,
+  disabled,
   label,
   required,
   ...props
 }: RadioGroupFieldProps) {
   const field = useFieldContext()
+  const isDisabled = useIsFormDisabled(field.form) || Boolean(disabled)
   const id = useId()
   const errorId = `${id}-error`
   const descriptionId = `${id}-description`
@@ -52,7 +55,11 @@ function RadioGroupField({
   const requiresValue = required ?? schemaRequiresValue
 
   return (
-    <Field data-field={field.name} data-invalid={isInvalid}>
+    <Field
+      data-disabled={isDisabled || undefined}
+      data-field={field.name}
+      data-invalid={isInvalid}
+    >
       {label && (
         <FieldLabel>
           {label}
@@ -66,6 +73,7 @@ function RadioGroupField({
         )}
         aria-invalid={isInvalid || undefined}
         aria-required={requiresValue || undefined}
+        disabled={isDisabled}
         name={field.name}
         onValueChange={(value) => field.handleChange(value)}
         value={field.state.value ?? null}

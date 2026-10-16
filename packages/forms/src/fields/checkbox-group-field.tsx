@@ -2,6 +2,7 @@
 
 import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { useIsFormDisabled } from "@zeno-lib/forms/lib/form-disabled"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
@@ -64,6 +65,7 @@ function CheckboxGroupField<V = string>({
   required,
 }: CheckboxGroupFieldProps<V>) {
   const field = useFieldContext<V[] | null | undefined>()
+  const isDisabled = useIsFormDisabled(field.form) || Boolean(disabled)
   const id = useId()
   const errorId = `${id}-error`
   const descriptionId = `${id}-description`
@@ -97,9 +99,10 @@ function CheckboxGroupField<V = string>({
       )}
       aria-invalid={isInvalid || undefined}
       className={className}
+      data-disabled={isDisabled || undefined}
       data-field={field.name}
       data-invalid={isInvalid}
-      disabled={disabled}
+      disabled={isDisabled}
     >
       {label && (
         <FieldLegend variant="label">
@@ -120,6 +123,7 @@ function CheckboxGroupField<V = string>({
           const optionId = `${id}-${index}`
           return (
             <Field
+              data-disabled={isDisabled || option.disabled || undefined}
               data-invalid={isInvalid}
               key={String(option.value)}
               orientation="horizontal"
@@ -127,7 +131,7 @@ function CheckboxGroupField<V = string>({
               <Checkbox
                 aria-invalid={isInvalid || undefined}
                 checked={checked.includes(option.value)}
-                disabled={disabled || option.disabled}
+                disabled={isDisabled || option.disabled}
                 id={optionId}
                 name={field.name}
                 onBlur={field.handleBlur}

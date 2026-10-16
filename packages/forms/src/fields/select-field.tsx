@@ -2,6 +2,7 @@
 
 import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { useIsFormDisabled } from "@zeno-lib/forms/lib/form-disabled"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
@@ -44,6 +45,7 @@ type SelectFieldProps = Omit<
 function SelectField({
   children,
   description,
+  disabled,
   label,
   onOpenChange,
   placeholder,
@@ -53,6 +55,7 @@ function SelectField({
   ...props
 }: SelectFieldProps) {
   const field = useFieldContext()
+  const isDisabled = useIsFormDisabled(field.form) || Boolean(disabled)
   // Opening the popup moves focus into it, so the trigger's blur would mark
   // the field touched, and show a required error, before anything is picked.
   // The field is touched once the popup closes, or focus leaves it closed.
@@ -82,7 +85,11 @@ function SelectField({
   }, [children])
 
   return (
-    <Field data-field={field.name} data-invalid={isInvalid}>
+    <Field
+      data-disabled={isDisabled || undefined}
+      data-field={field.name}
+      data-invalid={isInvalid}
+    >
       {label && (
         <FieldLabel htmlFor={id}>
           {label}
@@ -90,6 +97,7 @@ function SelectField({
         </FieldLabel>
       )}
       <Select
+        disabled={isDisabled}
         items={items}
         name={field.name}
         onOpenChange={(open, eventDetails) => {

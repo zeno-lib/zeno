@@ -89,21 +89,65 @@ function isTypeEmpty(value: unknown): boolean {
   return value === "" || (Array.isArray(value) && value.length === 0)
 }
 
+function isUnder(name: string, prefix: string): boolean {
+  return (
+    name === prefix ||
+    name.startsWith(`${prefix}.`) ||
+    name.startsWith(`${prefix}[`)
+  )
+}
+
+// The outermost object above `keys` that the defaults fill and the schema
+// lets be absent, with its empty value (`null` or `undefined`).
+function emptiableAncestor(
+  schema: StandardSchemaLike,
+  values: unknown,
+  keys: readonly PropertyKey[]
+): { keys: readonly PropertyKey[]; value: unknown } | null {
+  for (let length = 1; length < keys.length; length += 1) {
+    const prefix = keys.slice(0, length)
+    const start = valueAt(values, prefix)
+    if (typeof start !== "object" || start === null || Array.isArray(start)) {
+      continue
+    }
+    const empty = emptyValueFor(schema, values, toFieldName(prefix), start)
+    if (empty === null || empty === undefined) {
+      return { keys: prefix, value: empty }
+    }
+  }
+  return null
+}
+
 // `extractZodDefaults` starts every string at `""` and every array at `[]`.
 // Where the schema rejects that (`z.uuid().nullable()`,
 // `z.email().optional()`), start the field at its empty value instead, so an
 // untouched optional field passes. A required one keeps `""` or `[]`.
+//
+// An object the defaults only partly fill (`{ table: "" }` for
+// `z.object({ table: z.string(), id: z.number() }).nullable()`, a combobox's
+// value) would block submit on a path no field shows: start it at its empty
+// value too, when the schema lets it be absent.
 function withEmptyStartValues(
   schema: StandardSchemaLike,
   defaults: Record<string, unknown>
 ): Record<string, unknown> {
   const issues = validateSync(schema, defaults)
   let result: unknown = defaults
+  const emptied: string[] = []
   for (const issue of issues ?? []) {
     const name = toFieldName(issue.path)
     const keys = toPathKeys(name)
+    if (keys.length === 0 || emptied.some((prefix) => isUnder(name, prefix))) {
+      continue
+    }
+    const ancestor = emptiableAncestor(schema, result, keys)
+    if (ancestor) {
+      result = withValueAt(result, ancestor.keys, ancestor.value)
+      emptied.push(toFieldName(ancestor.keys))
+      continue
+    }
     const start = valueAt(defaults, keys)
-    if (keys.length === 0 || !isTypeEmpty(start)) {
+    if (!isTypeEmpty(start)) {
       continue
     }
     const empty = emptyValueFor(schema, result, name, start)

@@ -2,6 +2,21 @@
 
 import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { useIsFormDisabled } from "@zeno-lib/forms/lib/form-disabled"
+import {
+  findOption,
+  type ItemGroup,
+  type ItemObject,
+  type ItemOption,
+  type ItemValue,
+  isItemGroup,
+  isSameValue,
+  itemLabel,
+  itemValue,
+  toItemList,
+  type ValueComparator,
+  valueKey,
+} from "@zeno-lib/forms/lib/item-options"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
@@ -9,16 +24,19 @@ import {
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
 import { XIcon } from "lucide-react"
-import { type ReactNode, useId } from "react"
+import { type ReactNode, useId, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Combobox,
   ComboboxChip,
   ComboboxChips,
   ComboboxChipsInput,
+  ComboboxCollection,
   ComboboxContent,
   ComboboxEmpty,
+  ComboboxGroup,
   ComboboxItem,
+  ComboboxLabel,
   ComboboxList,
   ComboboxValue,
   useComboboxAnchor,
@@ -31,16 +49,23 @@ import {
 } from "@/components/ui/field"
 import { RequiredIndicator } from "../lib/required-indicator"
 
-type MultiSelectItemObject<V> = { value: V; label: string }
+type MultiSelectItemObject<V> = ItemObject<V>
+
+/** Items under a heading. */
+type MultiSelectItemGroup<T> = ItemGroup<T>
+
+/** An item of `items`, or of one of its groups. */
+type MultiSelectOption<T> = ItemOption<T>
 
 /** The value stored per selected item: `item.value` for objects, else the item. */
-type MultiSelectValue<T> = T extends MultiSelectItemObject<infer V> ? V : T
+type MultiSelectValue<T> = ItemValue<T>
 
 type MultiSelectFieldProps<T = string> = {
   /**
    * Options shown in the dropdown. Pass plain strings or numbers (value ===
    * label), or `{ value, label }` objects. The form value is an array of the
-   * selected values (`item.value` for objects).
+   * selected values (`item.value` for objects). To show them under headings,
+   * pass `{ label, items }` groups instead.
    */
   items: readonly T[]
   description?: ReactNode
@@ -50,7 +75,18 @@ type MultiSelectFieldProps<T = string> = {
   /** Message shown when filtering produces zero matches. */
   emptyMessage?: ReactNode
   /** Override per-row rendering. Default: the item's label. */
-  renderItem?: (item: T) => ReactNode
+  renderItem?: (item: MultiSelectOption<T>) => ReactNode
+  /**
+   * Whether an item's value is a stored value. Defaults to `Object.is`. Pass
+   * it when the values are objects (`{ kind, id }`), which a reload or a
+   * refetch rebuilds: `(a, b) => a.kind === b.kind && a.id === b.id`. Never
+   * called with an empty value.
+   */
+  // biome-ignore lint/style/useConsistentMethodSignatures: a method's parameters are bivariant, so a comparator typed with the value fits `form.<Field>`, whose props see the items as `unknown`.
+  isItemEqualToValue?(
+    itemValue: MultiSelectValue<T>,
+    value: MultiSelectValue<T>
+  ): boolean
   /** Show a button that clears every selection. Defaults to `true`. */
   showClear?: boolean
   /** Accessible label of the clear button. Defaults to `"Clear"`. */
@@ -64,23 +100,6 @@ type MultiSelectFieldProps<T = string> = {
   required?: boolean
 }
 
-function isItemObject(item: unknown): item is MultiSelectItemObject<unknown> {
-  return (
-    typeof item === "object" &&
-    item !== null &&
-    "value" in item &&
-    "label" in item
-  )
-}
-
-function itemValue(item: unknown): unknown {
-  return isItemObject(item) ? item.value : item
-}
-
-function itemLabel(item: unknown): string {
-  return isItemObject(item) ? item.label : String(item)
-}
-
 /**
  * Multi-value combobox: the selection renders as removable chips and the form
  * value is an array (`[]` when empty).
@@ -91,6 +110,7 @@ function MultiSelectField<T = string>({
   description,
   disabled,
   emptyMessage = "No results.",
+  isItemEqualToValue,
   items,
   label,
   placeholder,
@@ -99,6 +119,7 @@ function MultiSelectField<T = string>({
   showClear = true,
 }: MultiSelectFieldProps<T>) {
   const field = useFieldContext<MultiSelectValue<T>[] | null | undefined>()
+  const isDisabled = useIsFormDisabled(field.form) || Boolean(disabled)
   const anchor = useComboboxAnchor()
   const id = useId()
   const errorId = `${id}-error`
@@ -111,15 +132,47 @@ function MultiSelectField<T = string>({
   const schemaRequiresValue = useIsFieldRequiredBySchema(field)
   const requiresValue = required ?? schemaRequiresValue
 
+  const list = useMemo(() => toItemList(items), [items])
+  const isEqual = isItemEqualToValue as ValueComparator | undefined
+
   const values = field.state.value ?? []
   // Map stored values back to item identities, in selection order, so Base UI
   // compares by reference and the chips keep the order the user picked.
   const selected = values
-    .map((value) => items.find((item) => Object.is(itemValue(item), value)))
-    .filter((item): item is T => item !== undefined)
+    .map((value) => findOption(list, value, isEqual))
+    .filter((option): option is MultiSelectOption<T> => option !== undefined)
+
+  // Base UI only knows the values it has a chip for. Keep the others (their
+  // group still loading) where they were, so picking an option doesn't drop
+  // them.
+  const onValueChange = (next: MultiSelectOption<T>[]) => {
+    const picked = next.map(itemValue)
+    const kept = values.filter(
+      (value) =>
+        findOption(list, value, isEqual) === undefined ||
+        picked.some((other) => isSameValue(other, value, isEqual))
+    )
+    const added = picked.filter(
+      (other) => !values.some((value) => isSameValue(other, value, isEqual))
+    )
+    field.handleChange([...kept, ...added] as MultiSelectValue<T>[])
+  }
+
+  const renderOption = (option: MultiSelectOption<T>) =>
+    renderItem ? (
+      renderItem(option)
+    ) : (
+      <ComboboxItem key={valueKey(itemValue(option))} value={option}>
+        {itemLabel(option)}
+      </ComboboxItem>
+    )
 
   return (
-    <Field data-field={field.name} data-invalid={isInvalid}>
+    <Field
+      data-disabled={isDisabled || undefined}
+      data-field={field.name}
+      data-invalid={isInvalid}
+    >
       {label && (
         <FieldLabel htmlFor={id}>
           {label}
@@ -127,21 +180,19 @@ function MultiSelectField<T = string>({
         </FieldLabel>
       )}
       <Combobox
-        disabled={disabled}
-        items={items}
+        disabled={isDisabled}
+        items={list.items}
         multiple
-        onValueChange={(next: T[]) =>
-          field.handleChange(next.map(itemValue) as MultiSelectValue<T>[])
-        }
+        onValueChange={onValueChange}
         value={selected}
       >
         <ComboboxChips className={className} ref={anchor}>
           <ComboboxValue>
-            {(chips: T[]) => (
+            {(chips: MultiSelectOption<T>[]) => (
               <>
-                {chips.map((item) => (
-                  <ComboboxChip key={String(itemValue(item))}>
-                    {itemLabel(item)}
+                {chips.map((option) => (
+                  <ComboboxChip key={valueKey(itemValue(option))}>
+                    {itemLabel(option)}
                   </ComboboxChip>
                 ))}
                 <ComboboxChipsInput
@@ -159,7 +210,7 @@ function MultiSelectField<T = string>({
               </>
             )}
           </ComboboxValue>
-          {showClear && selected.length > 0 && !disabled && (
+          {showClear && selected.length > 0 && !isDisabled && (
             <Button
               aria-label={clearLabel}
               className="ml-auto"
@@ -175,13 +226,15 @@ function MultiSelectField<T = string>({
         <ComboboxContent anchor={anchor}>
           <ComboboxEmpty>{emptyMessage}</ComboboxEmpty>
           <ComboboxList>
-            {(item: T) =>
-              renderItem ? (
-                renderItem(item)
+            {(item: T, index: number) =>
+              isItemGroup(item) ? (
+                // Two groups can share a heading, or have none.
+                <ComboboxGroup items={item.items} key={index}>
+                  {item.label && <ComboboxLabel>{item.label}</ComboboxLabel>}
+                  <ComboboxCollection>{renderOption}</ComboboxCollection>
+                </ComboboxGroup>
               ) : (
-                <ComboboxItem key={String(itemValue(item))} value={item}>
-                  {itemLabel(item)}
-                </ComboboxItem>
+                renderOption(item as MultiSelectOption<T>)
               )
             }
           </ComboboxList>
@@ -197,5 +250,10 @@ function MultiSelectField<T = string>({
   )
 }
 
-export type { MultiSelectFieldProps, MultiSelectItemObject, MultiSelectValue }
+export type {
+  MultiSelectFieldProps,
+  MultiSelectItemGroup,
+  MultiSelectItemObject,
+  MultiSelectValue,
+}
 export { MultiSelectField }

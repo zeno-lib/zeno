@@ -69,4 +69,23 @@ describe("withEmptyStartValues", () => {
       ownerId: null,
     })
   })
+
+  test("starts an object the defaults only partly fill at its empty value, when it can be absent", () => {
+    const reference = z.object({ id: z.uuid(), table: z.string() })
+    const schema = z.object({
+      address: z.object({ city: z.string(), street: z.string() }).nullable(),
+      owner: reference,
+      payee: reference.optional(),
+      payer: reference.nullable(),
+    })
+    const start = withEmptyStartValues(schema, extractZodDefaults(schema))
+    expect(start).toEqual({
+      // Valid as filled, so its inputs stay controlled.
+      address: { city: "", street: "" },
+      // Required: its own fields still report what is missing.
+      owner: { id: "", table: "" },
+      payee: undefined,
+      payer: null,
+    })
+  })
 })

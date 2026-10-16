@@ -221,6 +221,38 @@ function settleEmptied(
   return { descended, next }
 }
 
+// The probe descends into a missing object with `{}`, so it never tries
+// `null` there. Try it on the side: a `.nullable()` object accepts it, so it
+// isn't required, though its own fields still are once it is set.
+function clearNullableObjects(
+  schema: StandardSchemaLike,
+  filled: readonly ProbeFill[],
+  probe: Record<PropertyKey, unknown>,
+  required: Set<string>,
+  cleared: Set<string>
+): void {
+  for (const fill of filled) {
+    if (isEmptyProbe(fill.value) || cleared.has(fill.path)) {
+      continue
+    }
+    fillAt(probe, fill.keys, null, true)
+    const issues = validateSync(schema, probe)
+    fillAt(probe, fill.keys, fill.value, true)
+    const rejected = issues?.some((issue) => {
+      const path = joinPath(issue.path?.map(pathKey) ?? [])
+      return (
+        path === fill.path ||
+        path.startsWith(`${fill.path}.`) ||
+        path.startsWith(`${fill.path}[`)
+      )
+    })
+    if (issues && !rejected) {
+      required.delete(fill.path)
+      cleared.add(fill.path)
+    }
+  }
+}
+
 function getRequiredPaths(schema: StandardSchemaLike): Set<string> {
   const required = new Set<string>()
   const cleared = new Set<string>()
@@ -234,6 +266,7 @@ function getRequiredPaths(schema: StandardSchemaLike): Set<string> {
       return required
     }
     const { failing, filled } = recordPass(issues, probe, required, cleared)
+    clearNullableObjects(schema, filled, probe, required, cleared)
     const settled = settleEmptied(emptied, failing, probe, required, cleared)
     emptied = [
       ...filled.filter(({ value }) => isEmptyProbe(value)),

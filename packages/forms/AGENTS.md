@@ -34,6 +34,11 @@ A typed layer over [TanStack Form](https://tanstack.com/form) and Zod. The user 
 - **Every registry field puts `data-field={field.name}` and `data-invalid` on its `<Field>` root, and
   `aria-invalid={isInvalid || undefined}` on its focusable control** (or on the group root, whose
   first focusable child then gets focus). Submit-invalid focus depends on it.
+- **Every registry field disables its control with `useIsFormDisabled(field.form) || disabled`**
+  (or passes `disabled` to `useFieldControl`, which does), and puts `data-disabled` on its
+  `<Field>` root. A `<fieldset disabled>` doesn't reach Base UI's checkbox, switch and radio, which
+  are spans over a hidden input. `||`, never `??`: a field's `disabled={false}` must not enable it
+  in a disabled form.
 - **Submit-invalid focus is `focusFirstInvalid`** (`lib/focus-first-invalid.ts`), which `<Form>`
   and `FormDialog` call right after `await form.handleSubmit()`. It relies on
   `useSyncExternalStore` flushing `aria-invalid`, `submitAction`'s field errors included, before
@@ -74,6 +79,10 @@ A typed layer over [TanStack Form](https://tanstack.com/form) and Zod. The user 
 - **Don't import `@zeno-lib/db` for `ActionResult`.** It is declared in `lib/action-result.ts` and
   matched structurally by `defineFormAction`; `lib/submit-action.test-d.ts` pins the
   assignability. Change both sides together.
+- **Base UI's Combobox tells a grouped list by `items[0]` alone, and copies the selected label
+  into the input whenever `value` is a new object.** A combobox field passes Base UI
+  `toItemList(items).items` (`lib/item-options.ts`) and keeps its selected item stable while it
+  stands for the same value, as `ComboboxField`'s `useHeldOption` does.
 - **The formatted number fields keep their own text state** (`lib/use-formatted-number.ts`), so
   `"12."` survives typing. Their value is `number | null`, unlike `NumberField`'s `undefined`. Tests
   read the Swiss grouping character from `getNumberSeparators("de-CH")`, because the code point

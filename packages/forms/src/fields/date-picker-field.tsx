@@ -2,7 +2,13 @@
 
 import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import {
+  type DateValueType,
+  parseDateValue,
+  toDateValue,
+} from "@zeno-lib/forms/lib/date-value"
 import { getEmptyValue } from "@zeno-lib/forms/lib/empty-value"
+import { useIsFormDisabled } from "@zeno-lib/forms/lib/form-disabled"
 import {
   useHideFieldErrors,
   useIsFieldRequired,
@@ -47,6 +53,15 @@ type DatePickerFieldProps = {
    * the `*`, and picking its selected day again keeps it instead of clearing.
    */
   required?: boolean
+  /**
+   * What the form value is. Whatever it is, the field reads a stored `Date`
+   * or ISO string.
+   * - `"date"` (default): a `Date`, at local midnight of the picked day.
+   * - `"iso-date"`: the day as `YYYY-MM-DD`, for a `date` column.
+   * - `"iso-datetime"`: the day's local midnight as an ISO 8601 timestamp
+   *   (`toISOString()`), for a timestamp column.
+   */
+  valueType?: DateValueType
 }
 
 const FALLBACK_PLACEHOLDER = "Pick a date"
@@ -68,8 +83,10 @@ function DatePickerField({
   placeholder = FALLBACK_PLACEHOLDER,
   required,
   triggerClassName,
+  valueType = "date",
 }: DatePickerFieldProps) {
-  const field = useFieldContext<Date | undefined>()
+  const field = useFieldContext<Date | string | null | undefined>()
+  const isDisabled = useIsFormDisabled(field.form) || Boolean(disabled)
   // Opening the popover moves focus into it, so the trigger's blur would mark
   // the field touched, and show a required error, before a day is picked.
   // The field is touched once the popover closes, or focus leaves it closed.
@@ -85,11 +102,14 @@ function DatePickerField({
   const schemaRequiresValue = useIsFieldRequiredBySchema(field)
   const requiresValue = required ?? schemaRequiresValue
 
-  const { value } = field.state
-  const empty = !value
+  const date = parseDateValue(field.state.value)
 
   return (
-    <Field data-field={field.name} data-invalid={isInvalid}>
+    <Field
+      data-disabled={isDisabled || undefined}
+      data-field={field.name}
+      data-invalid={isInvalid}
+    >
       {label && (
         <FieldLabel htmlFor={id}>
           {label}
@@ -115,8 +135,8 @@ function DatePickerField({
             "w-full justify-start text-left font-normal data-[empty=true]:text-muted-foreground",
             triggerClassName
           )}
-          data-empty={empty || undefined}
-          disabled={disabled}
+          data-empty={date ? undefined : true}
+          disabled={isDisabled}
           id={id}
           onBlur={() => {
             if (!isOpen.current) {
@@ -125,16 +145,21 @@ function DatePickerField({
           }}
         >
           <CalendarIcon />
-          {empty ? <span>{placeholder}</span> : formatValue(value)}
+          {date ? formatValue(date) : <span>{placeholder}</span>}
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0">
           <Calendar
+            defaultMonth={date}
             mode="single"
             onSelect={(next: Date | undefined) =>
-              field.handleChange(next ?? getEmptyValue(field, undefined))
+              field.handleChange(
+                next
+                  ? toDateValue(next, valueType)
+                  : getEmptyValue(field, undefined)
+              )
             }
             required={requiresValue}
-            selected={value}
+            selected={date}
             {...calendarProps}
           />
         </PopoverContent>
