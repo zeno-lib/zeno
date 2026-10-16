@@ -198,8 +198,8 @@ details the hand-rolled version above leaves out:
   dialog closes if the submit succeeds. If it fails, the prompt closes, the
   dialog stays open, and focus moves to the first invalid field.
   A leave asked for while a footer Save runs waits in the prompt; if the
-  save succeeds, the prompt closes with the dialog, even with
-  `closeOnSubmit` off.
+  save succeeds and no field changed since, the prompt closes with the
+  dialog, even with `closeOnSubmit` off.
 - **Footer submit**: the Save button sits outside the `<form>` (it targets
   it with `form="id"`), shows a spinner while submitting, and the dialog
   closes when the submit succeeds (`closeOnSubmit`, default `true`). A
@@ -217,12 +217,12 @@ details the hand-rolled version above leaves out:
   blame still says so: the `formErrors` an action returns, or "Something went
   wrong. Try again." when `onSubmit` throws (`submitErrorMessage` rewords
   it). Focus stays on Save, so retrying is one keypress.
-- **`disabled`**: turns off every field, Save, ⌘/Ctrl+Enter and the
-  unsaved-changes guard, as
+- **`disabled`**: turns off every field, Save and ⌘/Ctrl+Enter, as
   [`useForm({ disabled })`](/docs/feature-modules/components/forms/fields#disabling-the-form)
-  does, which also locks the dialog. Nothing can be saved, so Cancel just
-  closes and the page doesn't warn on unload. The `<form>` sits in a
-  `<fieldset disabled>` too, for native controls of your own.
+  does, which also locks the dialog. The unsaved-changes guard still asks
+  before discarding changes, but a prompt that opens while the dialog is
+  disabled doesn't offer Save. The `<form>` sits in a `<fieldset disabled>`
+  too, for native controls of your own.
 
 ```bash
 pnpm dlx shadcn@latest add zeno-lib/zeno/form-dialog
@@ -288,10 +288,10 @@ export function Members({ members }: { members: Member[] }) {
 | `footer` | `ReactNode` | Extra footer content, before the buttons. |
 | `closeOnSubmit` | `boolean` | Close after a successful submit. Defaults to `true`. |
 | `submitErrorMessage` | `ReactNode \| ((error) => ReactNode)` | Shown when `onSubmit` throws. Defaults to your `FormError` [default](/docs/feature-modules/components/forms#default-props), else `"Something went wrong. Try again."`. |
-| `guard` | `boolean` | The unsaved-changes prompt and unload warning. Defaults to `true`; off while the dialog or its form is disabled. |
+| `guard` | `boolean` | The unsaved-changes prompt and unload warning. Defaults to `true`. |
 | `discardPrompt` | `{ title?, description?, confirmLabel?, cancelLabel?, saveLabel?, saveTitle?, saveDescription? }` | Copy for the discard prompt. With `saveFromPrompt`, `saveTitle` and `saveDescription` replace `title` and `description`, which they default to. `saveLabel` defaults to `submitLabel`. |
 | `saveFromPrompt` | `boolean` | Offer Save in the discard prompt. Defaults to `false`. |
-| `disabled` | `boolean` | Turn off every field, Save, ⌘/Ctrl+Enter and `guard`. Defaults to `false`. |
+| `disabled` | `boolean` | Turn off every field, Save (the prompt's too) and ⌘/Ctrl+Enter. Defaults to `false`. |
 | `className` / `formClassName` | `string` | Classes for the popup / the `<form>`. |
 
 To give every dialog in your app the same copy and options, render

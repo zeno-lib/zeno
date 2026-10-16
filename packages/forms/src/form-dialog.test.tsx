@@ -18,7 +18,7 @@ import {
 } from "./form-dialog"
 import type { ActionResult } from "./lib/action-result"
 import { submitAction } from "./lib/submit-action"
-import { useFormDialog } from "./lib/use-form-dialog"
+import { type FormDialogController, useFormDialog } from "./lib/use-form-dialog"
 
 const NAME = /Name/
 const EMAIL = /Email/
@@ -54,6 +54,7 @@ function Harness({
   children,
   onSubmit = vi.fn(),
   closeOnSubmit,
+  controller,
   disabled,
   discardPrompt,
   formDisabled,
@@ -66,6 +67,8 @@ function Harness({
   children?: ReactNode
   onSubmit?: (values: Values) => unknown
   closeOnSubmit?: boolean
+  /** Gets the dialog's controller, to close it from outside. */
+  controller?: { current?: FormDialogController<Values> }
   disabled?: boolean
   discardPrompt?: DiscardPromptText
   /** Disable the form through `useForm({ disabled })`. */
@@ -75,6 +78,9 @@ function Harness({
   submitLabel?: ReactNode
 }) {
   const dialog = useFormDialog({ defaultValues: BLANK })
+  if (controller) {
+    controller.current = dialog
+  }
   const form = useForm({
     defaultValues: dialog.defaultValues,
     disabled: formDisabled,
@@ -311,6 +317,86 @@ describe("FormDialog", () => {
       expect(screen.queryByRole("alertdialog")).toBeNull()
     })
   }
+
+  test("an edit made while a Save runs keeps the leave prompt asking once it saves", async () => {
+    const user = userEvent.setup()
+    let finishSave: () => void = () => undefined
+    const onSubmit = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSave = resolve
+        })
+    )
+    render(<Harness onSubmit={onSubmit} />)
+    const name = await openEdit(user)
+    await user.type(name, "!")
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    await user.type(name, "?")
+    await user.keyboard("{Escape}")
+    const prompt = await screen.findByRole("alertdialog")
+
+    finishSave()
+    await waitFor(() =>
+      expect(screen.queryByRole("status", { hidden: true })).toBeNull()
+    )
+    expect(screen.getByRole("alertdialog")).toBe(prompt)
+    await user.click(
+      within(prompt).getByRole("button", { name: "Keep editing" })
+    )
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+    expect(name.value).toBe("Ada!?")
+  })
+
+  test("a Save that fails while the leave prompt asks focuses the invalid field once it closes", async () => {
+    const user = userEvent.setup()
+    let finishSave: (result: ActionResult<never>) => void = () => undefined
+    const action = vi.fn(
+      () =>
+        new Promise<ActionResult<never>>((resolve) => {
+          finishSave = resolve
+        })
+    )
+    render(<Harness action={action} />)
+    const name = await openEdit(user)
+    await user.type(name, "!")
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(action).toHaveBeenCalled())
+    await user.keyboard("{Escape}")
+    const prompt = await screen.findByRole("alertdialog")
+    await waitFor(() =>
+      expect(prompt.contains(document.activeElement)).toBe(true)
+    )
+
+    finishSave({
+      error: { fieldErrors: { email: ["Already taken"] }, formErrors: [] },
+      ok: false,
+    })
+    const email = screen.getByLabelText(EMAIL)
+    await waitFor(() => expect(email.getAttribute("aria-invalid")).toBe("true"))
+    expect(prompt.contains(document.activeElement)).toBe(true)
+    await user.click(
+      within(prompt).getByRole("button", { name: "Keep editing" })
+    )
+    await waitFor(() => expect(document.activeElement).toBe(email))
+  })
+
+  test("closing the dialog from outside closes its leave prompt for good", async () => {
+    const user = userEvent.setup()
+    const controller: { current?: FormDialogController<Values> } = {}
+    render(<Harness controller={controller} />)
+    const name = await openEdit(user)
+    await user.type(name, "!")
+    await user.keyboard("{Escape}")
+    await screen.findByRole("alertdialog")
+
+    act(() => controller.current?.close())
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+    await user.click(screen.getByRole("button", { name: "Edit" }))
+    await screen.findByRole("dialog")
+    expect(screen.queryByRole("alertdialog")).toBeNull()
+  })
 
   test("a field error from the server focuses that field", async () => {
     const user = userEvent.setup()
@@ -619,12 +705,11 @@ describe("FormDialog", () => {
   })
 
   for (const via of ["disabled", "useForm({ disabled })"]) {
-    test(`with ${via}, a changed dialog closes without asking or warning`, async () => {
+    test(`with ${via}, a changed dialog still asks and warns, without offering Save`, async () => {
       const user = userEvent.setup()
       const { rerender } = render(<Harness saveFromPrompt />)
       const name = await openEdit(user)
       await user.type(name, "!")
-      expect(warnsOnUnload()).toBe(true)
 
       rerender(
         <Harness
@@ -633,10 +718,14 @@ describe("FormDialog", () => {
           saveFromPrompt
         />
       )
-      expect(warnsOnUnload()).toBe(false)
+      expect(warnsOnUnload()).toBe(true)
       await user.click(screen.getByRole("button", { name: "Cancel" }))
+      const prompt = await screen.findByRole("alertdialog")
+      expect(within(prompt).getByText("Discard changes?")).toBeTruthy()
+      expect(within(prompt).queryByRole("button", { name: "Save" })).toBeNull()
+      await user.click(within(prompt).getByRole("button", { name: "Discard" }))
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull())
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
-      expect(screen.queryByRole("alertdialog")).toBeNull()
     })
   }
 
