@@ -1,5 +1,86 @@
 # @zeno-lib/forms
 
+## 0.7.0
+
+### Minor Changes
+
+- c1943eb: Set an app's defaults for the kit once, rather than wrapping fields or editing
+  registry files, and split a large form with `withForm`.
+  
+  - `createZenoForm({ defaultProps })` sets default props per field or form
+    component, keyed by name:
+    `defaultProps: { MoneyField: { currency: "CHF", locale: "de-CH" }, PercentageField: { scale: "fraction" } }`.
+    A prop passed at the call site wins, and one passed as `undefined` keeps the
+    default. Each component's defaults take only its own optional props. They
+    apply however the component renders: destructured from `useForm`, from
+    `useAppFields`, or as `field.X` inside `form.AppField`. The `create-form`
+    item passes an empty `defaultProps` to fill in.
+  - `FormDialogProvider`, a new export of the `form-dialog` item, sets the
+    default props of every `FormDialog` below it: its copy, `saveFromPrompt`,
+    `guard`, `closeOnSubmit` and so on. A prop passed to a dialog wins, and
+    `discardPrompt` merges key by key. `FormDialog` now renders the form's own
+    `FormError`, so a `FormError` default reaches dialogs too.
+  - `discardPrompt` takes `saveTitle` and `saveDescription`, the prompt's copy
+    with `saveFromPrompt`, so one provider can word both prompts. They default
+    to `title` and `description`.
+  - `withForm` accepts the form `useForm` returns, with or without a `schema`.
+    Its unset generics now default to what TanStack's own `useForm` infers. As a
+    result, without `onSubmitMeta`, `onSubmit`'s `meta` is `unknown` rather than
+    `never`.
+  - `create-form` exports `useAppFields`, which gives a `withForm` section the
+    same typed fields as `useForm`: `const { InputField } = useAppFields(form)`.
+  - `DatePickerField`'s calendar icon no longer shows an English "Calendar"
+    tooltip.
+  
+  Update `@zeno-lib/forms` first, then re-add the `create-form` and `form-dialog`
+  items with the shadcn CLI: `form-dialog` imports
+  `@zeno-lib/forms/lib/default-props`, which older versions don't have.
+  Re-adding `create-form` replaces `create-form.tsx`, so carry over any fields
+  you added to it.
+- e14d9de: A form disables as a whole, `DatePickerField` stores ISO strings, and the
+  combobox fields take grouped options and object values.
+  
+  - **One disabled state for the form.** `useForm({ disabled })`,
+    `<FormProvider disabled>` and `FormDialog`'s `disabled` turn off every kit
+    field, and `SubmitButton` and `ResetButton`; `<Form disabled>` does it for
+    what it wraps. That now includes the checkbox, switch and radio fields,
+    which Base UI draws as spans a `<fieldset disabled>` doesn't reach, so they
+    no longer need `disabled` passed one by one. `<Form disabled>` ignores a
+    submit, and `useForm({ disabled })` turns off `FormDialog`'s Save as its
+    prop does. A field's own `disabled` still applies, and `disabled={false}`
+    doesn't enable a field in a disabled form. Each form keeps its own state,
+    so a form rendered inside a disabled one stays enabled.
+    `useIsFormDisabled()` reads the state for a control of your own;
+    `useFieldControl` folds it into `disabled` and returns `isDisabled`. A
+    disabled field sets `data-disabled` on its root, which dims its label.
+  - **`DatePickerField` stores a string with `valueType`.** `"iso-date"` stores
+    the day as `YYYY-MM-DD`, for a `date` column; `"iso-datetime"` stores the
+    day's local midnight as an ISO 8601 timestamp. The default, `"date"`, still
+    stores a `Date`. The field reads a `Date` or either string, whatever
+    `valueType` says, and reads `YYYY-MM-DD` as that day in local time, not as
+    UTC midnight, which is the day before west of UTC. The calendar opens on the
+    selected date's month. The helpers are in `@zeno-lib/forms/lib/date-value`.
+  - **`ComboboxField` and `MultiSelectField` take groups and object values.**
+    Pass `{ label, items }` groups as `items` to show the options under
+    headings; plain items beside them show under no heading. For values that
+    are objects (`{ kind, id }`), pass `isItemEqualToValue`, as on Base UI's
+    Combobox, so a stored value still finds its item once a refetch rebuilds
+    the objects. Rebuilt items no longer overwrite what the user types in
+    `ComboboxField`, and picking in `MultiSelectField` keeps a stored value
+    whose item hasn't loaded yet.
+  - **A `.nullable()` object field no longer counts as required**, so it loses
+    its `*` and `aria-required`, and a combobox over one offers to clear. An
+    object the schema lets be absent starts at its empty value (`null` for
+    `.nullable()`) when the schema's defaults would only partly fill it, so an
+    untouched form no longer fails on a path no field shows.
+  
+  Update `@zeno-lib/forms` first, then re-add the `create-form` and
+  `form-dialog` items with the shadcn CLI
+  (`pnpm dlx shadcn@latest add zeno-lib/zeno/create-form zeno-lib/zeno/form-dialog`):
+  the updated fields import `@zeno-lib/forms/lib/form-disabled`,
+  `@zeno-lib/forms/lib/date-value` and `@zeno-lib/forms/lib/item-options`,
+  which older versions don't have.
+
 ## 0.6.0
 
 ### Minor Changes
