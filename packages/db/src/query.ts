@@ -9,10 +9,8 @@ import {
   getTableName,
   type InferInsertModel,
   type InferSelectModel,
-  inArray,
   is,
   isNull,
-  or,
   type SQL,
   sql,
 } from "drizzle-orm"
@@ -150,6 +148,7 @@ type SyncRowsBaseOptions<
    * Removes the stored rows that left the list, instead of deleting them: to
    * unlink, soft-delete, or delete only what nothing else references. Called
    * once, before any update or insert, and only when there is a row to remove.
+   * The rows left are read again after it, so a change it makes to them counts.
    */
   remove?: (
     tx: PgAsyncDatabase<TQueryResult, TRelations>,
@@ -224,8 +223,9 @@ const sameValue = (a: unknown, b: unknown) =>
 /**
  * Makes `rows` the parent's whole set of rows in `table`: the stored rows that
  * left the list are removed first, so a removed key can come straight back,
- * then each row updates the stored row it matches or is inserted. Resolves to
- * the resulting rows in input order, so a form can take up the new ids.
+ * then each row updates the stored row it matches, and the rest are inserted.
+ * Resolves to the resulting rows in input order, so a form can take up the new
+ * ids.
  *
  * Rows are told apart by one of:
  *
@@ -240,8 +240,19 @@ const sameValue = (a: unknown, b: unknown) =>
  *
  * An update sets only the columns the row carries and changes, skipping
  * `undefined`, and a stored row with nothing to change is returned as it is,
- * unwritten. An empty list removes every row the parent has. Two rows with the
- * same key throw before anything is written.
+ * unwritten. Rows are compared with the parent's rows as they stand after the
+ * removal, read again when something was removed, so the listed values win
+ * over what a delete trigger wrote to the rows left, and a kept row the removal
+ * deleted, through a cascade or a trigger, throws. An empty list removes every
+ * row the parent has. Two rows with the same key throw before anything is
+ * written.
+ *
+ * Each changed row is one update, in input order, and the new rows are
+ * inserted after the updates, so a kept row can reference a new one only
+ * through a deferrable foreign key. The returned rows are what each statement
+ * returned: a change a trigger makes to another row isn't in them. Removals
+ * and inserts go many rows to a statement, split to stay under the bind
+ * parameter limit, so thousands of rows take a few statements.
  *
  * Everything runs in `db.transaction`: its own transaction on a client, a
  * savepoint inside a `tx`. A failure undoes every write the sync made and
@@ -286,6 +297,100 @@ type SyncOptions = {
   parent: Row
   remove?: (tx: AnyDatabase, rows: Row[]) => Promise<unknown>
   rows: readonly Row[]
+}
+
+// postgres.js refuses a statement with 65,534 bind parameters or more, and
+// Postgres itself takes at most 65,535.
+const MAX_PARAMETERS = 65_533
+
+// How many items of `perItem` parameters fit in one statement, beside the
+// statement's own `reserved` ones.
+const maxRows = (perItem: number, reserved = 0) =>
+  Math.floor((MAX_PARAMETERS - reserved) / perItem)
+
+const chunks = <T>(items: readonly T[], size: number): T[][] => {
+  const parts: T[][] = []
+  for (let start = 0; start < items.length; start += size) {
+    parts.push(items.slice(start, start + size))
+  }
+  return parts
+}
+
+// `(a, b) IN (VALUES (…), …)`, which Postgres hashes, where an `OR` of one
+// `AND` per row takes it seconds to plan past a few thousand rows. The first
+// row takes its types from the columns and the rest follow, since a bare
+// parameter in `VALUES` is text.
+const inValues = (
+  table: PgTable,
+  columns: PgColumn[],
+  names: readonly string[],
+  rows: readonly Row[]
+) =>
+  sql`(${sql.join(columns, sql`, `)}) in (values ${sql.join(
+    rows.map(
+      (row, index) =>
+        sql`(${sql.join(
+          columns.map((column, position) => {
+            const value = sql.param(row[names[position] ?? ""], column)
+            return index === 0
+              ? sql`coalesce(${value}, (select ${column} from ${table} limit 0))`
+              : value
+          }),
+          sql`, `
+        )})`
+    ),
+    sql`, `
+  )})`
+
+// Runs one statement per part of `items`, at most `size` items each, and
+// resolves to their results in order. `size` assumes one parameter per value,
+// but a custom type or an `sql` value can bind several, so a part whose
+// statement binds too many is halved.
+const inParts = async <T, R>(
+  items: readonly T[],
+  size: number,
+  statement: (part: T[]) => PromiseLike<R> & {
+    toSQL: () => { params: unknown[] }
+  }
+): Promise<R[]> => {
+  const results: R[] = []
+  const run = async (part: T[]): Promise<void> => {
+    const query = statement(part)
+    if (part.length > 1 && query.toSQL().params.length > MAX_PARAMETERS) {
+      const half = Math.ceil(part.length / 2)
+      await run(part.slice(0, half))
+      await run(part.slice(half))
+      return
+    }
+    results.push(await query)
+  }
+  for (const part of chunks(items, size)) {
+    // biome-ignore lint/performance/noAwaitInLoops: a transaction is one connection, so its writes run one at a time
+    await run(part)
+  }
+  return results
+}
+
+// Inserts `rows` in as few statements as the parameter limit allows, and
+// resolves to the saved rows in the same order.
+const insertRows = async (
+  tx: AnyDatabase,
+  table: PgTable,
+  rows: readonly Row[]
+): Promise<Row[]> => {
+  const parts = await inParts(
+    rows,
+    maxRows(Object.keys(getColumns(table)).length),
+    (part) => tx.insert(table).values(part).returning()
+  )
+  // `INSERT … VALUES … RETURNING` returns the rows in the order listed.
+  const saved = parts.flat() as Row[]
+  if (saved.length !== rows.length) {
+    throw new Error(
+      `Expected ${rows.length} inserted rows, received ${saved.length}`
+    )
+  }
+  return saved
 }
 
 // Async, so a bad argument rejects like a failed statement instead of throwing.
@@ -357,47 +462,66 @@ const sync = async (
     listed.set(rowKey, index)
   }
 
-  return await db.transaction(async (tx) => {
-    const stored: Row[] = await tx.select().from(table).where(scope)
-    const byKey = new Map(stored.map((row) => [identity(row), row]))
-    const removed = stored.filter((row) => !listed.has(identity(row) ?? ""))
-
-    if (removed.length > 0) {
-      // One `IN` list for a single key column, which can't match a null.
-      const only = keyNames.length === 1 ? keyNames[0] : undefined
-      const values = only === undefined ? [] : removed.map((row) => row[only])
-      await (remove
-        ? remove(tx, removed)
-        : tx
+  // Deletes the removed rows by key, grouped by which key parts are null, since
+  // `IN` never matches a null: `IS NULL` matches those, an `IN` list the rest.
+  const deleteRemoved = async (tx: AnyDatabase, removed: readonly Row[]) => {
+    const groups = new Map<string, Row[]>()
+    for (const row of removed) {
+      const nulls = JSON.stringify(keyNames.map((name) => row[name] === null))
+      const group = groups.get(nulls)
+      if (group) {
+        group.push(row)
+      } else {
+        groups.set(nulls, [row])
+      }
+    }
+    for (const group of groups.values()) {
+      const [first = {}] = group
+      const present = keyNames.filter((name) => first[name] !== null)
+      const absent = keyNames
+        .filter((name) => first[name] === null)
+        .map((name) => isNull(column(name)))
+      if (present.length === 0) {
+        // biome-ignore lint/performance/noAwaitInLoops: a transaction is one connection, so its writes run one at a time
+        await tx.delete(table).where(and(scope, ...absent))
+        continue
+      }
+      // A row binds one parameter per present key part, the scope one per
+      // parent value.
+      await inParts(
+        group,
+        maxRows(present.length, parentNames.length),
+        (part) =>
+          tx
             .delete(table)
             .where(
               and(
                 scope,
-                only !== undefined && !values.includes(null)
-                  ? inArray(column(only), values)
-                  : or(...removed.map((row) => matching(row, keyNames)))
+                ...absent,
+                inValues(table, present.map(column), present, part)
               )
-            ))
+            )
+      )
     }
+  }
 
-    const save = async (row: Row): Promise<Row> => {
-      const rowKey = identity(row)
-      const match = rowKey === undefined ? undefined : byKey.get(rowKey)
+  return await db.transaction(async (tx) => {
+    const read = (): Promise<Row[]> => tx.select().from(table).where(scope)
+    let stored = await read()
+    const held = new Set(stored.map(identity))
+    const removed = stored.filter((row) => !listed.has(identity(row) ?? ""))
 
-      if (!match) {
-        // An id the parent doesn't hold is dropped, so the row is new, unless
-        // the column has no default to fill in: then the caller assigns ids,
-        // and a taken one fails on the primary key rather than moving a row.
-        const values =
-          key === undefined && column(id).hasDefault
-            ? { ...row, [id]: undefined }
-            : row
-        const inserted = await tx.insert(table).values(values).returning()
-        return one(inserted as Row[])
-      }
+    if (removed.length > 0) {
+      await (remove ? remove(tx, removed) : deleteRemoved(tx, removed))
+      // A delete trigger, a cascade or `remove` can rewrite the rows left, so
+      // the listed rows are compared with them as they are now.
+      stored = await read()
+    }
+    const byKey = new Map(stored.map((row) => [identity(row), row]))
 
-      // An unchanged column isn't set, so an untouched row isn't written and
-      // its `updated_at` trigger doesn't fire.
+    // An unchanged column isn't set, so an untouched row isn't written and
+    // its `updated_at` trigger doesn't fire.
+    const update = async (row: Row, match: Row): Promise<Row> => {
       const set = Object.fromEntries(
         Object.entries(definedValues(row)).filter(
           ([name, value]) =>
@@ -419,10 +543,46 @@ const sync = async (
       )
     }
 
+    // A listed row the parent doesn't hold now, as it is inserted.
+    const insertValues = (row: Row, index: number): Row => {
+      const rowKey = identity(row)
+      // Inserting it anew would give it a new id and defaults for the columns
+      // it doesn't carry, where the save asked to keep it.
+      if (rowKey !== undefined && held.has(rowKey)) {
+        throw new Error(
+          `Row ${index} was deleted along with the rows that left the list`
+        )
+      }
+      // An id the parent doesn't hold is dropped, so the row is new, unless
+      // the column has no default to fill in: then the caller assigns ids,
+      // and a taken one fails on the primary key rather than moving a row.
+      return key === undefined && column(id).hasDefault
+        ? { ...row, [id]: undefined }
+        : row
+    }
+
     const saved: Row[] = []
-    for (const row of wanted) {
-      // biome-ignore lint/performance/noAwaitInLoops: a transaction is one connection, so its writes run one at a time, and in input order
-      saved.push(await save(row))
+    const added: { index: number; values: Row }[] = []
+    for (const [index, row] of wanted.entries()) {
+      const rowKey = identity(row)
+      const match = rowKey === undefined ? undefined : byKey.get(rowKey)
+      if (match) {
+        // biome-ignore lint/performance/noAwaitInLoops: a transaction is one connection, so its writes run one at a time, and in input order
+        saved[index] = await update(row, match)
+      } else {
+        added.push({ index, values: insertValues(row, index) })
+      }
+    }
+
+    // After the updates, so a new row can take a unique value a kept row gave
+    // up.
+    const inserted = await insertRows(
+      tx,
+      table,
+      added.map(({ values }) => values)
+    )
+    for (const [offset, { index }] of added.entries()) {
+      saved[index] = inserted[offset] as Row
     }
     return saved
   })

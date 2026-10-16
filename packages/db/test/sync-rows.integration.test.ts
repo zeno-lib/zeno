@@ -1,7 +1,9 @@
 import { asc, eq, inArray, sql, TransactionRollbackError } from "drizzle-orm"
 import {
   bigint,
+  customType,
   integer,
+  numeric,
   type PgAsyncDatabase,
   text,
 } from "drizzle-orm/pg-core"
@@ -32,10 +34,29 @@ const members = unsecureTable("members", {
   teamId: bigint({ mode: "number" }).notNull(),
 })
 
+// Shares that must sum to 1, which a delete trigger rebalances.
+const shares = unsecureTable("shares", {
+  personId: text().notNull(),
+  share: numeric({ mode: "number" }).notNull(),
+  teamId: bigint({ mode: "number" }).notNull(),
+})
+
 // Ids the caller assigns: the column has no default.
 const codes = unsecureTable("codes", {
   id: primaryId("assigned"),
   label: text().notNull(),
+  listId: bigint({ mode: "number" }).notNull(),
+})
+
+// The same table, with a label that binds two parameters, as a custom type
+// mapping a value to an expression can.
+const twoParameterText = customType<{ data: string }>({
+  dataType: () => "text",
+  toDriver: (value) => sql`${value} || ${""}`,
+})
+const labelledCodes = unsecureTable("codes", {
+  id: primaryId("assigned"),
+  label: twoParameterText().notNull(),
   listId: bigint({ mode: "number" }).notNull(),
 })
 
@@ -62,9 +83,35 @@ const tables = [
     list_id bigint not null,
     label text not null
   )`,
+  sql`create temp table shares (
+    team_id bigint not null,
+    person_id text not null,
+    share numeric not null,
+    primary key (team_id, person_id)
+  )`,
+  // Scales the members left back up to a total of 1, as soon as one leaves.
+  sql`create function pg_temp.rebalance_shares() returns trigger
+    language plpgsql as $$
+    begin
+      update shares
+      set share = share / (select sum(share) from shares where team_id = old.team_id)
+      where team_id = old.team_id;
+      return null;
+    end
+    $$`,
+  sql`create trigger rebalance_shares after delete on shares
+    for each row execute function pg_temp.rebalance_shares()`,
 ]
 
-const db = createAdminClient()
+// Counts every statement sent, so a test can check how many a sync takes.
+let statements = 0
+const db = createAdminClient({
+  logger: {
+    logQuery: () => {
+      statements += 1
+    },
+  },
+})
 
 afterAll(async () => {
   await db.close()
@@ -212,6 +259,66 @@ describe("syncRows by id", () => {
       expect(await linesOf(tx, 1)).toEqual(saved)
     }))
 
+  it("lets a new row take a unique value a kept row gives up, wherever it is listed", () =>
+    withTables(async (tx) => {
+      const { apple } = await seedLines(tx)
+
+      const saved = await syncRows(tx, lines, {
+        parent: { orderId: 1 },
+        rows: [{ product: "apple" }, { id: apple.id, product: "green apple" }],
+      })
+
+      expect(saved.map(({ product }) => product)).toEqual([
+        "apple",
+        "green apple",
+      ])
+    }))
+
+  it("inserts thousands of new rows in a few statements, in input order", () =>
+    withTables(async (tx) => {
+      const { pear } = await seedLines(tx)
+      // Four values a row, so the new rows hold more bind parameters than
+      // one statement takes.
+      const added = Array.from({ length: 20_000 }, (_, index) => ({
+        note: `note ${index}`,
+        product: `item ${index}`,
+        quantity: index,
+      }))
+      const rows = [
+        ...added.slice(0, 10_000),
+        { id: pear.id, product: "pear", quantity: 5 },
+        ...added.slice(10_000),
+      ]
+      const before = statements
+
+      const saved = await syncRows(tx, lines, { parent: { orderId: 1 }, rows })
+
+      expect(statements - before).toBeLessThan(10)
+      expect(saved.map(({ product, quantity }) => [product, quantity])).toEqual(
+        rows.map(({ product, quantity }) => [product, quantity])
+      )
+      expect(saved[10_000]?.id).toBe(pear.id)
+      expect(await linesOf(tx, 1)).toEqual(
+        [...saved].sort((a, b) => a.id - b.id)
+      )
+    }))
+
+  it("splits an insert whose values bind more parameters than their columns", () =>
+    withTables(async (tx) => {
+      // Three columns, so a full batch of 21,844 rows binds 87,376 parameters.
+      const rows = Array.from({ length: 21_844 }, (_, index) => ({
+        id: `code ${index}`,
+        label: `label ${index}`,
+      }))
+
+      const saved = await syncRows(tx, labelledCodes, {
+        parent: { listId: 1 },
+        rows,
+      })
+
+      expect(saved.map(({ id }) => id)).toEqual(rows.map(({ id }) => id))
+    }))
+
   it("removes every row of the parent for an empty list", () =>
     withTables(async (tx) => {
       const { other } = await seedLines(tx)
@@ -347,6 +454,32 @@ describe("syncRows by key", () => {
       expect(await membersOf(tx, 2)).toEqual([otherTeam])
     }))
 
+  it("removes more rows than one statement can bind", () =>
+    withTables(async (tx) => {
+      const [, , , otherTeam] = await seedMembers(tx)
+      // Two key values a row, so removing them binds more parameters than one
+      // statement takes.
+      await syncRows(tx, members, {
+        key: ["personId", "groupId"],
+        parent: { teamId: 1 },
+        rows: Array.from({ length: 40_000 }, (_, index) => ({
+          groupId: "staff",
+          personId: `person ${index}`,
+        })),
+      })
+
+      await syncRows(tx, members, {
+        key: ["personId", "groupId"],
+        parent: { teamId: 1 },
+        rows: [{ groupId: "staff", personId: "person 0" }],
+      })
+
+      expect(await membersOf(tx, 1)).toEqual([
+        { groupId: "staff", personId: "person 0", role: "member", teamId: 1 },
+      ])
+      expect(await membersOf(tx, 2)).toEqual([otherTeam])
+    }))
+
   it("rejects two rows with the same key, nulls included", () =>
     withTables(async (tx) => {
       await expect(
@@ -370,5 +503,69 @@ describe("syncRows by key", () => {
           rows: [{ personId: "ada" } as { groupId: null; personId: string }],
         })
       ).rejects.toThrow('Row 0 has no value for key column "groupId"')
+    }))
+})
+
+describe("syncRows with triggers", () => {
+  const sharesOf = (tx: Db, teamId: number) =>
+    tx
+      .select()
+      .from(shares)
+      .where(eq(shares.teamId, teamId))
+      .orderBy(asc(shares.personId))
+
+  it("ends with the listed values when a delete trigger rewrites the rows left", () =>
+    withTables(async (tx) => {
+      await tx.insert(shares).values([
+        { personId: "ada", share: 0.5, teamId: 1 },
+        { personId: "bob", share: 0.3, teamId: 1 },
+        { personId: "cyd", share: 0.2, teamId: 1 },
+      ])
+
+      // Removing cyd rebalances ada to 0.625 and bob to 0.375 before the
+      // listed shares are written, and ada's 0.5 is the share she started with.
+      const saved = await syncRows(tx, shares, {
+        key: ["personId"],
+        parent: { teamId: 1 },
+        rows: [
+          { personId: "ada", share: 0.5 },
+          { personId: "bob", share: 0.5 },
+        ],
+      })
+
+      const expected = [
+        { personId: "ada", share: 0.5, teamId: 1 },
+        { personId: "bob", share: 0.5, teamId: 1 },
+      ]
+      expect(await sharesOf(tx, 1)).toEqual(expected)
+      expect(saved).toEqual(expected)
+    }))
+  it("rejects a kept row the removal deleted", () =>
+    withTables(async (tx) => {
+      const { apple, pear } = await seedLines(tx)
+      // Removing any line takes the pear with it, as a cascade would.
+      await tx.execute(sql`create function pg_temp.drop_pear() returns trigger
+        language plpgsql as $$
+        begin
+          delete from lines where product = 'pear';
+          return null;
+        end
+        $$`)
+      await tx.execute(sql`create trigger drop_pear after delete on lines
+        for each row execute function pg_temp.drop_pear()`)
+      const before = await linesOf(tx, 1)
+
+      await expect(
+        syncRows(tx, lines, {
+          parent: { orderId: 1 },
+          rows: [
+            { id: apple.id, product: "apple" },
+            { id: pear.id, product: "pear", quantity: 2 },
+          ],
+        })
+      ).rejects.toThrow(
+        "Row 1 was deleted along with the rows that left the list"
+      )
+      expect(await linesOf(tx, 1)).toEqual(before)
     }))
 })
