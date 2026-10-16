@@ -123,6 +123,7 @@ function CheckboxGroupField<V = string>({
           const optionId = `${id}-${index}`
           return (
             <Field
+              data-disabled={isDisabled || option.disabled || undefined}
               data-invalid={isInvalid}
               key={String(option.value)}
               orientation="horizontal"

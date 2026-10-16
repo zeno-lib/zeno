@@ -6,6 +6,7 @@ import {
 } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
 import { memo, type ReactNode, useState } from "react"
+import { createPortal } from "react-dom"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { Form, FormProvider, RadioGroupFieldItem, useForm } from "./create-form"
 import { FormDialog } from "./form-dialog"
@@ -183,6 +184,86 @@ describe("a disabled form", () => {
     render(<H />)
     await user.click(screen.getByRole("button", { name: "Lock" }))
     await expectDrawnControlsDisabled(user, captured)
+  })
+
+  test("toggling `useForm({ disabled })` reaches memoized fields with no Zeno provider", async () => {
+    const user = userEvent.setup()
+    const captured: Box = { current: undefined }
+    const Section = memo(({ form }: { form: ReturnType<typeof useTestForm> }) =>
+      renderFields(form)
+    )
+    function H() {
+      const [locked, setLocked] = useState(false)
+      const form = useTestForm({ disabled: locked })
+      return (
+        <form.AppForm>
+          <button onClick={() => setLocked(true)} type="button">
+            Lock
+          </button>
+          <Section form={form} />
+          <Capture captured={captured} form={form} />
+        </form.AppForm>
+      )
+    }
+    render(<H />)
+    await user.click(screen.getByRole("button", { name: "Lock" }))
+    await expectDrawnControlsDisabled(user, captured)
+  })
+
+  test("a form rendered inside another's `<Form disabled>` keeps its own state", async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    function H() {
+      const outer = useTestForm({})
+      const inner = useForm({ defaultValues: { title: "" }, onSubmit })
+      return (
+        <FormProvider form={outer}>
+          <Form disabled>
+            <outer.InputField label="Name" name="name" />
+            {/* A quick-add popover: portalled, under TanStack's provider. */}
+            {createPortal(
+              <inner.AppForm>
+                <Form>
+                  <inner.InputField label="Title" name="title" />
+                  <inner.SubmitButton>Add</inner.SubmitButton>
+                </Form>
+              </inner.AppForm>,
+              document.body
+            )}
+          </Form>
+        </FormProvider>
+      )
+    }
+    render(<H />)
+    expect(
+      screen.getByRole("textbox", { name: "Name" }).matches(":disabled")
+    ).toBe(true)
+    await user.type(screen.getByRole("textbox", { name: "Title" }), "Draft")
+    await user.click(screen.getByRole("button", { name: "Add" }))
+    expect(onSubmit).toHaveBeenCalledOnce()
+  })
+
+  test("CheckboxGroupField dims each option's label", () => {
+    function H() {
+      const form = useForm({
+        defaultValues: { channels: [] as string[] },
+        disabled: true,
+      })
+      return (
+        <FormProvider form={form}>
+          <form.CheckboxGroupField
+            items={[{ label: "Email", value: "email" }]}
+            label="Channels"
+            name="channels"
+          />
+        </FormProvider>
+      )
+    }
+    render(<H />)
+    const option = screen.getByRole("checkbox", { name: "Email" })
+    expect(
+      option.closest('[data-slot="field"]')?.getAttribute("data-disabled")
+    ).toBe("true")
   })
 })
 

@@ -5,6 +5,7 @@ import {
   focusFirstInvalid,
   restoreFocus,
 } from "@zeno-lib/forms/lib/focus-first-invalid"
+import { useIsFormDisabled } from "@zeno-lib/forms/lib/form-disabled"
 import { reportSubmitError } from "@zeno-lib/forms/lib/submit-error"
 import {
   type FormDialogController,
@@ -12,7 +13,6 @@ import {
   useLeaveGuard,
 } from "@zeno-lib/forms/lib/use-form-dialog"
 import { useUnsavedChangesWarning } from "@zeno-lib/forms/lib/use-unsaved-changes-warning"
-import { getFormDisabled } from "@zeno-lib/forms/lib/validation-modes"
 import { type AnyFormApi, useSelector } from "@zeno-lib/forms/tanstack"
 import {
   type FormEvent,
@@ -158,7 +158,8 @@ function FormDialog<TValues>({
 }: FormDialogProps<TValues>) {
   const formId = useId()
   // `useForm({ disabled })` locks the dialog as this prop does.
-  const isDisabled = disabled || getFormDisabled(form as unknown as AnyFormApi)
+  const isDisabled =
+    useIsFormDisabled(form as unknown as AnyFormApi) || disabled
   const popupRef = useRef<HTMLDivElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   // Set when a Save from the discard prompt fails, so the prompt hands focus

@@ -1,13 +1,17 @@
 "use client"
 
 import type { AnyFormApi } from "@tanstack/react-form"
-import type { ComponentProps, FormEvent, ReactNode } from "react"
+import {
+  type ComponentProps,
+  type FormEvent,
+  type ReactNode,
+  useMemo,
+} from "react"
 
 import { FormProvider as RawFormProvider, useFormContext } from "./lib/contexts"
 import { focusFirstInvalid, restoreFocus } from "./lib/focus-first-invalid"
 import { FormDisabledContext, useIsFormDisabled } from "./lib/form-disabled"
 import { reportSubmitError } from "./lib/submit-error"
-import { getFormDisabled } from "./lib/validation-modes"
 
 type FormProviderProps = {
   children: ReactNode
@@ -20,18 +24,21 @@ type FormProviderProps = {
 }
 
 function FormProvider({ children, disabled = false, form }: FormProviderProps) {
-  const isDisabled = disabled || getFormDisabled(form as AnyFormApi)
+  const { store } = form as AnyFormApi
+  const scope = useMemo(() => ({ disabled, key: store }), [disabled, store])
   return (
     <RawFormProvider value={form as AnyFormApi}>
-      <FormDisabledContext value={isDisabled}>{children}</FormDisabledContext>
+      <FormDisabledContext value={scope}>{children}</FormDisabledContext>
     </RawFormProvider>
   )
 }
 
 type FormProps = Omit<ComponentProps<"form">, "onSubmit"> & {
   /**
-   * Disable every field inside and the submit button, and ignore a submit.
-   * A field's own `disabled` still applies.
+   * Disable every field and button of the kit inside, and ignore a submit. A
+   * field's own `disabled` still applies. A button outside the `<form>`
+   * (`form="id"`) isn't inside: disable the form with `useForm({ disabled })`
+   * or `<FormProvider disabled>` to reach it.
    */
   disabled?: boolean
 }
@@ -39,8 +46,13 @@ type FormProps = Omit<ComponentProps<"form">, "onSubmit"> & {
 function Form({ children, className, disabled = false, ...props }: FormProps) {
   const form = useFormContext()
   const isDisabled = useIsFormDisabled(form) || disabled
+  const { store } = form
+  const scope = useMemo(
+    () => ({ disabled: isDisabled, key: store }),
+    [isDisabled, store]
+  )
   return (
-    <FormDisabledContext value={isDisabled}>
+    <FormDisabledContext value={scope}>
       <form
         className={className}
         noValidate

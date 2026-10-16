@@ -14,6 +14,7 @@ import { type ComponentProps, type ReactNode, useMemo } from "react"
 import { applyValidationError } from "./lib/apply-validation-error"
 import { fieldContext, formContext } from "./lib/contexts"
 import { withEmptyStartValues } from "./lib/empty-value"
+import { useDisabledOption } from "./lib/form-disabled"
 import { deepMergeDefaults, extractZodDefaults } from "./lib/schema-defaults"
 import {
   getRequiredPaths,
@@ -557,7 +558,6 @@ export function createZenoForm<
     } as NativeFormOptions)
 
     setFormZenoState(form, {
-      disabled,
       hideFieldErrors,
       requiredFields,
       requiredIndicator,
@@ -565,6 +565,7 @@ export function createZenoForm<
       ...(schemaMode === undefined ? {} : { validation: schemaMode }),
     })
 
+    useDisabledOption(form, disabled)
     useUnsavedChangesWarning(form, unsavedChangesWarning)
 
     const fields = useAppFields(form)
