@@ -5,12 +5,27 @@ import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import { getEmptyValue } from "@zeno-lib/forms/lib/empty-value"
 import { useIsFormDisabled } from "@zeno-lib/forms/lib/form-disabled"
 import {
+  findOption,
+  type ItemGroup,
+  type ItemObject,
+  type ItemOption,
+  type ItemValue,
+  isItemGroup,
+  isItemObject,
+  isSameValue,
+  itemLabel,
+  itemValue,
+  toItemList,
+  type ValueComparator,
+  valueKey,
+} from "@zeno-lib/forms/lib/item-options"
+import {
   useHideFieldErrors,
   useIsFieldRequired,
   useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
-import { type ReactNode, useId } from "react"
+import { type ReactNode, useId, useMemo, useState } from "react"
 import {
   Combobox,
   ComboboxCollection,
@@ -32,21 +47,16 @@ import { InputGroupAddon } from "@/components/ui/input-group"
 import { Spinner } from "@/components/ui/spinner"
 import { RequiredIndicator } from "../lib/required-indicator"
 
-type ComboboxItemObject<V> = { value: V; label: string }
+type ComboboxItemObject<V> = ItemObject<V>
 
 /** Items under a heading. */
-type ComboboxItemGroup<T> = { label: string; items: readonly T[] }
+type ComboboxItemGroup<T> = ItemGroup<T>
 
 /** An item of `items`, or of one of its groups. */
-type ComboboxOption<T> = T extends ComboboxItemGroup<infer I> ? I : T
+type ComboboxOption<T> = ItemOption<T>
 
 /** What picking an item stores: `item.value` for an object, else the item. */
-type ComboboxOptionValue<T> =
-  T extends ComboboxItemGroup<infer I>
-    ? ComboboxOptionValue<I>
-    : T extends ComboboxItemObject<infer V>
-      ? V
-      : T
+type ComboboxOptionValue<T> = ItemValue<T>
 
 type ComboboxFieldProps<T = string> = {
   /**
@@ -106,38 +116,24 @@ type ComboboxFieldProps<T = string> = {
   loading?: boolean
 }
 
-function isItemObject(item: unknown): item is ComboboxItemObject<unknown> {
-  return (
-    typeof item === "object" &&
-    item !== null &&
-    "value" in item &&
-    "label" in item
-  )
-}
-
-// What Base UI takes for a group: an object with an `items` array.
-function isItemGroup(item: unknown): item is ComboboxItemGroup<unknown> {
-  return (
-    typeof item === "object" &&
-    item !== null &&
-    Array.isArray((item as { items?: unknown }).items)
-  )
-}
-
-function itemValue(item: unknown): unknown {
-  return isItemObject(item) ? item.value : item
-}
-
-// One key per value, objects included.
-function valueKey(value: unknown): string {
-  if (typeof value !== "object" || value === null) {
-    return String(value)
+// Base UI copies the selected label into the input whenever `value` is a new
+// object, so items rebuilt on every render (mapped from fetched rows) would
+// overwrite what the user types. Keep the item found until it stands for
+// another value or label.
+function useHeldOption<O>(
+  match: O | undefined,
+  isEqual: ValueComparator | undefined
+): O | undefined {
+  const [held, setHeld] = useState(match)
+  const keepsHeld =
+    held !== undefined &&
+    match !== undefined &&
+    isSameValue(itemValue(held), itemValue(match), isEqual) &&
+    itemLabel(held) === itemLabel(match)
+  if (held !== match && !keepsHeld) {
+    setHeld(match)
   }
-  try {
-    return JSON.stringify(value)
-  } catch {
-    return String(value)
-  }
+  return keepsHeld ? held : match
 }
 
 function ComboboxField<T = string>({
@@ -171,32 +167,15 @@ function ComboboxField<T = string>({
   const requiresValue = required ?? schemaRequiresValue
   const canClear = showClear ?? !requiresValue
 
-  const options = items.flatMap((item) =>
-    isItemGroup(item) ? item.items : [item]
-  ) as ComboboxOption<T>[]
-  const isSameValue = (a: unknown, b: unknown): boolean => {
-    if (Object.is(a, b)) {
-      return true
-    }
-    if (a === null || a === undefined || b === null || b === undefined) {
-      return false
-    }
-    return (
-      isItemEqualToValue?.(
-        a as ComboboxOptionValue<T>,
-        b as ComboboxOptionValue<T>
-      ) ?? false
-    )
-  }
+  const list = useMemo(() => toItemList(items), [items])
+  const isEqual = isItemEqualToValue as ValueComparator | undefined
 
   const fieldValue = field.state.value
   // Base UI shows the value it gets as text, so a stored id whose item isn't
   // in `items` (options still loading, or a search that dropped it) would
   // show raw. Only a plain string or number item is its own label.
-  const match = options.find((option) =>
-    isSameValue(itemValue(option), fieldValue)
-  )
-  const plainItems = options.length > 0 && !options.some(isItemObject)
+  const match = useHeldOption(findOption(list, fieldValue, isEqual), isEqual)
+  const plainItems = list.options.length > 0 && !list.options.some(isItemObject)
   const value = (match ??
     (plainItems ? (fieldValue ?? null) : null)) as ComboboxOption<T> | null
 
@@ -206,7 +185,7 @@ function ComboboxField<T = string>({
     }
     return (
       <ComboboxItem key={valueKey(itemValue(option))} value={option}>
-        {isItemObject(option) ? option.label : String(option)}
+        {itemLabel(option)}
       </ComboboxItem>
     )
   }
@@ -227,7 +206,11 @@ function ComboboxField<T = string>({
         disabled={isDisabled}
         filter={filter}
         inputValue={inputValue}
-        items={items}
+        // The held item may be one `items` no longer has.
+        isItemEqualToValue={(item, selected) =>
+          isSameValue(itemValue(item), itemValue(selected), isEqual)
+        }
+        items={list.items}
         onInputValueChange={onInputValueChange}
         onValueChange={(next) => {
           if (next === null) {
@@ -262,10 +245,11 @@ function ComboboxField<T = string>({
         <ComboboxContent>
           <ComboboxEmpty>{emptyMessage}</ComboboxEmpty>
           <ComboboxList>
-            {(item: T) =>
+            {(item: T, index: number) =>
               isItemGroup(item) ? (
-                <ComboboxGroup items={item.items} key={item.label}>
-                  <ComboboxLabel>{item.label}</ComboboxLabel>
+                // Two groups can share a heading, or have none.
+                <ComboboxGroup items={item.items} key={index}>
+                  {item.label && <ComboboxLabel>{item.label}</ComboboxLabel>}
                   <ComboboxCollection>{renderOption}</ComboboxCollection>
                 </ComboboxGroup>
               ) : (

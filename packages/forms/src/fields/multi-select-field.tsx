@@ -4,13 +4,27 @@ import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import { useIsFormDisabled } from "@zeno-lib/forms/lib/form-disabled"
 import {
+  findOption,
+  type ItemGroup,
+  type ItemObject,
+  type ItemOption,
+  type ItemValue,
+  isItemGroup,
+  isSameValue,
+  itemLabel,
+  itemValue,
+  toItemList,
+  type ValueComparator,
+  valueKey,
+} from "@zeno-lib/forms/lib/item-options"
+import {
   useHideFieldErrors,
   useIsFieldRequired,
   useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
 import { XIcon } from "lucide-react"
-import { type ReactNode, useId } from "react"
+import { type ReactNode, useId, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Combobox,
@@ -35,21 +49,16 @@ import {
 } from "@/components/ui/field"
 import { RequiredIndicator } from "../lib/required-indicator"
 
-type MultiSelectItemObject<V> = { value: V; label: string }
+type MultiSelectItemObject<V> = ItemObject<V>
 
 /** Items under a heading. */
-type MultiSelectItemGroup<T> = { label: string; items: readonly T[] }
+type MultiSelectItemGroup<T> = ItemGroup<T>
 
 /** An item of `items`, or of one of its groups. */
-type MultiSelectOption<T> = T extends MultiSelectItemGroup<infer I> ? I : T
+type MultiSelectOption<T> = ItemOption<T>
 
 /** The value stored per selected item: `item.value` for objects, else the item. */
-type MultiSelectValue<T> =
-  T extends MultiSelectItemGroup<infer I>
-    ? MultiSelectValue<I>
-    : T extends MultiSelectItemObject<infer V>
-      ? V
-      : T
+type MultiSelectValue<T> = ItemValue<T>
 
 type MultiSelectFieldProps<T = string> = {
   /**
@@ -91,44 +100,6 @@ type MultiSelectFieldProps<T = string> = {
   required?: boolean
 }
 
-function isItemObject(item: unknown): item is MultiSelectItemObject<unknown> {
-  return (
-    typeof item === "object" &&
-    item !== null &&
-    "value" in item &&
-    "label" in item
-  )
-}
-
-// What Base UI takes for a group: an object with an `items` array.
-function isItemGroup(item: unknown): item is MultiSelectItemGroup<unknown> {
-  return (
-    typeof item === "object" &&
-    item !== null &&
-    Array.isArray((item as { items?: unknown }).items)
-  )
-}
-
-function itemValue(item: unknown): unknown {
-  return isItemObject(item) ? item.value : item
-}
-
-function itemLabel(item: unknown): string {
-  return isItemObject(item) ? item.label : String(item)
-}
-
-// One key per value, objects included.
-function valueKey(value: unknown): string {
-  if (typeof value !== "object" || value === null) {
-    return String(value)
-  }
-  try {
-    return JSON.stringify(value)
-  } catch {
-    return String(value)
-  }
-}
-
 /**
  * Multi-value combobox: the selection renders as removable chips and the form
  * value is an array (`[]` when empty).
@@ -161,32 +132,31 @@ function MultiSelectField<T = string>({
   const schemaRequiresValue = useIsFieldRequiredBySchema(field)
   const requiresValue = required ?? schemaRequiresValue
 
-  const options = items.flatMap((item) =>
-    isItemGroup(item) ? item.items : [item]
-  ) as MultiSelectOption<T>[]
-  const isSameValue = (a: unknown, b: unknown): boolean => {
-    if (Object.is(a, b)) {
-      return true
-    }
-    if (a === null || a === undefined || b === null || b === undefined) {
-      return false
-    }
-    return (
-      isItemEqualToValue?.(
-        a as MultiSelectValue<T>,
-        b as MultiSelectValue<T>
-      ) ?? false
-    )
-  }
+  const list = useMemo(() => toItemList(items), [items])
+  const isEqual = isItemEqualToValue as ValueComparator | undefined
 
   const values = field.state.value ?? []
   // Map stored values back to item identities, in selection order, so Base UI
   // compares by reference and the chips keep the order the user picked.
   const selected = values
-    .map((value) =>
-      options.find((option) => isSameValue(itemValue(option), value))
-    )
+    .map((value) => findOption(list, value, isEqual))
     .filter((option): option is MultiSelectOption<T> => option !== undefined)
+
+  // Base UI only knows the values it has a chip for. Keep the others (their
+  // group still loading) where they were, so picking an option doesn't drop
+  // them.
+  const onValueChange = (next: MultiSelectOption<T>[]) => {
+    const picked = next.map(itemValue)
+    const kept = values.filter(
+      (value) =>
+        findOption(list, value, isEqual) === undefined ||
+        picked.some((other) => isSameValue(other, value, isEqual))
+    )
+    const added = picked.filter(
+      (other) => !values.some((value) => isSameValue(other, value, isEqual))
+    )
+    field.handleChange([...kept, ...added] as MultiSelectValue<T>[])
+  }
 
   const renderOption = (option: MultiSelectOption<T>) =>
     renderItem ? (
@@ -211,11 +181,9 @@ function MultiSelectField<T = string>({
       )}
       <Combobox
         disabled={isDisabled}
-        items={items}
+        items={list.items}
         multiple
-        onValueChange={(next: MultiSelectOption<T>[]) =>
-          field.handleChange(next.map(itemValue) as MultiSelectValue<T>[])
-        }
+        onValueChange={onValueChange}
         value={selected}
       >
         <ComboboxChips className={className} ref={anchor}>
@@ -258,10 +226,11 @@ function MultiSelectField<T = string>({
         <ComboboxContent anchor={anchor}>
           <ComboboxEmpty>{emptyMessage}</ComboboxEmpty>
           <ComboboxList>
-            {(item: T) =>
+            {(item: T, index: number) =>
               isItemGroup(item) ? (
-                <ComboboxGroup items={item.items} key={item.label}>
-                  <ComboboxLabel>{item.label}</ComboboxLabel>
+                // Two groups can share a heading, or have none.
+                <ComboboxGroup items={item.items} key={index}>
+                  {item.label && <ComboboxLabel>{item.label}</ComboboxLabel>}
                   <ComboboxCollection>{renderOption}</ComboboxCollection>
                 </ComboboxGroup>
               ) : (

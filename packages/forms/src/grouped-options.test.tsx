@@ -1,5 +1,6 @@
 import { cleanup, render, screen, within } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
+import { useState } from "react"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
 import { Form, FormProvider, useForm } from "./create-form"
@@ -144,5 +145,107 @@ describe("grouped options with object values", () => {
       })
     )
     expect(captured.values?.parties).toEqual([])
+  })
+})
+
+describe("grouped options", () => {
+  test.each([
+    ["a group first", [{ items: ["Ada"], label: "People" }, "Globex"]],
+    ["a plain item first", ["Globex", { items: ["Ada"], label: "People" }]],
+  ])("mix groups and plain items, with %s", async (_, items) => {
+    const user = userEvent.setup()
+    const captured: { values?: { name: string | null } } = {}
+    function H() {
+      const form = useForm({
+        defaultValues: { name: null as string | null },
+        onSubmit: vi.fn(),
+      })
+      return (
+        <FormProvider form={form}>
+          <form.ComboboxField items={items} label="Name" name="name" />
+          <form.Subscribe selector={(state) => state.values}>
+            {(values) => {
+              captured.values = values
+              return null
+            }}
+          </form.Subscribe>
+        </FormProvider>
+      )
+    }
+    render(<H />)
+    const input = screen.getByRole("combobox", { name: "Name" })
+    await user.type(input, "Ad")
+    const people = await screen.findByRole("group", { name: "People" })
+    await user.click(within(people).getByRole("option", { name: "Ada" }))
+    expect(captured.values?.name).toBe("Ada")
+    await user.clear(input)
+    await user.type(input, "Glo")
+    await user.click(await screen.findByRole("option", { name: "Globex" }))
+    expect(captured.values?.name).toBe("Globex")
+  })
+
+  test("ComboboxField keeps what the user types while the items are rebuilt", async () => {
+    const user = userEvent.setup()
+    function H() {
+      const [, setQuery] = useState("")
+      const form = useForm({
+        defaultValues: { payer: { id: 1, kind: "company" } } as Values,
+        onSubmit: vi.fn(),
+        schema,
+      })
+      return (
+        <FormProvider form={form}>
+          <form.ComboboxField
+            isItemEqualToValue={isSameParty}
+            items={partyGroups()}
+            label="Payer"
+            name="payer"
+            onInputValueChange={setQuery}
+          />
+        </FormProvider>
+      )
+    }
+    render(<H />)
+    const input = screen.getByRole("combobox", { name: "Payer" })
+    await user.type(input, " Corp")
+    expect(input).toHaveProperty("value", "Globex Corp")
+  })
+
+  test("MultiSelectField keeps a stored value whose item isn't loaded yet", async () => {
+    const user = userEvent.setup()
+    const captured: { values?: Values } = {}
+    function H() {
+      const form = useForm({
+        defaultValues: { parties: [{ id: 9, kind: "company" }] } as Values,
+        onSubmit: vi.fn(),
+        schema,
+      })
+      return (
+        <FormProvider form={form}>
+          <form.MultiSelectField
+            isItemEqualToValue={isSameParty}
+            // The companies are still loading.
+            items={partyGroups().slice(0, 1)}
+            label="Parties"
+            name="parties"
+          />
+          <form.Subscribe selector={(state) => state.values}>
+            {(values) => {
+              captured.values = values
+              return null
+            }}
+          </form.Subscribe>
+        </FormProvider>
+      )
+    }
+    render(<H />)
+    await user.click(screen.getByRole("combobox", { name: "Parties" }))
+    await user.click(
+      await screen.findByRole("option", { name: "Ada Lovelace" })
+    )
+    expect(captured.values?.parties).toEqual([
+      { id: 9, kind: "company" },
+      { id: 1, kind: "person" },
+    ])
   })
 })
