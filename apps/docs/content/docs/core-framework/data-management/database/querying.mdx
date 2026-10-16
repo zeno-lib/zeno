@@ -422,7 +422,9 @@ await syncRows(tx, postsTags, {
 - The rows that left the list are removed first, then the kept rows are
   updated, then the new rows are inserted. A row the user removes and adds back
   doesn't hit a unique index, and neither does a new row that takes a value a
-  kept row gives up.
+  kept row gives up. A kept row that points at a new row through a foreign key
+  needs that key to be `deferrable initially deferred`, since the new row
+  doesn't exist yet when the kept row is updated.
 - An update sets only the columns a row carries and changes, and a property
   holding `undefined` keeps its stored value. A kept row with nothing changed is
   returned as it is, unwritten, so its `updated_at` stays put.
@@ -481,8 +483,13 @@ stand after the removal, so a member whose listed share is the one she started
 with is written back too, and the save ends with the listed shares. That costs
 one more read of the parent's rows, and only when the sync removed something.
 `remove` gets the same treatment: a change it makes to the rows left counts. A
-trigger that an update or an insert fires runs after that comparison, so what it
-writes to the other rows stays.
+kept row that the removal deleted, through a cascade or a trigger, rejects the
+sync rather than coming back as a new row.
+
+A trigger that an update or an insert fires runs after that comparison, so what
+it writes to the other rows stays, and the rows the sync returns don't show it:
+each is what its own statement returned. Read the parent's rows again after the
+sync when such a trigger exists.
 
 Between its statements, the sync leaves the rows in states the save doesn't end
 in, such as shares that sum to 0.8 once a member is removed. Check a rule across

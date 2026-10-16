@@ -1,6 +1,7 @@
 import { asc, eq, inArray, sql, TransactionRollbackError } from "drizzle-orm"
 import {
   bigint,
+  customType,
   integer,
   numeric,
   type PgAsyncDatabase,
@@ -44,6 +45,18 @@ const shares = unsecureTable("shares", {
 const codes = unsecureTable("codes", {
   id: primaryId("assigned"),
   label: text().notNull(),
+  listId: bigint({ mode: "number" }).notNull(),
+})
+
+// The same table, with a label that binds two parameters, as a custom type
+// mapping a value to an expression can.
+const twoParameterText = customType<{ data: string }>({
+  dataType: () => "text",
+  toDriver: (value) => sql`${value} || ${""}`,
+})
+const labelledCodes = unsecureTable("codes", {
+  id: primaryId("assigned"),
+  label: twoParameterText().notNull(),
   listId: bigint({ mode: "number" }).notNull(),
 })
 
@@ -290,6 +303,22 @@ describe("syncRows by id", () => {
       )
     }))
 
+  it("splits an insert whose values bind more parameters than their columns", () =>
+    withTables(async (tx) => {
+      // Three columns, so a full batch of 21,844 rows binds 87,376 parameters.
+      const rows = Array.from({ length: 21_844 }, (_, index) => ({
+        id: `code ${index}`,
+        label: `label ${index}`,
+      }))
+
+      const saved = await syncRows(tx, labelledCodes, {
+        parent: { listId: 1 },
+        rows,
+      })
+
+      expect(saved.map(({ id }) => id)).toEqual(rows.map(({ id }) => id))
+    }))
+
   it("removes every row of the parent for an empty list", () =>
     withTables(async (tx) => {
       const { other } = await seedLines(tx)
@@ -510,5 +539,33 @@ describe("syncRows with triggers", () => {
       ]
       expect(await sharesOf(tx, 1)).toEqual(expected)
       expect(saved).toEqual(expected)
+    }))
+  it("rejects a kept row the removal deleted", () =>
+    withTables(async (tx) => {
+      const { apple, pear } = await seedLines(tx)
+      // Removing any line takes the pear with it, as a cascade would.
+      await tx.execute(sql`create function pg_temp.drop_pear() returns trigger
+        language plpgsql as $$
+        begin
+          delete from lines where product = 'pear';
+          return null;
+        end
+        $$`)
+      await tx.execute(sql`create trigger drop_pear after delete on lines
+        for each row execute function pg_temp.drop_pear()`)
+      const before = await linesOf(tx, 1)
+
+      await expect(
+        syncRows(tx, lines, {
+          parent: { orderId: 1 },
+          rows: [
+            { id: apple.id, product: "apple" },
+            { id: pear.id, product: "pear", quantity: 2 },
+          ],
+        })
+      ).rejects.toThrow(
+        "Row 1 was deleted along with the rows that left the list"
+      )
+      expect(await linesOf(tx, 1)).toEqual(before)
     }))
 })

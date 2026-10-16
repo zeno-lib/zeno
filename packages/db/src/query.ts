@@ -242,14 +242,17 @@ const sameValue = (a: unknown, b: unknown) =>
  * `undefined`, and a stored row with nothing to change is returned as it is,
  * unwritten. Rows are compared with the parent's rows as they stand after the
  * removal, read again when something was removed, so the listed values win
- * over what a delete trigger wrote to the rows left. An empty list removes
- * every row the parent has. Two rows with the same key throw before anything is
+ * over what a delete trigger wrote to the rows left, and a kept row the removal
+ * deleted, through a cascade or a trigger, throws. An empty list removes every
+ * row the parent has. Two rows with the same key throw before anything is
  * written.
  *
  * Each changed row is one update, in input order, and the new rows are
- * inserted after the updates. Removals and inserts go many rows to a
- * statement, split to stay under the bind parameter limit, so thousands of
- * rows take a few statements.
+ * inserted after the updates, so a kept row can reference a new one only
+ * through a deferrable foreign key. The returned rows are what each statement
+ * returned: a change a trigger makes to another row isn't in them. Removals
+ * and inserts go many rows to a statement, split to stay under the bind
+ * parameter limit, so thousands of rows take a few statements.
  *
  * Everything runs in `db.transaction`: its own transaction on a client, a
  * savepoint inside a `tx`. A failure undoes every write the sync made and
@@ -339,6 +342,35 @@ const inValues = (
     sql`, `
   )})`
 
+// Runs one statement per part of `items`, at most `size` items each, and
+// resolves to their results in order. `size` assumes one parameter per value,
+// but a custom type or an `sql` value can bind several, so a part whose
+// statement binds too many is halved.
+const inParts = async <T, R>(
+  items: readonly T[],
+  size: number,
+  statement: (part: T[]) => PromiseLike<R> & {
+    toSQL: () => { params: unknown[] }
+  }
+): Promise<R[]> => {
+  const results: R[] = []
+  const run = async (part: T[]): Promise<void> => {
+    const query = statement(part)
+    if (part.length > 1 && query.toSQL().params.length > MAX_PARAMETERS) {
+      const half = Math.ceil(part.length / 2)
+      await run(part.slice(0, half))
+      await run(part.slice(half))
+      return
+    }
+    results.push(await query)
+  }
+  for (const part of chunks(items, size)) {
+    // biome-ignore lint/performance/noAwaitInLoops: a transaction is one connection, so its writes run one at a time
+    await run(part)
+  }
+  return results
+}
+
 // Inserts `rows` in as few statements as the parameter limit allows, and
 // resolves to the saved rows in the same order.
 const insertRows = async (
@@ -346,21 +378,17 @@ const insertRows = async (
   table: PgTable,
   rows: readonly Row[]
 ): Promise<Row[]> => {
-  let saved: Row[] = []
-  // A row binds at most one parameter per column.
-  for (const part of chunks(
+  const parts = await inParts(
     rows,
-    maxRows(Object.keys(getColumns(table)).length)
-  )) {
-    // biome-ignore lint/performance/noAwaitInLoops: a transaction is one connection, so its writes run one at a time
-    const inserted = (await tx.insert(table).values(part).returning()) as Row[]
-    if (inserted.length !== part.length) {
-      throw new Error(
-        `Expected ${part.length} inserted rows, received ${inserted.length}`
-      )
-    }
-    // `INSERT … VALUES … RETURNING` returns the rows in the order listed.
-    saved = saved.concat(inserted)
+    maxRows(Object.keys(getColumns(table)).length),
+    (part) => tx.insert(table).values(part).returning()
+  )
+  // `INSERT … VALUES … RETURNING` returns the rows in the order listed.
+  const saved = parts.flat() as Row[]
+  if (saved.length !== rows.length) {
+    throw new Error(
+      `Expected ${rows.length} inserted rows, received ${saved.length}`
+    )
   }
   return saved
 }
@@ -453,29 +481,34 @@ const sync = async (
       const absent = keyNames
         .filter((name) => first[name] === null)
         .map((name) => isNull(column(name)))
+      if (present.length === 0) {
+        // biome-ignore lint/performance/noAwaitInLoops: a transaction is one connection, so its writes run one at a time
+        await tx.delete(table).where(and(scope, ...absent))
+        continue
+      }
       // A row binds one parameter per present key part, the scope one per
       // parent value.
-      const size = maxRows(Math.max(present.length, 1), parentNames.length)
-      for (const part of chunks(group, size)) {
-        // biome-ignore lint/performance/noAwaitInLoops: a transaction is one connection, so its writes run one at a time
-        await tx
-          .delete(table)
-          .where(
-            and(
-              scope,
-              ...absent,
-              present.length > 0
-                ? inValues(table, present.map(column), present, part)
-                : undefined
+      await inParts(
+        group,
+        maxRows(present.length, parentNames.length),
+        (part) =>
+          tx
+            .delete(table)
+            .where(
+              and(
+                scope,
+                ...absent,
+                inValues(table, present.map(column), present, part)
+              )
             )
-          )
-      }
+      )
     }
   }
 
   return await db.transaction(async (tx) => {
     const read = (): Promise<Row[]> => tx.select().from(table).where(scope)
     let stored = await read()
+    const held = new Set(stored.map(identity))
     const removed = stored.filter((row) => !listed.has(identity(row) ?? ""))
 
     if (removed.length > 0) {
@@ -510,6 +543,24 @@ const sync = async (
       )
     }
 
+    // A listed row the parent doesn't hold now, as it is inserted.
+    const insertValues = (row: Row, index: number): Row => {
+      const rowKey = identity(row)
+      // Inserting it anew would give it a new id and defaults for the columns
+      // it doesn't carry, where the save asked to keep it.
+      if (rowKey !== undefined && held.has(rowKey)) {
+        throw new Error(
+          `Row ${index} was deleted along with the rows that left the list`
+        )
+      }
+      // An id the parent doesn't hold is dropped, so the row is new, unless
+      // the column has no default to fill in: then the caller assigns ids,
+      // and a taken one fails on the primary key rather than moving a row.
+      return key === undefined && column(id).hasDefault
+        ? { ...row, [id]: undefined }
+        : row
+    }
+
     const saved: Row[] = []
     const added: { index: number; values: Row }[] = []
     for (const [index, row] of wanted.entries()) {
@@ -518,18 +569,9 @@ const sync = async (
       if (match) {
         // biome-ignore lint/performance/noAwaitInLoops: a transaction is one connection, so its writes run one at a time, and in input order
         saved[index] = await update(row, match)
-        continue
+      } else {
+        added.push({ index, values: insertValues(row, index) })
       }
-      // An id the parent doesn't hold is dropped, so the row is new, unless
-      // the column has no default to fill in: then the caller assigns ids,
-      // and a taken one fails on the primary key rather than moving a row.
-      added.push({
-        index,
-        values:
-          key === undefined && column(id).hasDefault
-            ? { ...row, [id]: undefined }
-            : row,
-      })
     }
 
     // After the updates, so a new row can take a unique value a kept row gave
