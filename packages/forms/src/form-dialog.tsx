@@ -58,6 +58,10 @@ type DiscardPromptText = {
   cancelLabel?: ReactNode
   /** The Save action's label (`saveFromPrompt`). Defaults to `submitLabel`. */
   saveLabel?: ReactNode
+  /** The title with `saveFromPrompt`. Defaults to `title`. */
+  saveTitle?: ReactNode
+  /** The description with `saveFromPrompt`. Defaults to `description`. */
+  saveDescription?: ReactNode
 }
 
 // The slice of the `useForm()` API the dialog uses. Structural, so any Zeno /
@@ -162,14 +166,42 @@ function withDialogDefaults<P extends FormDialogDefaults>(
     return props
   }
   const merged = withDefaultProps(defaults as Partial<P>, props)
-  // The prompt's Save takes the nearest `submitLabel`, over a `saveLabel`
-  // set further up, unless the same level sets its own `saveLabel`.
-  const inherited: DiscardPromptText | undefined =
-    props.submitLabel === undefined
-      ? defaults.discardPrompt
-      : { ...defaults.discardPrompt, saveLabel: undefined }
-  merged.discardPrompt = withDefaultProps(inherited, props.discardPrompt ?? {})
+  // With `saveFromPrompt`, a `save*` key falls back to `title`, `description`
+  // or `submitLabel`. The nearest level wins: one that sets the fallback but
+  // not the `save*` key drops the `save*` key set further up.
+  const own = props.discardPrompt ?? {}
+  const inherited: DiscardPromptText = { ...defaults.discardPrompt }
+  if (props.submitLabel !== undefined) {
+    inherited.saveLabel = undefined
+  }
+  if (own.title !== undefined) {
+    inherited.saveTitle = undefined
+  }
+  if (own.description !== undefined) {
+    inherited.saveDescription = undefined
+  }
+  merged.discardPrompt = withDefaultProps(inherited, own)
   return merged
+}
+
+// The prompt's title and description for its mode.
+function getPromptCopy(
+  text: DiscardPromptText | undefined,
+  saveFromPrompt: boolean
+) {
+  if (saveFromPrompt) {
+    return {
+      description:
+        text?.saveDescription ??
+        text?.description ??
+        "Your unsaved changes will be lost unless you save them.",
+      title: text?.saveTitle ?? text?.title ?? "Save changes?",
+    }
+  }
+  return {
+    description: text?.description ?? "Your unsaved changes will be lost.",
+    title: text?.title ?? "Discard changes?",
+  }
 }
 
 /**
@@ -231,6 +263,7 @@ function FormDialog<TValues>(props: FormDialogProps<TValues>) {
   const [formErrorKey, setFormErrorKey] = useState(0)
   const { close, defaultValues, focus, isOpen, open, session } = dialog
   const DialogFormError = form.FormError ?? FormError
+  const promptCopy = getPromptCopy(discardPrompt, saveFromPrompt)
   // Read after a submit's await: the dialog may have closed, or reopened on
   // another record, while a slow save was in flight.
   const latest = useRef({ isOpen, session })
@@ -459,15 +492,9 @@ function FormDialog<TValues>(props: FormDialogProps<TValues>) {
           size={saveFromPrompt ? "default" : "sm"}
         >
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {discardPrompt?.title ??
-                (saveFromPrompt ? "Save changes?" : "Discard changes?")}
-            </AlertDialogTitle>
+            <AlertDialogTitle>{promptCopy.title}</AlertDialogTitle>
             <AlertDialogDescription>
-              {discardPrompt?.description ??
-                (saveFromPrompt
-                  ? "Your unsaved changes will be lost unless you save them."
-                  : "Your unsaved changes will be lost.")}
+              {promptCopy.description}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

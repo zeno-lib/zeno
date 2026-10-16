@@ -286,7 +286,7 @@ export function Members({ members }: { members: Member[] }) {
 | `closeOnSubmit` | `boolean` | Close after a successful submit. Defaults to `true`. |
 | `submitErrorMessage` | `ReactNode \| ((error) => ReactNode)` | Shown when `onSubmit` throws. Defaults to your `FormError` [default](/docs/feature-modules/components/forms#default-props), else `"Something went wrong. Try again."`. |
 | `guard` | `boolean` | The unsaved-changes prompt and unload warning. Defaults to `true`. |
-| `discardPrompt` | `{ title?, description?, confirmLabel?, cancelLabel?, saveLabel? }` | Copy for the discard prompt. `saveLabel` defaults to `submitLabel`. |
+| `discardPrompt` | `{ title?, description?, confirmLabel?, cancelLabel?, saveLabel?, saveTitle?, saveDescription? }` | Copy for the discard prompt. With `saveFromPrompt`, `saveTitle` and `saveDescription` replace `title` and `description`, which they default to. `saveLabel` defaults to `submitLabel`. |
 | `saveFromPrompt` | `boolean` | Offer Save in the discard prompt. Defaults to `false`. |
 | `disabled` | `boolean` | Turn off Save, ⌘/Ctrl+Enter and the native controls. Defaults to `false`. |
 | `className` / `formClassName` | `string` | Classes for the popup / the `<form>`. |
@@ -299,8 +299,10 @@ import { FormDialogProvider } from "@/components/form/form-dialog"
 
 <FormDialogProvider
   discardPrompt={{
-    description: "Save or discard them before you leave.",
-    title: "Unsaved changes",
+    description: "Your edits will be lost.",
+    saveDescription: "Save or discard them before you leave.",
+    saveTitle: "Unsaved changes",
+    title: "Discard your edits?",
   }}
   saveFromPrompt
 >
@@ -312,11 +314,12 @@ It takes every prop in the table except the ones that belong to a single
 dialog: `dialog`, `form`, `title`, `description`, `trigger`, `footer`,
 `disabled` and the children. A prop passed to a dialog wins. `discardPrompt`
 merges key by key, so a dialog can change the prompt's title and keep your
-labels, and a nested provider merges over its parent the same way. A
-dialog's `submitLabel` also labels the prompt's Save, over a `saveLabel`
-from a provider. The provider is a React context, so its copy can come from
-your translation hook. The dialog renders the form's own `FormError`, so the
-`submitErrorMessage` in your
+labels, and a nested provider merges over its parent the same way. The
+nearest copy wins: a dialog's `discardPrompt.title`,
+`discardPrompt.description` or `submitLabel` beats the `saveTitle`,
+`saveDescription` or `saveLabel` a provider sets. The provider is a React
+context, so its copy can come from your translation hook. The dialog
+renders the form's own `FormError`, so the `submitErrorMessage` in your
 [`defaultProps`](/docs/feature-modules/components/forms#default-props)
 reaches dialogs too; set one here only to word it differently in dialogs.
 

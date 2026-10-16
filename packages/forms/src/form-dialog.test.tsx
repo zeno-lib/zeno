@@ -670,6 +670,7 @@ describe("FormDialogProvider", () => {
         discardPrompt={{
           confirmLabel: "Verwerfen",
           saveLabel: "Sichern",
+          saveTitle: "Speichern?",
           title: "Verwerfen?",
         }}
       >
@@ -684,14 +685,43 @@ describe("FormDialogProvider", () => {
     await user.type(name, "!")
     await user.click(within(dialog).getByRole("button", { name: "Abbrechen" }))
 
-    // The prompt's copy merges key by key: the dialog's title, the outer
-    // provider's Discard label, and Save labelled by the inner provider's
-    // `submitLabel`, over the outer one's `saveLabel`.
+    // The prompt's copy merges key by key, and the nearest level wins: the
+    // dialog's title over the outer provider's `saveTitle`, its Discard
+    // label, and Save labelled by the inner provider's `submitLabel` over the
+    // outer one's `saveLabel`.
     const prompt = await screen.findByRole("alertdialog")
     within(prompt).getByText("Leave this person?")
     within(prompt).getByRole("button", { name: "Verwerfen" })
     within(prompt).getByRole("button", { name: "Speichern" })
   })
+
+  test.each([
+    [true, "Unsaved changes", "Save them before you leave?"],
+    [false, "Discard changes?", "They will be lost."],
+  ])(
+    "a provider words the prompt for each mode (saveFromPrompt: %s)",
+    async (saveFromPrompt, title, description) => {
+      const user = userEvent.setup()
+      render(
+        <FormDialogProvider
+          discardPrompt={{
+            description: "They will be lost.",
+            saveDescription: "Save them before you leave?",
+            saveTitle: "Unsaved changes",
+            title: "Discard changes?",
+          }}
+        >
+          <Harness saveFromPrompt={saveFromPrompt} />
+        </FormDialogProvider>
+      )
+      const name = await openEdit(user)
+      await user.type(name, "!")
+      await user.keyboard("{Escape}")
+      const prompt = await screen.findByRole("alertdialog")
+      within(prompt).getByText(title)
+      within(prompt).getByText(description)
+    }
+  )
 
   test("a dialog's submitLabel labels the prompt's Save over a provider's saveLabel", async () => {
     const user = userEvent.setup()

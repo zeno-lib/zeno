@@ -18,6 +18,9 @@ registry files, and split a large form with `withForm`.
   `guard`, `closeOnSubmit` and so on. A prop passed to a dialog wins, and
   `discardPrompt` merges key by key. `FormDialog` now renders the form's own
   `FormError`, so a `FormError` default reaches dialogs too.
+- `discardPrompt` takes `saveTitle` and `saveDescription`, the prompt's copy
+  with `saveFromPrompt`, so one provider can word both prompts. They default
+  to `title` and `description`.
 - `withForm` accepts the form `useForm` returns, with or without a `schema`.
   Its unset generics now default to what TanStack's own `useForm` infers. As a
   result, without `onSubmitMeta`, `onSubmit`'s `meta` is `unknown` rather than
