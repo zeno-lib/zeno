@@ -58,6 +58,7 @@ function Harness({
   discardPrompt,
   saveFromPrompt,
   submitErrorMessage,
+  submitLabel,
 }: {
   /** Submit through `submitAction` with this server action instead. */
   action?: (values: Values) => Promise<ActionResult<unknown>>
@@ -68,6 +69,7 @@ function Harness({
   discardPrompt?: DiscardPromptText
   saveFromPrompt?: boolean
   submitErrorMessage?: (error: unknown) => ReactNode
+  submitLabel?: ReactNode
 }) {
   const dialog = useFormDialog({ defaultValues: BLANK })
   const form = useForm({
@@ -96,6 +98,7 @@ function Harness({
         form={form}
         saveFromPrompt={saveFromPrompt}
         submitErrorMessage={submitErrorMessage}
+        submitLabel={submitLabel}
         title="Person"
       >
         <InputField label="Name" name="name" />
@@ -664,7 +667,11 @@ describe("FormDialogProvider", () => {
     render(
       <FormDialogProvider
         cancelLabel="Abbrechen"
-        discardPrompt={{ confirmLabel: "Verwerfen", title: "Verwerfen?" }}
+        discardPrompt={{
+          confirmLabel: "Verwerfen",
+          saveLabel: "Sichern",
+          title: "Verwerfen?",
+        }}
       >
         <FormDialogProvider saveFromPrompt submitLabel="Speichern">
           <Harness discardPrompt={{ title: "Leave this person?" }} />
@@ -678,11 +685,26 @@ describe("FormDialogProvider", () => {
     await user.click(within(dialog).getByRole("button", { name: "Abbrechen" }))
 
     // The prompt's copy merges key by key: the dialog's title, the outer
-    // provider's Discard label, and Save labelled from the inner provider.
+    // provider's Discard label, and Save labelled by the inner provider's
+    // `submitLabel`, over the outer one's `saveLabel`.
     const prompt = await screen.findByRole("alertdialog")
     within(prompt).getByText("Leave this person?")
     within(prompt).getByRole("button", { name: "Verwerfen" })
     within(prompt).getByRole("button", { name: "Speichern" })
+  })
+
+  test("a dialog's submitLabel labels the prompt's Save over a provider's saveLabel", async () => {
+    const user = userEvent.setup()
+    render(
+      <FormDialogProvider discardPrompt={{ saveLabel: "Speichern" }}>
+        <Harness saveFromPrompt submitLabel="Create invoice" />
+      </FormDialogProvider>
+    )
+    const name = await openEdit(user)
+    await user.type(name, "!")
+    await user.keyboard("{Escape}")
+    const prompt = await screen.findByRole("alertdialog")
+    within(prompt).getByRole("button", { name: "Create invoice" })
   })
 
   test("a dialog's own false wins over the provider's true", async () => {

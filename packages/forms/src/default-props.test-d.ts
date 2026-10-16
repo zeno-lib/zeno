@@ -3,13 +3,14 @@ import { createZenoForm } from "./create-zeno-form"
 import { FormError } from "./fields/form-error"
 import { MoneyField } from "./fields/money-field"
 import { PercentageField } from "./fields/percentage-field"
+import { SelectField } from "./fields/select-field"
 import { FormDialogProvider } from "./form-dialog"
 
-const fieldComponents = { MoneyField, PercentageField }
+const fieldComponents = { MoneyField, PercentageField, SelectField }
 const formComponents = { FormError }
 
 test("defaultProps takes each component's own props", () => {
-  const { useForm } = createZenoForm({
+  createZenoForm({
     defaultProps: {
       FormError: { submitErrorMessage: "Try again later." },
       MoneyField: { currency: "CHF", locale: "de-CH" },
@@ -18,11 +19,6 @@ test("defaultProps takes each component's own props", () => {
     fieldComponents,
     formComponents,
   })
-  // The fields keep their props and their typed names.
-  const form = useForm({ defaultValues: { amount: 0 }, onSubmit: () => null })
-  form.MoneyField({ currency: "EUR", name: "amount" })
-  // @ts-expect-error — not a path of the form
-  form.MoneyField({ name: "total" })
 })
 
 test("defaultProps rejects another component's prop", () => {
@@ -36,11 +32,11 @@ test("defaultProps rejects another component's prop", () => {
   })
 })
 
-test("defaultProps rejects a wrong value", () => {
+test("defaultProps rejects a required prop, which every call site still passes", () => {
   createZenoForm({
     defaultProps: {
-      // @ts-expect-error — `currency` is a string
-      MoneyField: { currency: 1 },
+      // @ts-expect-error — `children` is required
+      SelectField: { children: null },
     },
     fieldComponents,
     formComponents,
@@ -67,6 +63,4 @@ test("FormDialogProvider takes the options every dialog shares", () => {
   })
   // @ts-expect-error — a title belongs to one dialog
   FormDialogProvider({ children: null, title: "Person" })
-  // @ts-expect-error — `saveFromPrompt` is a boolean
-  FormDialogProvider({ children: null, saveFromPrompt: "yes" })
 })

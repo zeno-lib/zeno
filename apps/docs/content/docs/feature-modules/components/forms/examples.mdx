@@ -284,7 +284,7 @@ export function Members({ members }: { members: Member[] }) {
 | `submitLabel` / `cancelLabel` | `ReactNode` | Default to `"Save"` / `"Cancel"`. |
 | `footer` | `ReactNode` | Extra footer content, before the buttons. |
 | `closeOnSubmit` | `boolean` | Close after a successful submit. Defaults to `true`. |
-| `submitErrorMessage` | `ReactNode \| ((error) => ReactNode)` | Shown when `onSubmit` throws. Defaults to `"Something went wrong. Try again."`. |
+| `submitErrorMessage` | `ReactNode \| ((error) => ReactNode)` | Shown when `onSubmit` throws. Defaults to your `FormError` [default](/docs/feature-modules/components/forms#default-props), else `"Something went wrong. Try again."`. |
 | `guard` | `boolean` | The unsaved-changes prompt and unload warning. Defaults to `true`. |
 | `discardPrompt` | `{ title?, description?, confirmLabel?, cancelLabel?, saveLabel? }` | Copy for the discard prompt. `saveLabel` defaults to `submitLabel`. |
 | `saveFromPrompt` | `boolean` | Offer Save in the discard prompt. Defaults to `false`. |
@@ -312,11 +312,13 @@ It takes every prop in the table except the ones that belong to a single
 dialog: `dialog`, `form`, `title`, `description`, `trigger`, `footer`,
 `disabled` and the children. A prop passed to a dialog wins. `discardPrompt`
 merges key by key, so a dialog can change the prompt's title and keep your
-labels, and a nested provider merges over its parent the same way. The
-provider is a React context, so its copy can come from your translation
-hook. The dialog renders its own `FormError`, so set its message here with
-`submitErrorMessage`, not in
-[`defaultProps`](/docs/feature-modules/components/forms#default-props).
+labels, and a nested provider merges over its parent the same way. A
+dialog's `submitLabel` also labels the prompt's Save, over a `saveLabel`
+from a provider. The provider is a React context, so its copy can come from
+your translation hook. The dialog renders the form's own `FormError`, so the
+`submitErrorMessage` in your
+[`defaultProps`](/docs/feature-modules/components/forms#default-props)
+reaches dialogs too; set one here only to word it differently in dialogs.
 
 `useFormDialog({ defaultValues? })` returns `{ isOpen, open, close,
 defaultValues, focus, session }`. `close()` skips the guard (use it after

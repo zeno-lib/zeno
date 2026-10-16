@@ -6,7 +6,9 @@ import { FormError } from "./fields/form-error"
 import { InputField } from "./fields/input-field"
 import { MoneyField } from "./fields/money-field"
 import { SubmitButton } from "./fields/submit-button"
+import { FormDialog } from "./form-dialog"
 import { Form, FormProvider } from "./form-element"
+import { useFormDialog } from "./lib/use-form-dialog"
 
 afterEach(() => {
   cleanup()
@@ -90,6 +92,60 @@ describe("createZenoForm({ defaultProps })", () => {
     expect((await screen.findByRole("alert")).textContent).toBe(
       "Not saved. Try again later."
     )
+  })
+
+  test("a FormDialog renders the form's FormError, with its defaults", async () => {
+    vi.stubGlobal("reportError", vi.fn())
+    const user = userEvent.setup()
+    function DialogHarness() {
+      const dialog = useFormDialog({ defaultValues: VALUES })
+      const form = useForm({
+        defaultValues: dialog.defaultValues,
+        onSubmit: () => {
+          throw new Error("offline")
+        },
+      })
+      return (
+        <>
+          <button onClick={() => dialog.open()} type="button">
+            New
+          </button>
+          <FormDialog dialog={dialog} form={form} title="Payment">
+            <form.InputField label="Name" name="name" />
+          </FormDialog>
+        </>
+      )
+    }
+    render(<DialogHarness />)
+    await user.click(screen.getByRole("button", { name: "New" }))
+    await user.click(await screen.findByRole("button", { name: "Save" }))
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Not saved. Try again later."
+    )
+  })
+
+  test("a component with defaults keeps its statics", () => {
+    function Hint({ text = "None" }: { text?: string }) {
+      return <p>{text}</p>
+    }
+    Hint.Icon = () => <span>i</span>
+    const { useForm: useHintForm } = createZenoForm({
+      defaultProps: { Hint: { text: "Marked fields are required" } },
+      fieldComponents: { InputField },
+      formComponents: { Hint },
+    })
+    function HintHarness() {
+      const form = useHintForm({ defaultValues: {}, onSubmit: vi.fn() })
+      return (
+        <FormProvider form={form}>
+          <form.Hint />
+          <form.Hint.Icon />
+        </FormProvider>
+      )
+    }
+    render(<HintHarness />)
+    screen.getByText("Marked fields are required")
+    screen.getByText("i")
   })
 
   test("a field rendered through AppField gets its defaults too", () => {

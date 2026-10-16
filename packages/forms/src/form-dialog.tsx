@@ -15,6 +15,7 @@ import {
 import { useUnsavedChangesWarning } from "@zeno-lib/forms/lib/use-unsaved-changes-warning"
 import { type AnyFormApi, useSelector } from "@zeno-lib/forms/tanstack"
 import {
+  type ComponentType,
   createContext,
   type FormEvent,
   type KeyboardEvent,
@@ -48,7 +49,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Spinner } from "@/components/ui/spinner"
-import { FormError } from "./fields/form-error"
+import { FormError, type FormErrorProps } from "./fields/form-error"
 
 type DiscardPromptText = {
   title?: ReactNode
@@ -80,6 +81,11 @@ type DialogForm<TValues> = {
   readonly state: DialogFormState
   handleSubmit: () => unknown
   reset: (values?: TValues) => void
+  /**
+   * The form's own `FormError` (`useForm` attaches it), rendered with the
+   * app's `defaultProps`. The dialog falls back to the kit's.
+   */
+  FormError?: ComponentType<Pick<FormErrorProps, "submitErrorMessage">>
 }
 
 type FormDialogProps<TValues> = {
@@ -102,9 +108,9 @@ type FormDialogProps<TValues> = {
   /** Close after a successful submit. Defaults to `true`. */
   closeOnSubmit?: boolean
   /**
-   * Shown above the footer when the submit handler throws. Defaults to
-   * `FormError`'s `"Something went wrong. Try again."`. A function gets what
-   * was thrown.
+   * Shown above the footer when the submit handler throws. Defaults to the
+   * form's `FormError` default: your `defaultProps`, or
+   * `"Something went wrong. Try again."`. A function gets what was thrown.
    */
   submitErrorMessage?: ReactNode | ((error: unknown) => ReactNode)
   /**
@@ -152,13 +158,17 @@ function withDialogDefaults<P extends FormDialogDefaults>(
   defaults: FormDialogDefaults | undefined,
   props: P
 ): P {
-  const merged = withDefaultProps(defaults as Partial<P> | undefined, props)
-  if (defaults?.discardPrompt && props.discardPrompt) {
-    merged.discardPrompt = withDefaultProps(
-      defaults.discardPrompt,
-      props.discardPrompt
-    )
+  if (defaults === undefined) {
+    return props
   }
+  const merged = withDefaultProps(defaults as Partial<P>, props)
+  // The prompt's Save takes the nearest `submitLabel`, over a `saveLabel`
+  // set further up, unless the same level sets its own `saveLabel`.
+  const inherited: DiscardPromptText | undefined =
+    props.submitLabel === undefined
+      ? defaults.discardPrompt
+      : { ...defaults.discardPrompt, saveLabel: undefined }
+  merged.discardPrompt = withDefaultProps(inherited, props.discardPrompt ?? {})
   return merged
 }
 
@@ -220,6 +230,7 @@ function FormDialog<TValues>(props: FormDialogProps<TValues>) {
   const announceOnPromptClosed = useRef<boolean>(false)
   const [formErrorKey, setFormErrorKey] = useState(0)
   const { close, defaultValues, focus, isOpen, open, session } = dialog
+  const DialogFormError = form.FormError ?? FormError
   // Read after a submit's await: the dialog may have closed, or reopened on
   // another record, while a slow save was in flight.
   const latest = useRef({ isOpen, session })
@@ -396,7 +407,7 @@ function FormDialog<TValues>(props: FormDialogProps<TValues>) {
           {/* Next to the Save button that failed, and outside the <form>, so
               it stays in view when the fields scroll and adds no child for
               `formClassName` selectors to match. */}
-          <FormError
+          <DialogFormError
             key={formErrorKey}
             submitErrorMessage={submitErrorMessage}
           />

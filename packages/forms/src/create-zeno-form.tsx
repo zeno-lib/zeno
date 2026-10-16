@@ -91,18 +91,21 @@ type ManualPathExtras = {
   schema?: never
 }
 
+type SyncValidator<TFormData> = undefined | FormValidateOrFn<TFormData>
+type AsyncValidator<TFormData> = undefined | FormAsyncValidateOrFn<TFormData>
+
 type SchemaFormOptions<
   TFormData,
-  TOnMount extends undefined | FormValidateOrFn<TFormData>,
-  TOnChange extends undefined | FormValidateOrFn<TFormData>,
-  TOnChangeAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnBlur extends undefined | FormValidateOrFn<TFormData>,
-  TOnBlurAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnSubmit extends undefined | FormValidateOrFn<TFormData>,
-  TOnSubmitAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnDynamic extends undefined | FormValidateOrFn<TFormData>,
-  TOnDynamicAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>,
+  TOnMount extends SyncValidator<TFormData>,
+  TOnChange extends SyncValidator<TFormData>,
+  TOnChangeAsync extends AsyncValidator<TFormData>,
+  TOnBlur extends SyncValidator<TFormData>,
+  TOnBlurAsync extends AsyncValidator<TFormData>,
+  TOnSubmit extends SyncValidator<TFormData>,
+  TOnSubmitAsync extends AsyncValidator<TFormData>,
+  TOnDynamic extends SyncValidator<TFormData>,
+  TOnDynamicAsync extends AsyncValidator<TFormData>,
+  TOnServer extends AsyncValidator<TFormData>,
   TSubmitMeta,
 > = Omit<
   FormOptions<
@@ -126,16 +129,16 @@ type SchemaFormOptions<
 
 type ManualFormOptions<
   TFormData,
-  TOnMount extends undefined | FormValidateOrFn<TFormData>,
-  TOnChange extends undefined | FormValidateOrFn<TFormData>,
-  TOnChangeAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnBlur extends undefined | FormValidateOrFn<TFormData>,
-  TOnBlurAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnSubmit extends undefined | FormValidateOrFn<TFormData>,
-  TOnSubmitAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnDynamic extends undefined | FormValidateOrFn<TFormData>,
-  TOnDynamicAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>,
+  TOnMount extends SyncValidator<TFormData>,
+  TOnChange extends SyncValidator<TFormData>,
+  TOnChangeAsync extends AsyncValidator<TFormData>,
+  TOnBlur extends SyncValidator<TFormData>,
+  TOnBlurAsync extends AsyncValidator<TFormData>,
+  TOnSubmit extends SyncValidator<TFormData>,
+  TOnSubmitAsync extends AsyncValidator<TFormData>,
+  TOnDynamic extends SyncValidator<TFormData>,
+  TOnDynamicAsync extends AsyncValidator<TFormData>,
+  TOnServer extends AsyncValidator<TFormData>,
   TSubmitMeta,
 > = Omit<
   FormOptions<
@@ -159,16 +162,16 @@ type ManualFormOptions<
 
 type UseFormOptions<
   TFormData,
-  TOnMount extends undefined | FormValidateOrFn<TFormData>,
-  TOnChange extends undefined | FormValidateOrFn<TFormData>,
-  TOnChangeAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnBlur extends undefined | FormValidateOrFn<TFormData>,
-  TOnBlurAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnSubmit extends undefined | FormValidateOrFn<TFormData>,
-  TOnSubmitAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnDynamic extends undefined | FormValidateOrFn<TFormData>,
-  TOnDynamicAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>,
+  TOnMount extends SyncValidator<TFormData>,
+  TOnChange extends SyncValidator<TFormData>,
+  TOnChangeAsync extends AsyncValidator<TFormData>,
+  TOnBlur extends SyncValidator<TFormData>,
+  TOnBlurAsync extends AsyncValidator<TFormData>,
+  TOnSubmit extends SyncValidator<TFormData>,
+  TOnSubmitAsync extends AsyncValidator<TFormData>,
+  TOnDynamic extends SyncValidator<TFormData>,
+  TOnDynamicAsync extends AsyncValidator<TFormData>,
+  TOnServer extends AsyncValidator<TFormData>,
   TSubmitMeta,
 > =
   | SchemaFormOptions<
@@ -230,9 +233,6 @@ function withMountListener<L extends { onMount?: unknown } | undefined>(
     },
   } as NonNullable<L>
 }
-
-type SyncValidator<TFormData> = undefined | FormValidateOrFn<TFormData>
-type AsyncValidator<TFormData> = undefined | FormAsyncValidateOrFn<TFormData>
 
 // --- typed field wrappers (generic over the injected field components) --------
 
@@ -302,9 +302,19 @@ type FieldWrappers<FC extends Record<string, AnyComponent>, T> = {
   ) => ReactNode
 }
 
-// Each component's defaults take only its own props.
+// A component's optional props, per member of a union of props.
+type OptionalProps<P> = P extends unknown
+  ? {
+      [K in keyof P as Pick<P, K> extends Required<Pick<P, K>>
+        ? never
+        : K]?: P[K]
+    }
+  : never
+
+// Each component's defaults take only its own optional props: a required
+// one stays required at every call site, so its default would never apply.
 type DefaultProps<C extends Record<string, AnyComponent>> = {
-  [K in keyof C]?: Partial<ComponentProps<C[K]>>
+  [K in keyof C]?: OptionalProps<ComponentProps<C[K]>>
 }
 
 type CreateZenoFormConfig<
@@ -320,6 +330,10 @@ type CreateZenoFormConfig<
    */
   defaultProps?: DefaultProps<NoInfer<FC> & NoInfer<FMC>>
 }
+
+// What `memo` and `forwardRef` store on their component object, which a
+// function component must not take over.
+const REACT_TYPE_KEYS = new Set(["$$typeof", "compare", "render", "type"])
 
 // Wrap each component that has defaults, once, so they apply however it
 // renders: destructured from `useForm`, as `field.X` in `AppField`, or in
@@ -337,6 +351,13 @@ function withComponentDefaults<C extends Record<string, AnyComponent>>(
     const Defaulted = (props: object) => (
       <Component {...withDefaultProps(defaults, props)} />
     )
+    // Keep the component's statics (`AddressField.Row`): the wrapper is
+    // typed as the component.
+    for (const [key, value] of Object.entries(Component)) {
+      if (!REACT_TYPE_KEYS.has(key)) {
+        Object.assign(Defaulted, { [key]: value })
+      }
+    }
     Defaulted.displayName = name
     wrapped[name] = Defaulted
   }

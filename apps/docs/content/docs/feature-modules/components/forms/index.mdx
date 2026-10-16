@@ -224,22 +224,30 @@ const { useAppFields, useAppForm, useForm, withFieldGroup, withForm } =
 - A prop passed at the call site wins, so `<MoneyField currency="EUR" />`
   shows euros. A prop passed as `undefined` keeps the default, as a
   destructuring default would.
-- Each component's defaults take only that component's props, so another
-  field's prop or a wrong value fails the type check.
+- Each component's defaults take only that component's optional props, so
+  another field's prop, a wrong value or a required prop (`SelectField`'s
+  `children`) fails the type check.
+- Defaults belong to the component they are keyed by. The fields built on
+  `InputField`, such as `EmailField` and `MoneyField`, don't take
+  `InputField`'s.
 - The defaults apply however the component renders: destructured from
   `useForm`, from `useAppFields`, or as `field.MoneyField` inside
   `form.AppField`.
-- The field files stay as the registry ships them, so you can re-add them
-  with the shadcn CLI without losing your defaults.
+- The field files stay as the registry ships them. The `create-form` item
+  ships `create-form.tsx` with them, though, so when you re-add it to update
+  the fields, carry your `defaultProps` over to the new file.
 - A default is a fixed value. One that depends on another prop, such as a
   `max` that follows `scale`, still belongs at the call site.
 
-Every string the kit renders is a prop: `submitErrorMessage`,
+Every string the kit's own files render is a prop: `submitErrorMessage`,
 `emptyMessage`, `clearLabel`, `placeholder`, `label` on `EmailField` and
 `PasswordField`, and `ResetButton`'s children. So the same defaults
 translate the kit for an app with one UI language. `FormDialog` takes its
 own defaults from
 [`FormDialogProvider`](/docs/feature-modules/components/forms/examples#form-dialog).
+The shadcn primitives keep their own labels, such as the spinner's
+`"Loading"` and the combobox clear button's `"Clear"`: translate those in
+your `components/ui` files.
 
 ## Splitting a large form
 
@@ -257,7 +265,8 @@ import {
   useAppFields,
   useForm,
   withForm,
-} from "@/components/form/create-form"
+} from "@zeno-lib/forms/create-form"
+import { FieldLegend, FieldSet } from "@zeno-lib/ui/field"
 import { z } from "zod"
 
 const schema = z.object({
