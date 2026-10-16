@@ -28,37 +28,42 @@ import { YearField } from "./fields/year-field"
 
 // Wire the dropped-in field components into the headless factory. Edit the
 // field files under `./fields` freely — they use your own shadcn primitives.
-const { useAppForm, useForm, withFieldGroup, withForm } = createZenoForm({
-  fieldComponents: {
-    CheckboxField,
-    CheckboxGroupField,
-    ComboboxField,
-    ControlField,
-    DatePickerField,
-    EmailField,
-    InputField,
-    MoneyField,
-    MultiSelectField,
-    NumberField,
-    OtpField,
-    PasswordField,
-    PercentageField,
-    RadioGroupField,
-    SelectField,
-    SliderField,
-    SwitchField,
-    TextAreaField,
-    YearField,
-  },
-  formComponents: {
-    FormError,
-    ResetButton,
-    SubmitButton,
-  },
-})
+const { useAppFields, useAppForm, useForm, withFieldGroup, withForm } =
+  createZenoForm({
+    // Your app's default props per component, e.g.
+    // `MoneyField: { currency: "CHF", locale: "de-CH" }`. A prop passed at the
+    // call site wins.
+    defaultProps: {},
+    fieldComponents: {
+      CheckboxField,
+      CheckboxGroupField,
+      ComboboxField,
+      ControlField,
+      DatePickerField,
+      EmailField,
+      InputField,
+      MoneyField,
+      MultiSelectField,
+      NumberField,
+      OtpField,
+      PasswordField,
+      PercentageField,
+      RadioGroupField,
+      SelectField,
+      SliderField,
+      SwitchField,
+      TextAreaField,
+      YearField,
+    },
+    formComponents: {
+      FormError,
+      ResetButton,
+      SubmitButton,
+    },
+  })
 
 export * from "@zeno-lib/forms"
 export { ValidationSpinner } from "./addons/validation-spinner"
 export { FieldShell } from "./fields/field-shell"
 export { RadioGroupFieldItem } from "./fields/radio-group-field"
-export { useAppForm, useForm, withFieldGroup, withForm }
+export { useAppFields, useAppForm, useForm, withFieldGroup, withForm }

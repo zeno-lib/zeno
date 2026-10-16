@@ -180,7 +180,6 @@ function CalendarIcon() {
       aria-hidden
       className="size-4 shrink-0 opacity-60"
       fill="none"
-      role="img"
       stroke="currentColor"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -188,7 +187,6 @@ function CalendarIcon() {
       viewBox="0 0 24 24"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <title>Calendar</title>
       <path d="M8 2v3M16 2v3M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" />
     </svg>
   )

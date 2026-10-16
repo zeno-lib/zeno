@@ -58,6 +58,9 @@ A typed layer over [TanStack Form](https://tanstack.com/form) and Zod. The user 
 - **Field names use TanStack's syntax** (`members[0].name`). Required paths are stored with indices
   normalised to `[0]`, so one entry covers every array row.
 - **Type tests (`*.test-d.ts`) pin the field DX.** Update them with any factory type change.
+- **`useForm`'s unset generics default to their constraints, never `undefined` or `never`.** That
+  is what TanStack's `useForm` infers, and `withForm` rejects any other form type;
+  `with-form.test-d.ts` pins it.
 
 ## Traps
 

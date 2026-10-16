@@ -11,7 +11,11 @@ import { type ReactNode, useState } from "react"
 import { afterEach, describe, expect, onTestFinished, test, vi } from "vitest"
 import { z } from "zod"
 import { useForm } from "./create-form"
-import { FormDialog } from "./form-dialog"
+import {
+  type DiscardPromptText,
+  FormDialog,
+  FormDialogProvider,
+} from "./form-dialog"
 import type { ActionResult } from "./lib/action-result"
 import { submitAction } from "./lib/submit-action"
 import { useFormDialog } from "./lib/use-form-dialog"
@@ -51,8 +55,10 @@ function Harness({
   onSubmit = vi.fn(),
   closeOnSubmit,
   disabled,
+  discardPrompt,
   saveFromPrompt,
   submitErrorMessage,
+  submitLabel,
 }: {
   /** Submit through `submitAction` with this server action instead. */
   action?: (values: Values) => Promise<ActionResult<unknown>>
@@ -60,8 +66,10 @@ function Harness({
   onSubmit?: (values: Values) => unknown
   closeOnSubmit?: boolean
   disabled?: boolean
+  discardPrompt?: DiscardPromptText
   saveFromPrompt?: boolean
   submitErrorMessage?: (error: unknown) => ReactNode
+  submitLabel?: ReactNode
 }) {
   const dialog = useFormDialog({ defaultValues: BLANK })
   const form = useForm({
@@ -86,9 +94,11 @@ function Harness({
         closeOnSubmit={closeOnSubmit}
         dialog={dialog}
         disabled={disabled}
+        discardPrompt={discardPrompt}
         form={form}
         saveFromPrompt={saveFromPrompt}
         submitErrorMessage={submitErrorMessage}
+        submitLabel={submitLabel}
         title="Person"
       >
         <InputField label="Name" name="name" />
@@ -648,5 +658,96 @@ describe("FormDialog", () => {
     await user.keyboard("{Control>}{Enter}{/Control}")
     await waitFor(() => expect(inner).toHaveBeenCalled())
     expect(outer).not.toHaveBeenCalled()
+  })
+})
+
+describe("FormDialogProvider", () => {
+  test("sets the defaults of the dialogs below it; a dialog's own prop wins", async () => {
+    const user = userEvent.setup()
+    render(
+      <FormDialogProvider
+        cancelLabel="Abbrechen"
+        discardPrompt={{
+          confirmLabel: "Verwerfen",
+          saveLabel: "Sichern",
+          saveTitle: "Speichern?",
+          title: "Verwerfen?",
+        }}
+      >
+        <FormDialogProvider saveFromPrompt submitLabel="Speichern">
+          <Harness discardPrompt={{ title: "Leave this person?" }} />
+        </FormDialogProvider>
+      </FormDialogProvider>
+    )
+    const name = await openEdit(user)
+    const dialog = screen.getByRole("dialog")
+    within(dialog).getByRole("button", { name: "Speichern" })
+    await user.type(name, "!")
+    await user.click(within(dialog).getByRole("button", { name: "Abbrechen" }))
+
+    // The prompt's copy merges key by key, and the nearest level wins: the
+    // dialog's title over the outer provider's `saveTitle`, its Discard
+    // label, and Save labelled by the inner provider's `submitLabel` over the
+    // outer one's `saveLabel`.
+    const prompt = await screen.findByRole("alertdialog")
+    within(prompt).getByText("Leave this person?")
+    within(prompt).getByRole("button", { name: "Verwerfen" })
+    within(prompt).getByRole("button", { name: "Speichern" })
+  })
+
+  test.each([
+    [true, "Unsaved changes", "Save them before you leave?"],
+    [false, "Discard changes?", "They will be lost."],
+  ])(
+    "a provider words the prompt for each mode (saveFromPrompt: %s)",
+    async (saveFromPrompt, title, description) => {
+      const user = userEvent.setup()
+      render(
+        <FormDialogProvider
+          discardPrompt={{
+            description: "They will be lost.",
+            saveDescription: "Save them before you leave?",
+            saveTitle: "Unsaved changes",
+            title: "Discard changes?",
+          }}
+        >
+          <Harness saveFromPrompt={saveFromPrompt} />
+        </FormDialogProvider>
+      )
+      const name = await openEdit(user)
+      await user.type(name, "!")
+      await user.keyboard("{Escape}")
+      const prompt = await screen.findByRole("alertdialog")
+      within(prompt).getByText(title)
+      within(prompt).getByText(description)
+    }
+  )
+
+  test("a dialog's submitLabel labels the prompt's Save over a provider's saveLabel", async () => {
+    const user = userEvent.setup()
+    render(
+      <FormDialogProvider discardPrompt={{ saveLabel: "Speichern" }}>
+        <Harness saveFromPrompt submitLabel="Create invoice" />
+      </FormDialogProvider>
+    )
+    const name = await openEdit(user)
+    await user.type(name, "!")
+    await user.keyboard("{Escape}")
+    const prompt = await screen.findByRole("alertdialog")
+    within(prompt).getByRole("button", { name: "Create invoice" })
+  })
+
+  test("a dialog's own false wins over the provider's true", async () => {
+    const user = userEvent.setup()
+    render(
+      <FormDialogProvider saveFromPrompt>
+        <Harness saveFromPrompt={false} />
+      </FormDialogProvider>
+    )
+    const name = await openEdit(user)
+    await user.type(name, "!")
+    await user.keyboard("{Escape}")
+    const prompt = await screen.findByRole("alertdialog")
+    expect(within(prompt).queryByRole("button", { name: "Save" })).toBeNull()
   })
 })

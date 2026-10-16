@@ -1,6 +1,7 @@
 "use client"
 
 import { FormProvider } from "@zeno-lib/forms"
+import { withDefaultProps } from "@zeno-lib/forms/lib/default-props"
 import {
   focusFirstInvalid,
   restoreFocus,
@@ -15,10 +16,13 @@ import {
 import { useUnsavedChangesWarning } from "@zeno-lib/forms/lib/use-unsaved-changes-warning"
 import { type AnyFormApi, useSelector } from "@zeno-lib/forms/tanstack"
 import {
+  type ComponentType,
+  createContext,
   type FormEvent,
   type KeyboardEvent,
   type ReactElement,
   type ReactNode,
+  useContext,
   useId,
   useLayoutEffect,
   useRef,
@@ -46,7 +50,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Spinner } from "@/components/ui/spinner"
-import { FormError } from "./fields/form-error"
+import { FormError, type FormErrorProps } from "./fields/form-error"
 
 type DiscardPromptText = {
   title?: ReactNode
@@ -55,6 +59,10 @@ type DiscardPromptText = {
   cancelLabel?: ReactNode
   /** The Save action's label (`saveFromPrompt`). Defaults to `submitLabel`. */
   saveLabel?: ReactNode
+  /** The title with `saveFromPrompt`. Defaults to `title`. */
+  saveTitle?: ReactNode
+  /** The description with `saveFromPrompt`. Defaults to `description`. */
+  saveDescription?: ReactNode
 }
 
 // The slice of the `useForm()` API the dialog uses. Structural, so any Zeno /
@@ -78,6 +86,11 @@ type DialogForm<TValues> = {
   readonly state: DialogFormState
   handleSubmit: () => unknown
   reset: (values?: TValues) => void
+  /**
+   * The form's own `FormError` (`useForm` attaches it), rendered with the
+   * app's `defaultProps`. The dialog falls back to the kit's.
+   */
+  FormError?: ComponentType<Pick<FormErrorProps, "submitErrorMessage">>
 }
 
 type FormDialogProps<TValues> = {
@@ -100,9 +113,9 @@ type FormDialogProps<TValues> = {
   /** Close after a successful submit. Defaults to `true`. */
   closeOnSubmit?: boolean
   /**
-   * Shown above the footer when the submit handler throws. Defaults to
-   * `FormError`'s `"Something went wrong. Try again."`. A function gets what
-   * was thrown.
+   * Shown above the footer when the submit handler throws. Defaults to the
+   * form's `FormError` default: your `defaultProps`, or
+   * `"Something went wrong. Try again."`. A function gets what was thrown.
    */
   submitErrorMessage?: ReactNode | ((error: unknown) => ReactNode)
   /**
@@ -129,6 +142,87 @@ type FormDialogProps<TValues> = {
   formClassName?: string
 }
 
+/** The `FormDialog` props a `FormDialogProvider` can set for every dialog. */
+type FormDialogDefaults = Omit<
+  FormDialogProps<unknown>,
+  | "children"
+  | "description"
+  | "dialog"
+  | "disabled"
+  | "footer"
+  | "form"
+  | "title"
+  | "trigger"
+>
+
+const FormDialogDefaultsContext = createContext<FormDialogDefaults | undefined>(
+  undefined
+)
+
+// `props` over `defaults`, with the discard prompt's copy merged key by key.
+function withDialogDefaults<P extends FormDialogDefaults>(
+  defaults: FormDialogDefaults | undefined,
+  props: P
+): P {
+  if (defaults === undefined) {
+    return props
+  }
+  const merged = withDefaultProps(defaults as Partial<P>, props)
+  // With `saveFromPrompt`, a `save*` key falls back to `title`, `description`
+  // or `submitLabel`. The nearest level wins: one that sets the fallback but
+  // not the `save*` key drops the `save*` key set further up.
+  const own = props.discardPrompt ?? {}
+  const inherited: DiscardPromptText = { ...defaults.discardPrompt }
+  if (props.submitLabel !== undefined) {
+    inherited.saveLabel = undefined
+  }
+  if (own.title !== undefined) {
+    inherited.saveTitle = undefined
+  }
+  if (own.description !== undefined) {
+    inherited.saveDescription = undefined
+  }
+  merged.discardPrompt = withDefaultProps(inherited, own)
+  return merged
+}
+
+// The prompt's title and description for its mode.
+function getPromptCopy(
+  text: DiscardPromptText | undefined,
+  saveFromPrompt: boolean
+) {
+  if (saveFromPrompt) {
+    return {
+      description:
+        text?.saveDescription ??
+        text?.description ??
+        "Your unsaved changes will be lost unless you save them.",
+      title: text?.saveTitle ?? text?.title ?? "Save changes?",
+    }
+  }
+  return {
+    description: text?.description ?? "Your unsaved changes will be lost.",
+    title: text?.title ?? "Discard changes?",
+  }
+}
+
+/**
+ * Sets the default props of every `FormDialog` below it, such as its copy or
+ * `saveFromPrompt`. A prop passed to a dialog wins, and `discardPrompt` merges
+ * key by key. A nested provider merges over its parent the same way.
+ */
+function FormDialogProvider({
+  children,
+  ...defaults
+}: FormDialogDefaults & { children: ReactNode }) {
+  const parent = useContext(FormDialogDefaultsContext)
+  return (
+    <FormDialogDefaultsContext value={withDialogDefaults(parent, defaults)}>
+      {children}
+    </FormDialogDefaultsContext>
+  )
+}
+
 /**
  * A dialog-hosted form: opens with fresh values and fields per session,
  * submits from a footer button outside the `<form>` (via `form="id"`), shows a
@@ -137,25 +231,26 @@ type FormDialogProps<TValues> = {
  * submit) above the footer, closes on success, and asks before discarding
  * unsaved changes (Cancel, ×, Escape, outside press) or leaving the page.
  */
-function FormDialog<TValues>({
-  cancelLabel = "Cancel",
-  children,
-  className,
-  closeOnSubmit = true,
-  description,
-  dialog,
-  disabled = false,
-  discardPrompt,
-  footer,
-  form,
-  formClassName,
-  guard = true,
-  saveFromPrompt = false,
-  submitErrorMessage,
-  submitLabel = "Save",
-  title,
-  trigger,
-}: FormDialogProps<TValues>) {
+function FormDialog<TValues>(props: FormDialogProps<TValues>) {
+  const {
+    cancelLabel = "Cancel",
+    children,
+    className,
+    closeOnSubmit = true,
+    description,
+    dialog,
+    disabled = false,
+    discardPrompt,
+    footer,
+    form,
+    formClassName,
+    guard = true,
+    saveFromPrompt = false,
+    submitErrorMessage,
+    submitLabel = "Save",
+    title,
+    trigger,
+  } = withDialogDefaults(useContext(FormDialogDefaultsContext), props)
   const formId = useId()
   // `useForm({ disabled })` locks the dialog as this prop does.
   const isDisabled =
@@ -172,6 +267,8 @@ function FormDialog<TValues>({
   const announceOnPromptClosed = useRef<boolean>(false)
   const [formErrorKey, setFormErrorKey] = useState(0)
   const { close, defaultValues, focus, isOpen, open, session } = dialog
+  const DialogFormError = form.FormError ?? FormError
+  const promptCopy = getPromptCopy(discardPrompt, saveFromPrompt)
   // Read after a submit's await: the dialog may have closed, or reopened on
   // another record, while a slow save was in flight.
   const latest = useRef({ isOpen, session })
@@ -348,7 +445,7 @@ function FormDialog<TValues>({
           {/* Next to the Save button that failed, and outside the <form>, so
               it stays in view when the fields scroll and adds no child for
               `formClassName` selectors to match. */}
-          <FormError
+          <DialogFormError
             key={formErrorKey}
             submitErrorMessage={submitErrorMessage}
           />
@@ -400,15 +497,9 @@ function FormDialog<TValues>({
           size={saveFromPrompt ? "default" : "sm"}
         >
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {discardPrompt?.title ??
-                (saveFromPrompt ? "Save changes?" : "Discard changes?")}
-            </AlertDialogTitle>
+            <AlertDialogTitle>{promptCopy.title}</AlertDialogTitle>
             <AlertDialogDescription>
-              {discardPrompt?.description ??
-                (saveFromPrompt
-                  ? "Your unsaved changes will be lost unless you save them."
-                  : "Your unsaved changes will be lost.")}
+              {promptCopy.description}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -438,5 +529,10 @@ function FormDialog<TValues>({
   )
 }
 
-export type { DialogForm, DiscardPromptText, FormDialogProps }
-export { FormDialog }
+export type {
+  DialogForm,
+  DiscardPromptText,
+  FormDialogDefaults,
+  FormDialogProps,
+}
+export { FormDialog, FormDialogProvider }

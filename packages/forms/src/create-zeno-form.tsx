@@ -13,6 +13,7 @@ import { createFormHook } from "@tanstack/react-form"
 import { type ComponentProps, type ReactNode, useMemo } from "react"
 import { applyValidationError } from "./lib/apply-validation-error"
 import { fieldContext, formContext } from "./lib/contexts"
+import { withDefaultProps } from "./lib/default-props"
 import { withEmptyStartValues } from "./lib/empty-value"
 import { useDisabledOption } from "./lib/form-disabled"
 import { deepMergeDefaults, extractZodDefaults } from "./lib/schema-defaults"
@@ -96,18 +97,21 @@ type ManualPathExtras = {
   schema?: never
 }
 
+type SyncValidator<TFormData> = undefined | FormValidateOrFn<TFormData>
+type AsyncValidator<TFormData> = undefined | FormAsyncValidateOrFn<TFormData>
+
 type SchemaFormOptions<
   TFormData,
-  TOnMount extends undefined | FormValidateOrFn<TFormData>,
-  TOnChange extends undefined | FormValidateOrFn<TFormData>,
-  TOnChangeAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnBlur extends undefined | FormValidateOrFn<TFormData>,
-  TOnBlurAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnSubmit extends undefined | FormValidateOrFn<TFormData>,
-  TOnSubmitAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnDynamic extends undefined | FormValidateOrFn<TFormData>,
-  TOnDynamicAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>,
+  TOnMount extends SyncValidator<TFormData>,
+  TOnChange extends SyncValidator<TFormData>,
+  TOnChangeAsync extends AsyncValidator<TFormData>,
+  TOnBlur extends SyncValidator<TFormData>,
+  TOnBlurAsync extends AsyncValidator<TFormData>,
+  TOnSubmit extends SyncValidator<TFormData>,
+  TOnSubmitAsync extends AsyncValidator<TFormData>,
+  TOnDynamic extends SyncValidator<TFormData>,
+  TOnDynamicAsync extends AsyncValidator<TFormData>,
+  TOnServer extends AsyncValidator<TFormData>,
   TSubmitMeta,
 > = Omit<
   FormOptions<
@@ -131,16 +135,16 @@ type SchemaFormOptions<
 
 type ManualFormOptions<
   TFormData,
-  TOnMount extends undefined | FormValidateOrFn<TFormData>,
-  TOnChange extends undefined | FormValidateOrFn<TFormData>,
-  TOnChangeAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnBlur extends undefined | FormValidateOrFn<TFormData>,
-  TOnBlurAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnSubmit extends undefined | FormValidateOrFn<TFormData>,
-  TOnSubmitAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnDynamic extends undefined | FormValidateOrFn<TFormData>,
-  TOnDynamicAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>,
+  TOnMount extends SyncValidator<TFormData>,
+  TOnChange extends SyncValidator<TFormData>,
+  TOnChangeAsync extends AsyncValidator<TFormData>,
+  TOnBlur extends SyncValidator<TFormData>,
+  TOnBlurAsync extends AsyncValidator<TFormData>,
+  TOnSubmit extends SyncValidator<TFormData>,
+  TOnSubmitAsync extends AsyncValidator<TFormData>,
+  TOnDynamic extends SyncValidator<TFormData>,
+  TOnDynamicAsync extends AsyncValidator<TFormData>,
+  TOnServer extends AsyncValidator<TFormData>,
   TSubmitMeta,
 > = Omit<
   FormOptions<
@@ -164,16 +168,16 @@ type ManualFormOptions<
 
 type UseFormOptions<
   TFormData,
-  TOnMount extends undefined | FormValidateOrFn<TFormData>,
-  TOnChange extends undefined | FormValidateOrFn<TFormData>,
-  TOnChangeAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnBlur extends undefined | FormValidateOrFn<TFormData>,
-  TOnBlurAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnSubmit extends undefined | FormValidateOrFn<TFormData>,
-  TOnSubmitAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnDynamic extends undefined | FormValidateOrFn<TFormData>,
-  TOnDynamicAsync extends undefined | FormAsyncValidateOrFn<TFormData>,
-  TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>,
+  TOnMount extends SyncValidator<TFormData>,
+  TOnChange extends SyncValidator<TFormData>,
+  TOnChangeAsync extends AsyncValidator<TFormData>,
+  TOnBlur extends SyncValidator<TFormData>,
+  TOnBlurAsync extends AsyncValidator<TFormData>,
+  TOnSubmit extends SyncValidator<TFormData>,
+  TOnSubmitAsync extends AsyncValidator<TFormData>,
+  TOnDynamic extends SyncValidator<TFormData>,
+  TOnDynamicAsync extends AsyncValidator<TFormData>,
+  TOnServer extends AsyncValidator<TFormData>,
   TSubmitMeta,
 > =
   | SchemaFormOptions<
@@ -304,12 +308,66 @@ type FieldWrappers<FC extends Record<string, AnyComponent>, T> = {
   ) => ReactNode
 }
 
+// A component's optional props, per member of a union of props.
+type OptionalProps<P> = P extends unknown
+  ? {
+      [K in keyof P as Pick<P, K> extends Required<Pick<P, K>>
+        ? never
+        : K]?: P[K]
+    }
+  : never
+
+// Each component's defaults take only its own optional props: a required
+// one stays required at every call site, so its default would never apply.
+type DefaultProps<C extends Record<string, AnyComponent>> = {
+  [K in keyof C]?: OptionalProps<ComponentProps<C[K]>>
+}
+
 type CreateZenoFormConfig<
   FC extends Record<string, AnyComponent>,
   FMC extends Record<string, AnyComponent>,
 > = {
   fieldComponents: FC
   formComponents: FMC
+  /**
+   * Default props for field and form components, keyed by component name,
+   * e.g. `{ MoneyField: { currency: "CHF", locale: "de-CH" } }`. A prop
+   * passed at the call site wins; one passed as `undefined` keeps the default.
+   */
+  defaultProps?: DefaultProps<NoInfer<FC> & NoInfer<FMC>>
+}
+
+// What `memo` and `forwardRef` store on their component object, which a
+// function component must not take over.
+const REACT_TYPE_KEYS = new Set(["$$typeof", "compare", "render", "type"])
+
+// Wrap each component that has defaults, once, so they apply however it
+// renders: destructured from `useForm`, as `field.X` in `AppField`, or in
+// `withForm`.
+function withComponentDefaults<C extends Record<string, AnyComponent>>(
+  components: C,
+  defaultProps: Partial<Record<string, object>> | undefined
+): C {
+  const wrapped: Record<string, AnyComponent> = { ...components }
+  for (const [name, defaults] of Object.entries(defaultProps ?? {})) {
+    const Component = components[name]
+    if (Component === undefined || defaults === undefined) {
+      continue
+    }
+    const Defaulted = (props: object) => (
+      <Component {...withDefaultProps(defaults, props)} />
+    )
+    // Keep the component's statics (`AddressField.Row`): the wrapper is
+    // typed as the component.
+    for (const [key, value] of Object.entries(Component)) {
+      if (!REACT_TYPE_KEYS.has(key)) {
+        Object.assign(Defaulted, { [key]: value })
+      }
+    }
+    Defaulted.displayName = name
+    wrapped[name] = Defaulted
+  }
+  return wrapped as C
 }
 
 /**
@@ -324,10 +382,18 @@ export function createZenoForm<
   FC extends Record<string, AnyComponent>,
   FMC extends Record<string, AnyComponent>,
 >(config: CreateZenoFormConfig<FC, FMC>) {
+  const fieldComponents = withComponentDefaults(
+    config.fieldComponents,
+    config.defaultProps
+  )
+  const formComponents = withComponentDefaults(
+    config.formComponents,
+    config.defaultProps
+  )
   const { useAppForm, withFieldGroup, withForm } = createFormHook({
-    fieldComponents: config.fieldComponents,
+    fieldComponents,
     fieldContext,
-    formComponents: config.formComponents,
+    formComponents,
     formContext,
   })
 
@@ -341,8 +407,8 @@ export function createZenoForm<
         children: () => ReactNode
       }>
       const wrappers: Record<string, AnyComponent> = {}
-      for (const key of Object.keys(config.fieldComponents)) {
-        const Impl = config.fieldComponents[key] as AnyComponent
+      for (const key of Object.keys(fieldComponents)) {
+        const Impl = fieldComponents[key] as AnyComponent
         wrappers[key] = ({
           name,
           validators,
@@ -362,27 +428,25 @@ export function createZenoForm<
     }, [form])
   }
 
+  // An unset generic defaults to its constraint, which is what TanStack's own
+  // `useForm` infers, never to `undefined` or `never`: `withForm` rejects the
+  // form otherwise (`with-form.test-d.ts`).
   function useForm<
     TFormData,
-    TOnMount extends undefined | FormValidateOrFn<TFormData> = undefined,
-    TOnChange extends undefined | FormValidateOrFn<TFormData> = undefined,
+    TOnMount extends SyncValidator<TFormData> = SyncValidator<TFormData>,
+    TOnChange extends SyncValidator<TFormData> = SyncValidator<TFormData>,
     TOnChangeAsync extends
-      | undefined
-      | FormAsyncValidateOrFn<TFormData> = undefined,
-    TOnBlur extends undefined | FormValidateOrFn<TFormData> = undefined,
-    TOnBlurAsync extends
-      | undefined
-      | FormAsyncValidateOrFn<TFormData> = undefined,
-    TOnSubmit extends undefined | FormValidateOrFn<TFormData> = undefined,
+      AsyncValidator<TFormData> = AsyncValidator<TFormData>,
+    TOnBlur extends SyncValidator<TFormData> = SyncValidator<TFormData>,
+    TOnBlurAsync extends AsyncValidator<TFormData> = AsyncValidator<TFormData>,
+    TOnSubmit extends SyncValidator<TFormData> = SyncValidator<TFormData>,
     TOnSubmitAsync extends
-      | undefined
-      | FormAsyncValidateOrFn<TFormData> = undefined,
-    TOnDynamic extends undefined | FormValidateOrFn<TFormData> = undefined,
+      AsyncValidator<TFormData> = AsyncValidator<TFormData>,
+    TOnDynamic extends SyncValidator<TFormData> = SyncValidator<TFormData>,
     TOnDynamicAsync extends
-      | undefined
-      | FormAsyncValidateOrFn<TFormData> = undefined,
-    TOnServer extends undefined | FormAsyncValidateOrFn<TFormData> = undefined,
-    TSubmitMeta = never,
+      AsyncValidator<TFormData> = AsyncValidator<TFormData>,
+    TOnServer extends AsyncValidator<TFormData> = AsyncValidator<TFormData>,
+    TSubmitMeta = unknown,
   >(
     options: UseFormOptions<
       TFormData,
@@ -570,7 +634,7 @@ export function createZenoForm<
 
     const fields = useAppFields(form)
     return useMemo(
-      () => Object.assign(form, fields, config.formComponents),
+      () => Object.assign(form, fields, formComponents),
       [form, fields]
     )
   }
