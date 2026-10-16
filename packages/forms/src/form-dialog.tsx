@@ -110,7 +110,11 @@ type FormDialogProps<TValues> = {
   cancelLabel?: ReactNode
   /** Extra footer content, rendered before Cancel / Save. */
   footer?: ReactNode
-  /** Close after a successful submit. Defaults to `true`. */
+  /**
+   * Close after a successful submit. Defaults to `true`. A close the user
+   * asked for while the submit ran goes through once it succeeds either way,
+   * unless they edited a field since.
+   */
   closeOnSubmit?: boolean
   /**
    * Shown above the footer when the submit handler throws. Defaults to the
@@ -127,13 +131,15 @@ type FormDialogProps<TValues> = {
   discardPrompt?: DiscardPromptText
   /**
    * Offer Save in the discard prompt, next to Discard: it submits, and closes
-   * the dialog if the submit succeeds. Defaults to `false`.
+   * the dialog if the submit succeeds. Not in a prompt that opens while the
+   * dialog is disabled. Defaults to `false`.
    */
   saveFromPrompt?: boolean
   /**
    * Disable every field, Save and ⌘/Ctrl+Enter, as `useForm({ disabled })`
    * does. A `<fieldset disabled>` also disables native controls of your own.
-   * Defaults to `false`.
+   * A discard prompt that opens while disabled doesn't offer Save. Defaults
+   * to `false`.
    */
   disabled?: boolean
   /** Class for the dialog popup (e.g. a wider `sm:max-w-lg`). */
@@ -257,8 +263,8 @@ function FormDialog<TValues>(props: FormDialogProps<TValues>) {
     useIsFormDisabled(form as unknown as AnyFormApi) || disabled
   const popupRef = useRef<HTMLDivElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
-  // Set when a Save from the discard prompt fails, so the prompt hands focus
-  // to the first invalid field as it closes.
+  // Set when a submit fails while the discard prompt is open, so the prompt
+  // hands focus to the first invalid field as it closes.
   const focusInvalidOnPromptClose = useRef<boolean>(false)
   // The open prompt hides the dialog from assistive tech, so a form-level
   // error that shows up meanwhile (a Save from the prompt, or a footer Save
@@ -266,9 +272,13 @@ function FormDialog<TValues>(props: FormDialogProps<TValues>) {
   // the prompt has closed, which announces it.
   const announceOnPromptClosed = useRef<boolean>(false)
   const [formErrorKey, setFormErrorKey] = useState(0)
+  // Whether the discard prompt offers Save, set as it opens: a disabled
+  // dialog can't save. Kept while it's open, so the prompt doesn't change
+  // under the user; one disabled meanwhile only turns its Save off.
+  const [promptOffersSave, setPromptOffersSave] = useState(false)
   const { close, defaultValues, focus, isOpen, open, session } = dialog
   const DialogFormError = form.FormError ?? FormError
-  const promptCopy = getPromptCopy(discardPrompt, saveFromPrompt)
+  const promptCopy = getPromptCopy(discardPrompt, promptOffersSave)
   // Read after a submit's await: the dialog may have closed, or reopened on
   // another record, while a slow save was in flight.
   const latest = useRef({ isOpen, session })
@@ -313,6 +323,12 @@ function FormDialog<TValues>(props: FormDialogProps<TValues>) {
     }
   }, [session])
 
+  // A held leave belongs to the session it was asked in. Drop it when that
+  // session ends some other way (`dialog.close()`, a submit that closes it,
+  // `dialog.open()` on another record), so the prompt never outlives it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on every session change.
+  useLayoutEffect(() => cancelLeave, [isOpen, session])
+
   // Every way to submit (footer Save, ⌘/Ctrl+Enter, the prompt's Save) checks
   // this first. TanStack only refuses a second `handleSubmit` while one runs on
   // the very first attempt, and `isOpen` is false through the exit animation,
@@ -342,9 +358,24 @@ function FormDialog<TValues>(props: FormDialogProps<TValues>) {
     }
     const node = event.currentTarget
     const focused = node.ownerDocument.activeElement
+    // The fields stay editable while the submit runs. TanStack replaces
+    // `values` on every edit, so the same object means none came after.
+    const submitted = form.state.values
     const saved = await submit()
     if (!latest.current.isOpen || latest.current.session !== session) {
       return // the session this submit belongs to is over
+    }
+    if (isConfirmingRef.current) {
+      // The user asked to leave while the submit ran. If it saved every
+      // change, that leave goes through, `closeOnSubmit` or not. After a
+      // failure or a later edit, the prompt waits for the user's answer, and
+      // it traps focus, so it moves focus to an invalid field as it closes.
+      if (saved && form.state.values === submitted) {
+        confirmLeave()
+      } else {
+        focusInvalidOnPromptClose.current = !saved
+      }
+      return
     }
     if (saved) {
       if (closeOnSubmit) {
@@ -392,6 +423,7 @@ function FormDialog<TValues>(props: FormDialogProps<TValues>) {
         if (next) {
           open()
         } else {
+          setPromptOffersSave(saveFromPrompt && !isDisabled)
           requestLeave(close)
         }
       }}
@@ -480,21 +512,24 @@ function FormDialog<TValues>(props: FormDialogProps<TValues>) {
             setFormErrorKey((key) => key + 1)
           }
         }}
-        open={isConfirming}
+        // Closes in the same render as the dialog.
+        open={isConfirming && isOpen}
       >
         <AlertDialogContent
           // The prompt traps focus while open, so a failed Save's invalid
           // field gets focus as the prompt closes, not from `submit`.
           finalFocus={() => {
-            if (!focusInvalidOnPromptClose.current) {
+            const focusInvalid = focusInvalidOnPromptClose.current
+            focusInvalidOnPromptClose.current = false
+            // After Discard, the closing dialog hands focus back itself.
+            if (!(focusInvalid && latest.current.isOpen)) {
               return true
             }
-            focusInvalidOnPromptClose.current = false
             // Base UI focuses what this returns too; focusing here first
             // finds a field that takes focus, skipping disabled or hidden ones.
             return focusFirstInvalid(formRef.current) ?? true
           }}
-          size={saveFromPrompt ? "default" : "sm"}
+          size={promptOffersSave ? "default" : "sm"}
         >
           <AlertDialogHeader>
             <AlertDialogTitle>{promptCopy.title}</AlertDialogTitle>
@@ -513,7 +548,7 @@ function FormDialog<TValues>(props: FormDialogProps<TValues>) {
             >
               {discardPrompt?.confirmLabel ?? "Discard"}
             </AlertDialogAction>
-            {saveFromPrompt && (
+            {promptOffersSave && (
               <AlertDialogAction
                 disabled={isDisabled || isSaving || isSubmitting}
                 onClick={saveAndLeave}
