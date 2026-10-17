@@ -19,7 +19,8 @@ The configs form an inheritance chain. Each level extends the previous one:
 | `strict.json` | `base` | Enables `strict: true` |
 | `strictest.json` | `strict` | Extra strict checks (no unused locals or parameters, no switch fallthrough, no unchecked indexed access) |
 | `react.json` | `strictest` | Adds JSX support and DOM lib |
-| `nextjs.json` | `react` | Adds Next.js plugin, `next-env.d.ts`, and `.next/types` includes |
+| `nextjs.json` | `react` | Adds Next.js plugin, Node types, `next-env.d.ts`, and `.next/types` includes |
+| `node.json` | `strictest` | Adds Node types, for Node-only packages |
 
 ## Usage
 
@@ -37,8 +38,9 @@ You don't need to set `compilerOptions`, `include` or `exclude`. The config hand
 
 | Package type | Config |
 |-------------|--------|
-| Next.js app | `@zeno-lib/typescript/nextjs.json` |
+| Next.js app, or a package it imports that reads `process.env` or Node APIs | `@zeno-lib/typescript/nextjs.json` |
 | React library | `@zeno-lib/typescript/react.json` |
+| Node-only package | `@zeno-lib/typescript/node.json` |
 | Non-React package | `@zeno-lib/typescript/strictest.json` |
 | Loose / legacy | `@zeno-lib/typescript/strict.json` |
 
@@ -49,7 +51,7 @@ You don't need to set `compilerOptions`, `include` or `exclude`. The config hand
 | `apps/docs` | `@zeno-lib/typescript/nextjs.json` |
 | `packages/ui` | `@zeno-lib/typescript/react.json` |
 | `packages/supabase` | `@zeno-lib/typescript/strictest.json` |
-| `packages/e2e` | `@zeno-lib/typescript/strictest.json` |
+| `packages/e2e` | `@zeno-lib/typescript/node.json` |
 
 ## What's included
 
@@ -82,6 +84,7 @@ Adds these checks on top of `strict: true`:
 On top of the React config, the Next.js config:
 
 - Registers the `next` TypeScript plugin for App Router type safety
+- Loads Node's types (`types: ["node"]`). TypeScript 6 and later load no `@types` package unless `types` names it, and server code reads `process.env` and Node APIs. Install `@types/node`, which Next.js already asks for
 - Includes `next-env.d.ts` and `.next/types/**/*.ts` for generated types
 - Includes every `*.ts` and `*.tsx` file under the project root
 

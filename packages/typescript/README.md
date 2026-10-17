@@ -107,7 +107,9 @@ Extends `strictest.json` with the JSX and DOM library settings React needs.
 
 ### `nextjs.json`
 
-Extends `react.json` with the Next.js TypeScript plugin and the Next.js `include` paths.
+Extends `react.json` with the Next.js TypeScript plugin, Node's types and the Next.js `include` paths.
+
+TypeScript 6 and later load no `@types` package unless `types` names it, so `nextjs.json` names `node`: server components, route handlers and the packages an app imports read `process.env` and Node APIs. Install `@types/node`, which Next.js already asks for.
 
 ```json
 {
@@ -119,7 +121,8 @@ Extends `react.json` with the Next.js TypeScript plugin and the Next.js `include
     // "paths": {
     //   "@/*": ["${configDir}/*"]
     // },
-    "plugins": [{ "name": "next" }]
+    "plugins": [{ "name": "next" }],
+    "types": ["node"]
   },
   "include": [
     "${configDir}/next-env.d.ts",
@@ -138,7 +141,7 @@ Pick the configuration that fits your project:
 - `strict.json`: for projects that want strict type checking
 - `strictest.json`: for projects that want maximum type safety (recommended)
 - `react.json`: for React applications
-- `nextjs.json`: for Next.js applications
+- `nextjs.json`: for Next.js applications, and the packages they import that read `process.env` or Node APIs
 
 ### Example
 
