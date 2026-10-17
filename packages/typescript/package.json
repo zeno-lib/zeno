@@ -21,6 +21,14 @@
     "strict.json",
     "strictest.json"
   ],
+  "peerDependencies": {
+    "@types/node": "*"
+  },
+  "peerDependenciesMeta": {
+    "@types/node": {
+      "optional": true
+    }
+  },
   "publishConfig": {
     "access": "public"
   }

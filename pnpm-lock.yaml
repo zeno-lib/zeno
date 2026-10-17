@@ -573,7 +573,11 @@ importers:
         specifier: 5.0.3
         version: 5.0.3(@types/node@26.6.4)(jsdom@30.1.2(@noble/hashes@1.8.0))(msw@2.14.3(@types/node@26.6.4)(typescript@7.0.2))(vite@8.3.3(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
-  packages/typescript: {}
+  packages/typescript:
+    dependencies:
+      '@types/node':
+        specifier: '*'
+        version: 26.6.4
 
   packages/ui:
     dependencies:
