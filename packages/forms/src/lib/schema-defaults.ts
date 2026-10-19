@@ -1,4 +1,5 @@
-// Extract default values from a Zod schema for `useForm`.
+// Extract default values from a Zod schema for `useForm`, and keep the values
+// a caller passes to the schema's shape (`pickSchemaShape`, below).
 //
 // Tier A+ semantics:
 //   - `.default(...)` / `.prefault(...)` values flow through.
@@ -23,6 +24,7 @@ type SchemaDef = {
   readonly type?: string
   readonly innerType?: SchemaNode
   readonly shape?: Record<string, SchemaNode>
+  readonly catchall?: SchemaNode
   readonly in?: SchemaNode
   readonly element?: SchemaNode
   readonly defaultValue?: unknown
@@ -148,6 +150,71 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   )
 }
 
+// `.strict()` sets `catchall` to `z.never()`; a plain `z.object` leaves it
+// unset. Either way the schema accepts no key outside its `shape`.
+function acceptsOnlyShape(def: SchemaDef): boolean {
+  return def.catchall === undefined || getDef(def.catchall)?.type === "never"
+}
+
+function pickShape(node: SchemaNode, value: unknown): unknown {
+  let current: SchemaNode | undefined = node
+  for (let depth = 0; depth < MAX_WRAPPER_DEPTH; depth += 1) {
+    const def: SchemaDef | undefined = getDef(current)
+    switch (def?.type) {
+      case "object": {
+        const { shape } = def
+        if (!(shape && isPlainObject(value) && acceptsOnlyShape(def))) {
+          return value
+        }
+        const result: Record<string, unknown> = {}
+        for (const [key, field] of Object.entries(shape)) {
+          if (Object.hasOwn(value, key)) {
+            result[key] = pickShape(field, value[key])
+          }
+        }
+        return result
+      }
+      case "array": {
+        const { element } = def
+        return element && Array.isArray(value)
+          ? value.map((item) => pickShape(element, item))
+          : value
+      }
+      case "default":
+      case "nonoptional":
+      case "nullable":
+      case "optional":
+      case "prefault":
+      case "readonly":
+        current = def.innerType
+        continue
+      case "pipe":
+        current = def.in
+        continue
+      default:
+        return value
+    }
+  }
+  return value
+}
+
+// `value` with only the keys `schema` describes, so a form can start from a
+// record as read (`{ id, createdAt, … }`) without a `.strict()` schema
+// rejecting the rest on every submit. An object keeps the keys in its
+// `shape`, an array maps its `element` over every item, and the wrappers
+// unwrap as in `extractDefaultForField`. Where the shape isn't certain (a
+// union, a record, a loose or catchall object, `any`, a non-Zod schema) or the
+// value doesn't fit it (`null`, a string where an object is expected), the
+// value is kept as is. A key the value lacks stays absent: filling it is
+// `extractZodDefaults`' job.
+function pickSchemaShape<T>(schema: SchemaNode, value: T): T {
+  try {
+    return pickShape(schema, value) as T
+  } catch {
+    return value
+  }
+}
+
 // User-supplied values always win on conflict. Plain objects on both sides
 // recurse so nested `z.object(...)` defaults aren't clobbered by partial user
 // objects. Arrays, dates, class instances are treated atomically (user value
@@ -173,4 +240,9 @@ function deepMergeDefaults(
   return result
 }
 
-export { deepMergeDefaults, extractZodDefaultAt, extractZodDefaults }
+export {
+  deepMergeDefaults,
+  extractZodDefaultAt,
+  extractZodDefaults,
+  pickSchemaShape,
+}

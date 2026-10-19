@@ -178,6 +178,40 @@ describe("FormDialog", () => {
     expect(name.value).toBe("Ada")
   })
 
+  test("an edit opened on a record with keys the schema lacks saves to a .strict() schema", async () => {
+    const user = userEvent.setup()
+    const strictSchema = schema.strict()
+    const record = { ...ROW, createdAt: "2026-01-01", id: 7 }
+    const onSubmit = vi.fn()
+    function StrictHarness() {
+      const dialog = useFormDialog<Values>({ defaultValues: BLANK })
+      const form = useForm({
+        defaultValues: dialog.defaultValues,
+        onSubmit: ({ value }) => onSubmit(value),
+        schema: strictSchema,
+      })
+      const { InputField } = form
+      return (
+        <>
+          <button
+            onClick={() => dialog.open({ defaultValues: record })}
+            type="button"
+          >
+            Edit
+          </button>
+          <FormDialog dialog={dialog} form={form} title="Person">
+            <InputField label="Name" name="name" />
+          </FormDialog>
+        </>
+      )
+    }
+    render(<StrictHarness />)
+    await user.click(screen.getByRole("button", { name: "Edit" }))
+    await screen.findByLabelText(NAME)
+    await user.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(ROW))
+  })
+
   test("closes without asking when nothing changed", async () => {
     const user = userEvent.setup()
     render(<Harness />)
