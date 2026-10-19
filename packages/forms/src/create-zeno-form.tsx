@@ -531,7 +531,17 @@ export function createZenoForm<
 
     const wrappedOnSubmit = userOnSubmit
       ? ((async (props: { formApi: AnyFormApi; value: TFormData }) => {
-          const { submissionAttempts } = props.formApi.state
+          const { formApi } = props
+          const { submissionAttempts } = formApi.state
+          // A reset (a dialog closed meanwhile) or a newer submit while this
+          // one runs makes its failure stale, even once a later submit brings
+          // the count back. An edit doesn't: the save still didn't happen.
+          let superseded = false
+          const watch = formApi.store.subscribe(() => {
+            if (formApi.state.submissionAttempts !== submissionAttempts) {
+              superseded = true
+            }
+          })
           try {
             await (
               userOnSubmit as unknown as (
@@ -540,20 +550,15 @@ export function createZenoForm<
             )(props)
           } catch (error) {
             if (error instanceof ValidationError) {
-              applyValidationError(props.formApi, error)
+              applyValidationError(formApi, error)
               return
             }
-            // Kept for `FormError`, unless an edit, a reset (a dialog closed
-            // meanwhile) or a newer submit came first: then it is about
-            // values no longer on screen.
-            const { state } = props.formApi
-            if (
-              state.values === props.value &&
-              state.submissionAttempts === submissionAttempts
-            ) {
-              setSubmitError(props.formApi, error)
+            if (!superseded) {
+              setSubmitError(formApi, error)
             }
             throw error
+          } finally {
+            watch.unsubscribe()
           }
         }) as typeof userOnSubmit)
       : undefined
