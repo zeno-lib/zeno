@@ -136,6 +136,53 @@ describe("<FormError> with <Form>", () => {
     expect(screen.queryByRole("alert")).toBeNull()
   })
 
+  test("a submit that throws after an edit made while it ran still shows", async () => {
+    const user = userEvent.setup()
+    let rejectSubmit: (error: Error) => void = () => undefined
+    const onSubmit = vi.fn(
+      () =>
+        new Promise((_, reject) => {
+          rejectSubmit = reject
+        })
+    )
+    render(<Profile onSubmit={onSubmit} />)
+    await user.click(screen.getByRole("button", SUBMIT))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+
+    await user.type(screen.getByLabelText(NAME), "!")
+    rejectSubmit(new Error("offline"))
+    expect(await screen.findByRole("alert")).toBeTruthy()
+
+    // The next edit clears it, as after any thrown submit.
+    await user.type(screen.getByLabelText(NAME), "?")
+    expect(screen.queryByRole("alert")).toBeNull()
+  })
+
+  test("a reset while a submit runs drops its error, even after a new submit", async () => {
+    const user = userEvent.setup()
+    let rejectFirst: (error: Error) => void = () => undefined
+    const onSubmit = vi
+      .fn<(values: Values) => unknown>()
+      .mockImplementationOnce(
+        () =>
+          new Promise((_, reject) => {
+            rejectFirst = reject
+          })
+      )
+      .mockImplementationOnce(() => new Promise(() => undefined))
+    render(<Profile onSubmit={onSubmit} />)
+    await user.click(screen.getByRole("button", SUBMIT))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+
+    await user.click(screen.getByRole("button", { name: "Reset" }))
+    // Back to the first submit's attempt count, still running.
+    await user.click(screen.getByRole("button", SUBMIT))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2))
+    rejectFirst(new Error("offline"))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(screen.queryByRole("alert")).toBeNull()
+  })
+
   test("a reset drops a thrown submit's error, even when it restores the same values", async () => {
     const user = userEvent.setup()
     let resolveRetry: () => void = () => undefined

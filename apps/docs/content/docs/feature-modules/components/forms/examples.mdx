@@ -1408,10 +1408,10 @@ for you, above its footer.
 
 `useForm` records what `onSubmit` throws, whatever submits the form, with
 `setSubmitError(form, error)` from `@zeno-lib/forms/lib/submit-error`, and
-`useSubmitError(form)` reads it. A failure that settles after an edit, a
-reset or a newer submit is about values no longer on screen, so it isn't
-recorded. Call `setSubmitError` yourself for a failure your own submit code
-catches outside `onSubmit`.
+`useSubmitError(form)` reads it. A failure that settles after a reset or a
+newer submit is stale, so it isn't recorded. One that settles after an edit
+made while it ran is: the save still didn't happen. Call `setSubmitError`
+yourself for a failure your own submit code catches outside `onSubmit`.
 
 ## Unsaved-changes warning
 
