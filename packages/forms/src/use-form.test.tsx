@@ -62,6 +62,52 @@ describe("useForm — schema-derived defaults", () => {
   })
 })
 
+describe("useForm — defaultValues from a record", () => {
+  test("an edit form opened with a record as read submits to a .strict() schema", async () => {
+    const user = userEvent.setup()
+    const schema = z
+      .object({
+        address: z.object({ city: z.string() }).strict(),
+        email: z.email(),
+        lines: z.array(z.object({ label: z.string() }).strict()),
+      })
+      .strict()
+    const record = {
+      address: { city: "Geneva", updatedAt: "2026-01-01" },
+      createdAt: new Date("2026-01-01"),
+      email: "ada@example.com",
+      id: 7,
+      lines: [{ id: 1, label: "Design" }],
+    }
+    const onSubmit = vi.fn()
+    function Harness() {
+      const form = useForm({
+        defaultValues: record,
+        onSubmit: ({ value }) => onSubmit(value),
+        schema,
+      })
+      const { EmailField, SubmitButton } = form
+      return (
+        <FormProvider form={form}>
+          <Form>
+            <EmailField label="Email" name="email" />
+            <SubmitButton>Submit</SubmitButton>
+          </Form>
+        </FormProvider>
+      )
+    }
+    render(<Harness />)
+    await user.click(screen.getByRole("button", { name: "Submit" }))
+    await vi.waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({
+        address: { city: "Geneva" },
+        email: "ada@example.com",
+        lines: [{ label: "Design" }],
+      })
+    )
+  })
+})
+
 describe("useForm — required indicator", () => {
   test("`*` rendered next to required field labels (schema-derived)", () => {
     const schema = z.object({

@@ -48,6 +48,29 @@ test("schema path: defaultValues is PartialFormData (deep partial for plain obje
   })
 })
 
+test("schema path: defaultValues takes a record with keys the schema lacks", () => {
+  // A row as read: `useForm` keeps the keys the schema describes at runtime,
+  // and the form stays typed from the schema.
+  const invoiceSchema = z
+    .object({
+      lines: z.array(z.object({ label: z.string() }).strict()),
+      number: z.string(),
+    })
+    .strict()
+  const row = {
+    createdAt: new Date(),
+    id: 7,
+    lines: [{ id: 1, invoiceId: 7, label: "Design" }],
+    number: "2026-001",
+  }
+  const form = useForm({
+    defaultValues: row,
+    onSubmit: () => undefined,
+    schema: invoiceSchema,
+  })
+  expectTypeOf(form.state.values).toEqualTypeOf<z.input<typeof invoiceSchema>>()
+})
+
 test("schema path: validationLogic is forbidden (type never)", () => {
   // Error lands on the overall call argument, not on `validationLogic`:
   // `validationLogic: never` makes the whole options object incompatible.

@@ -168,8 +168,17 @@ const form = useForm({
 })
 ```
 
-Schema defaults are Zod-only. With a Valibot or ArkType schema, the hook
-skips extraction and uses your `defaultValues` as they are.
+Open an edit form with the record as read. The form keeps the keys its
+schema describes, at every depth and in every array row, and drops the
+rest, so a `.strict()` schema doesn't reject the row's `id` or `createdAt`
+on submit. Read the `id` from the record, not from `value`. A key the
+record lacks still gets its schema default. A `FormDialog` session and
+`submitAction`'s `reset` keep the same keys. Where the schema doesn't say
+which keys belong (a union, a record, a loose or catchall object), the
+value is kept as is.
+
+Schema defaults and that key filtering are Zod-only. With a Valibot or
+ArkType schema, the hook uses your `defaultValues` as they are.
 
 ## Focus on submit
 

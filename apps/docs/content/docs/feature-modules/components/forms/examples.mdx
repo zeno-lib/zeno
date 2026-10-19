@@ -1276,7 +1276,9 @@ What `submitAction(submit, action, options?)` does:
   so the returned record becomes the pristine baseline. The types only offer
   `true` when the data has the form's shape. `"values"` rebases on the
   values as the form held them, before the schema parsed them, and a function
-  maps the data to the next values.
+  maps the data to the next values. The data, mapped or not, keeps only the
+  keys the form's schema describes, so a saved row's `updatedAt` doesn't
+  become a form value.
 - **It returns the result**, typed from the action, so you can redirect or
   toast on `result.ok`. A thrown error (network, auth, a bug) propagates as is.
 

@@ -7,6 +7,7 @@ import {
   toActionError,
 } from "./action-result"
 import { applyValidationError } from "./apply-validation-error"
+import { pickSchemaShape } from "./schema-defaults"
 import { ValidationError } from "./validation-error"
 import { getFormSchema } from "./validation-modes"
 
@@ -179,13 +180,27 @@ async function submitAction(
 
   const { reset } = options
   if (reset === true) {
-    formApi.reset(result.data)
+    formApi.reset(toFormValues(formApi, result.data))
   } else if (reset === "values") {
     formApi.reset(value)
   } else if (typeof reset === "function") {
-    formApi.reset((reset as (data: unknown) => unknown)(result.data))
+    formApi.reset(
+      toFormValues(formApi, (reset as (data: unknown) => unknown)(result.data))
+    )
   }
   return result
+}
+
+// What the action returned, kept to the keys the form's own schema describes
+// (not `options.schema`, which is the action's), so a saved record's `id` or
+// `updatedAt` doesn't become a form value that a `.strict()` schema rejects on
+// the next submit. The submitted values need none of this: they already have
+// the form's shape.
+function toFormValues(formApi: FormApiLike, data: unknown): unknown {
+  const schema = getFormSchema(formApi as AnyFormApi)
+  return schema
+    ? pickSchemaShape(schema as Parameters<typeof pickSchemaShape>[0], data)
+    : data
 }
 
 export type { FormApiLike, SubmitActionOptions, SubmitActionSchema }

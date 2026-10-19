@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest"
 import { z } from "zod"
-import { deepMergeDefaults, extractZodDefaults } from "./schema-defaults"
+import {
+  deepMergeDefaults,
+  extractZodDefaults,
+  pickSchemaShape,
+} from "./schema-defaults"
 
 describe("extractZodDefaults — primitives", () => {
   test("z.string() → ''", () => {
@@ -190,5 +194,128 @@ describe("deepMergeDefaults", () => {
 
   test("schema object + user scalar → user wins (no merge attempt)", () => {
     expect(deepMergeDefaults({ x: { a: 1 } }, { x: null })).toEqual({ x: null })
+  })
+})
+
+describe("pickSchemaShape", () => {
+  test("keeps only the keys the schema describes, at every depth", () => {
+    const schema = z
+      .object({
+        address: z.object({ city: z.string() }).strict(),
+        name: z.string(),
+      })
+      .strict()
+    const record = {
+      address: { city: "Geneva", geocodedAt: "2026-01-01" },
+      createdAt: new Date(),
+      id: 7,
+      name: "Ada",
+    }
+    expect(pickSchemaShape(schema, record)).toEqual({
+      address: { city: "Geneva" },
+      name: "Ada",
+    })
+    // The record is copied, never trimmed in place.
+    expect(record).toHaveProperty("id", 7)
+  })
+
+  test("maps an array's element over every row", () => {
+    const schema = z.object({
+      lines: z.array(z.object({ amount: z.number(), label: z.string() })),
+    })
+    expect(
+      pickSchemaShape(schema, {
+        lines: [
+          { amount: 1, id: 10, label: "Design" },
+          { amount: 2, id: 11, label: "Build" },
+        ],
+      })
+    ).toEqual({
+      lines: [
+        { amount: 1, label: "Design" },
+        { amount: 2, label: "Build" },
+      ],
+    })
+  })
+
+  test("unwraps optional, nullable and default, keeping null and absent keys", () => {
+    const address = z.object({ city: z.string() })
+    const schema = z.object({
+      billing: address.nullable(),
+      shipping: address.optional(),
+      tags: z.array(z.object({ label: z.string() })).default([]),
+      work: address.nullable(),
+    })
+    const picked = pickSchemaShape(schema, {
+      billing: null,
+      tags: [{ id: 1, label: "vip" }],
+      work: { city: "Bern", id: 3 },
+    })
+    expect(picked).toEqual({
+      billing: null,
+      tags: [{ label: "vip" }],
+      work: { city: "Bern" },
+    })
+    expect(picked).not.toHaveProperty("shipping")
+  })
+
+  test("reads a pipe or a transform through its input", () => {
+    const schema = z
+      .object({
+        amount: z.string().transform(Number),
+        period: z
+          .object({ from: z.string(), to: z.string() })
+          .transform(({ from, to }) => `${from}/${to}`),
+      })
+      .transform((invoice) => ({ ...invoice, total: invoice.amount }))
+    expect(
+      pickSchemaShape(schema, {
+        amount: "12",
+        id: 4,
+        period: { from: "2026-01", id: 9, to: "2026-02" },
+      })
+    ).toEqual({ amount: "12", period: { from: "2026-01", to: "2026-02" } })
+  })
+
+  test("keeps as is what the schema doesn't describe for certain", () => {
+    const schema = z.object({
+      contact: z.union([
+        z.object({ email: z.string() }),
+        z.object({ phone: z.string() }),
+      ]),
+      extra: z.object({ a: z.string() }).catchall(z.string()),
+      labels: z.record(z.string(), z.object({ text: z.string() })),
+      loose: z.looseObject({ a: z.string() }),
+      meta: z.unknown(),
+      profile: z.object({ nick: z.string() }),
+    })
+    const value = {
+      contact: { email: "ada@example.com", id: 1 },
+      extra: { a: "x", b: "y" },
+      labels: { en: { id: 2, text: "Hello" } },
+      loose: { a: "x", b: "y" },
+      meta: { anything: true },
+      profile: "not an object",
+    }
+    expect(pickSchemaShape(schema, value)).toEqual(value)
+  })
+
+  test("leaves a value alone without a Zod schema", () => {
+    const value = { id: 1, name: "Ada" }
+    expect(
+      pickSchemaShape({} as Parameters<typeof pickSchemaShape>[0], value)
+    ).toBe(value)
+  })
+
+  test("leaves a missing key absent, for the schema default to fill", () => {
+    const schema = z.object({
+      name: z.string(),
+      role: z.string().default("member"),
+    })
+    const picked = pickSchemaShape(schema, { id: 7, name: "Ada" })
+    expect(deepMergeDefaults(extractZodDefaults(schema), picked)).toEqual({
+      name: "Ada",
+      role: "member",
+    })
   })
 })

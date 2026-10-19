@@ -508,6 +508,51 @@ describe("submitAction — success", () => {
     expect(form.state.isDirty).toBe(false)
   })
 
+  // An action that returns the saved row, with keys the form doesn't edit.
+  type SavedProfile = Profile & { id: number; updatedAt: string }
+  const resets = {
+    "a reset function": (saved: SavedProfile): Profile => saved,
+    "reset: true": true,
+  } as const
+
+  for (const [label, reset] of Object.entries(resets)) {
+    test(`${label} rebases on the saved row's form keys only, so the next save passes a .strict() schema`, async () => {
+      const user = userEvent.setup()
+      const save = vi.fn((input: Profile) =>
+        Promise.resolve<ActionResult<SavedProfile>>({
+          data: { ...input, id: 7, updatedAt: "2026-01-01" },
+          ok: true,
+        })
+      )
+      function Harness() {
+        const form = useForm({
+          defaultValues: { email: "ada@example.com", name: "Ada" },
+          onSubmit: (submit) => submitAction(submit, save, { reset }),
+          schema: profileSchema.strict(),
+        })
+        const { SubmitButton } = form
+        return (
+          <FormProvider form={form}>
+            <Form>
+              <SubmitButton>Submit</SubmitButton>
+            </Form>
+          </FormProvider>
+        )
+      }
+      render(<Harness />)
+
+      await user.click(screen.getByRole("button", SUBMIT))
+      await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+      await user.click(screen.getByRole("button", SUBMIT))
+
+      await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(2))
+      expect(save).toHaveBeenLastCalledWith({
+        email: "ada@example.com",
+        name: "Ada",
+      })
+    })
+  }
+
   test('reset: "values" rebases the form on the submitted values', async () => {
     const user = userEvent.setup()
     const formRef: { current: unknown } = { current: undefined }

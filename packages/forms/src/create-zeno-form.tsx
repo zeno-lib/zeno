@@ -16,7 +16,11 @@ import { fieldContext, formContext } from "./lib/contexts"
 import { withDefaultProps } from "./lib/default-props"
 import { withEmptyStartValues } from "./lib/empty-value"
 import { useDisabledOption } from "./lib/form-disabled"
-import { deepMergeDefaults, extractZodDefaults } from "./lib/schema-defaults"
+import {
+  deepMergeDefaults,
+  extractZodDefaults,
+  pickSchemaShape,
+} from "./lib/schema-defaults"
 import {
   getRequiredPaths,
   type StandardSchemaLike,
@@ -584,15 +588,21 @@ export function createZenoForm<
       [schema]
     )
 
+    // The caller's values keep only the keys the schema describes, so a
+    // record as read (`id`, `createdAt`, …) doesn't fail a `.strict()` schema
+    // on submit. The schema's own defaults then fill the keys left out.
     const mergedDefaultValues = useMemo(
       () =>
         schemaDefaults
           ? (deepMergeDefaults(
               schemaDefaults,
-              userDefaultValues as Record<string, unknown> | undefined
+              pickSchemaShape(
+                schema as Parameters<typeof pickSchemaShape>[0],
+                userDefaultValues as Record<string, unknown> | undefined
+              )
             ) as typeof userDefaultValues)
           : userDefaultValues,
-      [schemaDefaults, userDefaultValues]
+      [schema, schemaDefaults, userDefaultValues]
     )
 
     // Keep `formApi.reset(values)` from being undone by the next render; see
