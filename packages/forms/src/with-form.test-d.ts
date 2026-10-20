@@ -37,6 +37,31 @@ const AddressGroup = withFieldGroup({
   render: () => null,
 })
 
+// A section's `form` and a group's `group` carry the fields themselves.
+withForm({
+  defaultValues: VALUES,
+  render: ({ form }) => {
+    form.InputField({ name: "address.city" })
+    // @ts-expect-error — not a path of the form
+    form.InputField({ name: "phone" })
+    return null
+  },
+})
+
+withFieldGroup({
+  defaultValues: VALUES.address,
+  props: { label: "" },
+  render: ({ group, label }) => {
+    expectTypeOf(label).toEqualTypeOf<string>()
+    expectTypeOf(group.state.values).toEqualTypeOf<Values["address"]>()
+    const { InputField } = group
+    InputField({ name: "street" })
+    // @ts-expect-error — a path of the form, not of the group
+    InputField({ name: "address.street" })
+    return null
+  },
+})
+
 test("withForm takes the form useForm returns, with a schema", () => {
   const form = useForm({ onSubmit: () => undefined, schema })
   EmailSection({ form, title: "Email" })
