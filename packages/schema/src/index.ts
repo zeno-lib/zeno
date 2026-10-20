@@ -40,6 +40,54 @@ const AUDIT_COLUMN_KEYS = new Set<string>([
 ])
 type AuditColumnKey = "createdAt" | "createdBy" | "updatedAt" | "updatedBy"
 
+// The key a table built by `table()` from `@zeno-lib/db/schema` carries its
+// column rules under. A string rather than a symbol, so the two packages agree
+// on it without either importing the other; `@zeno-lib/db` mirrors it and
+// `packages/db/src/column-rules.test.ts` fails if they drift.
+const COLUMN_RULES_KEY = "~zeno"
+
+/**
+ * What a column marker from `@zeno-lib/db/schema` records: `serverOwned`
+ * keeps the column out of insert and update, `refine` runs on it in both.
+ */
+type ColumnRule = { readonly serverOwned: true } | { readonly refine: unknown }
+
+type TableColumnRules<TTable> = TTable extends {
+  readonly [COLUMN_RULES_KEY]: { readonly columns: infer TRules }
+}
+  ? TRules
+  : Record<never, never>
+
+type ServerOwnedKeys<TTable> = {
+  [K in keyof TableColumnRules<TTable>]: TableColumnRules<TTable>[K] extends {
+    readonly serverOwned: true
+  }
+    ? K
+    : never
+}[keyof TableColumnRules<TTable>]
+
+type ColumnRefinements<TTable> = {
+  [K in keyof TableColumnRules<TTable> as TableColumnRules<TTable>[K] extends {
+    readonly refine: unknown
+  }
+    ? K
+    : never]: TableColumnRules<TTable>[K] extends {
+    readonly refine: infer TRefine
+  }
+    ? TRefine
+    : never
+}
+
+// Identity columns, `by default` as well as `always`: the sequence hands them
+// out, so a client never writes one. Drizzle drops only `always` itself.
+type IdentityKeys<TTable extends Table> = {
+  [K in keyof TableColumns<TTable>]: TableColumns<TTable>[K]["_"]["identity"] extends
+    | "always"
+    | "byDefault"
+    ? K
+    : never
+}[keyof TableColumns<TTable>]
+
 type AuditKeys<TTable extends Table> = {
   [K in keyof TableColumns<TTable>]: K extends AuditColumnKey
     ? TableColumns<TTable>[K]["_"]["hasDefault"] extends true
@@ -48,9 +96,16 @@ type AuditKeys<TTable extends Table> = {
     : never
 }[keyof TableColumns<TTable>]
 
+// The keys insert and update never accept: defaulted audit columns,
+// server-owned columns and identities.
+type UnwritableKeys<TTable extends Table> =
+  | AuditKeys<TTable>
+  | IdentityKeys<TTable>
+  | ServerOwnedKeys<TTable>
+
 type InsertColumns<TTable extends Table> = Pick<
   TableColumns<TTable>,
-  Exclude<keyof InferInsertModel<TTable>, AuditKeys<TTable>>
+  Exclude<keyof InferInsertModel<TTable>, UnwritableKeys<TTable>>
 >
 
 type SelectRefine<
@@ -90,6 +145,15 @@ type RefineFromOptions<
     ? NonNullable<TOptions[TKey]>
     : undefined
   : undefined
+
+// A caller's refinement for a key replaces the column rule's in the type: a
+// function receives the column rule's schema at runtime and returns its own.
+type WriteRefine<TTable extends Table, TOptions, TKey extends string> =
+  RefineFromOptions<TOptions, TKey> extends infer TCaller
+    ? TCaller extends Record<string, unknown>
+      ? Omit<ColumnRefinements<TTable>, keyof TCaller> & TCaller
+      : ColumnRefinements<TTable>
+    : never
 
 type OmitKeys<TSchema, TKeys extends PropertyKey> =
   TSchema extends z.ZodObject<infer TShape, infer TConfig>
@@ -142,13 +206,13 @@ type DefineTableSchemaResult<
       BuildSchema<
         "insert",
         TableColumns<TTable>,
-        RefineFromOptions<TOptions, "insert">,
+        WriteRefine<TTable, TOptions, "insert">,
         TCoerce
       >,
       TTable,
-      RefineFromOptions<TOptions, "insert">
+      WriteRefine<TTable, TOptions, "insert">
     >,
-    AuditKeys<TTable>
+    UnwritableKeys<TTable>
   >
   select: BuildSchema<
     "select",
@@ -160,26 +224,76 @@ type DefineTableSchemaResult<
     BuildSchema<
       "update",
       TableColumns<TTable>,
-      RefineFromOptions<TOptions, "update">,
+      WriteRefine<TTable, TOptions, "update">,
       TCoerce
     >,
-    AuditKeys<TTable>
+    UnwritableKeys<TTable>
   >
 }
 
 type Refinements = Record<string, unknown>
 
-const auditKeys = (table: Table) => {
+const columnRules = (table: Table): Record<string, ColumnRule> =>
+  (table as { [COLUMN_RULES_KEY]?: { columns: Record<string, ColumnRule> } })[
+    COLUMN_RULES_KEY
+  ]?.columns ?? {}
+
+const unwritableKeys = (table: Table) => {
   const columns: Record<string, Column> = getColumns(table)
+  const rules = columnRules(table)
   const keys: string[] = []
 
   for (const key of Object.keys(columns)) {
-    if (AUDIT_COLUMN_KEYS.has(key) && columns[key]?.hasDefault) {
+    const column = columns[key]
+    const isAudit = AUDIT_COLUMN_KEYS.has(key) && column?.hasDefault
+    const isIdentity = column?.generatedIdentity !== undefined
+    const rule = rules[key]
+    const isServerOwned = rule !== undefined && "serverOwned" in rule
+
+    if (isAudit || isIdentity || isServerOwned) {
       keys.push(key)
     }
   }
 
   return keys
+}
+
+type SchemaRefinement = (schema: unknown) => unknown
+
+const applyRefinement = (refinement: unknown, schema: unknown) =>
+  typeof refinement === "function"
+    ? (refinement as SchemaRefinement)(schema)
+    : refinement
+
+// A caller's function refinement runs on the column rule's schema, so it can
+// narrow further; a caller's schema replaces it outright, as it replaces any
+// generated rule.
+const withColumnRules = (
+  table: Table,
+  refinements: Refinements = {}
+): Refinements => {
+  const merged: Refinements = { ...refinements }
+
+  const rules = columnRules(table)
+
+  for (const key of Object.keys(rules)) {
+    const rule = rules[key]
+
+    if (rule === undefined || !("refine" in rule)) {
+      continue
+    }
+
+    const refinement = refinements[key]
+
+    if (refinement === undefined) {
+      merged[key] = rule.refine
+    } else if (typeof refinement === "function") {
+      merged[key] = (schema: unknown) =>
+        (refinement as SchemaRefinement)(applyRefinement(rule.refine, schema))
+    }
+  }
+
+  return merged
 }
 
 // Postgres starts an ascending identity at its minimum value, which defaults
@@ -262,13 +376,12 @@ function defineTableSchema<
   options?: TOptions
 ): DefineTableSchemaResult<TTable, TCoerce, TOptions> {
   const schemaFactory = createDrizzleSchemaFactory(options?.factory)
-  const audit = auditKeys(table)
-  // Zod rejects an omit key the shape lacks, which a generated audit column
-  // would be.
-  const omitAudit = (schema: z.ZodObject) => {
+  const unwritable = unwritableKeys(table)
+  // Zod rejects an omit key the shape lacks, which a generated column would be.
+  const omitUnwritable = (schema: z.ZodObject) => {
     const mask: Record<string, true> = {}
 
-    for (const key of audit) {
+    for (const key of unwritable) {
       if (key in schema.shape) {
         mask[key] = true
       }
@@ -282,15 +395,21 @@ function defineTableSchema<
     "createInsertSchema" | "createSelectSchema" | "createUpdateSchema",
     (table: Table, refine: Refinements) => z.ZodObject
   >
-  const build = (
-    variant: "insert" | "select" | "update",
+  // Column rules say what a client may write, so they reach insert and update.
+  // `select` describes the stored row, which a rule the database doesn't
+  // enforce may not hold for.
+  const write = (
+    variant: "insert" | "update",
     create: (typeof factory)["createInsertSchema"]
-  ) => create(table, withPositiveIdentities(table, options?.[variant]))
+  ) => omitUnwritable(create(table, withColumnRules(table, options?.[variant])))
 
   return {
-    insert: omitAudit(build("insert", factory.createInsertSchema)),
-    select: build("select", factory.createSelectSchema),
-    update: omitAudit(build("update", factory.createUpdateSchema)),
+    insert: write("insert", factory.createInsertSchema),
+    select: factory.createSelectSchema(
+      table,
+      withPositiveIdentities(table, options?.select)
+    ),
+    update: write("update", factory.createUpdateSchema),
   } as unknown as DefineTableSchemaResult<TTable, TCoerce, TOptions>
 }
 

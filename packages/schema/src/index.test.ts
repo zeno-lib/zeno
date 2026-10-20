@@ -164,7 +164,7 @@ describe("defineTableSchema", () => {
     expect(defineTableSchema(events).insert.safeParse({}).success).toBe(false)
   })
 
-  it("rejects non-positive identity ids in every variant", () => {
+  it("keeps identity ids out of insert and update, and positive in select", () => {
     const items = pgTable("items", {
       id: bigint("id", { mode: "number" })
         .primaryKey()
@@ -173,17 +173,16 @@ describe("defineTableSchema", () => {
     })
     const schemas = defineTableSchema(items)
 
-    for (const id of [0, -1]) {
-      expect(schemas.insert.safeParse({ id, label: "x" }).success).toBe(false)
-      expect(schemas.update.safeParse({ id }).success).toBe(false)
-      expect(schemas.select.safeParse({ id, label: "x" }).success).toBe(false)
-    }
-
-    expect(schemas.insert.parse({ id: 1, label: "x" })).toEqual({
-      id: 1,
+    expect(schemas.insert.parse({ id: 5000, label: "x" })).toEqual({
       label: "x",
     })
-    expect(schemas.insert.parse({ label: "x" })).toEqual({ label: "x" })
+    expect(schemas.update.parse({ id: 5000, label: "x" })).toEqual({
+      label: "x",
+    })
+
+    for (const id of [0, -1]) {
+      expect(schemas.select.safeParse({ id, label: "x" }).success).toBe(false)
+    }
   })
 
   it("leaves identities configured to go below one unconstrained", () => {
@@ -203,12 +202,12 @@ describe("defineTableSchema", () => {
       id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
     })
     const schemas = defineTableSchema(items, {
-      insert: { id: (schema) => schema.max(10) },
+      select: { id: (schema) => schema.max(10) },
     })
 
-    expect(schemas.insert.safeParse({ id: 0 }).success).toBe(false)
-    expect(schemas.insert.safeParse({ id: 11 }).success).toBe(false)
-    expect(schemas.insert.safeParse({ id: 5 }).success).toBe(true)
+    expect(schemas.select.safeParse({ id: 0 }).success).toBe(false)
+    expect(schemas.select.safeParse({ id: 11 }).success).toBe(false)
+    expect(schemas.select.safeParse({ id: 5 }).success).toBe(true)
   })
 
   it("keeps a function-refined nullable insert column optional", () => {

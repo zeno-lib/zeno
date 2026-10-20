@@ -2,14 +2,21 @@
 import { Column, getColumnTable, getTableName, is, sql } from "drizzle-orm"
 import {
   type AnyPgColumn,
+  type AnyPgColumnBuilder,
   bigint,
   type ExtraConfigColumn,
   type HasIdentity,
   integer,
   type PgBigInt53Builder,
   type PgBigInt64Builder,
+  type PgBuildColumns,
+  type PgBuildExtraConfigColumns,
   type PgIntegerBuilder,
   type PgPolicyConfig,
+  type PgTableExtraConfig,
+  type PgTableExtraConfigValue,
+  type PgTableFnInternal,
+  type PgTableWithColumns,
   type PgTimestampBuilder,
   type PgTimestampStringBuilder,
   type PgUUIDBuilder,
@@ -24,6 +31,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core"
 import { snakeCase } from "drizzle-orm/pg-core/casing"
+import type { PgColumnsBuilders } from "drizzle-orm/pg-core/columns/all"
 import { authenticatedRole, authUid } from "drizzle-orm/supabase"
 import { authUsers } from "./auth-schema.ts"
 import {
@@ -643,12 +651,166 @@ export const authenticatedOwnerAllPolicy = (
   })
 }
 
+// The key a table carries its column rules under. `@zeno-lib/schema` reads it
+// by name (`COLUMN_RULES_KEY`), because neither package imports the other;
+// `src/column-rules.test.ts` fails if the two drift.
+const COLUMN_RULES_KEY = "~zeno"
+
+type ServerOwnedRule = { readonly serverOwned: true }
+type RefineRule<TRefine> = { readonly refine: TRefine }
+type ColumnRule = ServerOwnedRule | RefineRule<unknown>
+
+type WithColumnRule<TBuilder, TRule extends ColumnRule> = TBuilder & {
+  readonly [COLUMN_RULES_KEY]: TRule
+}
+
+// Drizzle builders mutate `this` and their methods return it, typed as an
+// intersection with `this`, so a marker survives the calls chained after it.
+const markColumn = <
+  TBuilder extends AnyPgColumnBuilder,
+  TRule extends ColumnRule,
+>(
+  builder: TBuilder,
+  rule: TRule
+) =>
+  Object.assign(builder, { [COLUMN_RULES_KEY]: rule }) as WithColumnRule<
+    TBuilder,
+    TRule
+  >
+
+/**
+ * A column only the server writes: a trigger, a `DEFAULT` such as
+ * `auth.uid()`, or an action of its own. `defineTableSchema` leaves it out of
+ * insert and update, so no form or action input accepts it.
+ */
+export const serverOwned = <TBuilder extends AnyPgColumnBuilder>(
+  builder: TBuilder
+) => markColumn(builder, { serverOwned: true } as const)
+
+/**
+ * A rule `defineTableSchema` applies to the column in insert and update, in
+ * the shape its `insert` and `update` options take: a Zod schema, or a
+ * function from the generated one. A caller's refinement for the same column
+ * runs on top of it.
+ */
+export const withRule = <
+  TBuilder extends AnyPgColumnBuilder,
+  const TRefine extends ((schema: never) => unknown) | object,
+>(
+  builder: TBuilder,
+  refine: TRefine
+) => markColumn(builder, { refine })
+
+type ColumnRuleOf<TBuilder> = TBuilder extends {
+  readonly [COLUMN_RULES_KEY]: infer TRule
+}
+  ? TRule
+  : never
+
+// Read from the builders, before drizzle builds the columns: its column config
+// copies a fixed set of builder fields, so the markers never reach the
+// column types.
+type ColumnRules<TColumnsMap> = {
+  readonly [K in keyof TColumnsMap as [ColumnRuleOf<TColumnsMap[K]>] extends [
+    never,
+  ]
+    ? never
+    : K]: ColumnRuleOf<TColumnsMap[K]>
+}
+
+type TableWithColumnRules<
+  TTableName extends string,
+  TSchema extends string | undefined,
+  TColumnsMap extends Record<string, AnyPgColumnBuilder>,
+> = PgTableWithColumns<{
+  name: TTableName
+  schema: TSchema
+  columns: PgBuildColumns<TTableName, TColumnsMap>
+  dialect: "pg"
+  isAlias: false
+}> & {
+  readonly [COLUMN_RULES_KEY]: { readonly columns: ColumnRules<TColumnsMap> }
+}
+
+type ExtraConfig<TColumnsMap extends Record<string, AnyPgColumnBuilder>> = (
+  self: PgBuildExtraConfigColumns<TColumnsMap>
+) =>
+  | (PgTableExtraConfigValue | PgTableExtraConfigValue[])[]
+  | PgTableExtraConfig
+
+/** Drizzle's table function, recording each column's rule on the table. */
+export type TableFn<TSchema extends string | undefined = undefined> = <
+  TTableName extends string,
+  TColumnsMap extends Record<string, AnyPgColumnBuilder>,
+>(
+  name: TTableName,
+  columns: TColumnsMap | ((columnTypes: PgColumnsBuilders) => TColumnsMap),
+  extraConfig?: ExtraConfig<TColumnsMap>
+) => TableWithColumnRules<TTableName, TSchema, TColumnsMap>
+
+type ColumnsArgument =
+  | Record<string, AnyPgColumnBuilder>
+  | ((columnTypes: PgColumnsBuilders) => Record<string, AnyPgColumnBuilder>)
+
+const readColumnRules = (builders: Record<string, AnyPgColumnBuilder>) => {
+  const rules: Record<string, ColumnRule> = {}
+
+  for (const [key, builder] of Object.entries(builders)) {
+    const rule = (builder as { [COLUMN_RULES_KEY]?: ColumnRule })[
+      COLUMN_RULES_KEY
+    ]
+
+    if (rule !== undefined) {
+      rules[key] = rule
+    }
+  }
+
+  return rules
+}
+
+// Drizzle builds the table exactly as before. For the callback form, it calls
+// the callback once, synchronously, so wrapping it is enough to see the
+// builders without importing drizzle's column factory.
+const withColumnRules = <TSchema extends string | undefined>(
+  create: PgTableFnInternal<TSchema>
+): TableFn<TSchema> => {
+  const createAny = create as unknown as (
+    name: string,
+    columns: ColumnsArgument,
+    extraConfig?: unknown
+  ) => object
+
+  return ((name: string, columns: ColumnsArgument, extraConfig?: unknown) => {
+    let builders: Record<string, AnyPgColumnBuilder> = {}
+    const built = createAny(
+      name,
+      typeof columns === "function"
+        ? (columnTypes: PgColumnsBuilders) => {
+            builders = columns(columnTypes)
+            return builders
+          }
+        : columns,
+      extraConfig
+    )
+
+    if (typeof columns !== "function") {
+      builders = columns
+    }
+
+    // Not enumerable, so nothing that walks a table's own keys for its
+    // columns ever meets it.
+    return Object.defineProperty(built, COLUMN_RULES_KEY, {
+      value: { columns: readColumnRules(builders) },
+    })
+  }) as unknown as TableFn<TSchema>
+}
+
 // Application-owned tables. Column keys stay camelCase, database identifiers
 // become snake_case, and RLS is on.
-export const table = snakeCase.table.withRLS
+export const table = withColumnRules(snakeCase.table.withRLS)
 
 // Escape hatch for intentionally non-RLS tables such as seed/reference data.
-export const unsecureTable = snakeCase.table
+export const unsecureTable = withColumnRules(snakeCase.table)
 
 // A non-public schema, with the same two guarantees `table` and `unsecureTable`
 // give at the top level. Drizzle's own `pgSchema(name)` takes no casing
@@ -662,7 +824,7 @@ export const schema = <TName extends string>(name: TName) => {
   // `Object.assign` mutates and returns the PgSchema instance, so `isSchema`
   // and the `entityKind` checks drizzle-kit runs still recognise it.
   return Object.assign(built, {
-    table: built.table.withRLS,
-    unsecureTable: built.table,
+    table: withColumnRules<TName>(built.table.withRLS),
+    unsecureTable: withColumnRules<TName>(built.table),
   })
 }

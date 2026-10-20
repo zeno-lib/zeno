@@ -27,11 +27,8 @@ describe("schema helpers under defineTableSchema", () => {
     expect(schemas.update.parse(forged)).toEqual({ body: "Hello" })
   })
 
-  it("accepts only positive sequential ids", () => {
-    expect(schemas.insert.safeParse({ body: "x", id: 0 }).success).toBe(false)
-    expect(schemas.insert.parse({ body: "x", id: 1 })).toEqual({
-      body: "x",
-      id: 1,
-    })
+  it("keeps sequential ids out of insert, and positive in select", () => {
+    expect(schemas.insert.parse({ body: "x", id: 1 })).toEqual({ body: "x" })
+    expect(schemas.select.shape.id.safeParse(0).success).toBe(false)
   })
 })
