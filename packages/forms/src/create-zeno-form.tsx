@@ -3,14 +3,24 @@
 
 import type {
   AnyFormApi,
+  AppFieldExtendedReactFieldGroupApi,
+  AppFieldExtendedReactFormApi,
+  BaseFormOptions,
   DeepKeys,
   DeepValue,
+  FieldsMap,
   FormAsyncValidateOrFn,
   FormOptions,
   FormValidateOrFn,
+  WithFormProps,
 } from "@tanstack/react-form"
 import { createFormHook } from "@tanstack/react-form"
-import { type ComponentProps, type ReactNode, useMemo } from "react"
+import {
+  type ComponentProps,
+  type PropsWithChildren,
+  type ReactNode,
+  useMemo,
+} from "react"
 import { applyValidationError } from "./lib/apply-validation-error"
 import { fieldContext, formContext } from "./lib/contexts"
 import { withDefaultProps } from "./lib/default-props"
@@ -394,42 +404,211 @@ export function createZenoForm<
     config.formComponents,
     config.defaultProps
   )
-  const { useAppForm, withFieldGroup, withForm } = createFormHook({
+  const {
+    useAppForm,
+    withFieldGroup: withTanStackFieldGroup,
+    withForm: withTanStackForm,
+  } = createFormHook({
     fieldComponents,
     fieldContext,
     formComponents,
     formContext,
   })
 
-  function useAppFields<TForm extends AnyAppForm>(form: TForm) {
-    type T = FormDataOf<TForm>
-    return useMemo(() => {
-      const Field = form.AppField as React.ComponentType<{
+  // One set of named fields per form, shared by `useForm`, `useAppFields` and
+  // every section and group that renders the form.
+  const fieldsByForm = new WeakMap<object, Record<string, AnyComponent>>()
+
+  function getAppFields<TForm extends AnyAppForm>(form: TForm) {
+    type Fields = FieldWrappers<FC, FormDataOf<TForm>>
+    const cached = fieldsByForm.get(form)
+    if (cached !== undefined) {
+      return cached as Fields
+    }
+    const Field = form.AppField as React.ComponentType<{
+      name: string
+      validators?: AnyFieldValidators
+      listeners?: AnyFieldListeners
+      children: () => ReactNode
+    }>
+    const wrappers: Record<string, AnyComponent> = {}
+    for (const key of Object.keys(fieldComponents)) {
+      const Impl = fieldComponents[key] as AnyComponent
+      wrappers[key] = ({
+        name,
+        validators,
+        listeners,
+        ...props
+      }: {
         name: string
         validators?: AnyFieldValidators
         listeners?: AnyFieldListeners
-        children: () => ReactNode
-      }>
-      const wrappers: Record<string, AnyComponent> = {}
-      for (const key of Object.keys(fieldComponents)) {
-        const Impl = fieldComponents[key] as AnyComponent
-        wrappers[key] = ({
-          name,
-          validators,
-          listeners,
-          ...props
-        }: {
-          name: string
-          validators?: AnyFieldValidators
-          listeners?: AnyFieldListeners
-        }) => (
-          <Field listeners={listeners} name={name} validators={validators}>
-            {() => <Impl {...props} />}
-          </Field>
-        )
+      }) => (
+        <Field listeners={listeners} name={name} validators={validators}>
+          {() => <Impl {...props} />}
+        </Field>
+      )
+    }
+    fieldsByForm.set(form, wrappers)
+    return wrappers as Fields
+  }
+
+  function useAppFields<TForm extends AnyAppForm>(form: TForm) {
+    return getAppFields(form)
+  }
+
+  // Puts the named fields on `target` (a section's form, a group) where it has
+  // none of that name. The same fields every time, so running it on each
+  // render changes nothing after the first.
+  function withNamedFields<T extends AnyAppForm>(target: T): T {
+    for (const [name, field] of Object.entries(getAppFields(target))) {
+      if (!(name in target)) {
+        Object.assign(target, { [name]: field })
       }
-      return wrappers as FieldWrappers<FC, T>
-    }, [form])
+    }
+    return target
+  }
+
+  /**
+   * TanStack's `withForm`, whose `render` gets a `form` carrying the typed
+   * fields, as `useForm`'s does: `<form.InputField name="email" />`.
+   */
+  function withForm<
+    TFormData,
+    TOnMount extends SyncValidator<TFormData>,
+    TOnChange extends SyncValidator<TFormData>,
+    TOnChangeAsync extends AsyncValidator<TFormData>,
+    TOnBlur extends SyncValidator<TFormData>,
+    TOnBlurAsync extends AsyncValidator<TFormData>,
+    TOnSubmit extends SyncValidator<TFormData>,
+    TOnSubmitAsync extends AsyncValidator<TFormData>,
+    TOnDynamic extends SyncValidator<TFormData>,
+    TOnDynamicAsync extends AsyncValidator<TFormData>,
+    TOnServer extends AsyncValidator<TFormData>,
+    TSubmitMeta,
+    // biome-ignore lint/complexity/noBannedTypes: TanStack's own default, so a section without `props` infers as it does.
+    TRenderProps extends object = {},
+  >({
+    render,
+    ...options
+  }: Omit<
+    WithFormProps<
+      TFormData,
+      TOnMount,
+      TOnChange,
+      TOnChangeAsync,
+      TOnBlur,
+      TOnBlurAsync,
+      TOnSubmit,
+      TOnSubmitAsync,
+      TOnDynamic,
+      TOnDynamicAsync,
+      TOnServer,
+      TSubmitMeta,
+      FC,
+      FMC,
+      TRenderProps
+    >,
+    "render"
+  > & {
+    render: (
+      props: PropsWithChildren<
+        NoInfer<TRenderProps> & {
+          // The named fields ride in the form components' slot, so the type
+          // stays TanStack's and a nested `withFieldGroup` still infers it.
+          form: AppFieldExtendedReactFormApi<
+            TFormData,
+            TOnMount,
+            TOnChange,
+            TOnChangeAsync,
+            TOnBlur,
+            TOnBlurAsync,
+            TOnSubmit,
+            TOnSubmitAsync,
+            TOnDynamic,
+            TOnDynamicAsync,
+            TOnServer,
+            TSubmitMeta,
+            FC,
+            FMC & FieldWrappers<FC, TFormData>
+          >
+        }
+      >
+    ) => ReactNode
+  }) {
+    return withTanStackForm<
+      TFormData,
+      TOnMount,
+      TOnChange,
+      TOnChangeAsync,
+      TOnBlur,
+      TOnBlurAsync,
+      TOnSubmit,
+      TOnSubmitAsync,
+      TOnDynamic,
+      TOnDynamicAsync,
+      TOnServer,
+      TSubmitMeta,
+      TRenderProps
+    >({
+      ...options,
+      render: (props) =>
+        render({
+          ...props,
+          form: withNamedFields(props.form),
+        } as Parameters<typeof render>[0]),
+    })
+  }
+
+  /**
+   * TanStack's `withFieldGroup`, whose `render` gets a `group` carrying the
+   * typed fields of the group's own values, as `useForm`'s form does:
+   * `<group.InputField name="street" />`.
+   */
+  function withFieldGroup<
+    TFieldGroupData,
+    TSubmitMeta,
+    // biome-ignore lint/complexity/noBannedTypes: TanStack's own default, so a group without `props` infers as it does.
+    TRenderProps extends object = {},
+  >({
+    render,
+    ...options
+  }: BaseFormOptions<TFieldGroupData, TSubmitMeta> & {
+    props?: TRenderProps
+    render: (
+      props: PropsWithChildren<
+        NoInfer<TRenderProps> & {
+          // As `withForm`'s, with TanStack's own arguments for the rest.
+          group: AppFieldExtendedReactFieldGroupApi<
+            unknown,
+            TFieldGroupData,
+            string | FieldsMap<unknown, TFieldGroupData>,
+            undefined | FormValidateOrFn<unknown>,
+            undefined | FormValidateOrFn<unknown>,
+            undefined | FormAsyncValidateOrFn<unknown>,
+            undefined | FormValidateOrFn<unknown>,
+            undefined | FormAsyncValidateOrFn<unknown>,
+            undefined | FormValidateOrFn<unknown>,
+            undefined | FormAsyncValidateOrFn<unknown>,
+            undefined | FormValidateOrFn<unknown>,
+            undefined | FormAsyncValidateOrFn<unknown>,
+            undefined | FormAsyncValidateOrFn<unknown>,
+            unknown extends TSubmitMeta ? never : TSubmitMeta,
+            FC,
+            FMC & FieldWrappers<FC, TFieldGroupData>
+          >
+        }
+      >
+    ) => ReactNode
+  }) {
+    return withTanStackFieldGroup<TFieldGroupData, TSubmitMeta, TRenderProps>({
+      ...options,
+      render: (props) =>
+        render({
+          ...props,
+          group: withNamedFields(props.group),
+        } as Parameters<typeof render>[0]),
+    })
   }
 
   // An unset generic defaults to its constraint, which is what TanStack's own
@@ -647,10 +826,9 @@ export function createZenoForm<
     useDisabledOption(form, disabled)
     useUnsavedChangesWarning(form, unsavedChangesWarning)
 
-    const fields = useAppFields(form)
     return useMemo(
-      () => Object.assign(form, fields, formComponents),
-      [form, fields]
+      () => Object.assign(form, getAppFields(form), formComponents),
+      [form]
     )
   }
 

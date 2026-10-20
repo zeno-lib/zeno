@@ -15,7 +15,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-const { useForm } = createZenoForm({
+const { useAppForm, useForm, withFieldGroup, withForm } = createZenoForm({
   defaultProps: {
     FormError: { submitErrorMessage: "Not saved. Try again later." },
     MoneyField: { currency: "CHF", currencyDisplay: "code", placeholder: "0" },
@@ -161,5 +161,29 @@ describe("createZenoForm({ defaultProps })", () => {
     }
     render(<AppFieldHarness />)
     expect(addonOf("Amount")).toBe("CHF")
+  })
+
+  test("a section's and a group's fields get their defaults too", () => {
+    const AmountSection = withForm({
+      defaultValues: VALUES,
+      render: ({ form }) => <form.MoneyField label="Amount" name="amount" />,
+    })
+    const FeeGroup = withFieldGroup({
+      defaultValues: { fee: VALUES.fee },
+      render: ({ group }) => <group.MoneyField label="Fee" name="fee" />,
+    })
+    function SectionHarness() {
+      // `useAppForm`'s form has no named fields until a section renders it.
+      const form = useAppForm({ defaultValues: VALUES, onSubmit: vi.fn() })
+      return (
+        <FormProvider form={form}>
+          <AmountSection form={form} />
+          <FeeGroup fields={{ fee: "fee" }} form={form} />
+        </FormProvider>
+      )
+    }
+    render(<SectionHarness />)
+    expect(addonOf("Amount")).toBe("CHF")
+    expect(addonOf("Fee")).toBe("CHF")
   })
 })
