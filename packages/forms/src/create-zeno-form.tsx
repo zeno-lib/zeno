@@ -322,21 +322,6 @@ type FieldWrappers<FC extends Record<string, AnyComponent>, T> = {
   ) => ReactNode
 }
 
-// Puts the named fields on `target` (a section's form, a group) where it has
-// none of that name. A form from `useForm` keeps its own, so a field its
-// parent renders never changes component.
-function withNamedFields<T extends object>(
-  target: T,
-  fields: Record<string, unknown>
-): T {
-  for (const [name, field] of Object.entries(fields)) {
-    if (!(name in target)) {
-      Object.assign(target, { [name]: field })
-    }
-  }
-  return target
-}
-
 // A component's optional props, per member of a union of props.
 type OptionalProps<P> = P extends unknown
   ? {
@@ -430,35 +415,58 @@ export function createZenoForm<
     formContext,
   })
 
-  function useAppFields<TForm extends AnyAppForm>(form: TForm) {
-    type T = FormDataOf<TForm>
-    return useMemo(() => {
-      const Field = form.AppField as React.ComponentType<{
+  // One set of named fields per form, shared by `useForm`, `useAppFields` and
+  // every section and group that renders the form.
+  const fieldsByForm = new WeakMap<object, Record<string, AnyComponent>>()
+
+  function getAppFields<TForm extends AnyAppForm>(form: TForm) {
+    type Fields = FieldWrappers<FC, FormDataOf<TForm>>
+    const cached = fieldsByForm.get(form)
+    if (cached !== undefined) {
+      return cached as Fields
+    }
+    const Field = form.AppField as React.ComponentType<{
+      name: string
+      validators?: AnyFieldValidators
+      listeners?: AnyFieldListeners
+      children: () => ReactNode
+    }>
+    const wrappers: Record<string, AnyComponent> = {}
+    for (const key of Object.keys(fieldComponents)) {
+      const Impl = fieldComponents[key] as AnyComponent
+      wrappers[key] = ({
+        name,
+        validators,
+        listeners,
+        ...props
+      }: {
         name: string
         validators?: AnyFieldValidators
         listeners?: AnyFieldListeners
-        children: () => ReactNode
-      }>
-      const wrappers: Record<string, AnyComponent> = {}
-      for (const key of Object.keys(fieldComponents)) {
-        const Impl = fieldComponents[key] as AnyComponent
-        wrappers[key] = ({
-          name,
-          validators,
-          listeners,
-          ...props
-        }: {
-          name: string
-          validators?: AnyFieldValidators
-          listeners?: AnyFieldListeners
-        }) => (
-          <Field listeners={listeners} name={name} validators={validators}>
-            {() => <Impl {...props} />}
-          </Field>
-        )
+      }) => (
+        <Field listeners={listeners} name={name} validators={validators}>
+          {() => <Impl {...props} />}
+        </Field>
+      )
+    }
+    fieldsByForm.set(form, wrappers)
+    return wrappers as Fields
+  }
+
+  function useAppFields<TForm extends AnyAppForm>(form: TForm) {
+    return getAppFields(form)
+  }
+
+  // Puts the named fields on `target` (a section's form, a group) where it has
+  // none of that name. The same fields every time, so running it on each
+  // render changes nothing after the first.
+  function withNamedFields<T extends AnyAppForm>(target: T): T {
+    for (const [name, field] of Object.entries(getAppFields(target))) {
+      if (!(name in target)) {
+        Object.assign(target, { [name]: field })
       }
-      return wrappers as FieldWrappers<FC, T>
-    }, [form])
+    }
+    return target
   }
 
   /**
@@ -544,14 +552,11 @@ export function createZenoForm<
       TRenderProps
     >({
       ...options,
-      render(props) {
-        // biome-ignore lint/correctness/useHookAtTopLevel: TanStack runs `render` inside its own component.
-        const fields = useAppFields(props.form)
-        return render({
+      render: (props) =>
+        render({
           ...props,
-          form: withNamedFields(props.form, fields),
-        } as Parameters<typeof render>[0])
-      },
+          form: withNamedFields(props.form),
+        } as Parameters<typeof render>[0]),
     })
   }
 
@@ -598,14 +603,11 @@ export function createZenoForm<
   }) {
     return withTanStackFieldGroup<TFieldGroupData, TSubmitMeta, TRenderProps>({
       ...options,
-      render(props) {
-        // biome-ignore lint/correctness/useHookAtTopLevel: TanStack runs `render` inside its own component.
-        const fields = useAppFields(props.group)
-        return render({
+      render: (props) =>
+        render({
           ...props,
-          group: withNamedFields(props.group, fields),
-        } as Parameters<typeof render>[0])
-      },
+          group: withNamedFields(props.group),
+        } as Parameters<typeof render>[0]),
     })
   }
 
@@ -824,10 +826,9 @@ export function createZenoForm<
     useDisabledOption(form, disabled)
     useUnsavedChangesWarning(form, unsavedChangesWarning)
 
-    const fields = useAppFields(form)
     return useMemo(
-      () => Object.assign(form, fields, formComponents),
-      [form, fields]
+      () => Object.assign(form, getAppFields(form), formComponents),
+      [form]
     )
   }
 

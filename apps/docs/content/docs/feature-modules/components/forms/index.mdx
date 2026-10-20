@@ -358,15 +358,19 @@ const AddressFields = withFieldGroup({
 - `fields` is a path of the form (`"billing"`, `` `rows[${index}]` ``) or, for
   a group whose keys sit at different paths, a map of them
   (`{ city: "city", street: "line1" }`).
+- A group reads `fields` once, when it mounts. When its path can change, as
+  an array row's index does when a row above it is removed, key the group by
+  that path (`` key={`rows[${index}]`} ``) so it remounts on the new one.
 - A group renders another by passing its own `group` as `form`.
 - A field that shows or hides on another's value reads it with
   `useSelector(group.store, (state) => state.values?.country)`, as a form
   does. Keep the `?.`: a group's `values` are `undefined` while the form has
   nothing at the group's path, such as a removed array row before its group
-  unmounts, whatever their type says. `group.AppField` with a render function still works for a field that
-  needs its own field API, such as an array's `pushValue`, or a `renderItem`
-  that needs its item's type: a named field, on a group or a form, takes a
-  generic field's items as `unknown`, where `field.ComboboxField` infers them.
+  unmounts, whatever their type says.
+- `group.AppField` with a render function still works for a field that needs
+  its own field API, such as an array's `pushValue`, or a `renderItem` that
+  needs its item's type: a named field, on a group or a form, takes a generic
+  field's items as `unknown`, where `field.ComboboxField` infers them.
 - A group has no validators of its own. The form's `schema` validates its
   fields at their full paths.
 

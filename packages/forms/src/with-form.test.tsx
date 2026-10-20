@@ -2,13 +2,7 @@ import { cleanup, render, screen } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
 import { afterEach, expect, test, vi } from "vitest"
 import { z } from "zod"
-import {
-  Form,
-  FormProvider,
-  useAppFields,
-  useForm,
-  withForm,
-} from "./create-form"
+import { Form, FormProvider, useForm, withForm } from "./create-form"
 
 const CITY = /City/
 
@@ -24,10 +18,7 @@ type Profile = z.infer<typeof schema>
 
 const AddressSection = withForm({
   defaultValues: {} as Profile,
-  render: ({ form }) => {
-    const { InputField } = useAppFields(form)
-    return <InputField label="City" name="address.city" />
-  },
+  render: ({ form }) => <form.InputField label="City" name="address.city" />,
 })
 
 test("a withForm section edits and validates the parent's form", async () => {
