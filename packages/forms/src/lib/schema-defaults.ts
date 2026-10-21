@@ -19,7 +19,11 @@
 // untouched. Async schemas, lazy schemas, and any throw inside the walk also
 // degrade to "skip" — never bring the form down.
 
-type SchemaNode = { readonly _zod?: { readonly def?: SchemaDef } }
+type SchemaNode = {
+  readonly _zod?: { readonly def?: SchemaDef }
+  // Zod classic's `.meta()`, which reads what `.meta({ … })` registered.
+  readonly meta?: () => unknown
+}
 
 type SchemaDef = {
   readonly type?: string
@@ -149,6 +153,53 @@ function extractZodDefaultAt(
   }
 }
 
+// The schema inside a wrapper, or `undefined` past the last one.
+function unwrapped(node: SchemaNode): SchemaNode | undefined {
+  const def: SchemaDef | undefined = getDef(node)
+  switch (def?.type) {
+    case "default":
+    case "nonoptional":
+    case "nullable":
+    case "optional":
+    case "prefault":
+    case "readonly":
+      return def.innerType
+    case "pipe":
+      return def.in
+    default:
+      return undefined
+  }
+}
+
+// What `.meta({ … })` registered on the field at `keys`. Zod keeps it on the
+// schema it was set on, not on the `.optional()` or `.nullable()` around it,
+// so the walk looks through each wrapper.
+function extractZodMetaAt(
+  schema: SchemaNode,
+  keys: readonly PropertyKey[]
+): Record<string, unknown> | undefined {
+  let found: Record<string, unknown> | undefined
+  try {
+    let node: SchemaNode | null = schema
+    for (const key of keys) {
+      node = node && childAt(node, key)
+    }
+    let current: SchemaNode | undefined =
+      node && keys.length > 0 ? node : undefined
+    for (let depth = 0; current && depth < MAX_WRAPPER_DEPTH; depth += 1) {
+      const meta = typeof current.meta === "function" ? current.meta() : null
+      if (isPlainObject(meta)) {
+        found = meta
+        break
+      }
+      current = unwrapped(current)
+    }
+  } catch {
+    // An unrecognised schema has no metadata to offer.
+  }
+  return found
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return (
     typeof value === "object" &&
@@ -251,5 +302,6 @@ export {
   deepMergeDefaults,
   extractZodDefaultAt,
   extractZodDefaults,
+  extractZodMetaAt,
   pickSchemaShape,
 }

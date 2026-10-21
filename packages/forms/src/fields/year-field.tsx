@@ -2,6 +2,7 @@
 
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import { getEmptyValue } from "@zeno-lib/forms/lib/empty-value"
+import { getFieldHints } from "@zeno-lib/forms/lib/field-hints"
 import { useFormattedNumber } from "@zeno-lib/forms/lib/use-formatted-number"
 import { InputField, type InputFieldProps } from "./input-field"
 
@@ -25,10 +26,14 @@ type YearFieldProps = Omit<
 
 /**
  * Four-digit year input. The form value is an integer year or `null`. No
- * thousands separator, digits only, clamped to `min`/`max` on blur.
+ * thousands separator, digits only, clamped on blur to `min`/`max`, or to the
+ * bounds the schema's `year()` column hints.
  */
-function YearField({ max, min, ...props }: YearFieldProps) {
+function YearField({ max: maxProp, min: minProp, ...props }: YearFieldProps) {
   const field = useFieldContext<number | null | undefined>()
+  const hints = getFieldHints(field, "year")
+  const max = maxProp ?? hints.max
+  const min = minProp ?? hints.min
 
   const inputProps = useFormattedNumber({
     allowNegative: false,

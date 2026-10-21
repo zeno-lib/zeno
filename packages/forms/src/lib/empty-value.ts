@@ -188,4 +188,10 @@ function getNoTextValue(field: AnyFieldApi): string | null {
   return start.ok && start.value === null ? null : ""
 }
 
-export { emptyValueFor, getEmptyValue, getNoTextValue, withEmptyStartValues }
+export {
+  emptyValueFor,
+  getEmptyValue,
+  getNoTextValue,
+  toPathKeys,
+  withEmptyStartValues,
+}

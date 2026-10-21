@@ -196,6 +196,22 @@ describe("ruled columns", () => {
     expect(accepts({ builtIn: 10_000 })).toBe(false)
   })
 
+  it("hints the form fields the scale and bounds of a percentage and a year", () => {
+    // The column's own schema, under the optional and nullable wrappers of a
+    // nullable column, is where `@zeno-lib/forms` reads the hint.
+    const hint = (key: "builtIn" | "discount" | "share") =>
+      insert.shape[key].unwrap().unwrap().meta()
+
+    expect(hint("discount")).toEqual({
+      field: "percentage",
+      max: 1,
+      min: -1,
+      scale: "fraction",
+    })
+    expect(hint("share")).toMatchObject({ max: 100, scale: "percent" })
+    expect(hint("builtIn")).toEqual({ field: "year", max: 9999, min: 0 })
+  })
+
   it("checks an email address, and keeps a nullable one optional", () => {
     expect(accepts({ contact: "jane@example.com" })).toBe(true)
     expect(accepts({ contact: "jane@" })).toBe(false)

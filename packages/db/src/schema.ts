@@ -446,7 +446,10 @@ export const percentage = ({
     name === undefined
       ? numeric({ mode: "number" })
       : numeric(name, { mode: "number" }),
-    (base) => base.min(min).max(max)
+    // The hint `PercentageField` from `@zeno-lib/forms` reads, so a form
+    // shows and clamps what the column accepts with no props.
+    (base) =>
+      base.min(min).max(max).meta({ field: "percentage", max, min, scale })
   )
 
 export type YearOptions = {
@@ -460,7 +463,8 @@ export type YearOptions = {
 // A calendar year as a `smallint`, so a whole number.
 export const year = ({ name, min = 0, max = 9999 }: YearOptions = {}) =>
   withRule(name === undefined ? smallint() : smallint(name), (base) =>
-    base.min(min).max(max)
+    // The hint `YearField` from `@zeno-lib/forms` reads.
+    base.min(min).max(max).meta({ field: "year", max, min })
   )
 
 // An email address as `text`, checked as `z.email()` checks it.
