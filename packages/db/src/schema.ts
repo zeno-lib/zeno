@@ -1,5 +1,12 @@
 // https://orm.drizzle.team/docs/rls#using-with-supabase  (re-exported roles, authUid, realtimeMessages)
-import { Column, getColumnTable, getTableName, is, sql } from "drizzle-orm"
+import {
+  type BuildColumn,
+  Column,
+  getColumnTable,
+  getTableName,
+  is,
+  sql,
+} from "drizzle-orm"
 import {
   type AnyPgColumn,
   type AnyPgColumnBuilder,
@@ -33,6 +40,8 @@ import {
 import { snakeCase } from "drizzle-orm/pg-core/casing"
 import type { PgColumnsBuilders } from "drizzle-orm/pg-core/columns/all"
 import { authenticatedRole, authUid } from "drizzle-orm/supabase"
+import type { GetZodType } from "drizzle-orm/zod"
+import type { z } from "zod"
 import { authUsers } from "./auth-schema.ts"
 import {
   DEFAULT_FUNCTION_PREFIX,
@@ -687,15 +696,23 @@ export const serverOwned = <TBuilder extends AnyPgColumnBuilder>(
   builder: TBuilder
 ) => markColumn(builder, { serverOwned: true } as const)
 
+// The schema drizzle's Zod bridge generates for the column, before it adds
+// `.nullable()` or `.optional()`: what a function refinement receives.
+type ColumnSchema<TBuilder extends AnyPgColumnBuilder> = GetZodType<
+  BuildColumn<string, TBuilder, "common">,
+  undefined
+>
+
 /**
  * A rule `defineTableSchema` applies to the column in insert and update, in
  * the shape its `insert` and `update` options take: a Zod schema, or a
- * function from the generated one. A caller's refinement for the same column
- * runs on top of it.
+ * function from the generated one, whose parameter is typed from the column
+ * (`z.ZodNumber` for a `numeric({ mode: "number" })`). A caller's refinement
+ * for the same column runs on top of it.
  */
 export const withRule = <
   TBuilder extends AnyPgColumnBuilder,
-  const TRefine extends ((schema: never) => unknown) | object,
+  TRefine extends ((schema: ColumnSchema<TBuilder>) => z.ZodType) | z.ZodType,
 >(
   builder: TBuilder,
   refine: TRefine

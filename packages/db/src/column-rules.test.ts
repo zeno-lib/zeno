@@ -13,7 +13,6 @@ import {
 } from "drizzle-orm/pg-core"
 import { snakeCase } from "drizzle-orm/pg-core/casing"
 import { describe, expect, it } from "vitest"
-import type { z } from "zod"
 import {
   authUserId,
   functionPolicies,
@@ -25,11 +24,8 @@ import {
 } from "./schema.ts"
 
 const percentage = () =>
-  withRule(numeric({ mode: "number" }), (base: z.ZodNumber) =>
-    base.min(0).max(1)
-  )
-const year = () =>
-  withRule(smallint(), (base: z.ZodNumber) => base.min(0).max(2999))
+  withRule(numeric({ mode: "number" }), (base) => base.min(0).max(1))
+const year = () => withRule(smallint(), (base) => base.min(0).max(2999))
 
 // A factory, because drizzle builders mutate: one set of builders can't make
 // two tables.

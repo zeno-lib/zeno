@@ -198,12 +198,11 @@ import {
 } from "@zeno-lib/db/schema"
 import { sql } from "drizzle-orm"
 import { numeric, text } from "drizzle-orm/pg-core"
-import type { z } from "zod"
 
 export const posts = table("posts", {
   id: primaryId("uuid"),
   // A share between 0 and 1, wherever a client writes it.
-  rating: withRule(numeric({ mode: "number" }), (schema: z.ZodNumber) =>
+  rating: withRule(numeric({ mode: "number" }), (schema) =>
     schema.min(0).max(1)
   ),
   title: text("title").notNull(),
@@ -213,8 +212,12 @@ export const posts = table("posts", {
 ```
 
 - `withRule(builder, refinement)` takes a refinement in the shape the `insert`
-  and `update` options take. A refinement you pass for the same column in the
-  options runs on top of it.
+  and `update` options take. A function receives the schema the column
+  generates, typed from the builder (`z.ZodNumber` for a
+  `numeric({ mode: "number" })`, `z.ZodString` for a `text()`), so it needs no
+  annotation. A refinement you pass for the same column in the options runs on
+  top of it. `@zeno-lib/db` imports Zod's types for this, so install `zod`
+  next to it when you use rules.
 - `serverOwned(builder)` leaves the column out of `insert` and `update`, for
   a column a trigger, a default or an action of its own sets.
 - `select` keeps every column, without the rules, because it describes the

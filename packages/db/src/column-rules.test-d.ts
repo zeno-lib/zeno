@@ -9,7 +9,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core"
 import { expectTypeOf, test } from "vitest"
-import type { z } from "zod"
+import { z } from "zod"
 import { authUsers } from "./auth-schema.ts"
 import {
   assignedPrimaryId,
@@ -23,11 +23,8 @@ import {
 } from "./schema.ts"
 
 const percentage = () =>
-  withRule(numeric({ mode: "number" }), (schema: z.ZodNumber) =>
-    schema.min(0).max(1)
-  )
-const year = () =>
-  withRule(smallint(), (schema: z.ZodNumber) => schema.min(0).max(2999))
+  withRule(numeric({ mode: "number" }), (schema) => schema.min(0).max(1))
+const year = () => withRule(smallint(), (schema) => schema.min(0).max(2999))
 
 const listings = table(
   "listings",
@@ -137,4 +134,25 @@ test("the callback form records the same rules", () => {
   const { insert } = defineTableSchema(tags)
 
   expectTypeOf<keyof z.infer<typeof insert>>().toEqualTypeOf<"label">()
+})
+
+test("a rule's refinement is typed from its column", () => {
+  withRule(numeric({ mode: "number" }), (schema) => {
+    expectTypeOf(schema).toEqualTypeOf<z.ZodNumber>()
+    return schema
+  })
+  withRule(smallint(), (schema) => {
+    expectTypeOf(schema).toEqualTypeOf<z.ZodInt>()
+    return schema
+  })
+  withRule(text(), (schema) => {
+    expectTypeOf(schema).toEqualTypeOf<z.ZodString>()
+    return schema
+  })
+  withRule(text().notNull(), z.literal("fixed"))
+
+  // @ts-expect-error: a numeric column's schema is no string schema.
+  withRule(numeric({ mode: "number" }), (schema: z.ZodString) => schema.min(1))
+  // @ts-expect-error: a refinement returns a schema.
+  withRule(text(), () => "fixed")
 })

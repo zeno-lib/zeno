@@ -89,10 +89,14 @@
     "drizzle-kit": "1.0.0-rc.5-5935859",
     "drizzle-orm": "1.0.0-rc.5-5935859",
     "postgres": ">=3.4",
-    "react": ">=19"
+    "react": ">=19",
+    "zod": ">=4"
   },
   "peerDependenciesMeta": {
     "react": {
+      "optional": true
+    },
+    "zod": {
       "optional": true
     }
   },
