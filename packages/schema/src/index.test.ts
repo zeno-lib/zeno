@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm"
 import {
   bigint,
+  date,
   integer,
   pgEnum,
   pgSchema,
@@ -225,6 +226,40 @@ describe("defineTableSchema", () => {
     expect(schemas.insert.safeParse({ note: "", title: "x" }).success).toBe(
       false
     )
+  })
+})
+
+describe("string-mode dates and timestamps", () => {
+  const events = zenoTable(
+    pgTable("events", {
+      at: timestamp("at", { mode: "string", withTimezone: true }),
+      day: date("day", { mode: "string" }),
+      localAt: timestamp("local_at", { mode: "string" }),
+    })
+  )
+  const { insert, update } = defineTableSchema(events)
+  const accepts = (value: Record<string, unknown>) =>
+    insert.safeParse(value).success && update.safeParse(value).success
+
+  it("takes a calendar date", () => {
+    expect(accepts({ day: "2026-09-17" })).toBe(true)
+    expect(accepts({ day: null })).toBe(true)
+    expect(accepts({ day: "2026-02-30" })).toBe(false)
+    expect(accepts({ day: "17.09.2026" })).toBe(false)
+  })
+
+  it("takes ISO 8601 and the text Postgres returns, with the offset a time zone needs", () => {
+    for (const at of [
+      "2026-09-17T07:53:56.357127+00:00",
+      "2026-09-17 07:53:56.357127+00",
+      "2026-09-17T07:53Z",
+    ]) {
+      expect(accepts({ at }), at).toBe(true)
+    }
+    expect(accepts({ at: "2026-09-17T07:53:56" })).toBe(false)
+    expect(accepts({ at: "yesterday" })).toBe(false)
+    expect(accepts({ localAt: "2026-09-17 07:53:56.357127" })).toBe(true)
+    expect(accepts({ localAt: "yesterday" })).toBe(false)
   })
 })
 

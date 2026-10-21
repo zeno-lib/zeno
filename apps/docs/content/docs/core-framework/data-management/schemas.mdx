@@ -105,6 +105,16 @@ strips it and nothing writes it. A column you declare yourself is writable,
 even one named `createdAt`. When a trusted path needs to set an audit column (a
 data import, say), build that schema with `createInsertSchema(...)` instead.
 
+### Dates and timestamps are checked as text
+
+A `date` or `timestamp` column in string mode (`date({ mode: "string" })`,
+`timestamp({ mode: "string" })`) holds text that Postgres has to parse, so
+`insert` and `update` check its format. A date is a calendar date
+(`2026-09-17`). A timestamp is ISO 8601, with a `T` or a space, or the text
+Postgres returns (`2026-09-17 07:53:56.357127+00`); one `withTimezone` needs
+its offset, which would otherwise come from the database session. `select`
+reads back whatever is stored, unchecked.
+
 ### Identity ids stay out of writes
 
 An identity column, such as the one `sequentialPrimaryId()` creates, is filled by

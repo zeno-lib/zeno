@@ -17,7 +17,7 @@ import {
   createSchemaFactory as createDrizzleSchemaFactory,
   type NoUnknownKeys,
 } from "drizzle-orm/zod"
-import type { z } from "zod"
+import { z } from "zod"
 
 export {
   createInsertSchema,
@@ -328,15 +328,65 @@ const toPositive = (schema: unknown) =>
     ? (schema as PositiveSchema).positive()
     : schema
 
-const withPositiveIdentities = (table: Table, refinements?: Refinements) => {
+const positiveCheck = (column: Column) =>
+  isPositiveIdentity(column) ? toPositive : undefined
+
+// Drizzle's string mode reads Postgres's text form back
+// (`2026-09-17 07:53:56.357127+00`), which ISO 8601 doesn't cover, so a
+// timestamp takes a `T` or a space, and an offset of hours with optional
+// minutes. One with a time zone needs the offset, which would otherwise come
+// from the session's time zone.
+const TIMESTAMP_TZ =
+  /^\d{4}-[01]\d-[0-3]\d[T ][0-2]\d:[0-5]\d(:[0-5]\d(\.\d+)?)?([+-][0-2]\d(:?[0-5]\d)?|Z)$/
+const TIMESTAMP =
+  /^\d{4}-[01]\d-[0-3]\d[T ][0-2]\d:[0-5]\d(:[0-5]\d(\.\d+)?)?([+-][0-2]\d(:?[0-5]\d)?|Z)?$/
+
+const toTimestamp = (pattern: RegExp) => (schema: unknown) =>
+  (schema as z.ZodString).check((context) => {
+    if (!pattern.test(context.value)) {
+      // Zod's own code and format, so its locale words the message.
+      context.issues.push({
+        code: "invalid_format",
+        format: "datetime",
+        input: context.value,
+      })
+    }
+  })
+
+const toDate = (schema: unknown) => (schema as z.ZodString).check(z.iso.date())
+
+// A string-mode `date` or `timestamp` column holds text Postgres must parse,
+// and Drizzle's bridge only asks for a string.
+const formatCheck = (column: Column): SchemaRefinement | undefined => {
+  switch (column.dataType) {
+    case "string date":
+      return toDate
+    case "string timestamp":
+      return toTimestamp(
+        (column as Column & { withTimezone?: boolean }).withTimezone
+          ? TIMESTAMP_TZ
+          : TIMESTAMP
+      )
+    default:
+      return undefined
+  }
+}
+
+// Each column's check, under the caller's refinement for it.
+const withChecks = (
+  table: Table,
+  checkFor: (column: Column) => SchemaRefinement | undefined,
+  refinements: Refinements | undefined
+) => {
   const columns: Record<string, Column> = getColumns(table)
   const generated: Record<string, SchemaRefinement> = {}
 
   for (const key of Object.keys(columns)) {
     const column = columns[key]
+    const check = column === undefined ? undefined : checkFor(column)
 
-    if (column !== undefined && isPositiveIdentity(column)) {
-      generated[key] = toPositive
+    if (check !== undefined) {
+      generated[key] = check
     }
   }
 
@@ -387,7 +437,11 @@ const buildTableSchema = (
     omitUnwritable(
       create(
         table,
-        withRuleRefinements(table, options?.[variant] as Refinements)
+        withChecks(
+          table,
+          formatCheck,
+          withRuleRefinements(table, options?.[variant] as Refinements)
+        )
       )
     )
 
@@ -395,7 +449,7 @@ const buildTableSchema = (
     insert: write("insert", factory.createInsertSchema),
     select: factory.createSelectSchema(
       table,
-      withPositiveIdentities(table, options?.select as Refinements)
+      withChecks(table, positiveCheck, options?.select as Refinements)
     ),
     table,
     update: write("update", factory.createUpdateSchema),
