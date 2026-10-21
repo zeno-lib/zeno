@@ -97,14 +97,13 @@ trace. For such a table, use the [Drizzle helpers](#direct-drizzle-helpers).
 
 ### Audit columns stay out of writes
 
-`createdAt`, `updatedAt`, `createdBy` and `updatedBy` are the keys
-`auditColumns()`, `timestamps()` and `authorship()` emit. The database fills
-them, through a column default and the triggers from `@zeno-lib/db/triggers`, so
-`insert` and `update` leave them out. If a caller sends `createdBy`, the schema
-strips it and nothing writes it. The match is by key **and** default, so a
-`createdAt` column without a default stays writable. When a trusted path needs
-to set one (a data import, say), build that schema with
-`createInsertSchema(...)` instead.
+The database fills the columns `auditColumns()`, `timestamps()` and
+`authorship()` emit, through a column default and the triggers from
+`@zeno-lib/db/triggers`. The helpers mark their columns, so `insert` and
+`update` leave them out under any key. If a caller sends `createdBy`, the schema
+strips it and nothing writes it. A column you declare yourself is writable,
+even one named `createdAt`. When a trusted path needs to set an audit column (a
+data import, say), build that schema with `createInsertSchema(...)` instead.
 
 ### Identity ids stay out of writes
 
@@ -209,6 +208,13 @@ export const posts = table("posts", {
   // Set by its default and never by a client.
   userId: serverOwned(authUserId({ notNull: true }).default(sql`auth.uid()`)),
 })
+```
+
+An owner column like `userId` above has a shorthand that adds the default and
+the marker together:
+
+```ts
+userId: authUserId({ defaultToCurrentUser: true, notNull: true })
 ```
 
 - `withRule(builder, refinement)` takes a refinement in the shape the `insert`

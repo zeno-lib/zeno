@@ -29,18 +29,6 @@ type NoTableSchemaOptions = { [noTableSchemaOptions]?: never }
 
 type TableColumns<TTable extends Table> = TTable["_"]["columns"]
 
-// The keys `timestamps()` and `authorship()` from `@zeno-lib/db/schema` emit.
-// This package cannot import them, so it matches the names instead, and only
-// when the column has a default, since a column the database never fills is
-// one the caller has to write.
-const AUDIT_COLUMN_KEYS = new Set<string>([
-  "createdAt",
-  "createdBy",
-  "updatedAt",
-  "updatedBy",
-])
-type AuditColumnKey = "createdAt" | "createdBy" | "updatedAt" | "updatedBy"
-
 // The key a table built by `table()` from `@zeno-lib/db/schema` carries its
 // column rules under. A string rather than a symbol, so the two packages agree
 // on it without either importing the other; `@zeno-lib/db` mirrors it and
@@ -48,10 +36,18 @@ type AuditColumnKey = "createdAt" | "createdBy" | "updatedAt" | "updatedBy"
 const COLUMN_RULES_KEY = "~zeno"
 
 /**
- * What a column marker from `@zeno-lib/db/schema` records: `serverOwned`
- * keeps the column out of insert and update, `refine` runs on it in both.
+ * What a column marker from `@zeno-lib/db/schema` records. `writer` says who
+ * writes the column when a client doesn't: `"server"` code (`serverOwned`), or
+ * only the `"database"`, through a default and a trigger (the audit columns
+ * `timestamps()` and `authorship()` emit). `refine` runs on it in insert and
+ * update.
  */
-type ColumnRule = { readonly serverOwned: true } | { readonly refine: unknown }
+type ColumnRule = {
+  readonly writer?: "database" | "server"
+  readonly refine?: unknown
+}
+
+type Writer = NonNullable<ColumnRule["writer"]>
 
 /**
  * A table built by `table()`, `unsecureTable()` or `schema(...).table` from
@@ -65,9 +61,9 @@ type ZenoTable = Table & {
 type TableColumnRules<TTable extends ZenoTable> =
   TTable[typeof COLUMN_RULES_KEY]["columns"]
 
-type ServerOwnedKeys<TTable extends ZenoTable> = {
+type WrittenByKeys<TTable extends ZenoTable, TWriter extends Writer> = {
   [K in keyof TableColumnRules<TTable>]: TableColumnRules<TTable>[K] extends {
-    readonly serverOwned: true
+    readonly writer: TWriter
   }
     ? K
     : never
@@ -95,20 +91,11 @@ type IdentityKeys<TTable extends Table> = {
     : never
 }[keyof TableColumns<TTable>]
 
-type AuditKeys<TTable extends Table> = {
-  [K in keyof TableColumns<TTable>]: K extends AuditColumnKey
-    ? TableColumns<TTable>[K]["_"]["hasDefault"] extends true
-      ? K
-      : never
-    : never
-}[keyof TableColumns<TTable>]
-
-// The keys insert and update never accept: defaulted audit columns,
-// server-owned columns and identities.
+// The keys insert and update never accept: identities, and the columns the
+// database or server code writes.
 type UnwritableKeys<TTable extends ZenoTable> =
-  | AuditKeys<TTable>
   | IdentityKeys<TTable>
-  | ServerOwnedKeys<TTable>
+  | WrittenByKeys<TTable, Writer>
 
 type InsertColumns<TTable extends ZenoTable> = Pick<
   TableColumns<TTable>,
@@ -249,13 +236,10 @@ const unwritableKeys = (table: ZenoTable) => {
   const keys: string[] = []
 
   for (const key of Object.keys(columns)) {
-    const column = columns[key]
-    const isAudit = AUDIT_COLUMN_KEYS.has(key) && column?.hasDefault
-    const isIdentity = column?.generatedIdentity !== undefined
-    const rule = rules[key]
-    const isServerOwned = rule !== undefined && "serverOwned" in rule
+    const isIdentity = columns[key]?.generatedIdentity !== undefined
+    const writer = rules[key]?.writer
 
-    if (isAudit || isIdentity || isServerOwned) {
+    if (isIdentity || writer !== undefined) {
       keys.push(key)
     }
   }
@@ -282,19 +266,19 @@ const withColumnRules = (
   const rules = columnRules(table)
 
   for (const key of Object.keys(rules)) {
-    const rule = rules[key]
+    const rule = rules[key]?.refine
 
-    if (rule === undefined || !("refine" in rule)) {
+    if (rule === undefined) {
       continue
     }
 
     const refinement = refinements[key]
 
     if (refinement === undefined) {
-      merged[key] = rule.refine
+      merged[key] = rule
     } else if (typeof refinement === "function") {
       merged[key] = (schema: unknown) =>
-        (refinement as SchemaRefinement)(applyRefinement(rule.refine, schema))
+        (refinement as SchemaRefinement)(applyRefinement(rule, schema))
     }
   }
 

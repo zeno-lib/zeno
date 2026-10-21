@@ -135,47 +135,21 @@ describe("defineTableSchema", () => {
     ).toBe(true)
   })
 
-  it("omits defaulted audit columns from insert and update, not select", () => {
-    const notes = zenoTable(
-      pgTable("notes", {
-        body: text("body").notNull(),
-        createdAt: timestamp("created_at").notNull().defaultNow(),
-        createdBy: uuid("created_by").notNull().default(sql`auth.uid()`),
-        id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-        updatedAt: timestamp("updated_at").notNull().defaultNow(),
-        updatedBy: uuid("updated_by").default(sql`auth.uid()`),
-      })
-    )
-    const schemas = defineTableSchema(notes)
-    const forged = {
-      body: "Hello",
-      createdAt: new Date("2000-01-01T00:00:00.000Z"),
-      createdBy: "00000000-0000-4000-8000-000000000000",
-      updatedAt: new Date("2000-01-01T00:00:00.000Z"),
-      updatedBy: "00000000-0000-4000-8000-000000000000",
-    }
-
-    expect(schemas.insert.parse(forged)).toEqual({ body: "Hello" })
-    expect(schemas.update.parse(forged)).toEqual({ body: "Hello" })
-    expect(Object.keys(schemas.select.shape)).toEqual(
-      expect.arrayContaining([
-        "createdAt",
-        "createdBy",
-        "updatedAt",
-        "updatedBy",
-      ])
-    )
-  })
-
-  it("keeps an audit-named column the database does not fill", () => {
+  it("keeps a column named like an audit column, which only its marker leaves out", () => {
     const events = zenoTable(
       pgTable("events", {
-        createdAt: timestamp("created_at").notNull(),
-        id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+        createdAt: timestamp("created_at").notNull().defaultNow(),
+        createdBy: uuid("created_by").default(sql`auth.uid()`),
+        label: text("label").notNull(),
       })
     )
+    const imported = {
+      createdAt: new Date("2000-01-01T00:00:00.000Z"),
+      createdBy: "00000000-0000-4000-8000-000000000000",
+      label: "x",
+    }
 
-    expect(defineTableSchema(events).insert.safeParse({}).success).toBe(false)
+    expect(defineTableSchema(events).insert.parse(imported)).toEqual(imported)
   })
 
   it("keeps identity ids out of insert and update, and positive in select", () => {

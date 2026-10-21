@@ -1,5 +1,4 @@
-import { sql } from "drizzle-orm"
-import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
+import { integer, pgTable, text, timestamp } from "drizzle-orm/pg-core"
 import { expectTypeOf, test } from "vitest"
 import { z } from "zod"
 
@@ -55,33 +54,19 @@ test("refined schemas preserve refinement-specific output types", () => {
   }>()
 })
 
-test("defaulted audit columns leave the insert and update types", () => {
-  const notes = zenoTable(
-    pgTable("notes", {
-      body: text("body").notNull(),
+test("a column named like an audit column stays in the insert type", () => {
+  const events = zenoTable(
+    pgTable("events", {
       createdAt: timestamp("created_at").notNull().defaultNow(),
-      createdBy: uuid("created_by").notNull().default(sql`auth.uid()`),
-      updatedAt: timestamp("updated_at").notNull(),
+      label: text("label").notNull(),
     })
   )
-  const schemas = defineTableSchema(notes)
+  const schemas = defineTableSchema(events)
 
   expectTypeOf<z.infer<typeof schemas.insert>>().toEqualTypeOf<{
-    body: string
-    updatedAt: Date
+    createdAt?: Date | undefined
+    label: string
   }>()
-  expectTypeOf<z.infer<typeof schemas.update>>().toEqualTypeOf<{
-    body?: string | undefined
-    updatedAt?: Date | undefined
-  }>()
-  expectTypeOf<keyof z.infer<typeof schemas.select>>().toEqualTypeOf<
-    "body" | "createdAt" | "createdBy" | "updatedAt"
-  >()
-
-  defineTableSchema(notes, {
-    // @ts-expect-error: an omitted audit column has nothing to refine.
-    insert: { createdBy: (schema) => schema },
-  })
 })
 
 test("a function refinement keeps a nullable or defaulted insert column optional", () => {

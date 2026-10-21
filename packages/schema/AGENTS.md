@@ -13,16 +13,14 @@ from Drizzle tables. The user guide is in
   derive from the DB variants themselves.
 - **Don't add a stricter unknown-key policy.** Generated columns are omitted and unknown keys are
   stripped, as plain Zod does.
-- **Detect audit columns by key and default.**
 - **Read column markers from the table's `"~zeno"` key, never from the column types.** Drizzle's
   `MakeColumnConfig` copies a fixed set of builder fields, so a marker on a builder never reaches
   the column types. `table()` from `@zeno-lib/db/schema` reads it off the builders and records it,
   type and value, on the table. An omit the inferred type doesn't also make offers a key the
   runtime strips; `packages/db/src/column-rules.test.ts` and `.test-d.ts` pin both sides.
 - **`COLUMN_RULES_KEY` in `src/index.ts` mirrors `@zeno-lib/db/schema`.** Rename both together,
-  along with the rule shapes (`serverOwned`, `refine`).
-- **`AUDIT_COLUMN_KEYS` in `src/index.ts` mirrors `@zeno-lib/db/schema`.** Rename both together;
-  `packages/db/src/schema-zod.test.ts` fails if they drift.
+  along with the rule shapes (`writer`, `refine`).
+- **Never leave a column out of a write for its name.** Only an identity or a marker does that.
 - **Never point `exports` back at `src/`.** A consumer's Next build doesn't transpile
   `node_modules` and fails with "Unknown module type". `dist/` is gitignored and built by
   `prepack`.

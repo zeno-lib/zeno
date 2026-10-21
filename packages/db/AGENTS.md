@@ -17,8 +17,6 @@ This node holds what the code and the guide don't make obvious.
   and `postgres` and run `drizzle-kit` from their own peer installs.
 - **`ActionResult` is duplicated in `@zeno-lib/forms/lib/action-result`**, because neither package
   depends on the other. Change both together and keep it plain JSON (no class instances, no `Map`).
-- **The audit mixin keys are mirrored in `@zeno-lib/schema`** (`AUDIT_COLUMN_KEYS`). Renaming one is
-  a breaking change there too; `src/schema-zod.test.ts` pins it.
 - **The function naming convention is shared** between `functionPolicies` and
   `selectFunctionPermissions` through `src/function-names.ts`.
 - **`pnpm test` needs the local Supabase stack** (`pnpm dev`), because
@@ -78,6 +76,9 @@ This node holds what the code and the guide don't make obvious.
   schema, never `pgSchema(...)`, whose public overload takes no casing and leaves RLS off.
 - **`serverOwned()` and `withRule()` only work inside the columns of Zeno's `table` functions.**
   Those read the markers off the builders; drizzle's own `pgTable` drops them, silently.
+- **A helper that emits a column only the server or the database writes marks it itself**
+  (`timestamps()`, `createdBy()`, `authUserId({ defaultToCurrentUser })`). A marker can't be
+  added by a call chained after the helper, and `@zeno-lib/schema` matches no names.
 - **The column rules key (`"~zeno"`) is mirrored in `@zeno-lib/schema`** (`COLUMN_RULES_KEY`).
   `src/column-rules.test.ts` fails if the two drift.
 - **Primary key defaults track the Supabase table editor, not Drizzle**

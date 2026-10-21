@@ -33,9 +33,7 @@ const listings = table(
     builtIn: year(),
     id: bigint({ mode: "number" }).generatedByDefaultAsIdentity(),
     occupancy: percentage(),
-    ownerId: serverOwned(
-      authUserId({ notNull: true }).default(sql`auth.uid()`)
-    ),
+    ownerId: authUserId({ defaultToCurrentUser: true, notNull: true }),
     summary: text(),
     title: text().notNull(),
   },

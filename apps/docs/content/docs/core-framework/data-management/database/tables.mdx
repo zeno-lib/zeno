@@ -276,6 +276,13 @@ SQL:
 // createdAt: string, updatedAt: string in $inferSelect
 ```
 
+`timestamps()`, `createdBy()` and `updatedBy()` (so `authorship()` and
+`auditColumns()` too) mark their columns as written by the database, so
+[`defineTableSchema`](/docs/core-framework/data-management/schemas) leaves them
+out of every `insert` and `update` schema, whatever key you give them. A column
+you write yourself with the same name, `createdAt: timestamp()` say, stays
+writable.
+
 <Callout type="warn">
   **`updated_at` needs a trigger, and so does `updated_by`.** Both get a
   `DEFAULT`, which Postgres applies on insert; SQL has no "on update" default,
@@ -371,6 +378,19 @@ userId: authUserId({ notNull: true })             // required, ON DELETE RESTRIC
 ALTER TABLE "<table>" ADD CONSTRAINT "<table>_user_id_users_id_fkey"
   FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id")
   ON DELETE SET NULL ON UPDATE CASCADE;
+```
+
+`defaultToCurrentUser: true` makes it an **owner** column: `DEFAULT auth.uid()`,
+so a row belongs to whoever inserts it, and
+[server-owned](/docs/core-framework/data-management/schemas#put-rules-on-the-column),
+so no form or action input lets a client pick the owner:
+
+```typescript
+userId: authUserId({ defaultToCurrentUser: true, notNull: true })
+```
+
+```sql
+"user_id" uuid DEFAULT auth.uid() NOT NULL
 ```
 
 `userId(reference, options?)` is the same column against your own table, which
