@@ -81,6 +81,12 @@ import { posts } from "{project}-db"
 export const postSchema = defineTableSchema(posts)
 ```
 
+`defineTableSchema` takes a table from Zeno's `table`, `unsecureTable` or
+`schema(...).table`, which record the column rules described
+[below](#put-rules-on-the-column). A table from Drizzle's own `pgTable` is a
+type error, and throws at runtime, because its rules would be ignored without a
+trace. For such a table, use the [Drizzle helpers](#direct-drizzle-helpers).
+
 `postSchema` contains:
 
 | Schema | Use it for |
@@ -325,7 +331,9 @@ import {
 ```
 
 Prefer `defineTableSchema(...)` for application tables so teams use the same
-variant names across forms, actions, and tests.
+variant names across forms, actions, and tests. The Drizzle helpers also take a
+plain `pgTable`, which `defineTableSchema` refuses, and they know nothing of
+column rules, identity ids or audit columns.
 
 ## Pitfalls
 

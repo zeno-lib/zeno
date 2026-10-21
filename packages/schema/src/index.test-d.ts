@@ -4,6 +4,7 @@ import { expectTypeOf, test } from "vitest"
 import { z } from "zod"
 
 import { defineTableSchema } from "./index"
+import { zenoTable } from "./test-table"
 
 type StandardSchema<T> = {
   readonly "~standard": {
@@ -16,11 +17,13 @@ declare function acceptsFormsSchema<TFormData>(
   _schema: StandardSchema<TFormData>
 ): void
 
-const posts = pgTable("posts", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  slug: text("slug").notNull(),
-  title: text("title").notNull(),
-})
+const posts = zenoTable(
+  pgTable("posts", {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+  })
+)
 
 test("insert and update schemas infer form-compatible Standard Schema data", () => {
   const schemas = defineTableSchema(posts)
@@ -53,12 +56,14 @@ test("refined schemas preserve refinement-specific output types", () => {
 })
 
 test("defaulted audit columns leave the insert and update types", () => {
-  const notes = pgTable("notes", {
-    body: text("body").notNull(),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    createdBy: uuid("created_by").notNull().default(sql`auth.uid()`),
-    updatedAt: timestamp("updated_at").notNull(),
-  })
+  const notes = zenoTable(
+    pgTable("notes", {
+      body: text("body").notNull(),
+      createdAt: timestamp("created_at").notNull().defaultNow(),
+      createdBy: uuid("created_by").notNull().default(sql`auth.uid()`),
+      updatedAt: timestamp("updated_at").notNull(),
+    })
+  )
   const schemas = defineTableSchema(notes)
 
   expectTypeOf<z.infer<typeof schemas.insert>>().toEqualTypeOf<{
@@ -80,11 +85,13 @@ test("defaulted audit columns leave the insert and update types", () => {
 })
 
 test("a function refinement keeps a nullable or defaulted insert column optional", () => {
-  const drafts = pgTable("drafts", {
-    note: text("note"),
-    status: text("status").notNull().default("open"),
-    title: text("title").notNull(),
-  })
+  const drafts = zenoTable(
+    pgTable("drafts", {
+      note: text("note"),
+      status: text("status").notNull().default("open"),
+      title: text("title").notNull(),
+    })
+  )
   const schemas = defineTableSchema(drafts, {
     insert: {
       note: (schema) => schema.min(1),

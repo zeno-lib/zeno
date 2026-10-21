@@ -10,14 +10,17 @@ import {
 import { describe, expect, it } from "vitest"
 
 import { defineTableSchema } from "./index"
+import { zenoTable } from "./test-table"
 
-const posts = pgTable("posts", {
-  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  slug: text("slug").notNull(),
-  summary: text("summary"),
-  title: text("title").notNull(),
-})
+const posts = zenoTable(
+  pgTable("posts", {
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    slug: text("slug").notNull(),
+    summary: text("summary"),
+    title: text("title").notNull(),
+  })
+)
 
 describe("defineTableSchema", () => {
   it("returns select, insert, and update Zod schemas for a Drizzle table", () => {
@@ -55,6 +58,13 @@ describe("defineTableSchema", () => {
     ).toEqual({
       title: "Updated title",
     })
+  })
+
+  it("refuses a plain drizzle table, whose column markers would be ignored", () => {
+    const raw = pgTable("raw", { label: text("label") })
+
+    // @ts-expect-error: only a table from `@zeno-lib/db/schema` records rules.
+    expect(() => defineTableSchema(raw)).toThrow(TypeError)
   })
 
   it("omits generated columns from insert and update schemas", () => {
@@ -126,14 +136,16 @@ describe("defineTableSchema", () => {
   })
 
   it("omits defaulted audit columns from insert and update, not select", () => {
-    const notes = pgTable("notes", {
-      body: text("body").notNull(),
-      createdAt: timestamp("created_at").notNull().defaultNow(),
-      createdBy: uuid("created_by").notNull().default(sql`auth.uid()`),
-      id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-      updatedAt: timestamp("updated_at").notNull().defaultNow(),
-      updatedBy: uuid("updated_by").default(sql`auth.uid()`),
-    })
+    const notes = zenoTable(
+      pgTable("notes", {
+        body: text("body").notNull(),
+        createdAt: timestamp("created_at").notNull().defaultNow(),
+        createdBy: uuid("created_by").notNull().default(sql`auth.uid()`),
+        id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+        updatedAt: timestamp("updated_at").notNull().defaultNow(),
+        updatedBy: uuid("updated_by").default(sql`auth.uid()`),
+      })
+    )
     const schemas = defineTableSchema(notes)
     const forged = {
       body: "Hello",
@@ -156,21 +168,25 @@ describe("defineTableSchema", () => {
   })
 
   it("keeps an audit-named column the database does not fill", () => {
-    const events = pgTable("events", {
-      createdAt: timestamp("created_at").notNull(),
-      id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-    })
+    const events = zenoTable(
+      pgTable("events", {
+        createdAt: timestamp("created_at").notNull(),
+        id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+      })
+    )
 
     expect(defineTableSchema(events).insert.safeParse({}).success).toBe(false)
   })
 
   it("keeps identity ids out of insert and update, and positive in select", () => {
-    const items = pgTable("items", {
-      id: bigint("id", { mode: "number" })
-        .primaryKey()
-        .generatedByDefaultAsIdentity(),
-      label: text("label").notNull(),
-    })
+    const items = zenoTable(
+      pgTable("items", {
+        id: bigint("id", { mode: "number" })
+          .primaryKey()
+          .generatedByDefaultAsIdentity(),
+        label: text("label").notNull(),
+      })
+    )
     const schemas = defineTableSchema(items)
 
     expect(schemas.insert.parse({ id: 5000, label: "x" })).toEqual({
@@ -186,11 +202,13 @@ describe("defineTableSchema", () => {
   })
 
   it("leaves identities configured to go below one unconstrained", () => {
-    const ledger = pgTable("ledger", {
-      id: integer("id")
-        .primaryKey()
-        .generatedByDefaultAsIdentity({ increment: -1, startWith: -1 }),
-    })
+    const ledger = zenoTable(
+      pgTable("ledger", {
+        id: integer("id")
+          .primaryKey()
+          .generatedByDefaultAsIdentity({ increment: -1, startWith: -1 }),
+      })
+    )
 
     expect(defineTableSchema(ledger).select.parse({ id: -5 })).toEqual({
       id: -5,
@@ -198,9 +216,11 @@ describe("defineTableSchema", () => {
   })
 
   it("runs a function refinement on top of the positive identity check", () => {
-    const items = pgTable("items", {
-      id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-    })
+    const items = zenoTable(
+      pgTable("items", {
+        id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+      })
+    )
     const schemas = defineTableSchema(items, {
       select: { id: (schema) => schema.max(10) },
     })
@@ -211,10 +231,12 @@ describe("defineTableSchema", () => {
   })
 
   it("keeps a function-refined nullable insert column optional", () => {
-    const drafts = pgTable("drafts", {
-      note: text("note"),
-      title: text("title").notNull(),
-    })
+    const drafts = zenoTable(
+      pgTable("drafts", {
+        note: text("note"),
+        title: text("title").notNull(),
+      })
+    )
     const schemas = defineTableSchema(drafts, {
       insert: { note: (schema) => schema.min(1) },
     })

@@ -822,9 +822,14 @@ export const schema = <TName extends string>(name: TName) => {
   const built = snakeCase.schema(name)
 
   // `Object.assign` mutates and returns the PgSchema instance, so `isSchema`
-  // and the `entityKind` checks drizzle-kit runs still recognise it.
+  // and the `entityKind` checks drizzle-kit runs still recognise it. Its type
+  // would intersect the two `table`s, and a call resolves to drizzle's, which
+  // drops the column rules, so the replaced members leave the type first.
   return Object.assign(built, {
     table: withColumnRules<TName>(built.table.withRLS),
     unsecureTable: withColumnRules<TName>(built.table),
-  })
+  }) as Omit<typeof built, "table"> & {
+    table: TableFn<TName>
+    unsecureTable: TableFn<TName>
+  }
 }

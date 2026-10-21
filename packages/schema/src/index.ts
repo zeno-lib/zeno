@@ -2,6 +2,7 @@
 import {
   type Column,
   getColumns,
+  getTableName,
   type InferInsertModel,
   type InferSelectModel,
   type Table,
@@ -52,13 +53,19 @@ const COLUMN_RULES_KEY = "~zeno"
  */
 type ColumnRule = { readonly serverOwned: true } | { readonly refine: unknown }
 
-type TableColumnRules<TTable> = TTable extends {
-  readonly [COLUMN_RULES_KEY]: { readonly columns: infer TRules }
+/**
+ * A table built by `table()`, `unsecureTable()` or `schema(...).table` from
+ * `@zeno-lib/db/schema`, which records its column rules. A plain drizzle
+ * table has none, so its markers would vanish without a trace.
+ */
+type ZenoTable = Table & {
+  readonly [COLUMN_RULES_KEY]: { readonly columns: object }
 }
-  ? TRules
-  : Record<never, never>
 
-type ServerOwnedKeys<TTable> = {
+type TableColumnRules<TTable extends ZenoTable> =
+  TTable[typeof COLUMN_RULES_KEY]["columns"]
+
+type ServerOwnedKeys<TTable extends ZenoTable> = {
   [K in keyof TableColumnRules<TTable>]: TableColumnRules<TTable>[K] extends {
     readonly serverOwned: true
   }
@@ -66,7 +73,7 @@ type ServerOwnedKeys<TTable> = {
     : never
 }[keyof TableColumnRules<TTable>]
 
-type ColumnRefinements<TTable> = {
+type ColumnRefinements<TTable extends ZenoTable> = {
   [K in keyof TableColumnRules<TTable> as TableColumnRules<TTable>[K] extends {
     readonly refine: unknown
   }
@@ -98,12 +105,12 @@ type AuditKeys<TTable extends Table> = {
 
 // The keys insert and update never accept: defaulted audit columns,
 // server-owned columns and identities.
-type UnwritableKeys<TTable extends Table> =
+type UnwritableKeys<TTable extends ZenoTable> =
   | AuditKeys<TTable>
   | IdentityKeys<TTable>
   | ServerOwnedKeys<TTable>
 
-type InsertColumns<TTable extends Table> = Pick<
+type InsertColumns<TTable extends ZenoTable> = Pick<
   TableColumns<TTable>,
   Exclude<keyof InferInsertModel<TTable>, UnwritableKeys<TTable>>
 >
@@ -113,16 +120,16 @@ type SelectRefine<
   TCoerce extends CoerceOptions,
 > = BuildRefine<TableColumns<TTable>, TCoerce>
 type InsertRefine<
-  TTable extends Table,
+  TTable extends ZenoTable,
   TCoerce extends CoerceOptions,
 > = BuildRefine<InsertColumns<TTable>, TCoerce>
 type UpdateRefine<
-  TTable extends Table,
+  TTable extends ZenoTable,
   TCoerce extends CoerceOptions,
 > = BuildRefine<InsertColumns<TTable>, TCoerce>
 
 type DefineTableSchemaOptions<
-  TTable extends Table,
+  TTable extends ZenoTable,
   TCoerce extends CoerceOptions = undefined,
 > = {
   factory?: CreateSchemaFactoryOptions<TCoerce>
@@ -148,7 +155,7 @@ type RefineFromOptions<
 
 // A caller's refinement for a key replaces the column rule's in the type: a
 // function receives the column rule's schema at runtime and returns its own.
-type WriteRefine<TTable extends Table, TOptions, TKey extends string> =
+type WriteRefine<TTable extends ZenoTable, TOptions, TKey extends string> =
   RefineFromOptions<TOptions, TKey> extends infer TCaller
     ? TCaller extends Record<string, unknown>
       ? Omit<ColumnRefinements<TTable>, keyof TCaller> & TCaller
@@ -197,7 +204,7 @@ type OptionalRefinedInsert<TSchema, TTable extends Table, TRefine> =
     : never
 
 type DefineTableSchemaResult<
-  TTable extends Table,
+  TTable extends ZenoTable,
   TCoerce extends CoerceOptions,
   TOptions,
 > = {
@@ -233,12 +240,10 @@ type DefineTableSchemaResult<
 
 type Refinements = Record<string, unknown>
 
-const columnRules = (table: Table): Record<string, ColumnRule> =>
-  (table as { [COLUMN_RULES_KEY]?: { columns: Record<string, ColumnRule> } })[
-    COLUMN_RULES_KEY
-  ]?.columns ?? {}
+const columnRules = (table: ZenoTable) =>
+  table[COLUMN_RULES_KEY].columns as Record<string, ColumnRule>
 
-const unwritableKeys = (table: Table) => {
+const unwritableKeys = (table: ZenoTable) => {
   const columns: Record<string, Column> = getColumns(table)
   const rules = columnRules(table)
   const keys: string[] = []
@@ -269,7 +274,7 @@ const applyRefinement = (refinement: unknown, schema: unknown) =>
 // narrow further; a caller's schema replaces it outright, as it replaces any
 // generated rule.
 const withColumnRules = (
-  table: Table,
+  table: ZenoTable,
   refinements: Refinements = {}
 ): Refinements => {
   const merged: Refinements = { ...refinements }
@@ -350,11 +355,11 @@ const withPositiveIdentities = (
   return merged
 }
 
-function defineTableSchema<TTable extends Table>(
+function defineTableSchema<TTable extends ZenoTable>(
   table: TTable
 ): DefineTableSchemaResult<TTable, undefined, NoTableSchemaOptions>
 function defineTableSchema<
-  TTable extends Table,
+  TTable extends ZenoTable,
   TCoerce extends CoerceOptions = undefined,
   TOptions extends DefineTableSchemaOptions<
     TTable,
@@ -365,7 +370,7 @@ function defineTableSchema<
   options: TOptions
 ): DefineTableSchemaResult<TTable, TCoerce, TOptions>
 function defineTableSchema<
-  TTable extends Table,
+  TTable extends ZenoTable,
   TCoerce extends CoerceOptions = undefined,
   TOptions extends DefineTableSchemaOptions<
     TTable,
@@ -375,6 +380,14 @@ function defineTableSchema<
   table: TTable,
   options?: TOptions
 ): DefineTableSchemaResult<TTable, TCoerce, TOptions> {
+  // The type already refuses a plain drizzle table. This catches a cast, or a
+  // caller without TypeScript, before its markers are silently ignored.
+  if (!(COLUMN_RULES_KEY in table)) {
+    throw new TypeError(
+      `defineTableSchema reads the column rules of a table from table(), unsecureTable() or schema(...).table in @zeno-lib/db/schema, and "${getTableName(table)}" has none.`
+    )
+  }
+
   const schemaFactory = createDrizzleSchemaFactory(options?.factory)
   const unwritable = unwritableKeys(table)
   // Zod rejects an omit key the shape lacks, which a generated column would be.
@@ -413,5 +426,5 @@ function defineTableSchema<
   } as unknown as DefineTableSchemaResult<TTable, TCoerce, TOptions>
 }
 
-export type { DefineTableSchemaOptions, DefineTableSchemaResult }
+export type { DefineTableSchemaOptions, DefineTableSchemaResult, ZenoTable }
 export { defineTableSchema }

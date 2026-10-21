@@ -13,7 +13,7 @@ from Drizzle tables. The user guide is in
   derive from the DB variants themselves.
 - **Don't add a stricter unknown-key policy.** Generated columns are omitted and unknown keys are
   stripped, as plain Zod does.
-- **Detect audit columns by key and default**, so a plain `pgTable` gets the same omit.
+- **Detect audit columns by key and default.**
 - **Read column markers from the table's `"~zeno"` key, never from the column types.** Drizzle's
   `MakeColumnConfig` copies a fixed set of builder fields, so a marker on a builder never reaches
   the column types. `table()` from `@zeno-lib/db/schema` reads it off the builders and records it,
