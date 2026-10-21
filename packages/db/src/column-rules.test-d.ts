@@ -1,4 +1,4 @@
-import { defineTableSchema } from "@zeno-lib/schema"
+import { defineServerTableSchema, defineTableSchema } from "@zeno-lib/schema"
 import { sql } from "drizzle-orm"
 import {
   bigint,
@@ -71,6 +71,24 @@ test("insert and update hold only what a client writes", () => {
   defineTableSchema(listings, {
     // @ts-expect-error: neither has an identity id.
     update: { id: (schema) => schema },
+  })
+})
+
+test("server code may write the server-owned columns", () => {
+  const schemas = defineServerTableSchema(listings, {
+    insert: { ownerId: (schema) => schema },
+  })
+
+  expectTypeOf<keyof z.infer<typeof schemas.insert>>().toEqualTypeOf<
+    "builtIn" | "occupancy" | "ownerId" | "summary" | "title"
+  >()
+  expectTypeOf<keyof z.infer<typeof schemas.update>>().toEqualTypeOf<
+    "builtIn" | "occupancy" | "ownerId" | "summary" | "title"
+  >()
+
+  defineServerTableSchema(listings, {
+    // @ts-expect-error: the database writes the audit columns.
+    update: { createdAt: (schema) => schema },
   })
 })
 

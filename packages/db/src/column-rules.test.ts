@@ -1,4 +1,4 @@
-import { defineTableSchema } from "@zeno-lib/schema"
+import { defineServerTableSchema, defineTableSchema } from "@zeno-lib/schema"
 import { generateDrizzleJson } from "drizzle-kit/api-postgres"
 import { sql } from "drizzle-orm"
 import {
@@ -138,6 +138,17 @@ describe("column rules", () => {
         defineTableSchema(built).insert.parse({ label: "x", ownerId: "y" })
       ).toEqual({ label: "x" })
     }
+  })
+
+  it("keeps server-owned columns for server code, and audit columns from everyone", () => {
+    const server = defineServerTableSchema(listings)
+    const expected = { ownerId: forged.ownerId, title: "Loft" }
+
+    expect(server.insert.parse(forged)).toEqual(expected)
+    expect(server.update.parse(forged)).toEqual(expected)
+    expect(server.insert.safeParse({ ...expected, occupancy: 2 }).success).toBe(
+      false
+    )
   })
 
   it("changes no DDL", async () => {

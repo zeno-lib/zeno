@@ -91,44 +91,51 @@ type IdentityKeys<TTable extends Table> = {
     : never
 }[keyof TableColumns<TTable>]
 
-// The keys insert and update never accept: identities, and the columns the
-// database or server code writes.
-type UnwritableKeys<TTable extends ZenoTable> =
-  | IdentityKeys<TTable>
-  | WrittenByKeys<TTable, Writer>
+// Whose columns a variant leaves out: a client writes neither the database's
+// nor the server's, and server code writes the server's.
+type ClientExcludes = Writer
+type ServerExcludes = "database"
 
-type InsertColumns<TTable extends ZenoTable> = Pick<
+// The keys insert and update never accept: identities, and the columns
+// `TExcludes` writes.
+type UnwritableKeys<
+  TTable extends ZenoTable,
+  TExcludes extends Writer = ClientExcludes,
+> = IdentityKeys<TTable> | WrittenByKeys<TTable, TExcludes>
+
+type InsertColumns<
+  TTable extends ZenoTable,
+  TExcludes extends Writer = ClientExcludes,
+> = Pick<
   TableColumns<TTable>,
-  Exclude<keyof InferInsertModel<TTable>, UnwritableKeys<TTable>>
+  Exclude<keyof InferInsertModel<TTable>, UnwritableKeys<TTable, TExcludes>>
 >
 
 type SelectRefine<
   TTable extends Table,
   TCoerce extends CoerceOptions,
 > = BuildRefine<TableColumns<TTable>, TCoerce>
-type InsertRefine<
+type WriteRefineOptions<
   TTable extends ZenoTable,
   TCoerce extends CoerceOptions,
-> = BuildRefine<InsertColumns<TTable>, TCoerce>
-type UpdateRefine<
-  TTable extends ZenoTable,
-  TCoerce extends CoerceOptions,
-> = BuildRefine<InsertColumns<TTable>, TCoerce>
+  TExcludes extends Writer,
+> = BuildRefine<InsertColumns<TTable, TExcludes>, TCoerce>
 
 type DefineTableSchemaOptions<
   TTable extends ZenoTable,
   TCoerce extends CoerceOptions = undefined,
+  TExcludes extends Writer = ClientExcludes,
 > = {
   factory?: CreateSchemaFactoryOptions<TCoerce>
   insert?: NoUnknownKeys<
-    InsertRefine<TTable, TCoerce>,
+    WriteRefineOptions<TTable, TCoerce, TExcludes>,
     InferInsertModel<TTable>
   >
   select?: NoUnknownKeys<
     SelectRefine<TTable, TCoerce>,
     InferSelectModel<TTable>
   >
-  update?: UpdateRefine<TTable, TCoerce>
+  update?: WriteRefineOptions<TTable, TCoerce, TExcludes>
 }
 
 type RefineFromOptions<
@@ -194,6 +201,7 @@ type DefineTableSchemaResult<
   TTable extends ZenoTable,
   TCoerce extends CoerceOptions,
   TOptions,
+  TExcludes extends Writer = ClientExcludes,
 > = {
   insert: OmitKeys<
     OptionalRefinedInsert<
@@ -206,7 +214,7 @@ type DefineTableSchemaResult<
       TTable,
       WriteRefine<TTable, TOptions, "insert">
     >,
-    UnwritableKeys<TTable>
+    UnwritableKeys<TTable, TExcludes>
   >
   select: BuildSchema<
     "select",
@@ -221,7 +229,7 @@ type DefineTableSchemaResult<
       WriteRefine<TTable, TOptions, "update">,
       TCoerce
     >,
-    UnwritableKeys<TTable>
+    UnwritableKeys<TTable, TExcludes>
   >
 }
 
@@ -230,7 +238,10 @@ type Refinements = Record<string, unknown>
 const columnRules = (table: ZenoTable) =>
   table[COLUMN_RULES_KEY].columns as Record<string, ColumnRule>
 
-const unwritableKeys = (table: ZenoTable) => {
+const CLIENT_EXCLUDES: ReadonlySet<Writer> = new Set(["database", "server"])
+const SERVER_EXCLUDES: ReadonlySet<Writer> = new Set(["database"])
+
+const unwritableKeys = (table: ZenoTable, excludes: ReadonlySet<Writer>) => {
   const columns: Record<string, Column> = getColumns(table)
   const rules = columnRules(table)
   const keys: string[] = []
@@ -239,7 +250,7 @@ const unwritableKeys = (table: ZenoTable) => {
     const isIdentity = columns[key]?.generatedIdentity !== undefined
     const writer = rules[key]?.writer
 
-    if (isIdentity || writer !== undefined) {
+    if (isIdentity || (writer !== undefined && excludes.has(writer))) {
       keys.push(key)
     }
   }
@@ -339,41 +350,22 @@ const withPositiveIdentities = (
   return merged
 }
 
-function defineTableSchema<TTable extends ZenoTable>(
-  table: TTable
-): DefineTableSchemaResult<TTable, undefined, NoTableSchemaOptions>
-function defineTableSchema<
-  TTable extends ZenoTable,
-  TCoerce extends CoerceOptions = undefined,
-  TOptions extends DefineTableSchemaOptions<
-    TTable,
-    TCoerce
-  > = DefineTableSchemaOptions<TTable, TCoerce>,
->(
-  table: TTable,
-  options: TOptions
-): DefineTableSchemaResult<TTable, TCoerce, TOptions>
-function defineTableSchema<
-  TTable extends ZenoTable,
-  TCoerce extends CoerceOptions = undefined,
-  TOptions extends DefineTableSchemaOptions<
-    TTable,
-    TCoerce
-  > = DefineTableSchemaOptions<TTable, TCoerce>,
->(
-  table: TTable,
-  options?: TOptions
-): DefineTableSchemaResult<TTable, TCoerce, TOptions> {
+const buildTableSchema = (
+  name: string,
+  table: ZenoTable,
+  options: DefineTableSchemaOptions<ZenoTable, CoerceOptions> | undefined,
+  excludes: ReadonlySet<Writer>
+) => {
   // The type already refuses a plain drizzle table. This catches a cast, or a
   // caller without TypeScript, before its markers are silently ignored.
   if (!(COLUMN_RULES_KEY in table)) {
     throw new TypeError(
-      `defineTableSchema reads the column rules of a table from table(), unsecureTable() or schema(...).table in @zeno-lib/db/schema, and "${getTableName(table)}" has none.`
+      `${name} reads the column rules of a table from table(), unsecureTable() or schema(...).table in @zeno-lib/db/schema, and "${getTableName(table)}" has none.`
     )
   }
 
   const schemaFactory = createDrizzleSchemaFactory(options?.factory)
-  const unwritable = unwritableKeys(table)
+  const unwritable = unwritableKeys(table, excludes)
   // Zod rejects an omit key the shape lacks, which a generated column would be.
   const omitUnwritable = (schema: z.ZodObject) => {
     const mask: Record<string, true> = {}
@@ -398,17 +390,79 @@ function defineTableSchema<
   const write = (
     variant: "insert" | "update",
     create: (typeof factory)["createInsertSchema"]
-  ) => omitUnwritable(create(table, withColumnRules(table, options?.[variant])))
+  ) =>
+    omitUnwritable(
+      create(table, withColumnRules(table, options?.[variant] as Refinements))
+    )
 
   return {
     insert: write("insert", factory.createInsertSchema),
     select: factory.createSelectSchema(
       table,
-      withPositiveIdentities(table, options?.select)
+      withPositiveIdentities(table, options?.select as Refinements)
     ),
     update: write("update", factory.createUpdateSchema),
-  } as unknown as DefineTableSchemaResult<TTable, TCoerce, TOptions>
+  }
+}
+
+function defineTableSchema<TTable extends ZenoTable>(
+  table: TTable
+): DefineTableSchemaResult<TTable, undefined, NoTableSchemaOptions>
+function defineTableSchema<
+  TTable extends ZenoTable,
+  TCoerce extends CoerceOptions = undefined,
+  TOptions extends DefineTableSchemaOptions<
+    TTable,
+    TCoerce
+  > = DefineTableSchemaOptions<TTable, TCoerce>,
+>(
+  table: TTable,
+  options: TOptions
+): DefineTableSchemaResult<TTable, TCoerce, TOptions>
+function defineTableSchema(
+  table: ZenoTable,
+  options?: DefineTableSchemaOptions<ZenoTable, CoerceOptions>
+) {
+  return buildTableSchema("defineTableSchema", table, options, CLIENT_EXCLUDES)
+}
+
+/**
+ * `defineTableSchema` for code that runs only on the server, such as a sync
+ * job, which writes the columns `serverOwned()` keeps from clients. Identity
+ * and audit columns stay out, as the database writes them. Never parse what a
+ * client sends with it: a server action's input is a client's.
+ */
+function defineServerTableSchema<TTable extends ZenoTable>(
+  table: TTable
+): DefineTableSchemaResult<
+  TTable,
+  undefined,
+  NoTableSchemaOptions,
+  ServerExcludes
+>
+function defineServerTableSchema<
+  TTable extends ZenoTable,
+  TCoerce extends CoerceOptions = undefined,
+  TOptions extends DefineTableSchemaOptions<
+    TTable,
+    TCoerce,
+    ServerExcludes
+  > = DefineTableSchemaOptions<TTable, TCoerce, ServerExcludes>,
+>(
+  table: TTable,
+  options: TOptions
+): DefineTableSchemaResult<TTable, TCoerce, TOptions, ServerExcludes>
+function defineServerTableSchema(
+  table: ZenoTable,
+  options?: DefineTableSchemaOptions<ZenoTable, CoerceOptions, ServerExcludes>
+) {
+  return buildTableSchema(
+    "defineServerTableSchema",
+    table,
+    options as DefineTableSchemaOptions<ZenoTable, CoerceOptions>,
+    SERVER_EXCLUDES
+  )
 }
 
 export type { DefineTableSchemaOptions, DefineTableSchemaResult, ZenoTable }
-export { defineTableSchema }
+export { defineServerTableSchema, defineTableSchema }
