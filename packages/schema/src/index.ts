@@ -205,6 +205,8 @@ type DefineTableSchemaResult<
   TOptions,
   TExcludes extends Writer = ClientExcludes,
 > = {
+  /** The table the schemas come from, for `ownedRows`. */
+  table: TTable
   insert: OmitKeys<
     OptionalRefinedInsert<
       BuildSchema<
@@ -395,6 +397,7 @@ const buildTableSchema = (
       table,
       withPositiveIdentities(table, options?.select as Refinements)
     ),
+    table,
     update: write("update", factory.createUpdateSchema),
   }
 }
@@ -458,6 +461,107 @@ function defineServerTableSchema(
   )
 }
 
+type ColumnKey<TTable extends Table> = Extract<
+  keyof TableColumns<TTable>,
+  string
+>
+
+// The part of a `defineTableSchema` result `ownedRows` reads.
+type OwnableSchema = {
+  insert: z.ZodObject
+  select: { shape: { id: z.ZodType } }
+  table: ZenoTable
+}
+
+type OwnedRowSchema<TSchema extends OwnableSchema, TParentKey extends string> =
+  TSchema["insert"] extends z.ZodObject<infer TShape, infer TConfig>
+    ? z.ZodObject<
+        {
+          [K in keyof TShape as K extends TParentKey ? never : K]: TShape[K]
+        } & { id: z.ZodOptional<TSchema["select"]["shape"]["id"]> },
+        TConfig
+      >
+    : never
+
+/**
+ * A table's rows that belong to one parent row and are edited as a list, such
+ * as an order's lines. `syncRows` from `@zeno-lib/db/query` takes it in place
+ * of the table, and a form validates each row with `row`.
+ */
+type OwnedRows<
+  TTable extends ZenoTable,
+  TParentKey extends string,
+  TRow extends z.ZodObject,
+> = {
+  /** The columns that point at the parent row, which `row` leaves out. */
+  readonly parent: readonly TParentKey[]
+  /**
+   * One row as a client sends it: the `insert` columns but the parent's, and
+   * the `id` of a stored row, absent on a new one.
+   */
+  readonly row: TRow
+  readonly table: TTable
+}
+
+/**
+ * The rows of `schema`'s table that belong to a parent through the `parent`
+ * columns, for a form that edits them as a list and the `syncRows` that saves
+ * it:
+ *
+ * ```ts
+ * const orderLines = ownedRows(defineTableSchema(lines), { parent: "orderId" })
+ *
+ * const orderSchema = defineTableSchema(orders).insert.extend({
+ *   lines: z.array(orderLines.row),
+ * })
+ *
+ * await syncRows(tx, orderLines, { parent: { orderId }, rows: input.lines })
+ * ```
+ *
+ * The table needs a sequential `id`. A link table matched by a natural key
+ * goes to `syncRows` with its `key` option instead.
+ */
+const ownedRows = <
+  TSchema extends OwnableSchema,
+  TParentKey extends ColumnKey<TSchema["table"]>,
+>(
+  schema: TSchema,
+  { parent }: { parent: TParentKey | readonly TParentKey[] }
+): OwnedRows<
+  TSchema["table"],
+  TParentKey,
+  OwnedRowSchema<TSchema, TParentKey>
+> => {
+  const parentKeys: readonly TParentKey[] =
+    typeof parent === "string" ? [parent] : [...parent]
+  const id = schema.select.shape.id as z.ZodType | undefined
+
+  if (id === undefined) {
+    throw new TypeError(
+      `ownedRows tells rows apart by their id, and "${getTableName(schema.table)}" has none.`
+    )
+  }
+
+  // Zod rejects an omit key the shape lacks, as a server-owned parent would be.
+  const omitted: Record<string, true> = {}
+
+  for (const key of parentKeys) {
+    if (key in schema.insert.shape) {
+      omitted[key] = true
+    }
+  }
+
+  return {
+    parent: parentKeys,
+    row: schema.insert.omit(omitted).extend({ id: id.optional() }),
+    table: schema.table,
+  } as unknown as OwnedRows<
+    TSchema["table"],
+    TParentKey,
+    OwnedRowSchema<TSchema, TParentKey>
+  >
+}
+
 const isZenoTable = (value: unknown): value is ZenoTable =>
   is(value, Table) && COLUMN_RULES_KEY in value
 
@@ -487,5 +591,15 @@ const writableColumns = (exports: Record<string, unknown>) => {
   return columns
 }
 
-export type { DefineTableSchemaOptions, DefineTableSchemaResult, ZenoTable }
-export { defineServerTableSchema, defineTableSchema, writableColumns }
+export type {
+  DefineTableSchemaOptions,
+  DefineTableSchemaResult,
+  OwnedRows,
+  ZenoTable,
+}
+export {
+  defineServerTableSchema,
+  defineTableSchema,
+  ownedRows,
+  writableColumns,
+}

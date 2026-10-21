@@ -356,6 +356,36 @@ export function CreatePostForm() {
 }
 ```
 
+### Edit a parent's rows as a list
+
+A form that edits a parent with its child rows, such as an order and its lines,
+validates each row and sends back the whole list, which
+[`syncRows`](/docs/core-framework/data-management/database/querying#syncing-a-parents-rows)
+saves. `ownedRows(schema, { parent })` describes those rows once, for both:
+
+```ts title="{project}-forms/src/orders/schemas.ts"
+import { defineTableSchema, ownedRows } from "@zeno-lib/schema"
+import { z } from "zod"
+
+export const orderLinesOfOrder = ownedRows(defineTableSchema(orderLines), {
+  parent: "orderId",
+})
+
+const orderSchema = defineTableSchema(orders)
+
+export const updateOrderSchema = orderSchema.update.extend({
+  id: orderSchema.select.shape.id,
+  lines: z.array(orderLinesOfOrder.row).max(100),
+})
+```
+
+- `row` is the table's `insert` columns without the parent's, which the sync
+  writes, plus the `id` of a stored row, absent on a new one. Extend it with a
+  row's own form-only fields.
+- `parent` names one column or several (`["orderId", "kind"]`).
+- The table needs a sequential `id`. A link table told apart by a natural key
+  goes to `syncRows` with its `key` option instead.
+
 ## Where each file lives
 
 Zeno splits a feature across two packages plus your app, so server-only database
