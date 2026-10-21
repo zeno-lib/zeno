@@ -57,6 +57,7 @@ import {
   schema,
   selectPolicy,
   sequence,
+  sequentialId,
   sequentialPrimaryId,
   table,
   tableCreator,
@@ -311,6 +312,14 @@ describe("default casing", () => {
     expect(int.id.generatedIdentity?.type).toBe("byDefault")
     expect(big.id.getSQLType()).toBe("bigint")
     expect(big.id.generatedIdentity?.type).toBe("byDefault")
+  })
+
+  it("builds a sequential id outside the primary key, for a composite key", () => {
+    const columns = getTableColumns(table("rooms", { id: sequentialId() }))
+
+    expect(columns.id.primary).toBe(false)
+    expect(columns.id.getSQLType()).toBe("bigint")
+    expect(columns.id.generatedIdentity?.type).toBe("byDefault")
   })
 
   it("builds an application-assigned primary key with no default", () => {

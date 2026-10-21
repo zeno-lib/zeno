@@ -233,6 +233,18 @@ with `"bigint"` your Drizzle type would no longer match the types Supabase
 generates. It applies to `bigint` only, and passing it alongside
 `type: "integer"` is a type error.
 
+`sequentialId()` takes the same options and builds the same identity column
+without the primary key, for a table whose key spans more columns than its id.
+`sequentialPrimaryId()` is `sequentialId().primaryKey()`:
+
+```typescript
+export const rooms = table(
+  "rooms",
+  { id: sequentialId(), listingId: bigint({ mode: "number" }).notNull() },
+  (t) => [primaryKey({ columns: [t.id, t.listingId] })]
+)
+```
+
 `assignedPrimaryId({ length })` bounds the column:
 
 ```typescript
@@ -399,6 +411,27 @@ is the common case once you have a `profiles` mirror:
 ```typescript
 ownerId: userId(() => profiles.id, { notNull: true })
 ```
+
+**Columns with a rule** carry a check that
+[`defineTableSchema`](/docs/core-framework/data-management/schemas#put-rules-on-the-column)
+applies wherever a client writes them. The database type is plain, so the check
+holds for writes that go through the derived schemas, and `select` reads back
+whatever is stored.
+
+| Helper | Column | `insert` and `update` accept |
+|---|---|---|
+| `percentage({ scale, min, max })` | `numeric`, read as a `number` | `0` to `1` by default. `scale: "percent"` stores 25 % as `25`, from `0` to `100`. |
+| `year({ min, max })` | `smallint` | Whole numbers from `0` to `9999` by default. |
+| `email()` | `text` | An address `z.email()` accepts. |
+
+```typescript
+occupancyRate: percentage()                       // 0.25 is 25 %
+baseRateFloor: percentage({ min: -0.01 })         // a rate that can go negative
+builtIn: year({ min: 1800 })
+contactEmail: email().notNull()
+```
+
+Each takes `name`, and chains like the builder it wraps.
 
 <Callout type="warn">
   An **ownership** column that an RLS policy keys on needs `notNull: true`.

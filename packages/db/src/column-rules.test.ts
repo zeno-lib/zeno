@@ -5,9 +5,7 @@ import {
   bigint,
   type ExtraConfigColumn,
   index,
-  numeric,
   primaryKey,
-  smallint,
   text,
   unique,
 } from "drizzle-orm/pg-core"
@@ -15,17 +13,16 @@ import { snakeCase } from "drizzle-orm/pg-core/casing"
 import { describe, expect, it } from "vitest"
 import {
   authUserId,
+  email,
   functionPolicies,
+  percentage,
   schema,
+  sequentialId,
   serverOwned,
   table,
   timestamps,
-  withRule,
+  year,
 } from "./schema.ts"
-
-const percentage = () =>
-  withRule(numeric({ mode: "number" }), (base) => base.min(0).max(1))
-const year = () => withRule(smallint(), (base) => base.min(0).max(2999))
 
 // A factory, because drizzle builders mutate: one set of builders can't make
 // two tables.
@@ -84,7 +81,7 @@ describe("column rules", () => {
       expect(variant.safeParse({ occupancy: 1.5, title: "x" }).success).toBe(
         false
       )
-      expect(variant.safeParse({ builtIn: 3000, title: "x" }).success).toBe(
+      expect(variant.safeParse({ builtIn: 10_000, title: "x" }).success).toBe(
         false
       )
       expect(
@@ -101,7 +98,7 @@ describe("column rules", () => {
   it("leaves select describing the stored row", () => {
     const stored = listingSchemas.select.parse({
       ...forged,
-      builtIn: 3000,
+      builtIn: 10_000,
       occupancy: 50,
       summary: null,
     })
@@ -157,5 +154,39 @@ describe("column rules", () => {
 
     expect(await ddl({ listings })).toEqual(expected)
     expect(await ddl({ listings: callback })).toEqual(expected)
+  })
+})
+
+describe("ruled columns", () => {
+  const measures = table("measures", {
+    builtIn: year(),
+    contact: email(),
+    discount: percentage({ min: -1 }),
+    id: sequentialId(),
+    occupancy: percentage(),
+    share: percentage({ scale: "percent" }),
+  })
+  const { insert } = defineTableSchema(measures)
+  const accepts = (value: Record<string, unknown>) =>
+    insert.safeParse(value).success
+
+  it("bounds a percentage in the scale it stores", () => {
+    expect(accepts({ occupancy: 0.25, share: 25 })).toBe(true)
+    expect(accepts({ occupancy: 1.5 })).toBe(false)
+    expect(accepts({ occupancy: -0.5 })).toBe(false)
+    expect(accepts({ share: 101 })).toBe(false)
+    expect(accepts({ discount: -0.5 })).toBe(true)
+  })
+
+  it("takes a year as a whole number of four digits at most", () => {
+    expect(accepts({ builtIn: 1990 })).toBe(true)
+    expect(accepts({ builtIn: 1990.5 })).toBe(false)
+    expect(accepts({ builtIn: 10_000 })).toBe(false)
+  })
+
+  it("checks an email address, and keeps a nullable one optional", () => {
+    expect(accepts({ contact: "jane@example.com" })).toBe(true)
+    expect(accepts({ contact: "jane@" })).toBe(false)
+    expect(accepts({ contact: null })).toBe(true)
   })
 })

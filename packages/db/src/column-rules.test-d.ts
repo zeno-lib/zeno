@@ -14,17 +14,15 @@ import { authUsers } from "./auth-schema.ts"
 import {
   assignedPrimaryId,
   authUserId,
+  percentage,
   sequentialPrimaryId,
   serverOwned,
   table,
   timestamps,
   uuidPrimaryId,
   withRule,
+  year,
 } from "./schema.ts"
-
-const percentage = () =>
-  withRule(numeric({ mode: "number" }), (schema) => schema.min(0).max(1))
-const year = () => withRule(smallint(), (schema) => schema.min(0).max(2999))
 
 const listings = table(
   "listings",

@@ -226,6 +226,8 @@ userId: authUserId({ defaultToCurrentUser: true, notNull: true })
   next to it when you use rules.
 - `serverOwned(builder)` leaves the column out of `insert` and `update`, for
   a column a trigger, a default or an action of its own sets.
+- `percentage()`, `year()` and `email()` are columns with their rule built in
+  ([Tables](/docs/core-framework/data-management/database/tables#columns)).
 - `select` keeps every column, without the rules, because it describes the
   stored row, which a rule the database doesn't enforce may not hold for.
 - The markers only work inside Zeno's `table`, `unsecureTable` and
