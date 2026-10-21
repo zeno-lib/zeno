@@ -233,6 +233,24 @@ userId: authUserId({ defaultToCurrentUser: true, notNull: true })
 - The markers only work inside Zeno's `table`, `unsecureTable` and
   `schema(...).table`. Drizzle's own `pgTable` drops them.
 
+### Review what clients may write
+
+A column is writable unless something marks it, so adding a column to a table
+also adds it to every form and action input derived from it. `writableColumns`
+lists, for every Zeno table among a module's exports, the columns `insert` and
+`update` accept. Snapshot it once, and a newly writable column shows up as a
+diff in review:
+
+```ts title="{project}-db/src/writable-columns.test.ts"
+import { writableColumns } from "@zeno-lib/schema"
+import { expect, test } from "vitest"
+import * as schema from "./schema"
+
+test("the columns a client may write", () => {
+  expect(writableColumns(schema)).toMatchSnapshot()
+})
+```
+
 ### Server code that writes a server-owned column
 
 `serverOwned()` keeps a column from clients, but server code may still set it: a

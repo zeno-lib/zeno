@@ -2,6 +2,8 @@ import { sql } from "drizzle-orm"
 import {
   bigint,
   integer,
+  pgEnum,
+  pgSchema,
   pgTable,
   text,
   timestamp,
@@ -9,7 +11,7 @@ import {
 } from "drizzle-orm/pg-core"
 import { describe, expect, it } from "vitest"
 
-import { defineTableSchema } from "./index"
+import { defineTableSchema, writableColumns } from "./index"
 import { zenoTable } from "./test-table"
 
 const posts = zenoTable(
@@ -223,5 +225,24 @@ describe("defineTableSchema", () => {
     expect(schemas.insert.safeParse({ note: "", title: "x" }).success).toBe(
       false
     )
+  })
+})
+
+describe("writableColumns", () => {
+  it("lists each Zeno table's writable columns, and skips everything else", () => {
+    const status = pgEnum("status", ["open", "closed"])
+    const billing = pgSchema("billing")
+    const invoices = zenoTable(
+      billing.table("invoices", {
+        id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+        total: integer("total").notNull(),
+      })
+    )
+    const raw = pgTable("raw", { label: text("label") })
+
+    expect(writableColumns({ invoices, posts, raw, status })).toEqual({
+      "billing.invoices": ["total"],
+      posts: ["createdAt", "slug", "summary", "title"],
+    })
   })
 })

@@ -3,9 +3,11 @@ import {
   type Column,
   getColumns,
   getTableName,
+  getTableUniqueName,
   type InferInsertModel,
   type InferSelectModel,
-  type Table,
+  is,
+  Table,
 } from "drizzle-orm"
 import {
   type BuildRefine,
@@ -464,5 +466,33 @@ function defineServerTableSchema(
   )
 }
 
+const isZenoTable = (value: unknown): value is ZenoTable =>
+  is(value, Table) && COLUMN_RULES_KEY in value
+
+/**
+ * The columns a client may write, for every Zeno table among `exports` (a
+ * schema barrel, say), keyed by name (`schema.table` outside `public`): what `defineTableSchema`'s
+ * `insert` accepts, and `update` accepts the same. Columns are writable unless
+ * marked, so snapshot this in one test, and a newly writable column shows up
+ * as a diff in review.
+ */
+const writableColumns = (exports: Record<string, unknown>) => {
+  const tables = Object.keys(exports)
+    .map((key) => exports[key])
+    .filter(isZenoTable)
+    .map((table) => [getTableUniqueName(table), table] as const)
+    .sort(([a], [b]) => a.localeCompare(b))
+  const columns: Record<string, string[]> = {}
+
+  for (const [name, table] of tables) {
+    columns[name] = Object.keys(
+      buildTableSchema("writableColumns", table, undefined, CLIENT_EXCLUDES)
+        .insert.shape
+    ).sort()
+  }
+
+  return columns
+}
+
 export type { DefineTableSchemaOptions, DefineTableSchemaResult, ZenoTable }
-export { defineServerTableSchema, defineTableSchema }
+export { defineServerTableSchema, defineTableSchema, writableColumns }
