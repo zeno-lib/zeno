@@ -8,8 +8,10 @@ export default defineConfig({
   dts: true,
   entry: {
     "prefetched-queries": "src/prefetched-queries.tsx",
+    "query-caller": "src/query-caller.ts",
     "query-defaults": "src/query-defaults.ts",
     "query-hydration-boundary": "src/query-hydration-boundary.tsx",
+    "query-route": "src/query-route.ts",
     "query-suspense": "src/query-suspense.tsx",
     "query-suspense-loading": "src/query-suspense-loading.tsx",
   },

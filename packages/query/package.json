@@ -17,10 +17,20 @@
       "import": "./dist/query-defaults.mjs",
       "default": "./dist/query-defaults.mjs"
     },
+    "./query-caller": {
+      "types": "./dist/query-caller.d.mts",
+      "import": "./dist/query-caller.mjs",
+      "default": "./dist/query-caller.mjs"
+    },
     "./query-hydration-boundary": {
       "types": "./dist/query-hydration-boundary.d.mts",
       "import": "./dist/query-hydration-boundary.mjs",
       "default": "./dist/query-hydration-boundary.mjs"
+    },
+    "./query-route": {
+      "types": "./dist/query-route.d.mts",
+      "import": "./dist/query-route.mjs",
+      "default": "./dist/query-route.mjs"
     },
     "./query-suspense": {
       "types": "./dist/query-suspense.d.mts",
@@ -43,6 +53,9 @@
     "test": "vitest --run",
     "test:watch": "vitest watch",
     "types:check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "devalue": "^6.0.3"
   },
   "devDependencies": {
     "@tanstack/react-query": "^5.104.1",
