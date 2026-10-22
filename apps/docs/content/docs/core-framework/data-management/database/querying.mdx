@@ -112,8 +112,8 @@ const [post, comments] = await db.transaction((tx) =>
 #### Reads that cannot take `tx`
 
 Some reads sit behind code that has no way to receive `tx`, such as a query
-factory that calls a server action, which builds its own client with
-`getRequestDb()` (see below). For those, a statement on `db` itself, awaited
+factory that calls a server action or a `defineQuery`, which builds its own
+client with `getRequestDb()` (see below). For those, a statement on `db` itself, awaited
 while the callback runs, joins the transaction too:
 
 ```typescript title="app/posts/[id]/page.tsx"
@@ -156,6 +156,7 @@ import { relations } from "./relations"
 export const {
   defineAction,
   defineFormAction,
+  defineQuery,
   getRequestContext,
   getRequestDb,
 } = createRequestDb({ relations, supabase: () => createClient() })
@@ -262,6 +263,47 @@ transaction back before `defineFormAction` converts it. On the client,
 
 `defineAction` still throws. Use it for an action whose errors no form renders
 (a delete button, a toggle).
+
+### Reads through a query route
+
+The browser runs server actions **one at a time**: Next.js queues each call
+until the one before it settles. That suits a write, but a screen whose cards
+each read through an action waits for every read in turn, and each one pays
+the round trip to the server and on to the database. Serve reads from a route
+instead, where each call is its own request and they run in parallel.
+
+`defineQuery`, which `createRequestDb` returns next to `defineAction`, takes
+the same arguments and behaves the same way: parse, verify the session, call
+the handler, resolve `undefined` to `null`. The difference is where it lives:
+export it from a module **without** `"use server"`, and gather those exports
+into the map a query route serves:
+
+```typescript title="app/posts/queries.ts"
+import "server-only"
+
+import { defineQuery } from "{project}-db/server-db"
+import { z } from "zod"
+import { selectPosts } from "./db-queries"
+
+export const selectPostsQuery = defineQuery(
+  z.object({ authorId: z.string() }),
+  selectPosts
+)
+```
+
+```typescript title="app/api/queries/[query]/route.ts"
+import { createQueryRoute } from "@zeno-lib/query/query-route"
+import * as queries from "@/app/posts/queries"
+
+export const { POST } = createQueryRoute(queries)
+```
+
+The browser side, `createQueryCaller`, and the server prefetch are on the
+[Queries](/docs/core-framework/data-management/queries#reads-through-a-query-route)
+page. Every entry in the map is a public endpoint, exactly like a server action:
+`defineQuery` checks the session and RLS authorizes the rows, and the schema
+bounds what a caller can ask for. `import "server-only"` makes a client import
+of the module fail the build instead of bundling your database client.
 
 ## Other RLS clients
 
