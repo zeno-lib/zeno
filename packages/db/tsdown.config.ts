@@ -24,6 +24,7 @@ export default defineConfig({
     next: "src/next.ts",
     query: "src/query.ts",
     schema: "src/schema.ts",
+    testing: "src/testing.ts",
     triggers: "src/triggers.ts",
   },
 })

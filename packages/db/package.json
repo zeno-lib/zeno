@@ -42,6 +42,11 @@
       "import": "./dist/schema.mjs",
       "default": "./dist/schema.mjs"
     },
+    "./testing": {
+      "types": "./dist/testing.d.mts",
+      "import": "./dist/testing.mjs",
+      "default": "./dist/testing.mjs"
+    },
     "./triggers": {
       "types": "./dist/triggers.d.mts",
       "import": "./dist/triggers.mjs",
