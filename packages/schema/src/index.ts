@@ -262,40 +262,43 @@ const unwritableKeys = (table: ZenoTable, excludes: ReadonlySet<Writer>) => {
 
 type SchemaRefinement = (schema: unknown) => unknown
 
-const applyRefinement = (refinement: unknown, schema: unknown) =>
-  typeof refinement === "function"
-    ? (refinement as SchemaRefinement)(schema)
-    : refinement
-
-// A caller's function refinement runs on the column rule's schema, so it can
-// narrow further; a caller's schema replaces it outright, as it replaces any
-// generated rule.
-const withColumnRules = (
-  table: ZenoTable,
-  refinements: Refinements = {}
+// `generated` under the caller's `refinements`: a caller's function runs on
+// the generated schema, so it can narrow further; a caller's schema replaces
+// it outright, as it replaces any rule drizzle generates.
+const composeRefinements = (
+  refinements: Refinements | undefined,
+  generated: Record<string, SchemaRefinement>
 ): Refinements => {
   const merged: Refinements = { ...refinements }
 
-  const rules = columnRules(table)
-
-  for (const key of Object.keys(rules)) {
-    const rule = rules[key]?.refine
-
-    if (rule === undefined) {
-      continue
-    }
-
-    const refinement = refinements[key]
+  for (const key of Object.keys(generated)) {
+    const inner = generated[key] as SchemaRefinement
+    const refinement = refinements?.[key]
 
     if (refinement === undefined) {
-      merged[key] = rule
+      merged[key] = inner
     } else if (typeof refinement === "function") {
       merged[key] = (schema: unknown) =>
-        (refinement as SchemaRefinement)(applyRefinement(rule, schema))
+        (refinement as SchemaRefinement)(inner(schema))
     }
   }
 
   return merged
+}
+
+const withRuleRefinements = (table: ZenoTable, refinements?: Refinements) => {
+  const rules = columnRules(table)
+  const generated: Record<string, SchemaRefinement> = {}
+
+  for (const key of Object.keys(rules)) {
+    const rule = rules[key]?.refine
+
+    if (typeof rule === "function") {
+      generated[key] = rule as SchemaRefinement
+    }
+  }
+
+  return composeRefinements(refinements, generated)
 }
 
 // Postgres starts an ascending identity at its minimum value, which defaults
@@ -323,33 +326,19 @@ const toPositive = (schema: unknown) =>
     ? (schema as PositiveSchema).positive()
     : schema
 
-// A caller's function refinement runs on the positive schema, so it can narrow
-// further. A caller's schema replaces the column schema outright, positive
-// check included, the same as it replaces every other generated rule.
-const withPositiveIdentities = (
-  table: Table,
-  refinements: Refinements = {}
-): Refinements => {
+const withPositiveIdentities = (table: Table, refinements?: Refinements) => {
   const columns: Record<string, Column> = getColumns(table)
-  const merged: Refinements = { ...refinements }
+  const generated: Record<string, SchemaRefinement> = {}
 
   for (const key of Object.keys(columns)) {
     const column = columns[key]
 
-    if (column === undefined || !isPositiveIdentity(column)) {
-      continue
-    }
-
-    const refinement = refinements[key]
-
-    if (refinement === undefined) {
-      merged[key] = toPositive
-    } else if (typeof refinement === "function") {
-      merged[key] = (schema: unknown) => refinement(toPositive(schema))
+    if (column !== undefined && isPositiveIdentity(column)) {
+      generated[key] = toPositive
     }
   }
 
-  return merged
+  return composeRefinements(refinements, generated)
 }
 
 const buildTableSchema = (
@@ -394,7 +383,10 @@ const buildTableSchema = (
     create: (typeof factory)["createInsertSchema"]
   ) =>
     omitUnwritable(
-      create(table, withColumnRules(table, options?.[variant] as Refinements))
+      create(
+        table,
+        withRuleRefinements(table, options?.[variant] as Refinements)
+      )
     )
 
   return {
@@ -481,7 +473,8 @@ const writableColumns = (exports: Record<string, unknown>) => {
     .map((key) => exports[key])
     .filter(isZenoTable)
     .map((table) => [getTableUniqueName(table), table] as const)
-    .sort(([a], [b]) => a.localeCompare(b))
+    // A plain sort, so the order doesn't hang on the machine's locale.
+    .sort(([a], [b]) => (a < b ? -1 : 1))
   const columns: Record<string, string[]> = {}
 
   for (const [name, table] of tables) {

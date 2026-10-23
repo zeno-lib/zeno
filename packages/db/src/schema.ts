@@ -21,6 +21,7 @@ import {
   type PgBuildExtraConfigColumns,
   type PgIntegerBuilder,
   type PgPolicyConfig,
+  type PgSchema,
   type PgTableExtraConfig,
   type PgTableExtraConfigValue,
   type PgTableFnInternal,
@@ -109,7 +110,7 @@ const DATABASE_OWNED = { writer: "database" } as const satisfies ColumnRule
 // Drizzle builders mutate `this` and their methods return it, typed as an
 // intersection with `this`, so a marker survives the calls chained after it.
 // A second marker adds to the first, so `serverOwned(percentage())` keeps the
-// rule for the server-side schema.
+// rule for the server-side schema. Two writers can't share a column.
 const markColumn = <
   TBuilder extends AnyPgColumnBuilder,
   TRule extends ColumnRule,
@@ -117,10 +118,22 @@ const markColumn = <
   builder: TBuilder,
   rule: TRule
 ) => {
-  const marked = builder as TBuilder & { [COLUMN_RULES_KEY]?: ColumnRule }
+  const current = (builder as { [COLUMN_RULES_KEY]?: ColumnRule })[
+    COLUMN_RULES_KEY
+  ]
+
+  if (
+    current?.writer !== undefined &&
+    rule.writer !== undefined &&
+    current.writer !== rule.writer
+  ) {
+    throw new TypeError(
+      `A column the ${current.writer} writes can't also be written by the ${rule.writer}.`
+    )
+  }
 
   return Object.assign(builder, {
-    [COLUMN_RULES_KEY]: { ...marked[COLUMN_RULES_KEY], ...rule },
+    [COLUMN_RULES_KEY]: { ...current, ...rule },
   }) as WithColumnRule<TBuilder, TRule>
 }
 
@@ -128,9 +141,16 @@ const markColumn = <
  * A column only the server writes: a trigger, a `DEFAULT` such as
  * `auth.uid()`, or an action of its own. `defineTableSchema` leaves it out of
  * insert and update, so no form or action input accepts it, and
- * `defineServerTableSchema` keeps it, for server code that sets it.
+ * `defineServerTableSchema` keeps it, for server code that sets it. An audit
+ * column, which the database writes, can't take it.
  */
-export const serverOwned = <TBuilder extends AnyPgColumnBuilder>(
+export const serverOwned = <
+  TBuilder extends AnyPgColumnBuilder & {
+    readonly [COLUMN_RULES_KEY]?: Partial<
+      WriterRule<"server"> & RefineRule<unknown>
+    >
+  },
+>(
   builder: TBuilder
 ) => markColumn(builder, SERVER_OWNED)
 
@@ -141,20 +161,38 @@ type ColumnSchema<TBuilder extends AnyPgColumnBuilder> = GetZodType<
   undefined
 >
 
+// A rule checks one value, and `.array()` mutates the builder it is called on,
+// so chained after `withRule` it would turn the rule on the array instead.
+type RuledColumn<TBuilder, TRefine> = WithColumnRule<
+  TBuilder,
+  RefineRule<TRefine>
+> & { readonly array: never }
+
+const arrayAfterRule = () => {
+  throw new TypeError(
+    "A column rule checks one value: call .array() before withRule(), and write the rule for the array."
+  )
+}
+
 /**
- * A rule `defineTableSchema` applies to the column in insert and update, in
- * the shape its `insert` and `update` options take: a Zod schema, or a
- * function from the generated one, whose parameter is typed from the column
- * (`z.ZodNumber` for a `numeric({ mode: "number" })`). A caller's refinement
- * for the same column runs on top of it.
+ * A rule `defineTableSchema` applies to the column in insert and update: a
+ * function from the schema the column generates, typed from it
+ * (`z.ZodNumber` for a `numeric({ mode: "number" })`). It runs before
+ * `.nullable()` and `.optional()`, so a nullable column stays nullable. A
+ * function the caller passes for the same column runs on top of it; a Zod
+ * schema replaces it, rule included.
  */
 export const withRule = <
   TBuilder extends AnyPgColumnBuilder,
-  TRefine extends ((schema: ColumnSchema<TBuilder>) => z.ZodType) | z.ZodType,
+  TRefine extends (schema: ColumnSchema<TBuilder>) => z.ZodType,
 >(
   builder: TBuilder,
   refine: TRefine
-) => markColumn(builder, { refine })
+) =>
+  Object.defineProperty(markColumn(builder, { refine }), "array", {
+    configurable: true,
+    value: arrayAfterRule,
+  }) as RuledColumn<TBuilder, TRefine>
 
 /** How a timestamp column is read back: a `Date` (the default) or Postgres's own text. */
 export type TimestampMode = "date" | "string"
@@ -289,9 +327,10 @@ const AUTH_UID_DEFAULT = sql`auth.uid()`
 type AuthUserIdColumn<
   TNotNull extends boolean,
   TDefaultToCurrentUser extends boolean,
-> = [TDefaultToCurrentUser] extends [true]
-  ? WithColumnRule<SetHasDefault<AuthorColumn<TNotNull>>, typeof SERVER_OWNED>
-  : AuthorColumn<TNotNull>
+> = [TDefaultToCurrentUser] extends [false]
+  ? AuthorColumn<TNotNull>
+  : // A flag only known at runtime types as an owner column, the safe side.
+    WithColumnRule<SetHasDefault<AuthorColumn<TNotNull>>, typeof SERVER_OWNED>
 
 // Nullable by default: a required reference to auth.users means deleting the
 // user fails, because the audit trail holds the row.
@@ -975,8 +1014,16 @@ export const schema = <TName extends string>(name: TName) => {
   return Object.assign(built, {
     table: withColumnRules<TName>(built.table.withRLS),
     unsecureTable: withColumnRules<TName>(built.table),
-  }) as Omit<typeof built, "table"> & {
-    table: TableFn<TName>
-    unsecureTable: TableFn<TName>
-  }
+  }) as unknown as ZenoSchema<TName>
+}
+
+// `existing()` returns the schema itself, typed as drizzle's `this`, which
+// the cast above would turn back into drizzle's `table`.
+export type ZenoSchema<TName extends string> = Omit<
+  PgSchema<TName>,
+  "existing" | "table"
+> & {
+  existing: () => ZenoSchema<TName>
+  table: TableFn<TName>
+  unsecureTable: TableFn<TName>
 }

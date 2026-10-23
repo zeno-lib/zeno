@@ -13,6 +13,7 @@ import { snakeCase } from "drizzle-orm/pg-core/casing"
 import { describe, expect, it } from "vitest"
 import {
   authUserId,
+  createdBy,
   email,
   functionPolicies,
   percentage,
@@ -200,4 +201,14 @@ describe("ruled columns", () => {
     expect(accepts({ contact: "jane@" })).toBe(false)
     expect(accepts({ contact: null })).toBe(true)
   })
+
+  it("refuses an array made of a ruled column, whose rule checks one value", () => {
+    expect(() => (percentage() as { array: () => unknown }).array()).toThrow(
+      TypeError
+    )
+  })
+})
+
+it("refuses a second writer for an audit column", () => {
+  expect(() => serverOwned(createdBy() as never)).toThrow(TypeError)
 })

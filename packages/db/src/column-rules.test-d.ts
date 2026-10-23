@@ -14,7 +14,10 @@ import { authUsers } from "./auth-schema.ts"
 import {
   assignedPrimaryId,
   authUserId,
+  createdBy,
   percentage,
+  schema as pgSchema,
+  sequentialId,
   sequentialPrimaryId,
   serverOwned,
   table,
@@ -163,10 +166,34 @@ test("a rule's refinement is typed from its column", () => {
     expectTypeOf(schema).toEqualTypeOf<z.ZodString>()
     return schema
   })
-  withRule(text().notNull(), z.literal("fixed"))
 
   // @ts-expect-error: a numeric column's schema is no string schema.
   withRule(numeric({ mode: "number" }), (schema: z.ZodString) => schema.min(1))
   // @ts-expect-error: a refinement returns a schema.
   withRule(text(), () => "fixed")
+  // @ts-expect-error: a schema would replace the nullable wrapper too.
+  withRule(text(), z.literal("fixed"))
+  // @ts-expect-error: the rule checks one value, so `.array()` goes first.
+  percentage().array()
+})
+
+test("an audit column stays the database's", () => {
+  // @ts-expect-error: the database writes it.
+  serverOwned(createdBy())
+  // A ruled column can be the server's, for its server-side schema.
+  serverOwned(percentage())
+})
+
+test("a table in an existing schema keeps its column rules", () => {
+  const invoices = pgSchema("billing")
+    .existing()
+    .table("invoices", {
+      id: sequentialId(),
+      note: text(),
+      paidAt: serverOwned(text()),
+    })
+
+  const { insert } = defineTableSchema(invoices)
+
+  expectTypeOf<keyof z.infer<typeof insert>>().toEqualTypeOf<"note">()
 })

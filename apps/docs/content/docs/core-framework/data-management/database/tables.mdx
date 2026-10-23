@@ -431,7 +431,8 @@ builtIn: year({ min: 1800 })
 contactEmail: email().notNull()
 ```
 
-Each takes `name`, and chains like the builder it wraps.
+Each takes `name`, and chains like the builder it wraps, except `.array()`: a
+rule checks one value.
 
 <Callout type="warn">
   An **ownership** column that an RLS policy keys on needs `notNull: true`.
@@ -725,7 +726,7 @@ casing and RLS where `pgSchema` applies neither.)
 | `materializedView` | `pgMaterializedView` |
 | `sequence` | `pgSequence` |
 | `role` | `pgRole` |
-| `tableCreator` | `pgTableCreator` |
+| `tableCreator` | `pgTableCreator`, a plain drizzle table: no casing, RLS or column rules, and `defineTableSchema` refuses it |
 | `isEnum` | `isPgEnum` |
 | `isView` | `isPgView` |
 | `isMaterializedView` | `isPgMaterializedView` |
