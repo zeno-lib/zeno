@@ -6,6 +6,7 @@ import {
   waitFor,
 } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
+import { StrictMode } from "react"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
 import { Form, FormProvider, useForm } from "./create-form"
@@ -103,6 +104,16 @@ describe("useForm — reset(values) rebases defaults", () => {
     rerender(<EditTitle capture={capture} record={{ title: "v2" }} />)
     await waitFor(() => expect(titleInput().value).toBe("v2"))
     expect(state?.isDefaultValue).toBe(true)
+  })
+
+  test("new caller defaults apply under Strict Mode", async () => {
+    const capture = vi.fn()
+    const { rerender } = render(
+      <EditTitle capture={capture} record={{ title: "v1" }} />,
+      { wrapper: StrictMode }
+    )
+    rerender(<EditTitle capture={capture} record={{ title: "v2" }} />)
+    await waitFor(() => expect(titleInput().value).toBe("v2"))
   })
 
   test("new caller defaults are not applied once the form is touched", async () => {
