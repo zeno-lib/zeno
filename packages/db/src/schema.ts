@@ -95,7 +95,21 @@ const COLUMN_RULES_KEY = "~zeno"
 type WriterRule<TWriter extends "database" | "server"> = {
   readonly writer: TWriter
 }
-type RefineRule<TRefine> = { readonly refine: TRefine }
+type RefineRule<TRefine> = {
+  readonly refine: TRefine
+  readonly hint?: FieldHint
+}
+
+/**
+ * What a column tells the form field that edits it, beside its rule:
+ * `{ field: "percentage", scale: "fraction" }` has `PercentageField` from
+ * `@zeno-lib/forms` show a stored `0.25` as 25 %. The field takes its bounds
+ * from the rule itself.
+ */
+export type FieldHint = {
+  readonly field: string
+  readonly [key: string]: unknown
+}
 type ColumnRule = Partial<
   WriterRule<"database" | "server"> & RefineRule<unknown>
 >
@@ -180,16 +194,18 @@ const arrayAfterRule = () => {
  * (`z.ZodNumber` for a `numeric({ mode: "number" })`). It runs before
  * `.nullable()` and `.optional()`, so a nullable column stays nullable. A
  * function the caller passes for the same column runs on top of it; a Zod
- * schema replaces it, rule included.
+ * schema replaces it, rule included. `hint` goes to the form field that edits
+ * the column.
  */
 export const withRule = <
   TBuilder extends AnyPgColumnBuilder,
   TRefine extends (schema: ColumnSchema<TBuilder>) => z.ZodType,
 >(
   builder: TBuilder,
-  refine: TRefine
+  refine: TRefine,
+  hint?: FieldHint
 ) =>
-  Object.defineProperty(markColumn(builder, { refine }), "array", {
+  Object.defineProperty(markColumn(builder, { hint, refine }), "array", {
     configurable: true,
     value: arrayAfterRule,
   }) as RuledColumn<TBuilder, TRefine>
@@ -446,10 +462,10 @@ export const percentage = ({
     name === undefined
       ? numeric({ mode: "number" })
       : numeric(name, { mode: "number" }),
-    // The hint `PercentageField` from `@zeno-lib/forms` reads, so a form
-    // shows and clamps what the column accepts with no props.
-    (base) =>
-      base.min(min).max(max).meta({ field: "percentage", max, min, scale })
+    (base) => base.min(min).max(max),
+    // `PercentageField` from `@zeno-lib/forms` reads it, and clamps to the
+    // rule's bounds, so a form shows what the column accepts with no props.
+    { field: "percentage", scale }
   )
 
 export type YearOptions = {
@@ -462,9 +478,11 @@ export type YearOptions = {
 
 // A calendar year as a `smallint`, so a whole number.
 export const year = ({ name, min = 0, max = 9999 }: YearOptions = {}) =>
-  withRule(name === undefined ? smallint() : smallint(name), (base) =>
-    // The hint `YearField` from `@zeno-lib/forms` reads.
-    base.min(min).max(max).meta({ field: "year", max, min })
+  withRule(
+    name === undefined ? smallint() : smallint(name),
+    (base) => base.min(min).max(max),
+    // `YearField` from `@zeno-lib/forms` clamps to the rule's bounds.
+    { field: "year" }
   )
 
 // An email address as `text`, checked as `z.email()` checks it.

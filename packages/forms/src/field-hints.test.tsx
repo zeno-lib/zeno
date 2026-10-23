@@ -6,28 +6,41 @@ import { Form, FormProvider, useForm } from "./create-form"
 
 afterEach(cleanup)
 
+type Hint = { field: string; scale?: "fraction" | "percent" }
+
+// Where `@zeno-lib/schema` registers a column's hint.
+const HINTS_KEY = Symbol.for("@zeno-lib/field-hints")
+const holder = globalThis as {
+  [HINTS_KEY]?: z.core.$ZodRegistry<Hint>
+}
+const hints = holder[HINTS_KEY] ?? z.registry<Hint>()
+holder[HINTS_KEY] = hints
+
+const hinted = <T extends z.ZodType>(column: T, hint: Hint) => {
+  hints.add(column, hint)
+  return column
+}
+
 // What a `percentage()` or `year()` column of `@zeno-lib/db/schema` hands a
 // form: the rule, its hint, and the wrappers of a nullable column.
 const schema = z.object({
-  built: z
-    .number()
-    .min(1900)
-    .max(2100)
-    .meta({ field: "year", max: 2100, min: 1900 })
+  built: hinted(z.int().min(1900).max(2100), { field: "year" })
     .nullable()
     .optional(),
-  occupancy: z
-    .number()
-    .min(0)
-    .max(1)
-    .meta({ field: "percentage", max: 1, min: 0, scale: "fraction" })
+  occupancy: hinted(z.number().min(0).max(1), {
+    field: "percentage",
+    scale: "fraction",
+  })
     .nullable()
-    .optional(),
-  rate: z
-    .number()
-    .min(-1)
-    .max(1)
-    .meta({ field: "percentage", max: 1, min: -1, scale: "fraction" })
+    .optional()
+    // Metadata of the form's own, around the column's schema.
+    .describe("Share of the floor area let"),
+  rate: hinted(z.number().min(-1).max(1), {
+    field: "percentage",
+    scale: "fraction",
+  })
+    // A caller's refinement narrows the column's bounds.
+    .max(0.5)
     .nullable()
     .optional(),
 })
@@ -74,10 +87,16 @@ test("a percentage field takes its scale and bounds from the column's hint", asy
   await user.tab()
   expect(captured.values?.occupancy).toBe(1)
 
-  // A bound below 0 lets the field take a negative rate.
-  await user.type(screen.getByLabelText("Rate"), "-25")
+  // A bound below 0 lets the field take a negative rate, and the field
+  // clamps to the bound the schema narrowed.
+  const rate = screen.getByLabelText("Rate")
+  await user.type(rate, "-25")
   await user.tab()
   expect(captured.values?.rate).toBe(-0.25)
+  await user.clear(rate)
+  await user.type(rate, "90")
+  await user.tab()
+  expect(captured.values?.rate).toBe(0.5)
 })
 
 test("a year field clamps to the column's hinted bounds", async () => {

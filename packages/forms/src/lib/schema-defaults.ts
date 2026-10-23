@@ -19,11 +19,7 @@
 // untouched. Async schemas, lazy schemas, and any throw inside the walk also
 // degrade to "skip" — never bring the form down.
 
-type SchemaNode = {
-  readonly _zod?: { readonly def?: SchemaDef }
-  // Zod classic's `.meta()`, which reads what `.meta({ … })` registered.
-  readonly meta?: () => unknown
-}
+type SchemaNode = { readonly _zod?: { readonly def?: SchemaDef } }
 
 type SchemaDef = {
   readonly type?: string
@@ -31,6 +27,7 @@ type SchemaDef = {
   readonly shape?: Record<string, SchemaNode>
   readonly catchall?: SchemaNode
   readonly in?: SchemaNode
+  readonly out?: SchemaNode
   readonly element?: SchemaNode
   readonly defaultValue?: unknown
 }
@@ -157,6 +154,7 @@ function extractZodDefaultAt(
 function unwrapped(node: SchemaNode): SchemaNode | undefined {
   const def: SchemaDef | undefined = getDef(node)
   switch (def?.type) {
+    case "catch":
     case "default":
     case "nonoptional":
     case "nullable":
@@ -164,21 +162,22 @@ function unwrapped(node: SchemaNode): SchemaNode | undefined {
     case "prefault":
     case "readonly":
       return def.innerType
+    // `z.preprocess` pipes a transform into the schema it feeds.
     case "pipe":
-      return def.in
+      return getDef(def.in)?.type === "transform" ? def.out : def.in
     default:
       return undefined
   }
 }
 
-// What `.meta({ … })` registered on the field at `keys`. Zod keeps it on the
-// schema it was set on, not on the `.optional()` or `.nullable()` around it,
-// so the walk looks through each wrapper.
-function extractZodMetaAt(
+// The schema at `keys`, or inside one of its wrappers, that `read` finds a
+// value on, with that value. A Zod registry keeps an entry on the schema it
+// was set on, not on the `.optional()` or `.nullable()` around it.
+function findZodSchemaAt<T>(
   schema: SchemaNode,
-  keys: readonly PropertyKey[]
-): Record<string, unknown> | undefined {
-  let found: Record<string, unknown> | undefined
+  keys: readonly PropertyKey[],
+  read: (node: SchemaNode) => T | undefined
+): { node: SchemaNode; value: T } | undefined {
   try {
     let node: SchemaNode | null = schema
     for (const key of keys) {
@@ -187,17 +186,16 @@ function extractZodMetaAt(
     let current: SchemaNode | undefined =
       node && keys.length > 0 ? node : undefined
     for (let depth = 0; current && depth < MAX_WRAPPER_DEPTH; depth += 1) {
-      const meta = typeof current.meta === "function" ? current.meta() : null
-      if (isPlainObject(meta)) {
-        found = meta
-        break
+      const value = read(current)
+      if (value !== undefined) {
+        return { node: current, value }
       }
       current = unwrapped(current)
     }
   } catch {
-    // An unrecognised schema has no metadata to offer.
+    // An unrecognised schema has nothing to offer.
   }
-  return found
+  return undefined
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -302,6 +300,6 @@ export {
   deepMergeDefaults,
   extractZodDefaultAt,
   extractZodDefaults,
-  extractZodMetaAt,
+  findZodSchemaAt,
   pickSchemaShape,
 }

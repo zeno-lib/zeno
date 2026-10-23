@@ -432,9 +432,10 @@ contactEmail: email().notNull()
 ```
 
 Each takes `name`, and chains like the builder it wraps, except `.array()`: a
-rule checks one value. `percentage()` and `year()` also put their scale and
-bounds in the rule's `.meta()`, where the form kit's `PercentageField` and
-`YearField` read them.
+rule checks one value. `percentage()` and `year()` also hint the form kit's
+`PercentageField` and `YearField`, which take their scale and bounds from the
+column. `withRule(builder, refinement, hint)` gives a column of your own a
+hint, such as `{ field: "percentage", scale: "fraction" }`.
 
 <Callout type="warn">
   An **ownership** column that an RLS policy keys on needs `notNull: true`.

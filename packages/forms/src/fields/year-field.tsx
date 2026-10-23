@@ -36,7 +36,7 @@ function YearField({ max: maxProp, min: minProp, ...props }: YearFieldProps) {
   const min = minProp ?? hints.min
 
   const inputProps = useFormattedNumber({
-    allowNegative: false,
+    allowNegative: min !== undefined && min < 0,
     max,
     maxIntegerDigits: 4,
     maximumFractionDigits: 0,
