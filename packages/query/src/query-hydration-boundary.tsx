@@ -5,6 +5,7 @@ import {
 } from "@tanstack/react-query"
 import type { ReactNode } from "react"
 import { PrefetchedQueries } from "./prefetched-queries"
+import { bindQueries, type QueryMap } from "./query-map"
 
 export type QueryHydrationBoundaryProps = {
   children: ReactNode
@@ -22,6 +23,11 @@ export type QueryHydrationBoundaryProps = {
   createQueryClient?: () => QueryClient
   /** Forwarded to TanStack's `dehydrate` (e.g. to also dehydrate pending queries). */
   dehydrateOptions?: DehydrateOptions
+  /**
+   * The map your query route serves. A `queryFn` built on `createQueryCaller` then calls these
+   * functions in-process during `prefetch`, since the server has no URL to fetch them from.
+   */
+  queries?: QueryMap
 }
 
 /**
@@ -43,8 +49,12 @@ export async function QueryHydrationBoundary({
   createQueryClient = () => new QueryClient(),
   dehydrateOptions,
   prefetch,
+  queries,
 }: QueryHydrationBoundaryProps) {
   const queryClient = createQueryClient()
+  if (queries) {
+    bindQueries(queryClient, queries)
+  }
 
   await prefetch(queryClient)
 

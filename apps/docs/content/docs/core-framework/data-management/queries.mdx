@@ -72,7 +72,8 @@ readers announce the skeleton without an extra wrapper.
 ### Why the boundary waits for hydration
 
 A Server Function cannot run during the initial server render. React throws _"Server Functions
-cannot be called during initial render"_ there. So a `useSuspenseQuery` whose `queryFn` calls one
+cannot be called during initial render"_ there, and a [query route](#reads-through-a-query-route)
+has no URL to fetch from the server either. So a `useSuspenseQuery` whose `queryFn` calls one
 would render its error into the HTML, while the browser suspends instead. The mismatch makes React
 re-render the whole subtree on the client.
 
@@ -128,6 +129,65 @@ To build the server `QueryClient` yourself (for example with shared `defaultOpti
 
 If you already have a dehydrated state from elsewhere, render `PrefetchedQueries` from
 `@zeno-lib/query/prefetched-queries` directly. It is TanStack's `HydrationBoundary` plus the flag.
+
+## Reads through a query route
+
+A `queryFn` that calls a Server Function is slow on a busy screen: the browser runs Server
+Functions one at a time, so the screen's queries wait for each other. Serve reads from a route
+instead, with [`defineQuery`](/docs/core-framework/data-management/database/querying#reads-through-a-query-route)
+on the server and `createQueryRoute` mounting them:
+
+```typescript title="app/api/queries/[query]/route.ts"
+import { createQueryRoute } from "@zeno-lib/query/query-route"
+import * as queries from "@/app/posts/queries"
+
+export const { POST } = createQueryRoute(queries)
+```
+
+In the browser, `createQueryCaller` builds the function your `queryFn`s call. Type it with the
+route's map through a **type-only** import, so none of the server code reaches the bundle, and
+pass TanStack's context through so a cancelled query aborts its request:
+
+```typescript title="lib/call-query.ts"
+import { createQueryCaller } from "@zeno-lib/query/query-caller"
+import type * as queries from "@/app/posts/queries"
+
+export const callQuery = createQueryCaller<typeof queries>({ path: "/api/queries" })
+```
+
+```typescript title="app/posts/query-options.ts"
+export const postsQueryOptions = (authorId: string) =>
+  queryOptions({
+    queryFn: (context) => callQuery("selectPostsQuery", { authorId }, context),
+    queryKey: ["posts", authorId],
+  })
+```
+
+The name and the input are typed against the map, and the data comes back with the server
+function's return type. Arguments and results travel through
+[`devalue`](https://github.com/sveltejs/devalue), so a `Date`, a `Map`, a `bigint` or an
+`undefined` property survives the trip. A failed call rejects with a `QueryRequestError` carrying
+the route's status, as does a `200` that is not the route's answer (a page rewritten to sign in).
+A redirect, which is what a session middleware answers once the session is gone, reloads the page
+so the middleware can redirect it, at most once a minute, so a redirect the reload keeps does not
+loop. The route answers `404` for a name the map does not serve as a function, `415` for a body
+that is not JSON, `400` for one `devalue` cannot parse and `413` for one over 1 MB, the limit
+Server Functions default to.
+
+A server render has no URL to fetch. To prefetch these queries, hand the same map to
+`QueryHydrationBoundary`, and the `queryFn`s it runs call the server functions in-process:
+
+```tsx
+import * as queries from "@/app/posts/queries"
+
+<QueryHydrationBoundary
+  prefetch={(queryClient) => queryClient.fetchQuery(postsQueryOptions(authorId))}
+  queries={queries}
+>
+```
+
+Outside such a boundary, a call on the server throws. The hydration gate in `QuerySuspense`
+keeps suspense queries off the server render, as it does for Server Functions.
 
 ## Timing presets
 

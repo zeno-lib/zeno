@@ -1,6 +1,6 @@
 # `@zeno-lib/query`
 
-Suspense and SSR-prefetch components for [TanStack Query](https://tanstack.com/query). The user guide
+Suspense and SSR-prefetch components, and the query route and caller, for [TanStack Query](https://tanstack.com/query). The user guide
 is in [`data-management/queries`](../../apps/docs/content/docs/core-framework/data-management/queries.mdx).
 
 ## Rules
@@ -12,9 +12,14 @@ is in [`data-management/queries`](../../apps/docs/content/docs/core-framework/da
   `"use client"` modules; per-file entries keep each directive in `dist/`.
 - **Never turn the prefetch flag into a prop.** `PrefetchedQueries` derives it from
   `state.queries.length > 0`, so nothing opens the gate without filling the cache.
-- **Never drop the hydration gate in `QuerySuspense`.** A `queryFn` that calls a Server Function
-  throws during the server render; without the gate the server renders `errorFallback` and React
-  re-renders the subtree.
+- **Never drop the hydration gate in `QuerySuspense`.** A `queryFn` that calls a Server Function,
+  or `callQuery` outside a boundary that bound its map, throws during the server render; without
+  the gate the server renders `errorFallback` and React re-renders the subtree.
+- **The binding between a server `QueryClient` and its query map lives in `query-map.ts` only.**
+  `query-hydration-boundary` and `query-caller` are separate entries; both must import it so tsdown
+  keeps one shared chunk, or the caller never sees what the boundary bound.
+- **Look a query name up with `Object.hasOwn`**, in the route and the caller. A plain index lets
+  `constructor` or `__proto__` through as a query.
 - **Before hydration, return `fallback` alone**, never a swapped child. A suspending update keeps the
   old children mounted beside the fallback, which doubles the skeleton.
 - **Keep `@tanstack/*` and `react*` in tsdown's `deps.neverBundle`.** A bundled copy splits the

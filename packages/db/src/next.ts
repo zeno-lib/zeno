@@ -76,6 +76,12 @@ export type RequestDb<TRelations extends AnyRelations = EmptyRelations> = {
   /** Wraps a handler into a `"use server"` export; see `DefineAction`. */
   defineAction: DefineAction<RequestContext<TRelations>>
   /**
+   * `defineAction` for a read served by a query route (`createQueryRoute` from
+   * `@zeno-lib/query/query-route`) instead of a server action. Export it from a
+   * module **without** `"use server"`, so the browser can run several at once.
+   */
+  defineQuery: DefineAction<RequestContext<TRelations>>
+  /**
    * `defineAction` for forms: resolves to an `ActionResult` instead of
    * throwing on invalid input; see `DefineFormAction`.
    */
@@ -126,9 +132,12 @@ export function createRequestDb<
     }
   )
 
+  const defineAction = createDefineAction(getRequestContext)
+
   return {
-    defineAction: createDefineAction(getRequestContext),
+    defineAction,
     defineFormAction: createDefineFormAction(getRequestContext),
+    defineQuery: defineAction,
     getRequestContext,
     getRequestDb: async () => (await getRequestContext()).db,
   }
