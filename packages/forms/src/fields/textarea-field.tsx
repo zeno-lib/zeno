@@ -1,7 +1,7 @@
 "use client"
 
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
-import { getEmptyValue } from "@zeno-lib/forms/lib/empty-value"
+import { getNoTextValue } from "@zeno-lib/forms/lib/empty-value"
 import { useFieldControl } from "@zeno-lib/forms/lib/use-field-control"
 import { Children, type ComponentProps, type ReactNode } from "react"
 import { InputGroup, InputGroupTextarea } from "@/components/ui/input-group"
@@ -46,12 +46,7 @@ function TextAreaField({
   const textareaProps = {
     ...controlProps,
     onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) =>
-      field.handleChange(
-        event.target.value === "" &&
-          getEmptyValue<string | null>(field, "") === null
-          ? null
-          : event.target.value
-      ),
+      field.handleChange(event.target.value || getNoTextValue(field)),
     value: field.state.value ?? "",
     ...props,
   }

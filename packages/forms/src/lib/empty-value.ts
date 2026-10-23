@@ -171,4 +171,21 @@ function getEmptyValue<T>(field: AnyFieldApi, fallback: T): T {
   ) as T
 }
 
-export { emptyValueFor, getEmptyValue, withEmptyStartValues }
+/**
+ * What a text control stores once its text is cleared: `null` where the field
+ * starts at `null` (a nullable string), so it saves as none, and `""`
+ * otherwise. Read from the schema's shape rather than by validating the form,
+ * so the other fields' values never change it.
+ */
+function getNoTextValue(field: AnyFieldApi): string | null {
+  const schema = getFormSchema(field.form)
+  const start = schema
+    ? extractZodDefaultAt(
+        schema as Parameters<typeof extractZodDefaultAt>[0],
+        toPathKeys(field.name)
+      )
+    : { ok: false as const }
+  return start.ok && start.value === null ? null : ""
+}
+
+export { emptyValueFor, getEmptyValue, getNoTextValue, withEmptyStartValues }

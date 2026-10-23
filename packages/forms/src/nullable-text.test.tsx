@@ -46,3 +46,35 @@ test("a nullable text field holds null for no text, from the start and once empt
   }
   expect(captured.values).toStrictEqual(empty)
 })
+
+test("an emptied nullable text field holds null whatever the other fields hold", async () => {
+  const user = userEvent.setup()
+  // Once every field passes, the async refinement keeps the form from being
+  // checked synchronously.
+  const schema = z
+    .object({ note: z.string().nullable() })
+    .refine(async () => await Promise.resolve(true))
+  const captured: { values?: unknown } = {}
+  function H() {
+    const form = useForm({ onSubmit: vi.fn(), schema })
+    const { InputField, Subscribe } = form
+    return (
+      <FormProvider form={form}>
+        <Form>
+          <InputField label="Note" name="note" />
+          <Subscribe selector={(state) => state.values}>
+            {(values) => {
+              captured.values = values
+              return null
+            }}
+          </Subscribe>
+        </Form>
+      </FormProvider>
+    )
+  }
+  render(<H />)
+
+  await user.type(screen.getByRole("textbox"), "x")
+  await user.clear(screen.getByRole("textbox"))
+  expect(captured.values).toStrictEqual({ note: null })
+})

@@ -234,6 +234,7 @@ describe("string-mode dates and timestamps", () => {
     pgTable("events", {
       at: timestamp("at", { mode: "string", withTimezone: true }),
       day: date("day", { mode: "string" }),
+      days: date("days", { mode: "string" }).array(),
       localAt: timestamp("local_at", { mode: "string" }),
     })
   )
@@ -246,6 +247,8 @@ describe("string-mode dates and timestamps", () => {
     expect(accepts({ day: null })).toBe(true)
     expect(accepts({ day: "2026-02-30" })).toBe(false)
     expect(accepts({ day: "17.09.2026" })).toBe(false)
+    expect(accepts({ day: "infinity" })).toBe(true)
+    expect(accepts({ days: ["2026-09-17", "2026-09-18"] })).toBe(true)
   })
 
   it("takes ISO 8601 and the text Postgres returns, with the offset a time zone needs", () => {
@@ -258,8 +261,27 @@ describe("string-mode dates and timestamps", () => {
     }
     expect(accepts({ at: "2026-09-17T07:53:56" })).toBe(false)
     expect(accepts({ at: "yesterday" })).toBe(false)
+    expect(accepts({ at: "-infinity" })).toBe(true)
     expect(accepts({ localAt: "2026-09-17 07:53:56.357127" })).toBe(true)
     expect(accepts({ localAt: "yesterday" })).toBe(false)
+  })
+
+  it("refuses a time Postgres would reject or shift", () => {
+    expect(accepts({ at: "2026-02-30 07:00+00" })).toBe(false)
+    expect(accepts({ at: "2026-09-17T24:00Z" })).toBe(false)
+    expect(accepts({ at: "2026-09-17T07:00+16:00" })).toBe(false)
+    // Postgres drops an offset on a column without a time zone.
+    expect(accepts({ localAt: "2026-09-16T22:00:00.000Z" })).toBe(false)
+  })
+
+  it("lets an object refinement report next to a bad timestamp", () => {
+    const result = insert
+      .refine(() => false, { message: "cross-field" })
+      .safeParse({ at: "yesterday" })
+
+    expect(result.error?.issues.map((issue) => issue.message)).toContain(
+      "cross-field"
+    )
   })
 })
 

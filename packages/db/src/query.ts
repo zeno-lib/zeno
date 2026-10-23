@@ -312,7 +312,8 @@ export function syncRows<
     | SyncRowsByIdOptions<TQueryResult, TRelations, TTable, TParent, TId>
     | SyncRowsByKeyOptions<TQueryResult, TRelations, TTable, TParent, TKey>
 ): Promise<SelectModel<TTable>[]>
-export function syncRows(
+// Async, as `sync` is, so a bad argument rejects instead of throwing.
+export async function syncRows(
   db: AnyDatabase,
   target: PgTable | OwnedTableRows<PgTable, string>,
   options: SyncOptions
@@ -326,14 +327,14 @@ export function syncRows(
   const named = [...target.parent].sort()
   const given = Object.keys(options.parent).sort()
   if (named.join() !== given.join()) {
-    return Promise.reject(
-      new Error(
-        `syncRows on "${getTableName(target.table)}" needs exactly the parent columns ${named.join(", ")}`
-      )
+    throw new Error(
+      `syncRows on "${getTableName(target.table)}" needs exactly the parent columns ${named.join(", ")}`
     )
   }
 
-  return sync(db, target.table, options)
+  // The descriptor's rows are told apart by id, whatever a cast passes.
+  const { parent, remove, rows } = options
+  return await sync(db, target.table, { parent, remove, rows })
 }
 
 // A value for every parent column, `undefined` excluded, as `sync` checks.

@@ -334,39 +334,64 @@ const positiveCheck = (column: Column) =>
 // Drizzle's string mode reads Postgres's text form back
 // (`2026-09-17 07:53:56.357127+00`), which ISO 8601 doesn't cover, so a
 // timestamp takes a `T` or a space, and an offset of hours with optional
-// minutes. One with a time zone needs the offset, which would otherwise come
-// from the session's time zone.
-const TIMESTAMP_TZ =
-  /^\d{4}-[01]\d-[0-3]\d[T ][0-2]\d:[0-5]\d(:[0-5]\d(\.\d+)?)?([+-][0-2]\d(:?[0-5]\d)?|Z)$/
+// minutes, up to the ±15:59 Postgres takes.
+// The groups are the date and the offset.
 const TIMESTAMP =
-  /^\d{4}-[01]\d-[0-3]\d[T ][0-2]\d:[0-5]\d(:[0-5]\d(\.\d+)?)?([+-][0-2]\d(:?[0-5]\d)?|Z)?$/
+  /^(\d{4}-\d{2}-\d{2})[T ](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?([+-](?:0\d|1[0-5])(?::?[0-5]\d)?|Z)?$/
 
-const toTimestamp = (pattern: RegExp) => (schema: unknown) =>
-  (schema as z.ZodString).check((context) => {
-    if (!pattern.test(context.value)) {
-      // Zod's own code and format, so its locale words the message.
-      context.issues.push({
-        code: "invalid_format",
-        format: "datetime",
-        input: context.value,
-      })
-    }
-  })
+// Postgres's special values, which the string mode reads back as they are.
+const INFINITIES: ReadonlySet<string> = new Set(["-infinity", "infinity"])
 
-const toDate = (schema: unknown) => (schema as z.ZodString).check(z.iso.date())
+const ISO_DATE = z.iso.date()
+
+const isDate = (value: string) => ISO_DATE.safeParse(value).success
+
+// One with a time zone needs the offset, which would otherwise come from the
+// session's time zone. One without refuses it, because Postgres drops it
+// without a word and stores the time as written.
+const isTimestamp = (withTimezone: boolean) => (value: string) => {
+  const [, day, offset] = TIMESTAMP.exec(value) ?? []
+
+  return (
+    day !== undefined && isDate(day) && (offset !== undefined) === withTimezone
+  )
+}
+
+const withFormat =
+  (format: "date" | "datetime", isValid: (value: string) => boolean) =>
+  (schema: unknown) =>
+    (schema as z.ZodString).check((context) => {
+      if (!(INFINITIES.has(context.value) || isValid(context.value))) {
+        // Zod's own code and format, so its locale words the message, and
+        // `continue` as its own format checks set, so object refinements
+        // still run.
+        context.issues.push({
+          code: "invalid_format",
+          continue: true,
+          format,
+          input: context.value,
+        })
+      }
+    })
 
 // A string-mode `date` or `timestamp` column holds text Postgres must parse,
-// and Drizzle's bridge only asks for a string.
+// and Drizzle's bridge only asks for a string. An array column's schema is
+// the array, so its elements go unchecked.
 const formatCheck = (column: Column): SchemaRefinement | undefined => {
+  const { dimensions = 0, withTimezone = false } = column as Column & {
+    dimensions?: number
+    withTimezone?: boolean
+  }
+
+  if (dimensions > 0) {
+    return undefined
+  }
+
   switch (column.dataType) {
     case "string date":
-      return toDate
+      return withFormat("date", isDate)
     case "string timestamp":
-      return toTimestamp(
-        (column as Column & { withTimezone?: boolean }).withTimezone
-          ? TIMESTAMP_TZ
-          : TIMESTAMP
-      )
+      return withFormat("datetime", isTimestamp(withTimezone))
     default:
       return undefined
   }
@@ -393,6 +418,23 @@ const withChecks = (
   return composeRefinements(refinements, generated)
 }
 
+// Zod rejects an omit key the shape lacks, which a generated or server-owned
+// column would be.
+const omitPresent = <TSchema extends z.ZodObject>(
+  schema: TSchema,
+  keys: readonly string[]
+) => {
+  const mask: Record<string, true> = {}
+
+  for (const key of keys) {
+    if (key in schema.shape) {
+      mask[key] = true
+    }
+  }
+
+  return schema.omit(mask)
+}
+
 const buildTableSchema = (
   name: string,
   table: ZenoTable,
@@ -409,18 +451,8 @@ const buildTableSchema = (
 
   const schemaFactory = createDrizzleSchemaFactory(options?.factory)
   const unwritable = unwritableKeys(table, excludes)
-  // Zod rejects an omit key the shape lacks, which a generated column would be.
-  const omitUnwritable = (schema: z.ZodObject) => {
-    const mask: Record<string, true> = {}
-
-    for (const key of unwritable) {
-      if (key in schema.shape) {
-        mask[key] = true
-      }
-    }
-
-    return schema.omit(mask)
-  }
+  const omitUnwritable = (schema: z.ZodObject) =>
+    omitPresent(schema, unwritable)
   // The drizzle factory's refinement parameters are typed per table, which a
   // generic `TTable` cannot satisfy, so the merged maps go in untyped.
   const factory = schemaFactory as unknown as Record<
@@ -596,18 +628,9 @@ const ownedRows = <
     )
   }
 
-  // Zod rejects an omit key the shape lacks, as a server-owned parent would be.
-  const omitted: Record<string, true> = {}
-
-  for (const key of parentKeys) {
-    if (key in schema.insert.shape) {
-      omitted[key] = true
-    }
-  }
-
   return {
     parent: parentKeys,
-    row: schema.insert.omit(omitted).extend({ id: id.optional() }),
+    row: omitPresent(schema.insert, parentKeys).extend({ id: id.optional() }),
     table: schema.table,
   } as unknown as OwnedRows<
     TSchema["table"],

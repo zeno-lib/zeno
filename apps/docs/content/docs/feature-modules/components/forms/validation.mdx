@@ -415,7 +415,8 @@ object value, starts at `null`, not at a `{ table: "" }` that would fail on
 schema takes `null`: a nullable text field holds `null` for no text, from the
 start and once emptied, so it saves as none, as a nullable column stores it. An
 optional one keeps `""`, because an update that skips `undefined` would keep the
-stored text. The `onChange` that `ControlField` and `useFieldControl` hand
+stored text. A text control of your own stores `getNoTextValue(field)` once
+cleared. The `onChange` that `ControlField` and `useFieldControl` hand
 a control stores it when given an empty value, and markup of your own reads
 it with `getEmptyValue(field, fallback)` from
 `@zeno-lib/forms/lib/empty-value`.
