@@ -42,11 +42,12 @@ const COLUMN_RULES_KEY = "~zeno"
  * writes the column when a client doesn't: `"server"` code (`serverOwned`), or
  * only the `"database"`, through a default and a trigger (the audit columns
  * `timestamps()` and `authorship()` emit). `refine` runs on it in insert and
- * update.
+ * update, and `hint` goes to the form field that edits it.
  */
 type ColumnRule = {
   readonly writer?: "database" | "server"
   readonly refine?: unknown
+  readonly hint?: FieldHint
 }
 
 type Writer = NonNullable<ColumnRule["writer"]>
@@ -288,15 +289,43 @@ const composeRefinements = (
   return merged
 }
 
+/** What a column's `withRule` hints the form field that edits it. */
+type FieldHint = { readonly field: string }
+
+// The hints, on the schema each rule returns. A registry of their own rather
+// than `.meta()`, which `z.toJSONSchema` would copy into every JSON Schema.
+// `@zeno-lib/forms` reads it under the same `globalThis` symbol without
+// importing this package, and a second copy of either finds the same one.
+const FIELD_HINTS_KEY = Symbol.for("@zeno-lib/field-hints")
+
+const fieldHints = (() => {
+  const holder = globalThis as {
+    [FIELD_HINTS_KEY]?: z.core.$ZodRegistry<FieldHint>
+  }
+  holder[FIELD_HINTS_KEY] ??= z.registry<FieldHint>()
+  return holder[FIELD_HINTS_KEY]
+})()
+
+const withHint =
+  (rule: SchemaRefinement, hint: FieldHint): SchemaRefinement =>
+  (schema) => {
+    const ruled = rule(schema)
+    fieldHints.add(ruled as z.ZodType, hint)
+    return ruled
+  }
+
 const withRuleRefinements = (table: ZenoTable, refinements?: Refinements) => {
   const rules = columnRules(table)
   const generated: Record<string, SchemaRefinement> = {}
 
   for (const key of Object.keys(rules)) {
-    const rule = rules[key]?.refine
+    const { hint, refine } = rules[key] ?? {}
 
-    if (typeof rule === "function") {
-      generated[key] = rule as SchemaRefinement
+    if (typeof refine === "function") {
+      generated[key] =
+        hint === undefined
+          ? (refine as SchemaRefinement)
+          : withHint(refine as SchemaRefinement, hint)
     }
   }
 

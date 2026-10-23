@@ -27,6 +27,7 @@ type SchemaDef = {
   readonly shape?: Record<string, SchemaNode>
   readonly catchall?: SchemaNode
   readonly in?: SchemaNode
+  readonly out?: SchemaNode
   readonly element?: SchemaNode
   readonly defaultValue?: unknown
 }
@@ -149,6 +150,54 @@ function extractZodDefaultAt(
   }
 }
 
+// The schema inside a wrapper, or `undefined` past the last one.
+function unwrapped(node: SchemaNode): SchemaNode | undefined {
+  const def: SchemaDef | undefined = getDef(node)
+  switch (def?.type) {
+    case "catch":
+    case "default":
+    case "nonoptional":
+    case "nullable":
+    case "optional":
+    case "prefault":
+    case "readonly":
+      return def.innerType
+    // `z.preprocess` pipes a transform into the schema it feeds.
+    case "pipe":
+      return getDef(def.in)?.type === "transform" ? def.out : def.in
+    default:
+      return undefined
+  }
+}
+
+// The schema at `keys`, or inside one of its wrappers, that `read` finds a
+// value on, with that value. A Zod registry keeps an entry on the schema it
+// was set on, not on the `.optional()` or `.nullable()` around it.
+function findZodSchemaAt<T>(
+  schema: SchemaNode,
+  keys: readonly PropertyKey[],
+  read: (node: SchemaNode) => T | undefined
+): { node: SchemaNode; value: T } | undefined {
+  try {
+    let node: SchemaNode | null = schema
+    for (const key of keys) {
+      node = node && childAt(node, key)
+    }
+    let current: SchemaNode | undefined =
+      node && keys.length > 0 ? node : undefined
+    for (let depth = 0; current && depth < MAX_WRAPPER_DEPTH; depth += 1) {
+      const value = read(current)
+      if (value !== undefined) {
+        return { node: current, value }
+      }
+      current = unwrapped(current)
+    }
+  } catch {
+    // An unrecognised schema has nothing to offer.
+  }
+  return undefined
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return (
     typeof value === "object" &&
@@ -251,5 +300,6 @@ export {
   deepMergeDefaults,
   extractZodDefaultAt,
   extractZodDefaults,
+  findZodSchemaAt,
   pickSchemaShape,
 }

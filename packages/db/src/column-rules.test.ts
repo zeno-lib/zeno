@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm/pg-core"
 import { snakeCase } from "drizzle-orm/pg-core/casing"
 import { describe, expect, it } from "vitest"
+import { z } from "zod"
 import {
   authUserId,
   createdBy,
@@ -194,6 +195,21 @@ describe("ruled columns", () => {
     expect(accepts({ builtIn: 1990 })).toBe(true)
     expect(accepts({ builtIn: 1990.5 })).toBe(false)
     expect(accepts({ builtIn: 10_000 })).toBe(false)
+  })
+
+  it("hints a form field the scale of a percentage, and keeps it out of JSON Schema", () => {
+    // Where `@zeno-lib/forms` reads it: the registry under this symbol, on
+    // the column's own schema inside a nullable column's wrappers.
+    const hints = (globalThis as Record<symbol, z.core.$ZodRegistry>)[
+      Symbol.for("@zeno-lib/field-hints")
+    ]
+    const hint = (key: "builtIn" | "discount" | "share") =>
+      hints?.get(insert.shape[key].unwrap().unwrap())
+
+    expect(hint("discount")).toEqual({ field: "percentage", scale: "fraction" })
+    expect(hint("share")).toEqual({ field: "percentage", scale: "percent" })
+    expect(hint("builtIn")).toEqual({ field: "year" })
+    expect(JSON.stringify(z.toJSONSchema(insert))).not.toContain('"field"')
   })
 
   it("checks an email address, and keeps a nullable one optional", () => {

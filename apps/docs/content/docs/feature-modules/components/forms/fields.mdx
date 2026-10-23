@@ -235,13 +235,23 @@ addon. Pick what the form value means with `scale`:
 
 `fractionDigits` (default `2`) counts the decimals of the shown percentage.
 `min`/`max` clamp on blur, in the form value's scale. `allowNegative`
-defaults to `false`.
+defaults to whether `min` is below 0.
+
+A field bound to a
+[`percentage()` column](/docs/core-framework/data-management/database/tables#columns)
+takes `scale` from the column's hint, and `min` and `max` from its schema's
+`.min()` and `.max()`, a refinement's included, so it needs none of the three
+props. A prop wins, and so does one from `defaultProps`, which is why no
+`scale`, `min` or `max` belongs there. The hint sits in a registry of its own,
+not in `.meta()`, so `z.toJSONSchema` never sees it.
 
 ## Year field
 
 `YearField` takes a four-digit integer year (`number | null`). It accepts
 digits only, with no thousands separator, and sets `inputMode="numeric"`.
-`min`/`max` clamp the value on blur.
+`min`/`max` clamp the value on blur, and a `min` below 0 lets it take a
+negative year. A field bound to a `year()` column takes them from the column's
+schema, as `PercentageField` does.
 
 <Preview>
   <YearFieldPreview />
