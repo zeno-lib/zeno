@@ -4,7 +4,8 @@
 // Tier A+ semantics:
 //   - `.default(...)` / `.prefault(...)` values flow through.
 //   - Strings (and string-format subtypes — email, url, uuid, regex, …) without
-//     a default fall back to `""` so React inputs render controlled.
+//     a default fall back to `""` so React inputs render controlled, or to
+//     `null` under `.nullable()`, which the fields render as no text.
 //   - Arrays without a default fall back to `[]`.
 //   - Nested `z.object(...)` recurses; emits a sub-record only if at least one
 //     leaf produced a value.
@@ -26,6 +27,7 @@ type SchemaDef = {
   readonly shape?: Record<string, SchemaNode>
   readonly catchall?: SchemaNode
   readonly in?: SchemaNode
+  readonly out?: SchemaNode
   readonly element?: SchemaNode
   readonly defaultValue?: unknown
 }
@@ -40,6 +42,7 @@ function getDef(node: SchemaNode | undefined): SchemaDef | undefined {
 
 function extractDefaultForField(node: SchemaNode): ExtractResult {
   let current: SchemaNode | undefined = node
+  let isNullable = false
   for (let depth = 0; depth < MAX_WRAPPER_DEPTH; depth += 1) {
     const def: SchemaDef | undefined = getDef(current)
     if (!def?.type) {
@@ -49,8 +52,11 @@ function extractDefaultForField(node: SchemaNode): ExtractResult {
       case "default":
       case "prefault":
         return { ok: true, value: def.defaultValue }
-      case "optional":
       case "nullable":
+        isNullable = true
+        current = def.innerType
+        continue
+      case "optional":
       case "nonoptional":
       case "readonly":
         current = def.innerType
@@ -58,8 +64,10 @@ function extractDefaultForField(node: SchemaNode): ExtractResult {
       case "pipe":
         current = def.in
         continue
+      // No text is `null` where the schema takes it, as a nullable column
+      // stores it, so a field left blank saves as none rather than as `""`.
       case "string":
-        return { ok: true, value: "" }
+        return { ok: true, value: isNullable ? null : "" }
       case "array":
         return { ok: true, value: [] }
       case "object": {
@@ -140,6 +148,54 @@ function extractZodDefaultAt(
   } catch {
     return { ok: false }
   }
+}
+
+// The schema inside a wrapper, or `undefined` past the last one.
+function unwrapped(node: SchemaNode): SchemaNode | undefined {
+  const def: SchemaDef | undefined = getDef(node)
+  switch (def?.type) {
+    case "catch":
+    case "default":
+    case "nonoptional":
+    case "nullable":
+    case "optional":
+    case "prefault":
+    case "readonly":
+      return def.innerType
+    // `z.preprocess` pipes a transform into the schema it feeds.
+    case "pipe":
+      return getDef(def.in)?.type === "transform" ? def.out : def.in
+    default:
+      return undefined
+  }
+}
+
+// The schema at `keys`, or inside one of its wrappers, that `read` finds a
+// value on, with that value. A Zod registry keeps an entry on the schema it
+// was set on, not on the `.optional()` or `.nullable()` around it.
+function findZodSchemaAt<T>(
+  schema: SchemaNode,
+  keys: readonly PropertyKey[],
+  read: (node: SchemaNode) => T | undefined
+): { node: SchemaNode; value: T } | undefined {
+  try {
+    let node: SchemaNode | null = schema
+    for (const key of keys) {
+      node = node && childAt(node, key)
+    }
+    let current: SchemaNode | undefined =
+      node && keys.length > 0 ? node : undefined
+    for (let depth = 0; current && depth < MAX_WRAPPER_DEPTH; depth += 1) {
+      const value = read(current)
+      if (value !== undefined) {
+        return { node: current, value }
+      }
+      current = unwrapped(current)
+    }
+  } catch {
+    // An unrecognised schema has nothing to offer.
+  }
+  return undefined
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -244,5 +300,6 @@ export {
   deepMergeDefaults,
   extractZodDefaultAt,
   extractZodDefaults,
+  findZodSchemaAt,
   pickSchemaShape,
 }

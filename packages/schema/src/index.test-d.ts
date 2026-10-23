@@ -1,9 +1,9 @@
-import { sql } from "drizzle-orm"
-import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
+import { integer, pgTable, text, timestamp } from "drizzle-orm/pg-core"
 import { expectTypeOf, test } from "vitest"
 import { z } from "zod"
 
 import { defineTableSchema } from "./index"
+import { zenoTable } from "./test-table"
 
 type StandardSchema<T> = {
   readonly "~standard": {
@@ -16,11 +16,13 @@ declare function acceptsFormsSchema<TFormData>(
   _schema: StandardSchema<TFormData>
 ): void
 
-const posts = pgTable("posts", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  slug: text("slug").notNull(),
-  title: text("title").notNull(),
-})
+const posts = zenoTable(
+  pgTable("posts", {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+  })
+)
 
 test("insert and update schemas infer form-compatible Standard Schema data", () => {
   const schemas = defineTableSchema(posts)
@@ -52,39 +54,29 @@ test("refined schemas preserve refinement-specific output types", () => {
   }>()
 })
 
-test("defaulted audit columns leave the insert and update types", () => {
-  const notes = pgTable("notes", {
-    body: text("body").notNull(),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    createdBy: uuid("created_by").notNull().default(sql`auth.uid()`),
-    updatedAt: timestamp("updated_at").notNull(),
-  })
-  const schemas = defineTableSchema(notes)
+test("a column named like an audit column stays in the insert type", () => {
+  const events = zenoTable(
+    pgTable("events", {
+      createdAt: timestamp("created_at").notNull().defaultNow(),
+      label: text("label").notNull(),
+    })
+  )
+  const schemas = defineTableSchema(events)
 
   expectTypeOf<z.infer<typeof schemas.insert>>().toEqualTypeOf<{
-    body: string
-    updatedAt: Date
+    createdAt?: Date | undefined
+    label: string
   }>()
-  expectTypeOf<z.infer<typeof schemas.update>>().toEqualTypeOf<{
-    body?: string | undefined
-    updatedAt?: Date | undefined
-  }>()
-  expectTypeOf<keyof z.infer<typeof schemas.select>>().toEqualTypeOf<
-    "body" | "createdAt" | "createdBy" | "updatedAt"
-  >()
-
-  defineTableSchema(notes, {
-    // @ts-expect-error: an omitted audit column has nothing to refine.
-    insert: { createdBy: (schema) => schema },
-  })
 })
 
 test("a function refinement keeps a nullable or defaulted insert column optional", () => {
-  const drafts = pgTable("drafts", {
-    note: text("note"),
-    status: text("status").notNull().default("open"),
-    title: text("title").notNull(),
-  })
+  const drafts = zenoTable(
+    pgTable("drafts", {
+      note: text("note"),
+      status: text("status").notNull().default("open"),
+      title: text("title").notNull(),
+    })
+  )
   const schemas = defineTableSchema(drafts, {
     insert: {
       note: (schema) => schema.min(1),

@@ -13,6 +13,7 @@ export default defineConfig({
       /^drizzle-orm(\/|$)/,
       /^postgres(\/|$)/,
       /^react(\/|$)/,
+      /^zod(\/|$)/,
     ],
   },
   dts: true,

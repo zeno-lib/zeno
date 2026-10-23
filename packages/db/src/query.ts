@@ -270,8 +270,35 @@ const sameValue = (a: unknown, b: unknown) =>
  *   rows: input.tagIds.map((tagId) => ({ tagId })),
  * })
  * ```
+ *
+ * In place of the table, it takes the rows `ownedRows` from `@zeno-lib/schema`
+ * describes, synced by `id`, whose `parent` must name exactly their parent
+ * columns:
+ *
+ * ```ts
+ * await syncRows(tx, orderLines, { parent: { orderId }, rows: input.lines })
+ * ```
  */
-export const syncRows = <
+export function syncRows<
+  TQueryResult extends PgQueryResultHKT,
+  TRelations extends AnyRelations,
+  TTable extends PgTable,
+  TParentKey extends ColumnKey<TTable>,
+>(
+  db: PgAsyncDatabase<TQueryResult, TRelations>,
+  owned: OwnedTableRows<TTable, TParentKey>,
+  options: Omit<
+    SyncRowsByIdOptions<
+      TQueryResult,
+      TRelations,
+      TTable,
+      OwnedParent<TTable, TParentKey>,
+      Extract<"id", ColumnKey<TTable>>
+    >,
+    "id" | "key"
+  >
+): Promise<SelectModel<TTable>[]>
+export function syncRows<
   TQueryResult extends PgQueryResultHKT,
   TRelations extends AnyRelations,
   TTable extends PgTable,
@@ -284,10 +311,45 @@ export const syncRows = <
   options:
     | SyncRowsByIdOptions<TQueryResult, TRelations, TTable, TParent, TId>
     | SyncRowsByKeyOptions<TQueryResult, TRelations, TTable, TParent, TKey>
-): Promise<SelectModel<TTable>[]> =>
-  sync(db as AnyDatabase, table, options as SyncOptions) as Promise<
-    SelectModel<TTable>[]
-  >
+): Promise<SelectModel<TTable>[]>
+// Async, as `sync` is, so a bad argument rejects instead of throwing.
+export async function syncRows(
+  db: AnyDatabase,
+  target: PgTable | OwnedTableRows<PgTable, string>,
+  options: SyncOptions
+): Promise<Row[]> {
+  if (is(target, PgTable)) {
+    return sync(db, target, options)
+  }
+
+  // A parent column the descriptor doesn't name would scope the sync to fewer
+  // rows than the form holds, and a missing one to more.
+  const named = [...target.parent].sort()
+  const given = Object.keys(options.parent).sort()
+  if (named.join() !== given.join()) {
+    throw new Error(
+      `syncRows on "${getTableName(target.table)}" needs exactly the parent columns ${named.join(", ")}`
+    )
+  }
+
+  // The descriptor's rows are told apart by id, whatever a cast passes.
+  const { parent, remove, rows } = options
+  return await sync(db, target.table, { parent, remove, rows })
+}
+
+// A value for every parent column, `undefined` excluded, as `sync` checks.
+type OwnedParent<TTable extends PgTable, TParentKey extends string> = {
+  [K in TParentKey]: K extends keyof InsertModel<TTable>
+    ? Exclude<InsertModel<TTable>[K], undefined>
+    : never
+}
+
+// What `ownedRows` from `@zeno-lib/schema` returns, read by shape: neither
+// package imports the other.
+type OwnedTableRows<TTable extends PgTable, TParentKey extends string> = {
+  readonly parent: readonly TParentKey[]
+  readonly table: TTable
+}
 
 type AnyDatabase = PgAsyncDatabase<PgQueryResultHKT, AnyRelations>
 

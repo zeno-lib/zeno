@@ -1,15 +1,31 @@
 // https://orm.drizzle.team/docs/rls#using-with-supabase  (re-exported roles, authUid, realtimeMessages)
-import { Column, getColumnTable, getTableName, is, sql } from "drizzle-orm"
+import {
+  type BuildColumn,
+  Column,
+  getColumnTable,
+  getTableName,
+  is,
+  sql,
+} from "drizzle-orm"
 import {
   type AnyPgColumn,
+  type AnyPgColumnBuilder,
   bigint,
   type ExtraConfigColumn,
   type HasIdentity,
   integer,
+  numeric,
   type PgBigInt53Builder,
   type PgBigInt64Builder,
+  type PgBuildColumns,
+  type PgBuildExtraConfigColumns,
   type PgIntegerBuilder,
   type PgPolicyConfig,
+  type PgSchema,
+  type PgTableExtraConfig,
+  type PgTableExtraConfigValue,
+  type PgTableFnInternal,
+  type PgTableWithColumns,
   type PgTimestampBuilder,
   type PgTimestampStringBuilder,
   type PgUUIDBuilder,
@@ -19,12 +35,17 @@ import {
   type SetHasDefault,
   type SetIsPrimaryKey,
   type SetNotNull,
+  smallint,
+  text,
   timestamp,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core"
 import { snakeCase } from "drizzle-orm/pg-core/casing"
+import type { PgColumnsBuilders } from "drizzle-orm/pg-core/columns/all"
 import { authenticatedRole, authUid } from "drizzle-orm/supabase"
+import type { GetZodType } from "drizzle-orm/zod"
+import type { z } from "zod"
 import { authUsers } from "./auth-schema.ts"
 import {
   DEFAULT_FUNCTION_PREFIX,
@@ -64,6 +85,131 @@ export {
   supabaseAuthAdminRole,
 } from "drizzle-orm/supabase"
 
+// The key a table carries its column rules under. `@zeno-lib/schema` reads it
+// by name (`COLUMN_RULES_KEY`), because neither package imports the other;
+// `src/column-rules.test.ts` fails if the two drift.
+const COLUMN_RULES_KEY = "~zeno"
+
+// Who writes a column, when a client doesn't: server code (`serverOwned`), or
+// only the database, through a default and a trigger (the audit columns).
+type WriterRule<TWriter extends "database" | "server"> = {
+  readonly writer: TWriter
+}
+type RefineRule<TRefine> = {
+  readonly refine: TRefine
+  readonly hint?: FieldHint
+}
+
+/**
+ * What a column tells the form field that edits it, beside its rule:
+ * `{ field: "percentage", scale: "fraction" }` has `PercentageField` from
+ * `@zeno-lib/forms` show a stored `0.25` as 25 %. The field takes its bounds
+ * from the rule itself.
+ */
+export type FieldHint = {
+  readonly field: string
+  readonly [key: string]: unknown
+}
+type ColumnRule = Partial<
+  WriterRule<"database" | "server"> & RefineRule<unknown>
+>
+
+type WithColumnRule<TBuilder, TRule extends ColumnRule> = TBuilder & {
+  readonly [COLUMN_RULES_KEY]: TRule
+}
+
+const SERVER_OWNED = { writer: "server" } as const satisfies ColumnRule
+const DATABASE_OWNED = { writer: "database" } as const satisfies ColumnRule
+
+// Drizzle builders mutate `this` and their methods return it, typed as an
+// intersection with `this`, so a marker survives the calls chained after it.
+// A second marker adds to the first, so `serverOwned(percentage())` keeps the
+// rule for the server-side schema. Two writers can't share a column.
+const markColumn = <
+  TBuilder extends AnyPgColumnBuilder,
+  TRule extends ColumnRule,
+>(
+  builder: TBuilder,
+  rule: TRule
+) => {
+  const current = (builder as { [COLUMN_RULES_KEY]?: ColumnRule })[
+    COLUMN_RULES_KEY
+  ]
+
+  if (
+    current?.writer !== undefined &&
+    rule.writer !== undefined &&
+    current.writer !== rule.writer
+  ) {
+    throw new TypeError(
+      `A column the ${current.writer} writes can't also be written by the ${rule.writer}.`
+    )
+  }
+
+  return Object.assign(builder, {
+    [COLUMN_RULES_KEY]: { ...current, ...rule },
+  }) as WithColumnRule<TBuilder, TRule>
+}
+
+/**
+ * A column only the server writes: a trigger, a `DEFAULT` such as
+ * `auth.uid()`, or an action of its own. `defineTableSchema` leaves it out of
+ * insert and update, so no form or action input accepts it, and
+ * `defineServerTableSchema` keeps it, for server code that sets it. An audit
+ * column, which the database writes, can't take it.
+ */
+export const serverOwned = <
+  TBuilder extends AnyPgColumnBuilder & {
+    readonly [COLUMN_RULES_KEY]?: Partial<
+      WriterRule<"server"> & RefineRule<unknown>
+    >
+  },
+>(
+  builder: TBuilder
+) => markColumn(builder, SERVER_OWNED)
+
+// The schema drizzle's Zod bridge generates for the column, before it adds
+// `.nullable()` or `.optional()`: what a function refinement receives.
+type ColumnSchema<TBuilder extends AnyPgColumnBuilder> = GetZodType<
+  BuildColumn<string, TBuilder, "common">,
+  undefined
+>
+
+// A rule checks one value, and `.array()` mutates the builder it is called on,
+// so chained after `withRule` it would turn the rule on the array instead.
+type RuledColumn<TBuilder, TRefine> = WithColumnRule<
+  TBuilder,
+  RefineRule<TRefine>
+> & { readonly array: never }
+
+const arrayAfterRule = () => {
+  throw new TypeError(
+    "A column rule checks one value: call .array() before withRule(), and write the rule for the array."
+  )
+}
+
+/**
+ * A rule `defineTableSchema` applies to the column in insert and update: a
+ * function from the schema the column generates, typed from it
+ * (`z.ZodNumber` for a `numeric({ mode: "number" })`). It runs before
+ * `.nullable()` and `.optional()`, so a nullable column stays nullable. A
+ * function the caller passes for the same column runs on top of it; a Zod
+ * schema replaces it, rule included. `hint` goes to the form field that edits
+ * the column.
+ */
+export const withRule = <
+  TBuilder extends AnyPgColumnBuilder,
+  TRefine extends (schema: ColumnSchema<TBuilder>) => z.ZodType,
+>(
+  builder: TBuilder,
+  refine: TRefine,
+  hint?: FieldHint
+) =>
+  Object.defineProperty(markColumn(builder, { hint, refine }), "array", {
+    configurable: true,
+    value: arrayAfterRule,
+  }) as RuledColumn<TBuilder, TRefine>
+
 /** How a timestamp column is read back: a `Date` (the default) or Postgres's own text. */
 export type TimestampMode = "date" | "string"
 
@@ -87,9 +233,13 @@ type TimestampColumn<TMode extends TimestampMode> = SetHasDefault<
   >
 >
 
+// The database writes the audit columns, through a default and a trigger, so
+// they leave every derived insert and update schema, server-side ones too.
+type AuditColumn<TBuilder> = WithColumnRule<TBuilder, typeof DATABASE_OWNED>
+
 export type TimestampColumns<TMode extends TimestampMode = "date"> = {
-  createdAt: TimestampColumn<TMode>
-  updatedAt: TimestampColumn<TMode>
+  createdAt: AuditColumn<TimestampColumn<TMode>>
+  updatedAt: AuditColumn<TimestampColumn<TMode>>
 }
 
 // `created_at` is a column DEFAULT, so Postgres fills it for every writer.
@@ -110,11 +260,14 @@ export const timestamps = <TMode extends TimestampMode = "date">({
   withTimezone = true,
 }: TimestampsOptions<TMode> = {}): TimestampColumns<TMode> => {
   const column = (name: string) =>
-    mode === "string"
-      ? timestamp(name, { mode: "string", precision, withTimezone })
-          .notNull()
-          .defaultNow()
-      : timestamp(name, { precision, withTimezone }).notNull().defaultNow()
+    markColumn(
+      mode === "string"
+        ? timestamp(name, { mode: "string", precision, withTimezone })
+            .notNull()
+            .defaultNow()
+        : timestamp(name, { precision, withTimezone }).notNull().defaultNow(),
+      DATABASE_OWNED
+    )
 
   return {
     createdAt: column("created_at"),
@@ -180,13 +333,45 @@ const authorColumn = ({
   return notNull ? column.notNull() : column
 }
 
+// `authUid` is `(select auth.uid())`, which is right for a policy predicate
+// (the wrapper lets the planner evaluate it once per statement) but invalid in
+// a column DEFAULT: Postgres rejects a subquery there with
+// "cannot use subquery in DEFAULT expression". The bare call is what a DEFAULT
+// takes, and it resolves the same request.jwt.claims setting.
+const AUTH_UID_DEFAULT = sql`auth.uid()`
+
+type AuthUserIdColumn<
+  TNotNull extends boolean,
+  TDefaultToCurrentUser extends boolean,
+> = [TDefaultToCurrentUser] extends [false]
+  ? AuthorColumn<TNotNull>
+  : // A flag only known at runtime types as an owner column, the safe side.
+    WithColumnRule<SetHasDefault<AuthorColumn<TNotNull>>, typeof SERVER_OWNED>
+
 // Nullable by default: a required reference to auth.users means deleting the
 // user fails, because the audit trail holds the row.
-export function authUserId<TNotNull extends boolean = false>(
-  options?: AuthorshipOptions<TNotNull> & { name?: string }
-): AuthorColumn<TNotNull>
-export function authUserId(options: AuthorColumnConfig = {}) {
-  return authorColumn(options)
+//
+// `defaultToCurrentUser` makes it an owner column: the signed-in user by
+// default, and server-owned, so no client picks the owner. The marker has to
+// come from here, because a `.default(...)` chained afterwards can't add it.
+export function authUserId<
+  TNotNull extends boolean = false,
+  TDefaultToCurrentUser extends boolean = false,
+>(
+  options?: AuthorshipOptions<TNotNull> & {
+    name?: string
+    defaultToCurrentUser?: TDefaultToCurrentUser
+  }
+): AuthUserIdColumn<TNotNull, TDefaultToCurrentUser>
+export function authUserId({
+  defaultToCurrentUser = false,
+  ...options
+}: AuthorColumnConfig & { defaultToCurrentUser?: boolean } = {}) {
+  const column = authorColumn(options)
+
+  return defaultToCurrentUser
+    ? markColumn(column.default(AUTH_UID_DEFAULT), SERVER_OWNED)
+    : column
 }
 
 // RLS policies and PostgREST joins cannot read auth.users, so applications
@@ -206,30 +391,25 @@ export function userId(
   return authorColumn({ ...options, reference })
 }
 
-// `authUid` is `(select auth.uid())`, which is right for a policy predicate
-// (the wrapper lets the planner evaluate it once per statement) but invalid in
-// a column DEFAULT: Postgres rejects a subquery there with
-// "cannot use subquery in DEFAULT expression". The bare call is what a DEFAULT
-// takes, and it resolves the same request.jwt.claims setting.
-const AUTH_UID_DEFAULT = sql`auth.uid()`
-
 export function createdBy<TNotNull extends boolean = false>(
   options?: AuthorshipOptions<TNotNull>
-): SetHasDefault<AuthorColumn<TNotNull>>
+): AuditColumn<SetHasDefault<AuthorColumn<TNotNull>>>
 export function createdBy(options: AuthorColumnConfig = {}) {
-  return authorColumn({ ...options, name: "created_by" }).default(
-    AUTH_UID_DEFAULT
+  return markColumn(
+    authorColumn({ ...options, name: "created_by" }).default(AUTH_UID_DEFAULT),
+    DATABASE_OWNED
   )
 }
 
 export function updatedBy<TNotNull extends boolean = false>(
   options?: AuthorshipOptions<TNotNull>
-): SetHasDefault<AuthorColumn<TNotNull>>
+): AuditColumn<SetHasDefault<AuthorColumn<TNotNull>>>
 export function updatedBy(options: AuthorColumnConfig = {}) {
   // The DEFAULT covers the insert for every writer. The update side is
   // `updatedByTrigger`, for the same reason `updated_at` needs one.
-  return authorColumn({ ...options, name: "updated_by" }).default(
-    AUTH_UID_DEFAULT
+  return markColumn(
+    authorColumn({ ...options, name: "updated_by" }).default(AUTH_UID_DEFAULT),
+    DATABASE_OWNED
   )
 }
 
@@ -253,6 +433,63 @@ export const auditColumns = <
   ...timestamps<TMode>(options),
   ...authorship<TNotNull>(options),
 })
+
+export type PercentageOptions = {
+  name?: string
+  /**
+   * How 25 % is stored: `"fraction"` (the default) stores `0.25`, `"percent"`
+   * stores `25`. The form's `PercentageField` takes the same prop.
+   */
+  scale?: "fraction" | "percent"
+  /** The lowest value insert and update accept, in the stored scale. `0` by default. */
+  min?: number
+  /**
+   * The highest value insert and update accept, in the stored scale: `1` for
+   * a fraction and `100` for a percent by default.
+   */
+  max?: number
+}
+
+// A share as a `numeric`, between 0 and 100 % unless the bounds say otherwise:
+// a rate can go negative, and some ratios exceed 100 %.
+export const percentage = ({
+  name,
+  scale = "fraction",
+  min = 0,
+  max = scale === "fraction" ? 1 : 100,
+}: PercentageOptions = {}) =>
+  withRule(
+    name === undefined
+      ? numeric({ mode: "number" })
+      : numeric(name, { mode: "number" }),
+    (base) => base.min(min).max(max),
+    // `PercentageField` from `@zeno-lib/forms` reads it, and clamps to the
+    // rule's bounds, so a form shows what the column accepts with no props.
+    { field: "percentage", scale }
+  )
+
+export type YearOptions = {
+  name?: string
+  /** `0` by default. */
+  min?: number
+  /** `9999` by default, the four digits a year field takes. */
+  max?: number
+}
+
+// A calendar year as a `smallint`, so a whole number.
+export const year = ({ name, min = 0, max = 9999 }: YearOptions = {}) =>
+  withRule(
+    name === undefined ? smallint() : smallint(name),
+    (base) => base.min(min).max(max),
+    // `YearField` from `@zeno-lib/forms` clamps to the rule's bounds.
+    { field: "year" }
+  )
+
+// An email address as `text`, checked as `z.email()` checks it.
+// `ZodString.email()` runs the same check, and keeps Zod a type-only import
+// here.
+export const email = ({ name }: { name?: string } = {}) =>
+  withRule(name === undefined ? text() : text(name), (base) => base.email())
 
 const DEFAULT_ID_NAME = "id"
 
@@ -293,28 +530,42 @@ type IdentityBuilder<
     ? PgBigInt64Builder
     : PgBigInt53Builder
 
+type SequentialIdColumn<
+  TType extends IdentityType,
+  TMode extends IdentityMode,
+  TGeneration extends IdentityGeneration,
+> = HasIdentity<IdentityBuilder<TType, TMode>, TGeneration>
+
 type SequentialPrimaryIdColumn<
   TType extends IdentityType,
   TMode extends IdentityMode,
   TGeneration extends IdentityGeneration,
 > = HasIdentity<SetIsPrimaryKey<IdentityBuilder<TType, TMode>>, TGeneration>
 
+type SequentialIdOptions<
+  TType extends IdentityType,
+  TMode extends IdentityMode,
+  TGeneration extends IdentityGeneration,
+> = {
+  name?: string
+  type?: TType
+  // `never` for integer, which has one JavaScript representation.
+  mode?: TType extends "integer" ? never : TMode
+  generated?: TGeneration
+}
+
 // Defaults match the Supabase table editor: bigint, generated by default as
 // identity. Option names follow Postgres, which calls this an identity column.
 // `mode` is "number" because PostgREST serialises to JSON numbers.
-export function sequentialPrimaryId<
+//
+// Not a primary key, for a table whose key spans more columns than the id.
+export function sequentialId<
   TType extends IdentityType = "bigint",
   TMode extends IdentityMode = "number",
   TGeneration extends IdentityGeneration = "byDefault",
 >(
-  options: {
-    name?: string
-    type?: TType
-    // `never` for integer, which has one JavaScript representation.
-    mode?: TType extends "integer" ? never : TMode
-    generated?: TGeneration
-  } = {}
-): SequentialPrimaryIdColumn<TType, TMode, TGeneration> {
+  options: SequentialIdOptions<TType, TMode, TGeneration> = {}
+): SequentialIdColumn<TType, TMode, TGeneration> {
   const {
     name = DEFAULT_ID_NAME,
     type = "bigint",
@@ -326,17 +577,32 @@ export function sequentialPrimaryId<
     mode?: IdentityMode
     generated?: IdentityGeneration
   }
-  const column =
-    type === "integer"
-      ? integer(name).primaryKey()
-      : bigint(name, { mode }).primaryKey()
+  const column = type === "integer" ? integer(name) : bigint(name, { mode })
 
   // TypeScript can't follow the runtime branch. A single cast is rejected too,
   // because Drizzle types `$default` off a polymorphic `this`, which leaves the
   // concrete builders unassignable to the intersected return type.
   return (generated === "always"
     ? column.generatedAlwaysAsIdentity()
-    : column.generatedByDefaultAsIdentity()) as unknown as SequentialPrimaryIdColumn<
+    : column.generatedByDefaultAsIdentity()) as unknown as SequentialIdColumn<
+    TType,
+    TMode,
+    TGeneration
+  >
+}
+
+// `sequentialId()` as the primary key, the id the Supabase table editor gives a
+// new table.
+export function sequentialPrimaryId<
+  TType extends IdentityType = "bigint",
+  TMode extends IdentityMode = "number",
+  TGeneration extends IdentityGeneration = "byDefault",
+>(
+  options: SequentialIdOptions<TType, TMode, TGeneration> = {}
+): SequentialPrimaryIdColumn<TType, TMode, TGeneration> {
+  return sequentialId(
+    options
+  ).primaryKey() as unknown as SequentialPrimaryIdColumn<
     TType,
     TMode,
     TGeneration
@@ -643,12 +909,116 @@ export const authenticatedOwnerAllPolicy = (
   })
 }
 
+type ColumnRuleOf<TBuilder> = TBuilder extends {
+  readonly [COLUMN_RULES_KEY]: infer TRule
+}
+  ? TRule
+  : never
+
+// Read from the builders, before drizzle builds the columns: its column config
+// copies a fixed set of builder fields, so the markers never reach the
+// column types.
+type ColumnRules<TColumnsMap> = {
+  readonly [K in keyof TColumnsMap as [ColumnRuleOf<TColumnsMap[K]>] extends [
+    never,
+  ]
+    ? never
+    : K]: ColumnRuleOf<TColumnsMap[K]>
+}
+
+type TableWithColumnRules<
+  TTableName extends string,
+  TSchema extends string | undefined,
+  TColumnsMap extends Record<string, AnyPgColumnBuilder>,
+> = PgTableWithColumns<{
+  name: TTableName
+  schema: TSchema
+  columns: PgBuildColumns<TTableName, TColumnsMap>
+  dialect: "pg"
+  isAlias: false
+}> & {
+  readonly [COLUMN_RULES_KEY]: { readonly columns: ColumnRules<TColumnsMap> }
+}
+
+type ExtraConfig<TColumnsMap extends Record<string, AnyPgColumnBuilder>> = (
+  self: PgBuildExtraConfigColumns<TColumnsMap>
+) =>
+  | (PgTableExtraConfigValue | PgTableExtraConfigValue[])[]
+  | PgTableExtraConfig
+
+/** Drizzle's table function, recording each column's rule on the table. */
+export type TableFn<TSchema extends string | undefined = undefined> = <
+  TTableName extends string,
+  TColumnsMap extends Record<string, AnyPgColumnBuilder>,
+>(
+  name: TTableName,
+  columns: TColumnsMap | ((columnTypes: PgColumnsBuilders) => TColumnsMap),
+  extraConfig?: ExtraConfig<TColumnsMap>
+) => TableWithColumnRules<TTableName, TSchema, TColumnsMap>
+
+type ColumnsArgument =
+  | Record<string, AnyPgColumnBuilder>
+  | ((columnTypes: PgColumnsBuilders) => Record<string, AnyPgColumnBuilder>)
+
+const readColumnRules = (builders: Record<string, AnyPgColumnBuilder>) => {
+  const rules: Record<string, ColumnRule> = {}
+
+  for (const [key, builder] of Object.entries(builders)) {
+    const rule = (builder as { [COLUMN_RULES_KEY]?: ColumnRule })[
+      COLUMN_RULES_KEY
+    ]
+
+    if (rule !== undefined) {
+      rules[key] = rule
+    }
+  }
+
+  return rules
+}
+
+// Drizzle builds the table exactly as before. For the callback form, it calls
+// the callback once, synchronously, so wrapping it is enough to see the
+// builders without importing drizzle's column factory.
+const withColumnRules = <TSchema extends string | undefined>(
+  create: PgTableFnInternal<TSchema>
+): TableFn<TSchema> => {
+  const createAny = create as unknown as (
+    name: string,
+    columns: ColumnsArgument,
+    extraConfig?: unknown
+  ) => object
+
+  return ((name: string, columns: ColumnsArgument, extraConfig?: unknown) => {
+    let builders: Record<string, AnyPgColumnBuilder> = {}
+    const built = createAny(
+      name,
+      typeof columns === "function"
+        ? (columnTypes: PgColumnsBuilders) => {
+            builders = columns(columnTypes)
+            return builders
+          }
+        : columns,
+      extraConfig
+    )
+
+    if (typeof columns !== "function") {
+      builders = columns
+    }
+
+    // Not enumerable, so nothing that walks a table's own keys for its
+    // columns ever meets it.
+    return Object.defineProperty(built, COLUMN_RULES_KEY, {
+      value: { columns: readColumnRules(builders) },
+    })
+  }) as unknown as TableFn<TSchema>
+}
+
 // Application-owned tables. Column keys stay camelCase, database identifiers
 // become snake_case, and RLS is on.
-export const table = snakeCase.table.withRLS
+export const table = withColumnRules(snakeCase.table.withRLS)
 
 // Escape hatch for intentionally non-RLS tables such as seed/reference data.
-export const unsecureTable = snakeCase.table
+export const unsecureTable = withColumnRules(snakeCase.table)
 
 // A non-public schema, with the same two guarantees `table` and `unsecureTable`
 // give at the top level. Drizzle's own `pgSchema(name)` takes no casing
@@ -660,9 +1030,22 @@ export const schema = <TName extends string>(name: TName) => {
   const built = snakeCase.schema(name)
 
   // `Object.assign` mutates and returns the PgSchema instance, so `isSchema`
-  // and the `entityKind` checks drizzle-kit runs still recognise it.
+  // and the `entityKind` checks drizzle-kit runs still recognise it. Its type
+  // would intersect the two `table`s, and a call resolves to drizzle's, which
+  // drops the column rules, so the replaced members leave the type first.
   return Object.assign(built, {
-    table: built.table.withRLS,
-    unsecureTable: built.table,
-  })
+    table: withColumnRules<TName>(built.table.withRLS),
+    unsecureTable: withColumnRules<TName>(built.table),
+  }) as unknown as ZenoSchema<TName>
+}
+
+// `existing()` returns the schema itself, typed as drizzle's `this`, which
+// the cast above would turn back into drizzle's `table`.
+export type ZenoSchema<TName extends string> = Omit<
+  PgSchema<TName>,
+  "existing" | "table"
+> & {
+  existing: () => ZenoSchema<TName>
+  table: TableFn<TName>
+  unsecureTable: TableFn<TName>
 }

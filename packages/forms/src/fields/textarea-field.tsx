@@ -1,6 +1,7 @@
 "use client"
 
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
+import { getNoTextValue } from "@zeno-lib/forms/lib/empty-value"
 import { useFieldControl } from "@zeno-lib/forms/lib/use-field-control"
 import { Children, type ComponentProps, type ReactNode } from "react"
 import { InputGroup, InputGroupTextarea } from "@/components/ui/input-group"
@@ -29,10 +30,10 @@ function TextAreaField({
   required,
   ...props
 }: TextAreaFieldProps) {
-  const field = useFieldContext<string>()
+  const field = useFieldContext<string | null>()
   // The label names the textarea through `htmlFor`, so the textarea needs no
   // `aria-labelledby` and the hook doesn't get `label`.
-  const { controlProps, ...shell } = useFieldControl<string>({
+  const { controlProps, ...shell } = useFieldControl<string | null>({
     description,
     disabled,
     required,
@@ -40,11 +41,12 @@ function TextAreaField({
   const hasAddons = Children.count(children) > 0
 
   // A textarea keeps the `""` the user typed, where `controlProps.onChange`
-  // would store the field's empty value.
+  // would store the field's empty value, unless the schema takes `null`: then
+  // no text is `null`, as the field starts, so it saves as none.
   const textareaProps = {
     ...controlProps,
     onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) =>
-      field.handleChange(event.target.value),
+      field.handleChange(event.target.value || getNoTextValue(field)),
     value: field.state.value ?? "",
     ...props,
   }

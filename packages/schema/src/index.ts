@@ -2,9 +2,12 @@
 import {
   type Column,
   getColumns,
+  getTableName,
+  getTableUniqueName,
   type InferInsertModel,
   type InferSelectModel,
-  type Table,
+  is,
+  Table,
 } from "drizzle-orm"
 import {
   type BuildRefine,
@@ -14,7 +17,7 @@ import {
   createSchemaFactory as createDrizzleSchemaFactory,
   type NoUnknownKeys,
 } from "drizzle-orm/zod"
-import type { z } from "zod"
+import { z } from "zod"
 
 export {
   createInsertSchema,
@@ -28,58 +31,114 @@ type NoTableSchemaOptions = { [noTableSchemaOptions]?: never }
 
 type TableColumns<TTable extends Table> = TTable["_"]["columns"]
 
-// The keys `timestamps()` and `authorship()` from `@zeno-lib/db/schema` emit.
-// This package cannot import them, so it matches the names instead, and only
-// when the column has a default, since a column the database never fills is
-// one the caller has to write.
-const AUDIT_COLUMN_KEYS = new Set<string>([
-  "createdAt",
-  "createdBy",
-  "updatedAt",
-  "updatedBy",
-])
-type AuditColumnKey = "createdAt" | "createdBy" | "updatedAt" | "updatedBy"
+// The key a table built by `table()` from `@zeno-lib/db/schema` carries its
+// column rules under. A string rather than a symbol, so the two packages agree
+// on it without either importing the other; `@zeno-lib/db` mirrors it and
+// `packages/db/src/column-rules.test.ts` fails if they drift.
+const COLUMN_RULES_KEY = "~zeno"
 
-type AuditKeys<TTable extends Table> = {
-  [K in keyof TableColumns<TTable>]: K extends AuditColumnKey
-    ? TableColumns<TTable>[K]["_"]["hasDefault"] extends true
-      ? K
-      : never
+/**
+ * What a column marker from `@zeno-lib/db/schema` records. `writer` says who
+ * writes the column when a client doesn't: `"server"` code (`serverOwned`), or
+ * only the `"database"`, through a default and a trigger (the audit columns
+ * `timestamps()` and `authorship()` emit). `refine` runs on it in insert and
+ * update, and `hint` goes to the form field that edits it.
+ */
+type ColumnRule = {
+  readonly writer?: "database" | "server"
+  readonly refine?: unknown
+  readonly hint?: FieldHint
+}
+
+type Writer = NonNullable<ColumnRule["writer"]>
+
+/**
+ * A table built by `table()`, `unsecureTable()` or `schema(...).table` from
+ * `@zeno-lib/db/schema`, which records its column rules. A plain drizzle
+ * table has none, so its markers would vanish without a trace.
+ */
+type ZenoTable = Table & {
+  readonly [COLUMN_RULES_KEY]: { readonly columns: object }
+}
+
+type TableColumnRules<TTable extends ZenoTable> =
+  TTable[typeof COLUMN_RULES_KEY]["columns"]
+
+type WrittenByKeys<TTable extends ZenoTable, TWriter extends Writer> = {
+  [K in keyof TableColumnRules<TTable>]: TableColumnRules<TTable>[K] extends {
+    readonly writer: TWriter
+  }
+    ? K
+    : never
+}[keyof TableColumnRules<TTable>]
+
+type ColumnRefinements<TTable extends ZenoTable> = {
+  [K in keyof TableColumnRules<TTable> as TableColumnRules<TTable>[K] extends {
+    readonly refine: unknown
+  }
+    ? K
+    : never]: TableColumnRules<TTable>[K] extends {
+    readonly refine: infer TRefine
+  }
+    ? TRefine
+    : never
+}
+
+// Identity columns, `by default` as well as `always`: the sequence hands them
+// out, so a client never writes one. Drizzle drops only `always` itself.
+type IdentityKeys<TTable extends Table> = {
+  [K in keyof TableColumns<TTable>]: TableColumns<TTable>[K]["_"]["identity"] extends
+    | "always"
+    | "byDefault"
+    ? K
     : never
 }[keyof TableColumns<TTable>]
 
-type InsertColumns<TTable extends Table> = Pick<
+// Whose columns a variant leaves out: a client writes neither the database's
+// nor the server's, and server code writes the server's.
+type ClientExcludes = Writer
+type ServerExcludes = "database"
+
+// The keys insert and update never accept: identities, and the columns
+// `TExcludes` writes.
+type UnwritableKeys<
+  TTable extends ZenoTable,
+  TExcludes extends Writer = ClientExcludes,
+> = IdentityKeys<TTable> | WrittenByKeys<TTable, TExcludes>
+
+type InsertColumns<
+  TTable extends ZenoTable,
+  TExcludes extends Writer = ClientExcludes,
+> = Pick<
   TableColumns<TTable>,
-  Exclude<keyof InferInsertModel<TTable>, AuditKeys<TTable>>
+  Exclude<keyof InferInsertModel<TTable>, UnwritableKeys<TTable, TExcludes>>
 >
 
 type SelectRefine<
   TTable extends Table,
   TCoerce extends CoerceOptions,
 > = BuildRefine<TableColumns<TTable>, TCoerce>
-type InsertRefine<
-  TTable extends Table,
+type WriteRefineOptions<
+  TTable extends ZenoTable,
   TCoerce extends CoerceOptions,
-> = BuildRefine<InsertColumns<TTable>, TCoerce>
-type UpdateRefine<
-  TTable extends Table,
-  TCoerce extends CoerceOptions,
-> = BuildRefine<InsertColumns<TTable>, TCoerce>
+  TExcludes extends Writer,
+> = BuildRefine<InsertColumns<TTable, TExcludes>, TCoerce>
 
 type DefineTableSchemaOptions<
-  TTable extends Table,
+  TTable extends ZenoTable,
   TCoerce extends CoerceOptions = undefined,
+  TExcludes extends Writer = ClientExcludes,
 > = {
   factory?: CreateSchemaFactoryOptions<TCoerce>
   insert?: NoUnknownKeys<
-    InsertRefine<TTable, TCoerce>,
+    WriteRefineOptions<TTable, TCoerce, TExcludes>,
     InferInsertModel<TTable>
   >
   select?: NoUnknownKeys<
     SelectRefine<TTable, TCoerce>,
     InferSelectModel<TTable>
   >
-  update?: UpdateRefine<TTable, TCoerce>
+  update?: WriteRefineOptions<TTable, TCoerce, TExcludes>
 }
 
 type RefineFromOptions<
@@ -90,6 +149,15 @@ type RefineFromOptions<
     ? NonNullable<TOptions[TKey]>
     : undefined
   : undefined
+
+// A caller's refinement for a key replaces the column rule's in the type: a
+// function receives the column rule's schema at runtime and returns its own.
+type WriteRefine<TTable extends ZenoTable, TOptions, TKey extends string> =
+  RefineFromOptions<TOptions, TKey> extends infer TCaller
+    ? TCaller extends Record<string, unknown>
+      ? Omit<ColumnRefinements<TTable>, keyof TCaller> & TCaller
+      : ColumnRefinements<TTable>
+    : never
 
 type OmitKeys<TSchema, TKeys extends PropertyKey> =
   TSchema extends z.ZodObject<infer TShape, infer TConfig>
@@ -133,22 +201,25 @@ type OptionalRefinedInsert<TSchema, TTable extends Table, TRefine> =
     : never
 
 type DefineTableSchemaResult<
-  TTable extends Table,
+  TTable extends ZenoTable,
   TCoerce extends CoerceOptions,
   TOptions,
+  TExcludes extends Writer = ClientExcludes,
 > = {
+  /** The table the schemas come from, for `ownedRows`. */
+  table: TTable
   insert: OmitKeys<
     OptionalRefinedInsert<
       BuildSchema<
         "insert",
         TableColumns<TTable>,
-        RefineFromOptions<TOptions, "insert">,
+        WriteRefine<TTable, TOptions, "insert">,
         TCoerce
       >,
       TTable,
-      RefineFromOptions<TOptions, "insert">
+      WriteRefine<TTable, TOptions, "insert">
     >,
-    AuditKeys<TTable>
+    UnwritableKeys<TTable, TExcludes>
   >
   select: BuildSchema<
     "select",
@@ -160,26 +231,105 @@ type DefineTableSchemaResult<
     BuildSchema<
       "update",
       TableColumns<TTable>,
-      RefineFromOptions<TOptions, "update">,
+      WriteRefine<TTable, TOptions, "update">,
       TCoerce
     >,
-    AuditKeys<TTable>
+    UnwritableKeys<TTable, TExcludes>
   >
 }
 
 type Refinements = Record<string, unknown>
 
-const auditKeys = (table: Table) => {
+const columnRules = (table: ZenoTable) =>
+  table[COLUMN_RULES_KEY].columns as Record<string, ColumnRule>
+
+const CLIENT_EXCLUDES: ReadonlySet<Writer> = new Set(["database", "server"])
+const SERVER_EXCLUDES: ReadonlySet<Writer> = new Set(["database"])
+
+const unwritableKeys = (table: ZenoTable, excludes: ReadonlySet<Writer>) => {
   const columns: Record<string, Column> = getColumns(table)
+  const rules = columnRules(table)
   const keys: string[] = []
 
   for (const key of Object.keys(columns)) {
-    if (AUDIT_COLUMN_KEYS.has(key) && columns[key]?.hasDefault) {
+    const isIdentity = columns[key]?.generatedIdentity !== undefined
+    const writer = rules[key]?.writer
+
+    if (isIdentity || (writer !== undefined && excludes.has(writer))) {
       keys.push(key)
     }
   }
 
   return keys
+}
+
+type SchemaRefinement = (schema: unknown) => unknown
+
+// `generated` under the caller's `refinements`: a caller's function runs on
+// the generated schema, so it can narrow further; a caller's schema replaces
+// it outright, as it replaces any rule drizzle generates.
+const composeRefinements = (
+  refinements: Refinements | undefined,
+  generated: Record<string, SchemaRefinement>
+): Refinements => {
+  const merged: Refinements = { ...refinements }
+
+  for (const key of Object.keys(generated)) {
+    const inner = generated[key] as SchemaRefinement
+    const refinement = refinements?.[key]
+
+    if (refinement === undefined) {
+      merged[key] = inner
+    } else if (typeof refinement === "function") {
+      merged[key] = (schema: unknown) =>
+        (refinement as SchemaRefinement)(inner(schema))
+    }
+  }
+
+  return merged
+}
+
+/** What a column's `withRule` hints the form field that edits it. */
+type FieldHint = { readonly field: string }
+
+// The hints, on the schema each rule returns. A registry of their own rather
+// than `.meta()`, which `z.toJSONSchema` would copy into every JSON Schema.
+// `@zeno-lib/forms` reads it under the same `globalThis` symbol without
+// importing this package, and a second copy of either finds the same one.
+const FIELD_HINTS_KEY = Symbol.for("@zeno-lib/field-hints")
+
+const fieldHints = (() => {
+  const holder = globalThis as {
+    [FIELD_HINTS_KEY]?: z.core.$ZodRegistry<FieldHint>
+  }
+  holder[FIELD_HINTS_KEY] ??= z.registry<FieldHint>()
+  return holder[FIELD_HINTS_KEY]
+})()
+
+const withHint =
+  (rule: SchemaRefinement, hint: FieldHint): SchemaRefinement =>
+  (schema) => {
+    const ruled = rule(schema)
+    fieldHints.add(ruled as z.ZodType, hint)
+    return ruled
+  }
+
+const withRuleRefinements = (table: ZenoTable, refinements?: Refinements) => {
+  const rules = columnRules(table)
+  const generated: Record<string, SchemaRefinement> = {}
+
+  for (const key of Object.keys(rules)) {
+    const { hint, refine } = rules[key] ?? {}
+
+    if (typeof refine === "function") {
+      generated[key] =
+        hint === undefined
+          ? (refine as SchemaRefinement)
+          : withHint(refine as SchemaRefinement, hint)
+    }
+  }
+
+  return composeRefinements(refinements, generated)
 }
 
 // Postgres starts an ascending identity at its minimum value, which defaults
@@ -207,40 +357,171 @@ const toPositive = (schema: unknown) =>
     ? (schema as PositiveSchema).positive()
     : schema
 
-// A caller's function refinement runs on the positive schema, so it can narrow
-// further. A caller's schema replaces the column schema outright, positive
-// check included, the same as it replaces every other generated rule.
-const withPositiveIdentities = (
+const positiveCheck = (column: Column) =>
+  isPositiveIdentity(column) ? toPositive : undefined
+
+// Drizzle's string mode reads Postgres's text form back
+// (`2026-09-17 07:53:56.357127+00`), which ISO 8601 doesn't cover, so a
+// timestamp takes a `T` or a space, and an offset of hours with optional
+// minutes, up to the ±15:59 Postgres takes.
+// The groups are the date and the offset.
+const TIMESTAMP =
+  /^(\d{4}-\d{2}-\d{2})[T ](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?([+-](?:0\d|1[0-5])(?::?[0-5]\d)?|Z)?$/
+
+// Postgres's special values, which the string mode reads back as they are.
+const INFINITIES: ReadonlySet<string> = new Set(["-infinity", "infinity"])
+
+const ISO_DATE = z.iso.date()
+
+const isDate = (value: string) => ISO_DATE.safeParse(value).success
+
+// One with a time zone needs the offset, which would otherwise come from the
+// session's time zone. One without refuses it, because Postgres drops it
+// without a word and stores the time as written.
+const isTimestamp = (withTimezone: boolean) => (value: string) => {
+  const [, day, offset] = TIMESTAMP.exec(value) ?? []
+
+  return (
+    day !== undefined && isDate(day) && (offset !== undefined) === withTimezone
+  )
+}
+
+const withFormat =
+  (format: "date" | "datetime", isValid: (value: string) => boolean) =>
+  (schema: unknown) =>
+    (schema as z.ZodString).check((context) => {
+      if (!(INFINITIES.has(context.value) || isValid(context.value))) {
+        // Zod's own code and format, so its locale words the message, and
+        // `continue` as its own format checks set, so object refinements
+        // still run.
+        context.issues.push({
+          code: "invalid_format",
+          continue: true,
+          format,
+          input: context.value,
+        })
+      }
+    })
+
+// A string-mode `date` or `timestamp` column holds text Postgres must parse,
+// and Drizzle's bridge only asks for a string. An array column's schema is
+// the array, so its elements go unchecked.
+const formatCheck = (column: Column): SchemaRefinement | undefined => {
+  const { dimensions = 0, withTimezone = false } = column as Column & {
+    dimensions?: number
+    withTimezone?: boolean
+  }
+
+  if (dimensions > 0) {
+    return undefined
+  }
+
+  switch (column.dataType) {
+    case "string date":
+      return withFormat("date", isDate)
+    case "string timestamp":
+      return withFormat("datetime", isTimestamp(withTimezone))
+    default:
+      return undefined
+  }
+}
+
+// Each column's check, under the caller's refinement for it.
+const withChecks = (
   table: Table,
-  refinements: Refinements = {}
-): Refinements => {
+  checkFor: (column: Column) => SchemaRefinement | undefined,
+  refinements: Refinements | undefined
+) => {
   const columns: Record<string, Column> = getColumns(table)
-  const merged: Refinements = { ...refinements }
+  const generated: Record<string, SchemaRefinement> = {}
 
   for (const key of Object.keys(columns)) {
     const column = columns[key]
+    const check = column === undefined ? undefined : checkFor(column)
 
-    if (column === undefined || !isPositiveIdentity(column)) {
-      continue
-    }
-
-    const refinement = refinements[key]
-
-    if (refinement === undefined) {
-      merged[key] = toPositive
-    } else if (typeof refinement === "function") {
-      merged[key] = (schema: unknown) => refinement(toPositive(schema))
+    if (check !== undefined) {
+      generated[key] = check
     }
   }
 
-  return merged
+  return composeRefinements(refinements, generated)
 }
 
-function defineTableSchema<TTable extends Table>(
+// Zod rejects an omit key the shape lacks, which a generated or server-owned
+// column would be.
+const omitPresent = <TSchema extends z.ZodObject>(
+  schema: TSchema,
+  keys: readonly string[]
+) => {
+  const mask: Record<string, true> = {}
+
+  for (const key of keys) {
+    if (key in schema.shape) {
+      mask[key] = true
+    }
+  }
+
+  return schema.omit(mask)
+}
+
+const buildTableSchema = (
+  name: string,
+  table: ZenoTable,
+  options: DefineTableSchemaOptions<ZenoTable, CoerceOptions> | undefined,
+  excludes: ReadonlySet<Writer>
+) => {
+  // The type already refuses a plain drizzle table. This catches a cast, or a
+  // caller without TypeScript, before its markers are silently ignored.
+  if (!(COLUMN_RULES_KEY in table)) {
+    throw new TypeError(
+      `${name} reads the column rules of a table from table(), unsecureTable() or schema(...).table in @zeno-lib/db/schema, and "${getTableName(table)}" has none.`
+    )
+  }
+
+  const schemaFactory = createDrizzleSchemaFactory(options?.factory)
+  const unwritable = unwritableKeys(table, excludes)
+  const omitUnwritable = (schema: z.ZodObject) =>
+    omitPresent(schema, unwritable)
+  // The drizzle factory's refinement parameters are typed per table, which a
+  // generic `TTable` cannot satisfy, so the merged maps go in untyped.
+  const factory = schemaFactory as unknown as Record<
+    "createInsertSchema" | "createSelectSchema" | "createUpdateSchema",
+    (table: Table, refine: Refinements) => z.ZodObject
+  >
+  // Column rules say what a client may write, so they reach insert and update.
+  // `select` describes the stored row, which a rule the database doesn't
+  // enforce may not hold for.
+  const write = (
+    variant: "insert" | "update",
+    create: (typeof factory)["createInsertSchema"]
+  ) =>
+    omitUnwritable(
+      create(
+        table,
+        withChecks(
+          table,
+          formatCheck,
+          withRuleRefinements(table, options?.[variant] as Refinements)
+        )
+      )
+    )
+
+  return {
+    insert: write("insert", factory.createInsertSchema),
+    select: factory.createSelectSchema(
+      table,
+      withChecks(table, positiveCheck, options?.select as Refinements)
+    ),
+    table,
+    update: write("update", factory.createUpdateSchema),
+  }
+}
+
+function defineTableSchema<TTable extends ZenoTable>(
   table: TTable
 ): DefineTableSchemaResult<TTable, undefined, NoTableSchemaOptions>
 function defineTableSchema<
-  TTable extends Table,
+  TTable extends ZenoTable,
   TCoerce extends CoerceOptions = undefined,
   TOptions extends DefineTableSchemaOptions<
     TTable,
@@ -250,49 +531,181 @@ function defineTableSchema<
   table: TTable,
   options: TOptions
 ): DefineTableSchemaResult<TTable, TCoerce, TOptions>
-function defineTableSchema<
-  TTable extends Table,
+function defineTableSchema(
+  table: ZenoTable,
+  options?: DefineTableSchemaOptions<ZenoTable, CoerceOptions>
+) {
+  return buildTableSchema("defineTableSchema", table, options, CLIENT_EXCLUDES)
+}
+
+/**
+ * `defineTableSchema` for code that runs only on the server, such as a sync
+ * job, which writes the columns `serverOwned()` keeps from clients. Identity
+ * and audit columns stay out, as the database writes them. Never parse what a
+ * client sends with it: a server action's input is a client's.
+ */
+function defineServerTableSchema<TTable extends ZenoTable>(
+  table: TTable
+): DefineTableSchemaResult<
+  TTable,
+  undefined,
+  NoTableSchemaOptions,
+  ServerExcludes
+>
+function defineServerTableSchema<
+  TTable extends ZenoTable,
   TCoerce extends CoerceOptions = undefined,
   TOptions extends DefineTableSchemaOptions<
     TTable,
-    TCoerce
-  > = DefineTableSchemaOptions<TTable, TCoerce>,
+    TCoerce,
+    ServerExcludes
+  > = DefineTableSchemaOptions<TTable, TCoerce, ServerExcludes>,
 >(
   table: TTable,
-  options?: TOptions
-): DefineTableSchemaResult<TTable, TCoerce, TOptions> {
-  const schemaFactory = createDrizzleSchemaFactory(options?.factory)
-  const audit = auditKeys(table)
-  // Zod rejects an omit key the shape lacks, which a generated audit column
-  // would be.
-  const omitAudit = (schema: z.ZodObject) => {
-    const mask: Record<string, true> = {}
-
-    for (const key of audit) {
-      if (key in schema.shape) {
-        mask[key] = true
-      }
-    }
-
-    return schema.omit(mask)
-  }
-  // The drizzle factory's refinement parameters are typed per table, which a
-  // generic `TTable` cannot satisfy, so the merged maps go in untyped.
-  const factory = schemaFactory as unknown as Record<
-    "createInsertSchema" | "createSelectSchema" | "createUpdateSchema",
-    (table: Table, refine: Refinements) => z.ZodObject
-  >
-  const build = (
-    variant: "insert" | "select" | "update",
-    create: (typeof factory)["createInsertSchema"]
-  ) => create(table, withPositiveIdentities(table, options?.[variant]))
-
-  return {
-    insert: omitAudit(build("insert", factory.createInsertSchema)),
-    select: build("select", factory.createSelectSchema),
-    update: omitAudit(build("update", factory.createUpdateSchema)),
-  } as unknown as DefineTableSchemaResult<TTable, TCoerce, TOptions>
+  options: TOptions
+): DefineTableSchemaResult<TTable, TCoerce, TOptions, ServerExcludes>
+function defineServerTableSchema(
+  table: ZenoTable,
+  options?: DefineTableSchemaOptions<ZenoTable, CoerceOptions, ServerExcludes>
+) {
+  return buildTableSchema(
+    "defineServerTableSchema",
+    table,
+    options as DefineTableSchemaOptions<ZenoTable, CoerceOptions>,
+    SERVER_EXCLUDES
+  )
 }
 
-export type { DefineTableSchemaOptions, DefineTableSchemaResult }
-export { defineTableSchema }
+type ColumnKey<TTable extends Table> = Extract<
+  keyof TableColumns<TTable>,
+  string
+>
+
+// The part of a `defineTableSchema` result `ownedRows` reads.
+type OwnableSchema = {
+  insert: z.ZodObject
+  select: { shape: { id: z.ZodType } }
+  table: ZenoTable
+}
+
+type OwnedRowSchema<TSchema extends OwnableSchema, TParentKey extends string> =
+  TSchema["insert"] extends z.ZodObject<infer TShape, infer TConfig>
+    ? z.ZodObject<
+        {
+          [K in keyof TShape as K extends TParentKey ? never : K]: TShape[K]
+        } & { id: z.ZodOptional<TSchema["select"]["shape"]["id"]> },
+        TConfig
+      >
+    : never
+
+/**
+ * A table's rows that belong to one parent row and are edited as a list, such
+ * as an order's lines. `syncRows` from `@zeno-lib/db/query` takes it in place
+ * of the table, and a form validates each row with `row`.
+ */
+type OwnedRows<
+  TTable extends ZenoTable,
+  TParentKey extends string,
+  TRow extends z.ZodObject,
+> = {
+  /** The columns that point at the parent row, which `row` leaves out. */
+  readonly parent: readonly TParentKey[]
+  /**
+   * One row as a client sends it: the `insert` columns but the parent's, and
+   * the `id` of a stored row, absent on a new one.
+   */
+  readonly row: TRow
+  readonly table: TTable
+}
+
+/**
+ * The rows of `schema`'s table that belong to a parent through the `parent`
+ * columns, for a form that edits them as a list and the `syncRows` that saves
+ * it:
+ *
+ * ```ts
+ * const orderLines = ownedRows(defineTableSchema(lines), { parent: "orderId" })
+ *
+ * const orderSchema = defineTableSchema(orders).insert.extend({
+ *   lines: z.array(orderLines.row),
+ * })
+ *
+ * await syncRows(tx, orderLines, { parent: { orderId }, rows: input.lines })
+ * ```
+ *
+ * The table needs a sequential `id`. A link table matched by a natural key
+ * goes to `syncRows` with its `key` option instead.
+ */
+const ownedRows = <
+  TSchema extends OwnableSchema,
+  TParentKey extends ColumnKey<TSchema["table"]>,
+>(
+  schema: TSchema,
+  { parent }: { parent: TParentKey | readonly TParentKey[] }
+): OwnedRows<
+  TSchema["table"],
+  TParentKey,
+  OwnedRowSchema<TSchema, TParentKey>
+> => {
+  const parentKeys: readonly TParentKey[] =
+    typeof parent === "string" ? [parent] : [...parent]
+  const id = schema.select.shape.id as z.ZodType | undefined
+
+  if (id === undefined) {
+    throw new TypeError(
+      `ownedRows tells rows apart by their id, and "${getTableName(schema.table)}" has none.`
+    )
+  }
+
+  return {
+    parent: parentKeys,
+    row: omitPresent(schema.insert, parentKeys).extend({ id: id.optional() }),
+    table: schema.table,
+  } as unknown as OwnedRows<
+    TSchema["table"],
+    TParentKey,
+    OwnedRowSchema<TSchema, TParentKey>
+  >
+}
+
+const isZenoTable = (value: unknown): value is ZenoTable =>
+  is(value, Table) && COLUMN_RULES_KEY in value
+
+/**
+ * The columns a client may write, for every Zeno table among `exports` (a
+ * schema barrel, say), keyed by name (`schema.table` outside `public`): what `defineTableSchema`'s
+ * `insert` accepts, and `update` accepts the same. Columns are writable unless
+ * marked, so snapshot this in one test, and a newly writable column shows up
+ * as a diff in review.
+ */
+const writableColumns = (exports: Record<string, unknown>) => {
+  const tables = Object.keys(exports)
+    .map((key) => exports[key])
+    .filter(isZenoTable)
+    .map((table) => [getTableUniqueName(table), table] as const)
+    // A plain sort, so the order doesn't hang on the machine's locale.
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+  const columns: Record<string, string[]> = {}
+
+  for (const [name, table] of tables) {
+    columns[name] = Object.keys(
+      buildTableSchema("writableColumns", table, undefined, CLIENT_EXCLUDES)
+        .insert.shape
+    ).sort()
+  }
+
+  return columns
+}
+
+export type {
+  DefineTableSchemaOptions,
+  DefineTableSchemaResult,
+  OwnedRows,
+  ZenoTable,
+}
+export {
+  defineServerTableSchema,
+  defineTableSchema,
+  ownedRows,
+  writableColumns,
+}

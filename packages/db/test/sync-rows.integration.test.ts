@@ -1,3 +1,4 @@
+import { defineTableSchema, ownedRows } from "@zeno-lib/schema"
 import { asc, eq, inArray, sql, TransactionRollbackError } from "drizzle-orm"
 import {
   bigint,
@@ -9,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core"
 import type { PostgresJsQueryResultHKT } from "drizzle-orm/postgres-js"
 import { afterAll, describe, expect, it } from "vitest"
+import { z } from "zod"
 import { createAdminClient } from "../src/index"
 import { syncRows } from "../src/query"
 import { primaryId, unsecureTable } from "../src/schema"
@@ -567,5 +569,44 @@ describe("syncRows with triggers", () => {
         "Row 1 was deleted along with the rows that left the list"
       )
       expect(await linesOf(tx, 1)).toEqual(before)
+    }))
+})
+
+describe("syncRows with ownedRows", () => {
+  const orderLines = ownedRows(defineTableSchema(lines), { parent: "orderId" })
+
+  it("saves the rows a form validated with the descriptor's row", () =>
+    withTables(async (tx) => {
+      const { apple, other } = await seedLines(tx)
+      const rows = z
+        .array(orderLines.row)
+        .parse([
+          { id: apple.id, orderId: 2, product: "green apple" },
+          { product: "fig" },
+        ])
+
+      const saved = await syncRows(tx, orderLines, {
+        parent: { orderId: 1 },
+        rows,
+      })
+
+      expect(saved.map(({ id, product }) => [id, product])).toEqual([
+        [apple.id, "green apple"],
+        [expect.any(Number), "fig"],
+      ])
+      expect(await linesOf(tx, 2)).toEqual([other])
+    }))
+
+  it("refuses a parent other than the descriptor's, which would scope the sync wrong", () =>
+    withTables(async (tx) => {
+      await seedLines(tx)
+
+      await expect(
+        syncRows(tx, orderLines, {
+          parent: { orderId: 1, product: "apple" } as { orderId: number },
+          rows: [],
+        })
+      ).rejects.toThrow("needs exactly the parent columns orderId")
+      expect(await linesOf(tx, 1)).toHaveLength(3)
     }))
 })

@@ -398,7 +398,7 @@ array):
 |---|---|
 | `z.string()` | `""` |
 | `z.string().optional()` | `undefined` |
-| `z.uuid().nullable()`, `z.number().nullable()` | `null` |
+| `z.string().nullable()`, `z.uuid().nullable()`, `z.number().nullable()` | `null` |
 | `z.array(z.string())` | `[]` |
 | `z.string().min(1)`, `z.number()` | none, so the field is required |
 
@@ -406,11 +406,17 @@ Clearing a field (the combobox clear button, an emptied number, money,
 percentage or year input, an unpicked date) stores its empty value, so the
 form stays valid. A field also starts at it when the schema rejects `""` or
 `[]` (`z.email().optional()` starts at `undefined`, `z.uuid().nullable()` at
-`null`), so an untouched optional field passes. So does an object the schema
+`null`), so an untouched optional field passes, and a nullable string always
+starts at `null`. So does an object the schema
 lets be absent when the defaults would only partly fill it:
 `z.object({ table: z.string(), id: z.number() }).nullable()`, a combobox's
 object value, starts at `null`, not at a `{ table: "" }` that would fail on
-`id`, which no field shows. Text inputs keep `""`, which the user typed. The `onChange` that `ControlField` and `useFieldControl` hand
+`id`, which no field shows. Text inputs keep the `""` the user typed, unless the
+schema takes `null`: a nullable text field holds `null` for no text, from the
+start and once emptied, so it saves as none, as a nullable column stores it. An
+optional one keeps `""`, because an update that skips `undefined` would keep the
+stored text. A text control of your own stores `getNoTextValue(field)` once
+cleared. The `onChange` that `ControlField` and `useFieldControl` hand
 a control stores it when given an empty value, and markup of your own reads
 it with `getEmptyValue(field, fallback)` from
 `@zeno-lib/forms/lib/empty-value`.
