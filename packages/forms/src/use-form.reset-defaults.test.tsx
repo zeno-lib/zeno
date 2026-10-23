@@ -6,7 +6,6 @@ import {
   waitFor,
 } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
-import { StrictMode } from "react"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
 import { Form, FormProvider, useForm } from "./create-form"
@@ -66,30 +65,35 @@ function titleInput() {
 }
 
 describe("useForm — reset(values) rebases defaults", () => {
-  test("reset after submit sticks across rerenders with fixed defaults", async () => {
-    const user = userEvent.setup()
-    let state: Captured | undefined
-    const capture = vi.fn((next: Captured) => {
-      state = next
+  for (const reactStrictMode of [false, true]) {
+    test(`reset after submit sticks across rerenders with fixed defaults (reactStrictMode: ${reactStrictMode})`, async () => {
+      const user = userEvent.setup()
+      let state: Captured | undefined
+      const capture = vi.fn((next: Captured) => {
+        state = next
+      })
+      const record = { title: "Draft" }
+      const { rerender } = render(
+        <EditTitle capture={capture} record={record} />,
+        { reactStrictMode }
+      )
+
+      await user.clear(titleInput())
+      await user.type(titleInput(), "Saved title")
+      await user.click(screen.getByRole("button", { name: SAVE }))
+
+      await waitFor(() => expect(state?.isTouched).toBe(false))
+      for (const tick of [1, 2, 3]) {
+        rerender(<EditTitle capture={capture} record={record} tick={tick} />)
+      }
+      await act(() => Promise.resolve())
+
+      expect(titleInput().value).toBe("Saved title")
+      expect(state?.values).toEqual({ title: "Saved title" })
+      expect(state?.isDefaultValue).toBe(true)
+      expect(state?.isDirty).toBe(false)
     })
-    const record = { title: "Draft" }
-    const { rerender } = render(<EditTitle capture={capture} record={record} />)
-
-    await user.clear(titleInput())
-    await user.type(titleInput(), "Saved title")
-    await user.click(screen.getByRole("button", { name: SAVE }))
-
-    await waitFor(() => expect(state?.isTouched).toBe(false))
-    for (const tick of [1, 2, 3]) {
-      rerender(<EditTitle capture={capture} record={record} tick={tick} />)
-    }
-    await act(() => Promise.resolve())
-
-    expect(titleInput().value).toBe("Saved title")
-    expect(state?.values).toEqual({ title: "Saved title" })
-    expect(state?.isDefaultValue).toBe(true)
-    expect(state?.isDirty).toBe(false)
-  })
+  }
 
   test("new caller defaults apply while the form is untouched", async () => {
     let state: Captured | undefined
@@ -104,16 +108,6 @@ describe("useForm — reset(values) rebases defaults", () => {
     rerender(<EditTitle capture={capture} record={{ title: "v2" }} />)
     await waitFor(() => expect(titleInput().value).toBe("v2"))
     expect(state?.isDefaultValue).toBe(true)
-  })
-
-  test("new caller defaults apply under Strict Mode", async () => {
-    const capture = vi.fn()
-    const { rerender } = render(
-      <EditTitle capture={capture} record={{ title: "v1" }} />,
-      { wrapper: StrictMode }
-    )
-    rerender(<EditTitle capture={capture} record={{ title: "v2" }} />)
-    await waitFor(() => expect(titleInput().value).toBe("v2"))
   })
 
   test("new caller defaults are not applied once the form is touched", async () => {
