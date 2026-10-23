@@ -46,7 +46,8 @@ const isRollback = (error: unknown): boolean => {
  * For tests on a shared database: when suites run in parallel, a committed row
  * changes what every other suite counts. Nothing written here is visible
  * outside the transaction, and nothing needs cleaning up, whatever the rows
- * cascade into. On a transaction, it runs in a savepoint.
+ * cascade into. Only statements sent through `tx` are in it: a write through
+ * another client commits. On a transaction, it runs in a savepoint.
  *
  * ```ts
  * it("archives a deal", () =>
@@ -79,6 +80,11 @@ export const rollBackAfter = async <TTx, T>(
 
 /** A query, or a function that starts one, so a synchronous throw counts too. */
 type Query = PromiseLike<unknown> | (() => PromiseLike<unknown>)
+
+// A query on an RLS client is a callable proxy, so tell a query from a function
+// that starts one by its `then`, not by `typeof`.
+const isThenable = (query: Query): query is PromiseLike<unknown> =>
+  typeof (query as Partial<PromiseLike<unknown>>).then === "function"
 
 const describeValue = (value: unknown): string => {
   try {
@@ -115,7 +121,7 @@ export const expectPostgresError = async (
   code: string
 ): Promise<PostgresError> => {
   const caught = await Promise.resolve()
-    .then(() => (typeof query === "function" ? query() : query))
+    .then(() => (isThenable(query) ? query : query()))
     .then(
       (value) => {
         throw new Error(
@@ -127,7 +133,10 @@ export const expectPostgresError = async (
   const postgresError = toPostgresError(caught)
 
   if (postgresError?.code !== code) {
-    const message = caught instanceof Error ? caught.message : String(caught)
+    // The server's message, not Drizzle's "Failed query: …" wrapper around it.
+    const message =
+      postgresError?.message ??
+      (caught instanceof Error ? caught.message : String(caught))
     throw new Error(
       `Expected Postgres error ${code}, got ${postgresError?.code ?? "no PostgresError"}: ${message}`
     )

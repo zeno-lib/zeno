@@ -4,7 +4,7 @@ import type { PgAsyncDatabase } from "drizzle-orm/pg-core"
 import type { PostgresJsQueryResultHKT } from "drizzle-orm/postgres-js"
 import { afterAll, describe, expect, it } from "vitest"
 import { authUsers } from "../src/auth-schema"
-import { createAdminClient } from "../src/index"
+import { createAdminClient, createSupabaseClient } from "../src/index"
 import { expectRlsDenied, rollBackAfter } from "../src/testing"
 import { posts } from "./schema"
 
@@ -95,4 +95,19 @@ describe("expectRlsDenied", () => {
 
       expect(error.message).toContain("row-level security policy")
     }))
+
+  it("recognises a write refused on an RLS client, whose queries are callable", async () => {
+    const userDb = createSupabaseClient({
+      role: "authenticated",
+      sub: randomUUID(),
+    })
+
+    try {
+      await expectRlsDenied(
+        userDb.insert(posts).values({ title: "Not mine", userId: randomUUID() })
+      )
+    } finally {
+      await userDb.close()
+    }
+  })
 })

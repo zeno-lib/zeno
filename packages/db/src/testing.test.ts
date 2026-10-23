@@ -30,7 +30,9 @@ describe("expectPostgresError", () => {
   it("rejects when the query fails with another code", async () => {
     await expect(
       expectPostgresError(deniedQuery(), SqlState.uniqueViolation)
-    ).rejects.toThrow("Expected Postgres error 23505, got 42501")
+    ).rejects.toThrow(
+      "Expected Postgres error 23505, got 42501: new row violates row-level security policy"
+    )
   })
 
   it("rejects when the error didn't come from the server", async () => {

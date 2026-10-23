@@ -264,7 +264,7 @@ it("admins see every deal", async () => {
 - Assert the exact set `idsSeen` returns. An empty set is also what a broken claims setup looks like.
 - `cleanUp()` deletes every user the harness created, then signs out and closes `db`. It retries transient Auth errors and skips users that are already gone. Delete rows that reference those users first.
 
-To write rows that never commit, and to assert that a write is refused, use `rollBackAfter` and `expectRlsDenied` from `@zeno-lib/db/testing`. See [Testing against the database](/docs/core-framework/data-management/database/querying#testing-against-the-database).
+To write rows that never commit, and to assert that a write is refused, use `rollBackAfter` and `expectRlsDenied` from `@zeno-lib/db/testing`. The rows are visible only inside that transaction, so a statement on `harness.db` sees them only when it runs inside `rollBackAfter(harness.db, …)`, never beside a `rollBackAfter(admin, …)`. See [Testing against the database](/docs/core-framework/data-management/database/querying#testing-against-the-database).
 
 ## Type testing
 
