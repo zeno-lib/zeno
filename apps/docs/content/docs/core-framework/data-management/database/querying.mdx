@@ -406,6 +406,15 @@ as a new row, so a sync never writes another parent's row. When the id column
 has no default (`primaryId("assigned")`), the caller assigns ids: a new row
 keeps its id, and one another row already holds fails on the primary key.
 
+The form and the sync agree on what a row is through
+[`ownedRows`](/docs/core-framework/data-management/schemas#edit-a-parents-rows-as-a-list),
+which `syncRows` takes in place of the table. Its `parent` must then name
+exactly the descriptor's parent columns:
+
+```typescript
+await syncRows(tx, orderLinesOfOrder, { parent: { orderId: id }, rows: lines })
+```
+
 A junction table, or any table whose rows are told apart by what they point at,
 takes `key`, the natural key columns within the parent. Each row carries them,
 since a missing one would be stored as the column default and never match

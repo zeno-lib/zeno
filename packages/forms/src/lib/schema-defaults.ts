@@ -4,7 +4,8 @@
 // Tier A+ semantics:
 //   - `.default(...)` / `.prefault(...)` values flow through.
 //   - Strings (and string-format subtypes — email, url, uuid, regex, …) without
-//     a default fall back to `""` so React inputs render controlled.
+//     a default fall back to `""` so React inputs render controlled, or to
+//     `null` under `.nullable()`, which the fields render as no text.
 //   - Arrays without a default fall back to `[]`.
 //   - Nested `z.object(...)` recurses; emits a sub-record only if at least one
 //     leaf produced a value.
@@ -40,6 +41,7 @@ function getDef(node: SchemaNode | undefined): SchemaDef | undefined {
 
 function extractDefaultForField(node: SchemaNode): ExtractResult {
   let current: SchemaNode | undefined = node
+  let isNullable = false
   for (let depth = 0; depth < MAX_WRAPPER_DEPTH; depth += 1) {
     const def: SchemaDef | undefined = getDef(current)
     if (!def?.type) {
@@ -49,8 +51,11 @@ function extractDefaultForField(node: SchemaNode): ExtractResult {
       case "default":
       case "prefault":
         return { ok: true, value: def.defaultValue }
-      case "optional":
       case "nullable":
+        isNullable = true
+        current = def.innerType
+        continue
+      case "optional":
       case "nonoptional":
       case "readonly":
         current = def.innerType
@@ -58,8 +63,10 @@ function extractDefaultForField(node: SchemaNode): ExtractResult {
       case "pipe":
         current = def.in
         continue
+      // No text is `null` where the schema takes it, as a nullable column
+      // stores it, so a field left blank saves as none rather than as `""`.
       case "string":
-        return { ok: true, value: "" }
+        return { ok: true, value: isNullable ? null : "" }
       case "array":
         return { ok: true, value: [] }
       case "object": {

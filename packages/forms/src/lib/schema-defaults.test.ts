@@ -65,9 +65,12 @@ describe("extractZodDefaults — wrappers", () => {
     expect(extractZodDefaults(schema)).toEqual({ x: "" })
   })
 
-  test(".nullable() unwraps to inner string → ''", () => {
-    const schema = z.object({ x: z.string().nullable() })
-    expect(extractZodDefaults(schema)).toEqual({ x: "" })
+  test(".nullable() starts a string at null, which a nullable column stores", () => {
+    const schema = z.object({
+      x: z.string().nullable(),
+      y: z.string().nullable().optional(),
+    })
+    expect(extractZodDefaults(schema)).toEqual({ x: null, y: null })
   })
 
   test(".readonly() unwraps to inner string → ''", () => {

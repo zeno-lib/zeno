@@ -105,6 +105,18 @@ strips it and nothing writes it. A column you declare yourself is writable,
 even one named `createdAt`. When a trusted path needs to set an audit column (a
 data import, say), build that schema with `createInsertSchema(...)` instead.
 
+### Dates and timestamps are checked as text
+
+A `date` or `timestamp` column in string mode (`date({ mode: "string" })`,
+`timestamp({ mode: "string" })`) holds text that Postgres has to parse, so
+`insert` and `update` check its format. A date is a calendar date
+(`2026-09-17`). A timestamp is a calendar date and a time, ISO 8601 with a `T`
+or a space, or the text Postgres returns (`2026-09-17 07:53:56.357127+00`). One
+`withTimezone` needs its offset, which would otherwise come from the database
+session; one without refuses an offset, which Postgres would drop without a
+word. Both take `infinity` and `-infinity`. An array column's elements go
+unchecked. `select` reads back whatever is stored, unchecked.
+
 ### Identity ids stay out of writes
 
 An identity column, such as the one `sequentialPrimaryId()` creates, is filled by
@@ -355,6 +367,36 @@ export function CreatePostForm() {
   )
 }
 ```
+
+### Edit a parent's rows as a list
+
+A form that edits a parent with its child rows, such as an order and its lines,
+validates each row and sends back the whole list, which
+[`syncRows`](/docs/core-framework/data-management/database/querying#syncing-a-parents-rows)
+saves. `ownedRows(schema, { parent })` describes those rows once, for both:
+
+```ts title="{project}-forms/src/orders/schemas.ts"
+import { defineTableSchema, ownedRows } from "@zeno-lib/schema"
+import { z } from "zod"
+
+export const orderLinesOfOrder = ownedRows(defineTableSchema(orderLines), {
+  parent: "orderId",
+})
+
+const orderSchema = defineTableSchema(orders)
+
+export const updateOrderSchema = orderSchema.update.extend({
+  id: orderSchema.select.shape.id,
+  lines: z.array(orderLinesOfOrder.row).max(100),
+})
+```
+
+- `row` is the table's `insert` columns without the parent's, which the sync
+  writes, plus the `id` of a stored row, absent on a new one. Extend it with a
+  row's own form-only fields.
+- `parent` names one column or several (`["orderId", "kind"]`).
+- The table needs a sequential `id`. A link table told apart by a natural key
+  goes to `syncRows` with its `key` option instead.
 
 ## Where each file lives
 

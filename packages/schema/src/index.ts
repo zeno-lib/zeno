@@ -17,7 +17,7 @@ import {
   createSchemaFactory as createDrizzleSchemaFactory,
   type NoUnknownKeys,
 } from "drizzle-orm/zod"
-import type { z } from "zod"
+import { z } from "zod"
 
 export {
   createInsertSchema,
@@ -205,6 +205,8 @@ type DefineTableSchemaResult<
   TOptions,
   TExcludes extends Writer = ClientExcludes,
 > = {
+  /** The table the schemas come from, for `ownedRows`. */
+  table: TTable
   insert: OmitKeys<
     OptionalRefinedInsert<
       BuildSchema<
@@ -326,19 +328,111 @@ const toPositive = (schema: unknown) =>
     ? (schema as PositiveSchema).positive()
     : schema
 
-const withPositiveIdentities = (table: Table, refinements?: Refinements) => {
+const positiveCheck = (column: Column) =>
+  isPositiveIdentity(column) ? toPositive : undefined
+
+// Drizzle's string mode reads Postgres's text form back
+// (`2026-09-17 07:53:56.357127+00`), which ISO 8601 doesn't cover, so a
+// timestamp takes a `T` or a space, and an offset of hours with optional
+// minutes, up to the ±15:59 Postgres takes.
+// The groups are the date and the offset.
+const TIMESTAMP =
+  /^(\d{4}-\d{2}-\d{2})[T ](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?([+-](?:0\d|1[0-5])(?::?[0-5]\d)?|Z)?$/
+
+// Postgres's special values, which the string mode reads back as they are.
+const INFINITIES: ReadonlySet<string> = new Set(["-infinity", "infinity"])
+
+const ISO_DATE = z.iso.date()
+
+const isDate = (value: string) => ISO_DATE.safeParse(value).success
+
+// One with a time zone needs the offset, which would otherwise come from the
+// session's time zone. One without refuses it, because Postgres drops it
+// without a word and stores the time as written.
+const isTimestamp = (withTimezone: boolean) => (value: string) => {
+  const [, day, offset] = TIMESTAMP.exec(value) ?? []
+
+  return (
+    day !== undefined && isDate(day) && (offset !== undefined) === withTimezone
+  )
+}
+
+const withFormat =
+  (format: "date" | "datetime", isValid: (value: string) => boolean) =>
+  (schema: unknown) =>
+    (schema as z.ZodString).check((context) => {
+      if (!(INFINITIES.has(context.value) || isValid(context.value))) {
+        // Zod's own code and format, so its locale words the message, and
+        // `continue` as its own format checks set, so object refinements
+        // still run.
+        context.issues.push({
+          code: "invalid_format",
+          continue: true,
+          format,
+          input: context.value,
+        })
+      }
+    })
+
+// A string-mode `date` or `timestamp` column holds text Postgres must parse,
+// and Drizzle's bridge only asks for a string. An array column's schema is
+// the array, so its elements go unchecked.
+const formatCheck = (column: Column): SchemaRefinement | undefined => {
+  const { dimensions = 0, withTimezone = false } = column as Column & {
+    dimensions?: number
+    withTimezone?: boolean
+  }
+
+  if (dimensions > 0) {
+    return undefined
+  }
+
+  switch (column.dataType) {
+    case "string date":
+      return withFormat("date", isDate)
+    case "string timestamp":
+      return withFormat("datetime", isTimestamp(withTimezone))
+    default:
+      return undefined
+  }
+}
+
+// Each column's check, under the caller's refinement for it.
+const withChecks = (
+  table: Table,
+  checkFor: (column: Column) => SchemaRefinement | undefined,
+  refinements: Refinements | undefined
+) => {
   const columns: Record<string, Column> = getColumns(table)
   const generated: Record<string, SchemaRefinement> = {}
 
   for (const key of Object.keys(columns)) {
     const column = columns[key]
+    const check = column === undefined ? undefined : checkFor(column)
 
-    if (column !== undefined && isPositiveIdentity(column)) {
-      generated[key] = toPositive
+    if (check !== undefined) {
+      generated[key] = check
     }
   }
 
   return composeRefinements(refinements, generated)
+}
+
+// Zod rejects an omit key the shape lacks, which a generated or server-owned
+// column would be.
+const omitPresent = <TSchema extends z.ZodObject>(
+  schema: TSchema,
+  keys: readonly string[]
+) => {
+  const mask: Record<string, true> = {}
+
+  for (const key of keys) {
+    if (key in schema.shape) {
+      mask[key] = true
+    }
+  }
+
+  return schema.omit(mask)
 }
 
 const buildTableSchema = (
@@ -357,18 +451,8 @@ const buildTableSchema = (
 
   const schemaFactory = createDrizzleSchemaFactory(options?.factory)
   const unwritable = unwritableKeys(table, excludes)
-  // Zod rejects an omit key the shape lacks, which a generated column would be.
-  const omitUnwritable = (schema: z.ZodObject) => {
-    const mask: Record<string, true> = {}
-
-    for (const key of unwritable) {
-      if (key in schema.shape) {
-        mask[key] = true
-      }
-    }
-
-    return schema.omit(mask)
-  }
+  const omitUnwritable = (schema: z.ZodObject) =>
+    omitPresent(schema, unwritable)
   // The drizzle factory's refinement parameters are typed per table, which a
   // generic `TTable` cannot satisfy, so the merged maps go in untyped.
   const factory = schemaFactory as unknown as Record<
@@ -385,7 +469,11 @@ const buildTableSchema = (
     omitUnwritable(
       create(
         table,
-        withRuleRefinements(table, options?.[variant] as Refinements)
+        withChecks(
+          table,
+          formatCheck,
+          withRuleRefinements(table, options?.[variant] as Refinements)
+        )
       )
     )
 
@@ -393,8 +481,9 @@ const buildTableSchema = (
     insert: write("insert", factory.createInsertSchema),
     select: factory.createSelectSchema(
       table,
-      withPositiveIdentities(table, options?.select as Refinements)
+      withChecks(table, positiveCheck, options?.select as Refinements)
     ),
+    table,
     update: write("update", factory.createUpdateSchema),
   }
 }
@@ -458,6 +547,98 @@ function defineServerTableSchema(
   )
 }
 
+type ColumnKey<TTable extends Table> = Extract<
+  keyof TableColumns<TTable>,
+  string
+>
+
+// The part of a `defineTableSchema` result `ownedRows` reads.
+type OwnableSchema = {
+  insert: z.ZodObject
+  select: { shape: { id: z.ZodType } }
+  table: ZenoTable
+}
+
+type OwnedRowSchema<TSchema extends OwnableSchema, TParentKey extends string> =
+  TSchema["insert"] extends z.ZodObject<infer TShape, infer TConfig>
+    ? z.ZodObject<
+        {
+          [K in keyof TShape as K extends TParentKey ? never : K]: TShape[K]
+        } & { id: z.ZodOptional<TSchema["select"]["shape"]["id"]> },
+        TConfig
+      >
+    : never
+
+/**
+ * A table's rows that belong to one parent row and are edited as a list, such
+ * as an order's lines. `syncRows` from `@zeno-lib/db/query` takes it in place
+ * of the table, and a form validates each row with `row`.
+ */
+type OwnedRows<
+  TTable extends ZenoTable,
+  TParentKey extends string,
+  TRow extends z.ZodObject,
+> = {
+  /** The columns that point at the parent row, which `row` leaves out. */
+  readonly parent: readonly TParentKey[]
+  /**
+   * One row as a client sends it: the `insert` columns but the parent's, and
+   * the `id` of a stored row, absent on a new one.
+   */
+  readonly row: TRow
+  readonly table: TTable
+}
+
+/**
+ * The rows of `schema`'s table that belong to a parent through the `parent`
+ * columns, for a form that edits them as a list and the `syncRows` that saves
+ * it:
+ *
+ * ```ts
+ * const orderLines = ownedRows(defineTableSchema(lines), { parent: "orderId" })
+ *
+ * const orderSchema = defineTableSchema(orders).insert.extend({
+ *   lines: z.array(orderLines.row),
+ * })
+ *
+ * await syncRows(tx, orderLines, { parent: { orderId }, rows: input.lines })
+ * ```
+ *
+ * The table needs a sequential `id`. A link table matched by a natural key
+ * goes to `syncRows` with its `key` option instead.
+ */
+const ownedRows = <
+  TSchema extends OwnableSchema,
+  TParentKey extends ColumnKey<TSchema["table"]>,
+>(
+  schema: TSchema,
+  { parent }: { parent: TParentKey | readonly TParentKey[] }
+): OwnedRows<
+  TSchema["table"],
+  TParentKey,
+  OwnedRowSchema<TSchema, TParentKey>
+> => {
+  const parentKeys: readonly TParentKey[] =
+    typeof parent === "string" ? [parent] : [...parent]
+  const id = schema.select.shape.id as z.ZodType | undefined
+
+  if (id === undefined) {
+    throw new TypeError(
+      `ownedRows tells rows apart by their id, and "${getTableName(schema.table)}" has none.`
+    )
+  }
+
+  return {
+    parent: parentKeys,
+    row: omitPresent(schema.insert, parentKeys).extend({ id: id.optional() }),
+    table: schema.table,
+  } as unknown as OwnedRows<
+    TSchema["table"],
+    TParentKey,
+    OwnedRowSchema<TSchema, TParentKey>
+  >
+}
+
 const isZenoTable = (value: unknown): value is ZenoTable =>
   is(value, Table) && COLUMN_RULES_KEY in value
 
@@ -487,5 +668,15 @@ const writableColumns = (exports: Record<string, unknown>) => {
   return columns
 }
 
-export type { DefineTableSchemaOptions, DefineTableSchemaResult, ZenoTable }
-export { defineServerTableSchema, defineTableSchema, writableColumns }
+export type {
+  DefineTableSchemaOptions,
+  DefineTableSchemaResult,
+  OwnedRows,
+  ZenoTable,
+}
+export {
+  defineServerTableSchema,
+  defineTableSchema,
+  ownedRows,
+  writableColumns,
+}
