@@ -574,6 +574,54 @@ constraints?, { code? })` returns it only for an integrity-constraint violation
 `constraints`, only for one of those. `SqlState` names the codes an application
 usually branches on.
 
+## Testing against the database
+
+Suites that share one local database, and run in parallel with each other and
+with your end-to-end tests, must not commit what they write: a committed row
+changes what every other suite counts. `@zeno-lib/db/testing` has three helpers
+for those tests. They throw instead of calling `expect`, so any test runner can
+use them.
+
+```typescript
+import { SqlState } from "@zeno-lib/db/errors"
+import { expectPostgresError, expectRlsDenied, rollBackAfter } from "@zeno-lib/db/testing"
+
+it("rejects a second contact with the same email", () =>
+  rollBackAfter(db, async (tx) => {
+    await tx.insert(contacts).values(ada)
+
+    const error = await expectPostgresError(
+      tx.insert(contacts).values(ada),
+      SqlState.uniqueViolation
+    )
+    expect(error.constraint_name).toBe("contacts_email_key")
+  }))
+```
+
+- `rollBackAfter(db, run)` runs `run` in a transaction that always rolls back,
+  and resolves to what `run` returned. Nothing it writes is visible outside the
+  transaction, and nothing needs cleaning up, whatever the rows cascade into.
+  Only statements sent through `tx` are in it: a write through another client,
+  such as a module-level `admin`, commits.
+  `run` gets the same transaction type `db.transaction` hands you, relations
+  included, and an error it throws is rethrown. On a `tx`, it runs in a
+  savepoint.
+- `expectPostgresError(query, code)` resolves to the `PostgresError` when the
+  query fails with that SQLSTATE, so you can check its `constraint_name` or
+  message. It rejects when the query succeeds, which a bare `try`/`catch` misses,
+  and when it fails with another code. Pass the query, or a function that starts
+  it.
+- `expectRlsDenied(query)` is the same check for `insufficient_privilege`
+  (`42501`): a write a row-level security policy or a missing grant refused. A
+  `select` that RLS filters doesn't fail, it returns fewer rows, so assert on
+  those instead.
+
+<Callout type="warn">
+A failed statement aborts the transaction it ran in, and every later statement
+in it fails too. Make the failing query the last statement in `rollBackAfter`,
+or run it in a savepoint with `tx.transaction(...)`.
+</Callout>
+
 ## Pitfalls
 
 - Do not import `@zeno-lib/db` runtime clients from Client Components or browser
