@@ -167,8 +167,12 @@ The name and the input are typed against the map, and the data comes back with t
 function's return type. Arguments and results travel through
 [`devalue`](https://github.com/sveltejs/devalue), so a `Date`, a `Map`, a `bigint` or an
 `undefined` property survives the trip. A failed call rejects with a `QueryRequestError` carrying
-the route's status. A redirect, which is what a session middleware answers once the session is
-gone, reloads the page so the middleware can redirect it.
+the route's status, as does a `200` that is not the route's answer (a page rewritten to sign in).
+A redirect, which is what a session middleware answers once the session is gone, reloads the page
+so the middleware can redirect it, at most once a minute, so a redirect the reload keeps does not
+loop. The route answers `404` for a name the map does not serve as a function, `415` for a body
+that is not JSON, `400` for one `devalue` cannot parse and `413` for one over 1 MB, the limit
+Server Functions default to.
 
 A server render has no URL to fetch. To prefetch these queries, hand the same map to
 `QueryHydrationBoundary`, and the `queryFn`s it runs call the server functions in-process:

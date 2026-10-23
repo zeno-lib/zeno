@@ -1,6 +1,11 @@
 import type { QueryClient } from "@tanstack/react-query"
 import { parse, stringify } from "devalue"
-import { getBoundQueries, QUERY_CONTENT_TYPE, type QueryMap } from "./query-map"
+import {
+  findQuery,
+  getBoundQueries,
+  QUERY_CONTENT_TYPE,
+  type QueryMap,
+} from "./query-map"
 
 export type { QueryMap } from "./query-map"
 
@@ -75,12 +80,13 @@ export function createQueryCaller<TQueries extends QueryMap>({
   return async (name, input, context = {}) => {
     const bound = context.client && getBoundQueries(context.client)
     if (bound) {
-      if (!Object.hasOwn(bound, name)) {
+      const query = findQuery(bound, name)
+      if (!query) {
         throw new Error(
           `callQuery: "${name}" is not in the queries bound to this QueryHydrationBoundary`
         )
       }
-      return (await bound[name]?.(input)) as QueryData<TQueries, typeof name>
+      return (await query(input)) as QueryData<TQueries, typeof name>
     }
     if (typeof window === "undefined") {
       throw new Error(
@@ -99,13 +105,36 @@ export function createQueryCaller<TQueries extends QueryMap>({
     })
 
     if (response.type === "opaqueredirect") {
-      window.location.reload()
+      reloadOnce()
       throw new QueryRequestError(name, 401)
     }
-    if (!response.ok) {
+    // A page answering 200 in the route's place (a rewrite to sign in, a
+    // host's password wall) is not data.
+    if (
+      !(
+        response.ok &&
+        response.headers.get("content-type")?.startsWith(QUERY_CONTENT_TYPE)
+      )
+    ) {
       throw new QueryRequestError(name, response.status)
     }
 
     return parse(await response.text())
   }
+}
+
+const RELOADED_AT_KEY = "zeno-query:reloaded-at"
+
+/**
+ * Reloads the page, unless a redirect already did within the last minute: a
+ * redirect the reload does not clear (a trailing-slash rule, a middleware that
+ * redirects only API paths) would otherwise reload forever.
+ */
+function reloadOnce() {
+  const reloadedAt = Number(sessionStorage.getItem(RELOADED_AT_KEY))
+  if (Date.now() - reloadedAt < 60_000) {
+    return
+  }
+  sessionStorage.setItem(RELOADED_AT_KEY, String(Date.now()))
+  window.location.reload()
 }

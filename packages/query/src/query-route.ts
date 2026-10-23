@@ -1,7 +1,12 @@
 import { parse, stringify } from "devalue"
-import { QUERY_CONTENT_TYPE, type QueryMap } from "./query-map"
+import { findQuery, QUERY_CONTENT_TYPE, type QueryMap } from "./query-map"
 
 export type { QueryMap } from "./query-map"
+
+/** The largest body the route parses, the default Server Functions accept. */
+const MAX_BODY_BYTES = 1024 * 1024
+
+const TRAILING_SLASH = /\/$/
 
 /**
  * Builds the `POST` handler of a route that serves `queries` to the browser,
@@ -24,11 +29,8 @@ export function createQueryRoute(queries: QueryMap): {
 } {
   return {
     POST: async (request) => {
-      const name = decodeURIComponent(
-        new URL(request.url).pathname.split("/").at(-1) ?? ""
-      )
-      // `Object.hasOwn`, so `constructor` or `__proto__` is not a query.
-      if (!Object.hasOwn(queries, name)) {
+      const query = findQuery(queries, queryName(request))
+      if (!query) {
         return new Response(null, { status: 404 })
       }
       // A cross-site page can only send a simple content type without a
@@ -38,9 +40,22 @@ export function createQueryRoute(queries: QueryMap): {
       ) {
         return new Response(null, { status: 415 })
       }
+      if (Number(request.headers.get("content-length")) > MAX_BODY_BYTES) {
+        return new Response(null, { status: 413 })
+      }
 
-      const query = queries[name] as QueryMap[string]
-      const data = await query(parse(await request.text()))
+      const body = await request.text()
+      if (body.length > MAX_BODY_BYTES) {
+        return new Response(null, { status: 413 })
+      }
+      let input: unknown
+      try {
+        input = parse(body)
+      } catch {
+        return new Response(null, { status: 400 })
+      }
+
+      const data = await query(input)
 
       return new Response(stringify(data), {
         headers: {
@@ -49,5 +64,18 @@ export function createQueryRoute(queries: QueryMap): {
         },
       })
     },
+  }
+}
+
+/** The path's last segment, or `""` when it is not a valid escape. */
+function queryName(request: Request): string {
+  const segment = new URL(request.url).pathname
+    .replace(TRAILING_SLASH, "")
+    .split("/")
+    .at(-1)
+  try {
+    return decodeURIComponent(segment ?? "")
+  } catch {
+    return ""
   }
 }
