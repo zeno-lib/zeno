@@ -7,7 +7,7 @@ import {
   within,
 } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
-import { type ReactNode, useState } from "react"
+import { type ReactNode, StrictMode, useState } from "react"
 import { afterEach, describe, expect, onTestFinished, test, vi } from "vitest"
 import { z } from "zod"
 import { useForm } from "./create-form"
@@ -174,6 +174,13 @@ describe("FormDialog", () => {
   test("opens with per-session defaults and focuses the requested field", async () => {
     const user = userEvent.setup()
     render(<Harness />)
+    const name = await openEdit(user)
+    expect(name.value).toBe("Ada")
+  })
+
+  test("opens with per-session defaults under Strict Mode", async () => {
+    const user = userEvent.setup()
+    render(<Harness />, { wrapper: StrictMode })
     const name = await openEdit(user)
     expect(name.value).toBe("Ada")
   })

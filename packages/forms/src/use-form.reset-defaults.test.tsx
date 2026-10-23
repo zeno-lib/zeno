@@ -65,30 +65,35 @@ function titleInput() {
 }
 
 describe("useForm — reset(values) rebases defaults", () => {
-  test("reset after submit sticks across rerenders with fixed defaults", async () => {
-    const user = userEvent.setup()
-    let state: Captured | undefined
-    const capture = vi.fn((next: Captured) => {
-      state = next
+  for (const reactStrictMode of [false, true]) {
+    test(`reset after submit sticks across rerenders with fixed defaults (reactStrictMode: ${reactStrictMode})`, async () => {
+      const user = userEvent.setup()
+      let state: Captured | undefined
+      const capture = vi.fn((next: Captured) => {
+        state = next
+      })
+      const record = { title: "Draft" }
+      const { rerender } = render(
+        <EditTitle capture={capture} record={record} />,
+        { reactStrictMode }
+      )
+
+      await user.clear(titleInput())
+      await user.type(titleInput(), "Saved title")
+      await user.click(screen.getByRole("button", { name: SAVE }))
+
+      await waitFor(() => expect(state?.isTouched).toBe(false))
+      for (const tick of [1, 2, 3]) {
+        rerender(<EditTitle capture={capture} record={record} tick={tick} />)
+      }
+      await act(() => Promise.resolve())
+
+      expect(titleInput().value).toBe("Saved title")
+      expect(state?.values).toEqual({ title: "Saved title" })
+      expect(state?.isDefaultValue).toBe(true)
+      expect(state?.isDirty).toBe(false)
     })
-    const record = { title: "Draft" }
-    const { rerender } = render(<EditTitle capture={capture} record={record} />)
-
-    await user.clear(titleInput())
-    await user.type(titleInput(), "Saved title")
-    await user.click(screen.getByRole("button", { name: SAVE }))
-
-    await waitFor(() => expect(state?.isTouched).toBe(false))
-    for (const tick of [1, 2, 3]) {
-      rerender(<EditTitle capture={capture} record={record} tick={tick} />)
-    }
-    await act(() => Promise.resolve())
-
-    expect(titleInput().value).toBe("Saved title")
-    expect(state?.values).toEqual({ title: "Saved title" })
-    expect(state?.isDefaultValue).toBe(true)
-    expect(state?.isDirty).toBe(false)
-  })
+  }
 
   test("new caller defaults apply while the form is untouched", async () => {
     let state: Captured | undefined
