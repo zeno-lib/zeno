@@ -394,7 +394,7 @@ ALTER TABLE "<table>" ADD CONSTRAINT "<table>_user_id_users_id_fkey"
 
 `defaultToCurrentUser: true` makes it an **owner** column: `DEFAULT auth.uid()`,
 so a row belongs to whoever inserts it, and
-[server-owned](/docs/core-framework/data-management/schemas#put-rules-on-the-column),
+[server-managed](/docs/core-framework/data-management/schemas#put-rules-on-the-column),
 so no form or action input lets a client pick the owner:
 
 ```typescript

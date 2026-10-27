@@ -15,11 +15,12 @@ import {
   assignedPrimaryId,
   authUserId,
   createdBy,
+  databaseManaged,
   percentage,
   schema as pgSchema,
   sequentialId,
   sequentialPrimaryId,
-  serverOwned,
+  serverManaged,
   table,
   timestamps,
   uuidPrimaryId,
@@ -35,6 +36,7 @@ const listings = table(
     id: bigint({ mode: "number" }).generatedByDefaultAsIdentity(),
     occupancy: percentage(),
     ownerId: authUserId({ defaultToCurrentUser: true, notNull: true }),
+    slug: databaseManaged(text()),
     summary: text(),
     title: text().notNull(),
   },
@@ -62,13 +64,14 @@ test("insert and update hold only what a client writes", () => {
     | "id"
     | "occupancy"
     | "ownerId"
+    | "slug"
     | "summary"
     | "title"
     | "updatedAt"
   >()
 
   defineTableSchema(listings, {
-    // @ts-expect-error: a server-owned column has nothing to refine.
+    // @ts-expect-error: a server-managed column has nothing to refine.
     insert: { ownerId: (schema) => schema },
   })
   defineTableSchema(listings, {
@@ -77,7 +80,7 @@ test("insert and update hold only what a client writes", () => {
   })
 })
 
-test("server code may write the server-owned columns", () => {
+test("server code may write the server-managed columns", () => {
   const schemas = defineServerTableSchema(listings, {
     insert: { ownerId: (schema) => schema },
   })
@@ -93,11 +96,15 @@ test("server code may write the server-owned columns", () => {
     // @ts-expect-error: the database writes the audit columns.
     update: { createdAt: (schema) => schema },
   })
+  defineServerTableSchema(listings, {
+    // @ts-expect-error: and the columns marked as its own.
+    insert: { slug: (schema) => schema },
+  })
 })
 
 test("a marker survives the builder calls chained after it", () => {
   const notes = table("notes", {
-    authorId: serverOwned(authUserId({ notNull: true })).default(
+    authorId: serverManaged(authUserId({ notNull: true })).default(
       sql`auth.uid()`
     ),
     body: text().notNull(),
@@ -145,7 +152,7 @@ test("a key a client supplies stays in insert", () => {
 test("the callback form records the same rules", () => {
   const tags = table("tags", (t) => ({
     label: t.text().notNull(),
-    ownerId: serverOwned(t.uuid().notNull().default(sql`auth.uid()`)),
+    ownerId: serverManaged(t.uuid().notNull().default(sql`auth.uid()`)),
   }))
 
   const { insert } = defineTableSchema(tags)
@@ -177,11 +184,15 @@ test("a rule's refinement is typed from its column", () => {
   percentage().array()
 })
 
-test("an audit column stays the database's", () => {
+test("a database-managed column stays the database's", () => {
   // @ts-expect-error: the database writes it.
-  serverOwned(createdBy())
+  serverManaged(createdBy())
+  // @ts-expect-error: the database writes it.
+  serverManaged(databaseManaged(text()))
+  // @ts-expect-error: server code writes it.
+  databaseManaged(serverManaged(text()))
   // A ruled column can be the server's, for its server-side schema.
-  serverOwned(percentage())
+  serverManaged(percentage())
 })
 
 test("a table in an existing schema keeps its column rules", () => {
@@ -190,7 +201,7 @@ test("a table in an existing schema keeps its column rules", () => {
     .table("invoices", {
       id: sequentialId(),
       note: text(),
-      paidAt: serverOwned(text()),
+      paidAt: serverManaged(text()),
     })
 
   const { insert } = defineTableSchema(invoices)

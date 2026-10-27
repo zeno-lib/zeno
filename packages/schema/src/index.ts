@@ -39,9 +39,9 @@ const COLUMN_RULES_KEY = "~zeno"
 
 /**
  * What a column marker from `@zeno-lib/db/schema` records. `writer` says who
- * writes the column when a client doesn't: `"server"` code (`serverOwned`), or
- * only the `"database"`, through a default and a trigger (the audit columns
- * `timestamps()` and `authorship()` emit). `refine` runs on it in insert and
+ * writes the column when a client doesn't: `"server"` code (`serverManaged`),
+ * or only the `"database"` (`databaseManaged`, which the audit columns of
+ * `timestamps()` and `authorship()` carry). `refine` runs on it in insert and
  * update, and `hint` goes to the form field that edits it.
  */
 type ColumnRule = {
@@ -447,8 +447,8 @@ const withChecks = (
   return composeRefinements(refinements, generated)
 }
 
-// Zod rejects an omit key the shape lacks, which a generated or server-owned
-// column would be.
+// Zod rejects an omit key the shape lacks, which a generated or managed column
+// would be.
 const omitPresent = <TSchema extends z.ZodObject>(
   schema: TSchema,
   keys: readonly string[]
@@ -540,8 +540,9 @@ function defineTableSchema(
 
 /**
  * `defineTableSchema` for code that runs only on the server, such as a sync
- * job, which writes the columns `serverOwned()` keeps from clients. Identity
- * and audit columns stay out, as the database writes them. Never parse what a
+ * job, which writes the columns `serverManaged()` keeps from clients.
+ * Identity, audit and `databaseManaged()` columns stay out, as the database
+ * writes them. Never parse what a
  * client sends with it: a server action's input is a client's.
  */
 function defineServerTableSchema<TTable extends ZenoTable>(

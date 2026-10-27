@@ -92,15 +92,15 @@ trace. For such a table, use the [Drizzle helpers](#direct-drizzle-helpers).
 | Schema | Use it for |
 |---|---|
 | `postSchema.select` | Data read from the database. Generated and audit columns are present. Nullable columns accept `null`. |
-| `postSchema.insert` | Data accepted before an insert. Generated, identity, audit and server-owned columns are omitted; defaulted columns are optional according to Drizzle metadata. |
-| `postSchema.update` | Data accepted before an update. Updatable fields are optional; generated, identity, audit and server-owned columns are omitted. |
+| `postSchema.insert` | Data accepted before an insert. Generated, identity and managed columns, audit columns included, are omitted; defaulted columns are optional according to Drizzle metadata. |
+| `postSchema.update` | Data accepted before an update. Updatable fields are optional; generated, identity and managed columns, audit columns included, are omitted. |
 
 ### Audit columns stay out of writes
 
 The database fills the columns `auditColumns()`, `timestamps()` and
 `authorship()` emit, through a column default and the triggers from
-`@zeno-lib/db/triggers`. The helpers mark their columns, so `insert` and
-`update` leave them out under any key. If a caller sends `createdBy`, the schema
+`@zeno-lib/db/triggers`. The helpers mark their columns `databaseManaged`, so
+`insert` and `update` leave them out under any key. If a caller sends `createdBy`, the schema
 strips it and nothing writes it. A column you declare yourself is writable,
 even one named `createdAt`. When a trusted path needs to set an audit column (a
 data import, say), build that schema with `createInsertSchema(...)` instead.
@@ -202,8 +202,9 @@ applies it to `insert` and `update`:
 ```ts title="{project}-db/src/schema/posts.ts"
 import {
   authUserId,
+  databaseManaged,
   primaryId,
-  serverOwned,
+  serverManaged,
   table,
   withRule,
 } from "@zeno-lib/db/schema"
@@ -216,9 +217,11 @@ export const posts = table("posts", {
   rating: withRule(numeric({ mode: "number" }), (schema) =>
     schema.min(0).max(1)
   ),
+  // A trigger derives it from the title.
+  slug: databaseManaged(text("slug").notNull()),
   title: text("title").notNull(),
   // Set by its default and never by a client.
-  userId: serverOwned(authUserId({ notNull: true }).default(sql`auth.uid()`)),
+  userId: serverManaged(authUserId({ notNull: true }).default(sql`auth.uid()`)),
 })
 ```
 
@@ -240,8 +243,15 @@ userId: authUserId({ defaultToCurrentUser: true, notNull: true })
 - A rule checks one value, so an array column calls `.array()` before
   `withRule`, and writes the rule for the array. `percentage().array()` is a
   type error, and throws.
-- `serverOwned(builder)` leaves the column out of `insert` and `update`, for
-  a column a trigger, a default or an action of its own sets.
+- `serverManaged(builder)` leaves the column out of `insert` and `update`, for
+  a column server code sets: a sync's rows, or a value an action sets itself.
+  [`defineServerTableSchema`](#server-code-that-writes-a-server-managed-column)
+  keeps it. A column a trigger also writes takes this one, so that server code
+  can still set it.
+- `databaseManaged(builder)` leaves the column out of every `insert` and
+  `update`, the server-side ones too, for a column only a trigger, a default or
+  a database function sets. The audit columns carry it already. One column
+  can't take both: that is a type error, and throws.
 - `percentage()`, `year()` and `email()` are columns with their rule built in
   ([Tables](/docs/core-framework/data-management/database/tables#columns)).
 - `select` keeps every column, without the rules, because it describes the
@@ -267,14 +277,14 @@ test("the columns a client may write", () => {
 })
 ```
 
-### Server code that writes a server-owned column
+### Server code that writes a server-managed column
 
-`serverOwned()` keeps a column from clients, but server code may still set it: a
-sync job that records when a payment cleared, say, or a seed that creates a row
-for another user. `defineServerTableSchema(table, options?)` takes the same
-options and returns the same three variants, with the server-owned columns kept
-in `insert` and `update`. Identity and audit columns stay out, because the
-database writes them. An upsert keyed on the id extends the schema with
+`serverManaged()` keeps a column from clients, but server code may still set it:
+a sync job that records when a payment cleared, say, or a seed that creates a
+row for another user. `defineServerTableSchema(table, options?)` takes the same
+options and returns the same three variants, with the server-managed columns
+kept in `insert` and `update`. Identity, audit and `databaseManaged()` columns
+stay out, because the database writes them. An upsert keyed on the id extends the schema with
 `select.shape.id`.
 
 ```ts title="{project}-db/src/queries/payments/sync.ts"
@@ -307,7 +317,7 @@ export const postSchema = defineTableSchema(posts, {
 ## Derive form and action schemas
 
 Zeno does not generate form-specific schemas. Forms are product workflows. They
-may omit server-owned fields, add UI-only values, or require cross-field
+may omit server-managed fields, add UI-only values, or require cross-field
 validation that the database table should not know about.
 
 Derive those schemas yourself with Zod, in the same `schemas.ts` as the
