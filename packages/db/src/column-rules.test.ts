@@ -15,12 +15,13 @@ import { z } from "zod"
 import {
   authUserId,
   createdBy,
+  databaseManaged,
   email,
   functionPolicies,
   percentage,
   schema,
   sequentialId,
-  serverOwned,
+  serverManaged,
   table,
   timestamps,
   year,
@@ -33,7 +34,11 @@ const listingColumns = () => ({
   builtIn: year(),
   id: bigint({ mode: "number" }).generatedByDefaultAsIdentity(),
   occupancy: percentage(),
-  ownerId: serverOwned(authUserId({ notNull: true }).default(sql`auth.uid()`)),
+  ownerId: serverManaged(
+    authUserId({ notNull: true }).default(sql`auth.uid()`)
+  ),
+  // A trigger derives it from the title.
+  slug: databaseManaged(text()),
   summary: text(),
   title: text().notNull(),
 })
@@ -54,12 +59,13 @@ const forged = {
   createdAt: "2000-01-01 00:00:00+00",
   id: 5000,
   ownerId: "00000000-0000-4000-8000-000000000000",
+  slug: "forged",
   title: "Loft",
   updatedAt: "2000-01-01 00:00:00+00",
 }
 
 describe("column rules", () => {
-  it("drops identities, server-owned and audit columns from insert and update", () => {
+  it("drops identities and managed columns from insert and update", () => {
     expect(listingSchemas.insert.parse(forged)).toEqual({ title: "Loft" })
     expect(listingSchemas.update.parse(forged)).toEqual({ title: "Loft" })
     // The inferred keys (`column-rules.test-d.ts`) are these, so the type
@@ -127,11 +133,11 @@ describe("column rules", () => {
   it("records the rules from the callback form and a second schema", () => {
     const tags = table("tags", (t) => ({
       label: t.text().notNull(),
-      ownerId: serverOwned(t.uuid().notNull().default(sql`auth.uid()`)),
+      ownerId: serverManaged(t.uuid().notNull().default(sql`auth.uid()`)),
     }))
     const billing = schema("billing")
     const invoices = billing.table("invoices", {
-      issuedBy: serverOwned(authUserId()),
+      issuedBy: serverManaged(authUserId()),
       label: text().notNull(),
     })
 
@@ -142,7 +148,7 @@ describe("column rules", () => {
     }
   })
 
-  it("keeps server-owned columns for server code, and audit columns from everyone", () => {
+  it("keeps server-managed columns for server code, and database-managed ones from everyone", () => {
     const server = defineServerTableSchema(listings)
     const expected = { ownerId: forged.ownerId, title: "Loft" }
 
@@ -226,5 +232,5 @@ describe("ruled columns", () => {
 })
 
 it("refuses a second writer for an audit column", () => {
-  expect(() => serverOwned(createdBy() as never)).toThrow(TypeError)
+  expect(() => serverManaged(createdBy() as never)).toThrow(TypeError)
 })

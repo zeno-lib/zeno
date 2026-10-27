@@ -74,7 +74,8 @@ This node holds what the code and the guide don't make obvious.
 
 - **Use `table(...)` and `unsecureTable(...)`, never `.enableRLS()`**, and `schema(...)` for a second
   schema, never `pgSchema(...)`, whose public overload takes no casing and leaves RLS off.
-- **`serverOwned()` and `withRule()` only work inside the columns of Zeno's `table` functions.**
+- **`serverManaged()`, `databaseManaged()` and `withRule()` only work inside the columns of Zeno's
+  `table` functions.**
   Those read the markers off the builders; drizzle's own `pgTable` drops them, silently.
 - **A helper that emits a column only the server or the database writes marks it itself**
   (`timestamps()`, `createdBy()`, `authUserId({ defaultToCurrentUser })`). A marker can't be

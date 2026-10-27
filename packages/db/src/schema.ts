@@ -90,8 +90,8 @@ export {
 // `src/column-rules.test.ts` fails if the two drift.
 const COLUMN_RULES_KEY = "~zeno"
 
-// Who writes a column, when a client doesn't: server code (`serverOwned`), or
-// only the database, through a default and a trigger (the audit columns).
+// Who writes a column, when a client doesn't: server code (`serverManaged`),
+// or only the database (`databaseManaged`, the audit columns among them).
 type WriterRule<TWriter extends "database" | "server"> = {
   readonly writer: TWriter
 }
@@ -118,13 +118,13 @@ type WithColumnRule<TBuilder, TRule extends ColumnRule> = TBuilder & {
   readonly [COLUMN_RULES_KEY]: TRule
 }
 
-const SERVER_OWNED = { writer: "server" } as const satisfies ColumnRule
-const DATABASE_OWNED = { writer: "database" } as const satisfies ColumnRule
+const SERVER_MANAGED = { writer: "server" } as const satisfies ColumnRule
+const DATABASE_MANAGED = { writer: "database" } as const satisfies ColumnRule
 
 // Drizzle builders mutate `this` and their methods return it, typed as an
 // intersection with `this`, so a marker survives the calls chained after it.
-// A second marker adds to the first, so `serverOwned(percentage())` keeps the
-// rule for the server-side schema. Two writers can't share a column.
+// A second marker adds to the first, so `serverManaged(percentage())` keeps
+// the rule for the server-side schema. Two writers can't share a column.
 const markColumn = <
   TBuilder extends AnyPgColumnBuilder,
   TRule extends ColumnRule,
@@ -152,13 +152,13 @@ const markColumn = <
 }
 
 /**
- * A column only the server writes: a trigger, a `DEFAULT` such as
- * `auth.uid()`, or an action of its own. `defineTableSchema` leaves it out of
- * insert and update, so no form or action input accepts it, and
- * `defineServerTableSchema` keeps it, for server code that sets it. An audit
- * column, which the database writes, can't take it.
+ * A column server code writes and no client does: a sync's rows, or a value an
+ * action of its own sets. `defineTableSchema` leaves it out of insert and
+ * update, so no form or action input accepts it, and `defineServerTableSchema`
+ * keeps it, for the server code that sets it. A column the database alone
+ * writes takes `databaseManaged` instead, and can't take this too.
  */
-export const serverOwned = <
+export const serverManaged = <
   TBuilder extends AnyPgColumnBuilder & {
     readonly [COLUMN_RULES_KEY]?: Partial<
       WriterRule<"server"> & RefineRule<unknown>
@@ -166,7 +166,24 @@ export const serverOwned = <
   },
 >(
   builder: TBuilder
-) => markColumn(builder, SERVER_OWNED)
+) => markColumn(builder, SERVER_MANAGED)
+
+/**
+ * A column only the database writes: a trigger, a `DEFAULT`, or a function of
+ * its own. `defineTableSchema` and `defineServerTableSchema` both leave it out
+ * of insert and update, so no input accepts a value the database would
+ * overwrite. The audit columns of `timestamps()` and `authorship()` carry it
+ * already.
+ */
+export const databaseManaged = <
+  TBuilder extends AnyPgColumnBuilder & {
+    readonly [COLUMN_RULES_KEY]?: Partial<
+      WriterRule<"database"> & RefineRule<unknown>
+    >
+  },
+>(
+  builder: TBuilder
+) => markColumn(builder, DATABASE_MANAGED)
 
 // The schema drizzle's Zod bridge generates for the column, before it adds
 // `.nullable()` or `.optional()`: what a function refinement receives.
@@ -235,7 +252,7 @@ type TimestampColumn<TMode extends TimestampMode> = SetHasDefault<
 
 // The database writes the audit columns, through a default and a trigger, so
 // they leave every derived insert and update schema, server-side ones too.
-type AuditColumn<TBuilder> = WithColumnRule<TBuilder, typeof DATABASE_OWNED>
+type AuditColumn<TBuilder> = WithColumnRule<TBuilder, typeof DATABASE_MANAGED>
 
 export type TimestampColumns<TMode extends TimestampMode = "date"> = {
   createdAt: AuditColumn<TimestampColumn<TMode>>
@@ -266,7 +283,7 @@ export const timestamps = <TMode extends TimestampMode = "date">({
             .notNull()
             .defaultNow()
         : timestamp(name, { precision, withTimezone }).notNull().defaultNow(),
-      DATABASE_OWNED
+      DATABASE_MANAGED
     )
 
   return {
@@ -346,13 +363,13 @@ type AuthUserIdColumn<
 > = [TDefaultToCurrentUser] extends [false]
   ? AuthorColumn<TNotNull>
   : // A flag only known at runtime types as an owner column, the safe side.
-    WithColumnRule<SetHasDefault<AuthorColumn<TNotNull>>, typeof SERVER_OWNED>
+    WithColumnRule<SetHasDefault<AuthorColumn<TNotNull>>, typeof SERVER_MANAGED>
 
 // Nullable by default: a required reference to auth.users means deleting the
 // user fails, because the audit trail holds the row.
 //
 // `defaultToCurrentUser` makes it an owner column: the signed-in user by
-// default, and server-owned, so no client picks the owner. The marker has to
+// default, and server-managed, so no client picks the owner. The marker has to
 // come from here, because a `.default(...)` chained afterwards can't add it.
 export function authUserId<
   TNotNull extends boolean = false,
@@ -370,7 +387,7 @@ export function authUserId({
   const column = authorColumn(options)
 
   return defaultToCurrentUser
-    ? markColumn(column.default(AUTH_UID_DEFAULT), SERVER_OWNED)
+    ? markColumn(column.default(AUTH_UID_DEFAULT), SERVER_MANAGED)
     : column
 }
 
@@ -397,7 +414,7 @@ export function createdBy<TNotNull extends boolean = false>(
 export function createdBy(options: AuthorColumnConfig = {}) {
   return markColumn(
     authorColumn({ ...options, name: "created_by" }).default(AUTH_UID_DEFAULT),
-    DATABASE_OWNED
+    DATABASE_MANAGED
   )
 }
 
@@ -409,7 +426,7 @@ export function updatedBy(options: AuthorColumnConfig = {}) {
   // `updatedByTrigger`, for the same reason `updated_at` needs one.
   return markColumn(
     authorColumn({ ...options, name: "updated_by" }).default(AUTH_UID_DEFAULT),
-    DATABASE_OWNED
+    DATABASE_MANAGED
   )
 }
 
