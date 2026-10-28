@@ -1,5 +1,11 @@
 # @zeno-lib/test
 
+## 0.1.2
+
+### Patch Changes
+
+- 6ec1ead: Update `@testing-library/user-event` to 14.6.8 and `jsdom` to 30.1.3.
+
 ## 0.1.1
 
 ### Patch Changes

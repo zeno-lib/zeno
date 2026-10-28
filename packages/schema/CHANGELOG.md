@@ -1,5 +1,16 @@
 # @zeno-lib/schema
 
+## 0.5.0
+
+### Minor Changes
+
+- 745b1f4: The `drizzle-orm` peer moves to `1.0.0-rc.5`, matching `@zeno-lib/db`.
+
+### Patch Changes
+
+- 8b5653b: Lint fixes for Biome 2.6 and Ultracite 8, with no change in behavior: regular expressions
+  take the `u` flag and a capture group nothing reads is gone.
+
 ## 0.4.1
 
 ### Patch Changes

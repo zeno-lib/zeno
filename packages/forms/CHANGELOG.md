@@ -1,5 +1,12 @@
 # @zeno-lib/forms
 
+## 0.10.1
+
+### Patch Changes
+
+- 8b5653b: Lint fixes for Biome 2.6 and Ultracite 8, with no change in behavior: regular expressions
+  take the `u` flag and a capture group nothing reads is gone.
+
 ## 0.10.0
 
 ### Minor Changes
