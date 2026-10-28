@@ -26,9 +26,9 @@ type PercentageFieldProps = Omit<
   fractionDigits?: number
   /** Accept negative percentages. Defaults to whether `min` is below 0. */
   allowNegative?: boolean
-  /** Clamp on blur, in the form value's scale. */
+  /** Clamp on blur, in the form value's scale. Defaults to `0`. */
   min?: number
-  /** Clamp on blur, in the form value's scale. */
+  /** Clamp on blur, in the form value's scale. Defaults to 100 %. */
   max?: number
 }
 
@@ -52,12 +52,14 @@ function PercentageField({
 }: PercentageFieldProps) {
   const field = useFieldContext<number | null | undefined>()
   const hints = getFieldHints(field, "percentage")
-  const max = maxProp ?? hints.max
-  const min = minProp ?? hints.min
   const isFraction = (scaleProp ?? hints.scale ?? "percent") === "fraction"
+  // With no column to give them, the bounds are the scale's 0 to 100 %, as a
+  // `percentage()` column's default ones.
+  const max = maxProp ?? hints.max ?? (isFraction ? 1 : 100)
+  const min = minProp ?? hints.min ?? 0
 
   const inputProps = useFormattedNumber({
-    allowNegative: allowNegative ?? (min !== undefined && min < 0),
+    allowNegative: allowNegative ?? min < 0,
     locale,
     max,
     maximumFractionDigits: fractionDigits,

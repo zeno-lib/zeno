@@ -184,6 +184,24 @@ describe("PercentageField", () => {
     await user.type(input, "7.25")
     expect(captured.current).toBe(7.25)
   })
+
+  // No column hints this field's bounds, so its scale gives them.
+  test.each([
+    { max: 1, scale: "fraction" },
+    { max: 100, scale: "percent" },
+  ] as const)(
+    "stops at the $scale scale's 100 percent with no column",
+    async ({ max, scale }) => {
+      const user = userEvent.setup()
+      const captured = { current: undefined as number | null | undefined }
+      render(<PercentHarness captured={captured} scale={scale} />)
+      const input = screen.getByLabelText(RATE) as HTMLInputElement
+      await user.clear(input)
+      await user.type(input, "150")
+      await user.tab()
+      expect(captured.current).toBe(max)
+    }
+  )
 })
 
 describe("YearField", () => {
