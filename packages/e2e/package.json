@@ -40,15 +40,15 @@
     "verify-deps": "node ./dist/cli.mjs verify-deps"
   },
   "devDependencies": {
-    "@playwright/test": "1.63.0",
-    "@types/node": "^26.6.4",
+    "@playwright/test": "1.64.1",
+    "@types/node": "^26.6.5",
     "@zeno-lib/docs": "workspace:*",
     "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
-    "tsdown": "^0.23.0",
+    "tsdown": "^0.23.1",
     "typescript": "7.0.2",
-    "vite": "8.3.3",
-    "vitest": "5.0.3"
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
   },
   "peerDependencies": {
     "@playwright/test": ">=1"

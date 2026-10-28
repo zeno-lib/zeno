@@ -71,23 +71,23 @@
     "types:check": "tsc --noEmit"
   },
   "devDependencies": {
-    "@supabase/supabase-js": "2.117.2",
-    "@types/node": "26.6.4",
+    "@supabase/supabase-js": "2.118.0",
+    "@types/node": "26.6.5",
     "@types/react": "19.3.0",
     "@zeno-lib/schema": "workspace:*",
     "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
-    "dotenv": "18.0.5",
+    "dotenv": "18.0.9",
     "drizzle-kit": "1.0.0-rc.5-5935859",
     "drizzle-orm": "1.0.0-rc.5-5935859",
     "postgres": "3.4.9",
-    "react": "^19.3.0",
-    "supabase": "2.120.0",
-    "tsdown": "^0.23.0",
+    "react": "^19.3.1",
+    "supabase": "2.122.0",
+    "tsdown": "^0.23.1",
     "typescript": "7.0.2",
-    "vite": "8.3.3",
-    "vitest": "5.0.3",
-    "zod": "^4.6.5"
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "zod": "^4.6.7"
   },
   "peerDependencies": {
     "@supabase/supabase-js": ">=2",
