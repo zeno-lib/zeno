@@ -51,15 +51,15 @@
   },
   "devDependencies": {
     "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.117.2",
-    "@types/node": "26.6.4",
+    "@supabase/supabase-js": "^2.118.0",
+    "@types/node": "26.6.5",
     "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
-    "next": "^16.4.0",
-    "tsdown": "^0.23.0",
+    "next": "^16.4.3",
+    "tsdown": "^0.23.1",
     "typescript": "7.0.2",
-    "vite": "8.3.3",
-    "vitest": "5.0.3"
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
   },
   "peerDependencies": {
     "@supabase/ssr": ">=0.10.0",

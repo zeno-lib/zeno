@@ -27,10 +27,10 @@
   "devDependencies": {
     "@zeno-lib/typescript": "workspace:^",
     "drizzle-orm": "1.0.0-rc.5-5935859",
-    "tsdown": "^0.23.0",
+    "tsdown": "^0.23.1",
     "typescript": "7.0.2",
-    "vitest": "5.0.3",
-    "zod": "^4.6.5"
+    "vitest": "5.0.5",
+    "zod": "^4.6.7"
   },
   "peerDependencies": {
     "drizzle-orm": "1.0.0-rc.5-5935859",
