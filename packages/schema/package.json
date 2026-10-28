@@ -26,14 +26,14 @@
   },
   "devDependencies": {
     "@zeno-lib/typescript": "workspace:^",
-    "drizzle-orm": "1.0.0-rc.5-5935859",
+    "drizzle-orm": "1.0.0-rc.5",
     "tsdown": "^0.23.1",
     "typescript": "7.0.2",
     "vitest": "5.0.5",
     "zod": "^4.6.7"
   },
   "peerDependencies": {
-    "drizzle-orm": "1.0.0-rc.5-5935859",
+    "drizzle-orm": "1.0.0-rc.5",
     "zod": ">=4"
   },
   "publishConfig": {
