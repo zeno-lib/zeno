@@ -5,7 +5,7 @@ export default defineConfig({
   // Keep peer imports as bare specifiers. `next` ships no exports map, so a
   // `next/headers` resolved to a file is emitted as `next/headers.js`, which
   // breaks on any consumer whose `next` adds a strict exports map.
-  deps: { neverBundle: [/^@supabase\//, /^next(\/|$)/] },
+  deps: { neverBundle: [/^@supabase\//u, /^next(?:\/|$)/u] },
   dts: true,
   entry: {
     client: "src/client.ts",

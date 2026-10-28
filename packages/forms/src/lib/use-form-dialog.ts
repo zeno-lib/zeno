@@ -199,7 +199,7 @@ const FOCUSABLE =
   'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 function attributeSelector(attribute: string, value: string): string {
-  return `[${attribute}="${value.replace(/["\\]/g, "\\$&")}"]`
+  return `[${attribute}="${value.replace(/["\\]/gu, "\\$&")}"]`
 }
 
 /**

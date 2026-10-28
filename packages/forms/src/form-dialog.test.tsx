@@ -20,9 +20,9 @@ import type { ActionResult } from "./lib/action-result"
 import { submitAction } from "./lib/submit-action"
 import { type FormDialogController, useFormDialog } from "./lib/use-form-dialog"
 
-const NAME = /Name/
-const EMAIL = /Email/
-const INNER_NAME = /Inner name/
+const NAME = /Name/u
+const EMAIL = /Email/u
+const INNER_NAME = /Inner name/u
 
 const animatable = HTMLElement.prototype as {
   getAnimations?: () => unknown[]

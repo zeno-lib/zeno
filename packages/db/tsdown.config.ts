@@ -8,12 +8,12 @@ export default defineConfig({
   // the consumer's own Drizzle Kit sees.
   deps: {
     neverBundle: [
-      /^@supabase\//,
-      /^drizzle-kit(\/|$)/,
-      /^drizzle-orm(\/|$)/,
-      /^postgres(\/|$)/,
-      /^react(\/|$)/,
-      /^zod(\/|$)/,
+      /^@supabase\//u,
+      /^drizzle-kit(?:\/|$)/u,
+      /^drizzle-orm(?:\/|$)/u,
+      /^postgres(?:\/|$)/u,
+      /^react(?:\/|$)/u,
+      /^zod(?:\/|$)/u,
     ],
   },
   dts: true,

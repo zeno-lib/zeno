@@ -14,10 +14,10 @@ afterEach(() => {
 })
 
 const SUBMIT = { name: "Submit" }
-const EMAIL_LABEL = /Email/
-const NAME_LABEL = /Name/
-const OWNER_1_SHARE_LABEL = /^Owner 1 share/
-const OWNER_2_SHARE_LABEL = /^Owner 2 share/
+const EMAIL_LABEL = /Email/u
+const NAME_LABEL = /Name/u
+const OWNER_1_SHARE_LABEL = /^Owner 1 share/u
+const OWNER_2_SHARE_LABEL = /^Owner 2 share/u
 
 function failure(
   fieldErrors: Record<string, string[]>,

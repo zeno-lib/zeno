@@ -53,10 +53,10 @@ type StandardSchemaLike = {
 // Each level can take two passes: the empty value, then the descent.
 const MAX_PROBE_DEPTH = 16
 
-const INDEX_SEGMENT = /^\d+$/
+const INDEX_SEGMENT = /^\d+$/u
 
 // Matches `[3]` and `.3` index segments in a field name.
-const INDEX_IN_NAME = /\[\d+\]|\.(\d+)(?=\.|\[|$)/g
+const INDEX_IN_NAME = /\[\d+\]|\.\d+(?=\.|\[|$)/gu
 
 function pathKey(part: PathPart): PropertyKey {
   // biome-ignore lint/suspicious/noUnnecessaryConditions: issue paths come from third-party validators at runtime, and a non-conforming `null` segment would make `in` throw.

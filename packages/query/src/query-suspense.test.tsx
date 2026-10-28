@@ -18,8 +18,8 @@ import {
 import { QuerySuspenseLoading } from "./query-suspense-loading"
 
 const KEY = ["greeting"]
-const ANY_FAILURE = /failed:/
-const DEBUG_FAILURE = /failed: QuerySuspense: debugState="error"/
+const ANY_FAILURE = /failed:/u
+const DEBUG_FAILURE = /failed: QuerySuspense: debugState="error"/u
 
 // @testing-library auto-cleanup only runs with `globals: true`; our vitest config keeps it off.
 afterEach(() => {

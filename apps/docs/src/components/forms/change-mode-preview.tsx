@@ -18,8 +18,8 @@ const schema = z.object({
   password: z
     .string()
     .min(8, "At least 8 characters")
-    .regex(/[A-Z]/, "Include at least one uppercase letter")
-    .regex(/\d/, "Include at least one digit"),
+    .regex(/[A-Z]/u, "Include at least one uppercase letter")
+    .regex(/\d/u, "Include at least one digit"),
 })
 
 export function ChangeModeExample() {

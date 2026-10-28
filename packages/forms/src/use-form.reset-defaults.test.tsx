@@ -14,8 +14,8 @@ afterEach(() => {
   cleanup()
 })
 
-const TITLE = /Title/
-const SAVE = /Save/
+const TITLE = /Title/u
+const SAVE = /Save/u
 
 const schema = z.object({ title: z.string().min(1) })
 

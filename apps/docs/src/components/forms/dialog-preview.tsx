@@ -25,7 +25,7 @@ import { z } from "zod"
 
 import { wrapperClass } from "./preview-utils"
 
-const slugRegex = /^[a-z0-9-]+$/
+const slugRegex = /^[a-z0-9-]+$/u
 const projectSchema = z.object({
   name: z.string().min(1, "Name is required"),
   slug: z

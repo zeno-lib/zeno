@@ -12,16 +12,16 @@ import { z } from "zod"
 import { SelectItem } from "@/components/ui/select"
 import { Form, FormProvider, RadioGroupFieldItem, useForm } from "./create-form"
 
-const CONTACT_EMAIL_LABEL = /Contact email/
-const PASSWORD_LABEL = /Password/
-const NAME_LABEL = /Name/
-const ACCEPT_NAME = /Accept/
-const TITLE_LABEL = /Title/
-const NOTE_LABEL = /Note/
-const DAY_LABEL = /Day/
-const PICKED_DAY = /October 9/
-const ROLE_LABEL = /Role/
-const OWNER_LABEL = /Owner/
+const CONTACT_EMAIL_LABEL = /Contact email/u
+const PASSWORD_LABEL = /Password/u
+const NAME_LABEL = /Name/u
+const ACCEPT_NAME = /Accept/u
+const TITLE_LABEL = /Title/u
+const NOTE_LABEL = /Note/u
+const DAY_LABEL = /Day/u
+const PICKED_DAY = /October 9/u
+const ROLE_LABEL = /Role/u
+const OWNER_LABEL = /Owner/u
 const PICK_A_ROLE = "Pick a role"
 const PICK_A_DAY = "Pick a day"
 

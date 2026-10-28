@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from "vitest"
 import { z } from "zod"
 import { Form, FormProvider, useForm, withForm } from "./create-form"
 
-const CITY = /City/
+const CITY = /City/u
 
 afterEach(() => {
   cleanup()

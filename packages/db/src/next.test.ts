@@ -3,6 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 import { FieldValidationError } from "./action-result.ts"
 import { createDefineAction, createDefineFormAction } from "./define-action.ts"
+import {
+  type ClaimsSource,
+  createRequestDb,
+  UnauthenticatedError,
+} from "./next.ts"
 
 // No database: the RLS client factory is replaced by a stub that returns a
 // marker object, so nothing here builds a pool or opens a connection. What
@@ -17,12 +22,6 @@ const { createSupabaseClientMock } = vi.hoisted(() => ({
 vi.mock("./clients.ts", () => ({
   createSupabaseClient: createSupabaseClientMock,
 }))
-
-import {
-  type ClaimsSource,
-  createRequestDb,
-  UnauthenticatedError,
-} from "./next.ts"
 
 const claims: JwtPayload = {
   aal: "aal1",

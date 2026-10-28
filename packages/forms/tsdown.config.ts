@@ -6,11 +6,11 @@ export default defineConfig({
   // give the form and field contexts a different identity from the app's.
   deps: {
     neverBundle: [
-      /^@tanstack\//,
-      /^next(\/|$)/,
-      /^react(\/|$)/,
-      /^react-dom(\/|$)/,
-      /^zod(\/|$)/,
+      /^@tanstack\//u,
+      /^next(?:\/|$)/u,
+      /^react(?:\/|$)/u,
+      /^react-dom(?:\/|$)/u,
+      /^zod(?:\/|$)/u,
     ],
   },
   dts: true,

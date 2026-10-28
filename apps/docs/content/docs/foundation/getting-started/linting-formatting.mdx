@@ -39,7 +39,7 @@ Biome handles all formatting with these settings:
 
 - **Double quotes** for strings
 - **Semicolons** only where needed, relying on automatic semicolon insertion (ASI)
-- **Sorted Tailwind classes** via the `useSortedClasses` rule (also inside `clsx` calls)
+- **Unsorted Tailwind classes**: the preset's `useTailwindSortedClasses` rule is off, because Biome can't read the theme stylesheet and would move theme classes such as `text-muted-foreground` to the front
 - **Sorted object keys** via the `useSortedKeys` assist action
 
 ## Overrides

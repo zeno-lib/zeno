@@ -3,7 +3,7 @@ import { defineConfig } from "tsdown"
 export default defineConfig({
   clean: true,
   // Optional peer, type-only today; keep it a bare specifier if that changes.
-  deps: { neverBundle: [/^@supabase\//] },
+  deps: { neverBundle: [/^@supabase\//u] },
   dts: true,
   entry: {
     "configs/index": "src/configs/index.ts",

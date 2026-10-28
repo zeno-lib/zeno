@@ -6,7 +6,7 @@ export type { QueryMap } from "./query-map"
 /** The largest body the route parses, the default Server Functions accept. */
 const MAX_BODY_BYTES = 1024 * 1024
 
-const TRAILING_SLASH = /\/$/
+const TRAILING_SLASH = /\/$/u
 
 /**
  * Builds the `POST` handler of a route that serves `queries` to the browser,
@@ -28,6 +28,7 @@ export function createQueryRoute(queries: QueryMap): {
   POST: (request: Request) => Promise<Response>
 } {
   return {
+    // biome-ignore lint/correctness/noComponentHookFactories: a Next.js route handler named by its HTTP method, not a component
     POST: async (request) => {
       const query = findQuery(queries, queryName(request))
       if (!query) {

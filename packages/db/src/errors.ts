@@ -39,7 +39,7 @@ const INTEGRITY_CONSTRAINT_CLASS = "23"
 const MAX_CAUSE_DEPTH = 5
 
 /** A SQLSTATE: five digits or upper-case letters. */
-const SQLSTATE_PATTERN = /^[0-9A-Z]{5}$/
+const SQLSTATE_PATTERN = /^[0-9A-Z]{5}$/u
 
 /**
  * Whether `error` is a postgres.js server error, judged by its shape.

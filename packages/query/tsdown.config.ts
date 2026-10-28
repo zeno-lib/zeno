@@ -4,7 +4,9 @@ export default defineConfig({
   clean: true,
   // Peers stay bare specifiers: a bundled second copy of React or TanStack Query would give the
   // context `QuerySuspense` reads (and the QueryClient context) a different identity from the app's.
-  deps: { neverBundle: [/^@tanstack\//, /^react(\/|$)/, /^react-dom(\/|$)/] },
+  deps: {
+    neverBundle: [/^@tanstack\//u, /^react(?:\/|$)/u, /^react-dom(?:\/|$)/u],
+  },
   dts: true,
   entry: {
     "prefetched-queries": "src/prefetched-queries.tsx",

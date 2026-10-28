@@ -34,7 +34,9 @@
 
   .zeno-prose p {
     text-align: justify;
+    /* biome-ignore lint/suspicious/useBaseline: progressive enhancement, a browser without it keeps plain wrapping */
     hyphens: auto;
+    /* biome-ignore lint/suspicious/useBaseline: progressive enhancement, a browser without it keeps plain wrapping */
     text-wrap: pretty;
   }
 

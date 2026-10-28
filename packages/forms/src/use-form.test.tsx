@@ -6,9 +6,9 @@ import { z } from "zod"
 import { Form, FormProvider, useForm } from "./create-form"
 import { ValidationError } from "./lib/validation-error"
 
-const EMAIL_LABEL = /Email/
-const VALID_EMAIL_MSG = /Enter a valid email/i
-const SUBMIT_NAME = /Submit/
+const EMAIL_LABEL = /Email/u
+const VALID_EMAIL_MSG = /Enter a valid email/iu
+const SUBMIT_NAME = /Submit/u
 
 // @testing-library auto-cleanup only runs with `globals: true`. Our vitest
 // config keeps globals off (we import test helpers explicitly), so add the

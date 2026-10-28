@@ -22,7 +22,7 @@ const fakeUser = (id: string, email: string) =>
 const retryable = { name: "AuthRetryableFetchError", status: 0 }
 const notFound = { code: "user_not_found", name: "AuthApiError", status: 404 }
 const fatal = { name: "AuthApiError", status: 401 }
-const RANDOM_EMAIL = /^zeno-test-.+@example\.test$/
+const RANDOM_EMAIL = /^zeno-test-.+@example\.test$/u
 
 function createFakes() {
   let nextId = 0

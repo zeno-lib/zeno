@@ -15,8 +15,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest"
 // Fails first when a drizzle-kit upgrade stops loading the config in the process that writes the migration.
 
 const PACKAGE_ROOT = join(import.meta.dirname, "..")
-const FOLDER = /^\d{14}_posts$/
-const SQL_FILE = /^\d{14}_posts\.sql$/
+const FOLDER = /^\d{14}_posts$/u
+const SQL_FILE = /^\d{14}_posts\.sql$/u
 
 // The file behind the `drizzle-kit` command.
 function drizzleKitBin(): string {

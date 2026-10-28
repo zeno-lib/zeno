@@ -11,9 +11,9 @@ import {
   withForm,
 } from "./create-form"
 
-const STREET_LABEL = /Street/
-const CITY_LABEL = /City/
-const BILLING_STREET_LABEL = /Billing street/
+const STREET_LABEL = /Street/u
+const CITY_LABEL = /City/u
+const BILLING_STREET_LABEL = /Billing street/u
 
 afterEach(() => {
   cleanup()

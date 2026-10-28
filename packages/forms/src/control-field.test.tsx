@@ -9,7 +9,7 @@ afterEach(() => {
   cleanup()
 })
 
-const PHONE = /Phone/
+const PHONE = /Phone/u
 const SUBMIT = { name: "Submit" }
 
 // A control a `<label htmlFor>` can't name: only `aria-labelledby` does.
