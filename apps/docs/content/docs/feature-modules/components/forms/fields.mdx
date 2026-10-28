@@ -234,8 +234,10 @@ addon. Pick what the form value means with `scale`:
 </Preview>
 
 `fractionDigits` (default `2`) counts the decimals of the shown percentage.
-`min`/`max` clamp on blur, in the form value's scale. `allowNegative`
-defaults to whether `min` is below 0.
+`min`/`max` clamp on blur, in the form value's scale, and default to 0 and
+100 % (`0`–`1` on the fraction scale), as a `percentage()` column's do. Pass
+`max` for a ratio that can exceed 100 %, or a `min` below 0 for a rate that
+can go negative. `allowNegative` defaults to whether `min` is below 0.
 
 A field bound to a
 [`percentage()` column](/docs/core-framework/data-management/database/tables#columns)
