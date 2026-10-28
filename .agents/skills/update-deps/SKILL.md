@@ -41,8 +41,10 @@ following an upstream rename.
 3. **The batch.** On `deps/<YYYY-MM-DD>` off `origin/main`, apply every batch update:
    `pnpm update -r --latest <pkg>...`, plus the Actions bumps. Migrate what the release notes
    require. Then run `pnpm registry:build` (it re-infers the registry items' npm dependencies),
-   `pnpm lint:fix` and `pnpm run ci`. If it fails, bisect to the culprit and fix it in the batch;
-   move it to its own PR only if the fix makes it an attention update.
+   `pnpm lint:fix` and `pnpm run ci`. If it fails, rerun the failing suite on `origin/main` first,
+   since the RLS tests share the local Supabase and a polluted DB fails there too
+   (`pnpm --filter @zeno-lib/db reset` clears it). Otherwise bisect to the culprit and fix it in the
+   batch; move it to its own PR only if the fix makes it an attention update.
 4. **One PR per attention update.** Branch each off `origin/main`, not off the batch, so the PRs
    merge in any order: `deps/<package>-<version>`. Bump, migrate, `pnpm registry:build`,
    `pnpm lint:fix`, and get `pnpm run ci` green.
@@ -53,7 +55,9 @@ following an upstream rename.
    change, or its shipped code does: a patch for a bumped dependency, more if a peer range now
    excludes versions consumers may have. `devDependencies`-only changes need none. Each PR adds
    its own changeset files rather than editing a pending one, so the PRs never conflict over them.
-7. **Open the PRs** against `main`, labelled `dependencies`. Start each body with
+7. **Open the PRs** against `main`, labelled `dependencies`. Resolve's `update-deps` finds them by
+   that label, waits for them to merge, then matches the versions Zeno's lockfile resolves on
+   `main`, so never drop the label. Start each body with
    `**Next:** review <files>. About <n> minutes.` and a word on the changesets, like the repo's
    other PRs.
    - Batch: `Update dependencies (<YYYY-MM-DD>)`. The body has one table (package, from, to,
@@ -91,7 +95,8 @@ following an upstream rename.
 - **`pnpm update -r --latest` can turn an exact pin into a caret** when the package also has a peer
   entry. Recheck the pins it touched.
 - **Every PR touches `pnpm-lock.yaml`,** so once one merges, the others conflict. Rebase on
-  `main` and run `pnpm install` to regenerate it; never hand-merge the lockfile.
+  `main`, take `main`'s lockfile, and run `pnpm install` to reapply the branch's bumps; never
+  hand-merge the lockfile.
 - **A package that dev-depends on its own peer must keep the peer range covering that version**
   (`@zeno-lib/test` peers `vite` and `vitest`). Otherwise, peer ranges are deliberately loose
   (`>=`): never raise a floor just because the dev version moved.
@@ -99,8 +104,9 @@ following an upstream rename.
   turbo bump, commit whatever block turbo writes; never opt out with `agentGuidance`.
 - **An esbuild postinstall that reports "Expected X but got Y"** means a stale pnpm metadata cache
   dropped its platform binaries: `pnpm cache delete esbuild`, then update again.
-- **Leave alone:** `workspace:` specifiers, `engines.node`, and `@typescript/typescript6`, which
-  stays on 6.x because `scripts/build-registry.ts` imports the TypeScript 6 API from it.
+- **Leave alone:** `workspace:` specifiers, `engines.node`, the workflows' `node-version`, and
+  `@typescript/typescript6`, which stays on 6.x because `scripts/build-registry.ts` imports the
+  TypeScript 6 API from it.
 - **pnpm itself:** bump `packageManager` in the root `package.json`, then `pnpm install`.
 - **Fresh releases are skipped on purpose.** pnpm's `minimumReleaseAge` hides versions younger
   than the threshold. Don't work around it; the update lands next week.
