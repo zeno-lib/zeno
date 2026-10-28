@@ -9,7 +9,7 @@ import * as schema from "./schema.ts"
 type DdlEntity = { entityType: string; schema?: string; name: string }
 
 const ddlFor = async (exports: Record<string, unknown>) =>
-  ((await generateDrizzleJson(exports)).ddl ?? []) as DdlEntity[]
+  (await generateDrizzleJson(exports)).ddl as DdlEntity[]
 
 describe("auth.users", () => {
   it("ships every column Supabase has, so schemaFilter can include auth", () => {

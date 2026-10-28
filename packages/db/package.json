@@ -78,8 +78,8 @@
     "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
     "dotenv": "18.0.9",
-    "drizzle-kit": "1.0.0-rc.5-5935859",
-    "drizzle-orm": "1.0.0-rc.5-5935859",
+    "drizzle-kit": "1.0.0-rc.5",
+    "drizzle-orm": "1.0.0-rc.5",
     "postgres": "3.4.9",
     "react": "^19.3.1",
     "supabase": "2.122.0",
@@ -91,8 +91,8 @@
   },
   "peerDependencies": {
     "@supabase/supabase-js": ">=2",
-    "drizzle-kit": "1.0.0-rc.5-5935859",
-    "drizzle-orm": "1.0.0-rc.5-5935859",
+    "drizzle-kit": "1.0.0-rc.5",
+    "drizzle-orm": "1.0.0-rc.5",
     "postgres": ">=3.4",
     "react": ">=19",
     "zod": ">=4"

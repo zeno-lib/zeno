@@ -710,11 +710,15 @@ export const functionPermissionTables = (
 export type FunctionPermissions = Record<FunctionPolicyOperation, boolean>
 
 /**
- * Anything with Drizzle's `execute` returning rows: a postgres-js client from
- * `@zeno-lib/db`, a `PgAsyncDatabase`, or a transaction.
+ * Anything with Drizzle's `execute` returning rows in `"objects"` mode: a
+ * postgres-js client from `@zeno-lib/db`, a `PgAsyncDatabase`, or a
+ * transaction.
  */
 export type QueryExecutor = {
-  execute: (query: SQL) => PromiseLike<readonly Record<string, unknown>[]>
+  execute: (
+    query: SQL,
+    mode: "objects"
+  ) => PromiseLike<readonly Record<string, unknown>[]>
 }
 
 export type SelectFunctionPermissionsOptions = {
@@ -778,7 +782,8 @@ export const selectFunctionPermissions = async (
           (operation) => sql`${call(operation)} as ${sql.identifier(operation)}`
         ),
         sql`, `
-      )}`
+      )}`,
+      "objects"
     )
   )
 
