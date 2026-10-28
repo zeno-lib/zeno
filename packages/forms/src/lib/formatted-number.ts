@@ -43,15 +43,15 @@ const separatorCache = new Map<string, NumberSeparators>()
 
 // Minus signs a user may type or paste: ASCII hyphen-minus, U+2212 (what Intl
 // emits for some locales), and the en dash.
-const MINUS_SIGNS = /[-−–]/
-const LEADING_MINUS = /^[^\d]*[-−–]/
-const NON_DIGIT = /\D/g
-const LEADING_ZEROS = /^0+(?=\d)/
-const DIGIT = /\d/
-const DIGITS = /\d/g
-const PARENTHESIZED = /^\s*\(.*\)\s*$/
-const NOT_NUMERIC = /[^\d.,]/g
-const UNICODE_MINUS = /\u2212/g
+const MINUS_SIGNS = /[-−–]/u
+const LEADING_MINUS = /^[^\d]*[-−–]/u
+const NON_DIGIT = /\D/gu
+const LEADING_ZEROS = /^0+(?=\d)/u
+const DIGIT = /\d/u
+const DIGITS = /\d/gu
+const PARENTHESIZED = /^\s*\(.*\)\s*$/u
+const NOT_NUMERIC = /[^\d.,]/gu
+const UNICODE_MINUS = /\u2212/gu
 
 function getNumberSeparators(locale?: string): NumberSeparators {
   const key = locale ?? ""

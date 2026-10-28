@@ -52,9 +52,9 @@ function createFakes(body: unknown, status = 200) {
   return { calls, context, evaluate, page, post, request }
 }
 
-const BASE64_PREFIX = /^base64-/
-const REFUSED = /failed with 404: .*Not found/
-const NO_STORAGE_KEY = /no storageKey/
+const BASE64_PREFIX = /^base64-/u
+const REFUSED = /failed with 404: .*Not found/u
+const NO_STORAGE_KEY = /no storageKey/u
 
 const decode = (value: string) =>
   JSON.parse(

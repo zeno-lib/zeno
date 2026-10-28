@@ -4,8 +4,8 @@ import { afterEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
 import { Form, FormProvider, useForm } from "./create-form"
 
-const DIET_LABEL = /Diet/
-const SAUSAGE_LABEL = /Sausage/
+const DIET_LABEL = /Diet/u
+const SAUSAGE_LABEL = /Sausage/u
 
 afterEach(() => {
   cleanup()

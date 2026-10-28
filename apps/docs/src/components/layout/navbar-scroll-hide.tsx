@@ -15,7 +15,7 @@ export function NavbarScrollHide() {
     let rafId = 0
 
     function getNavHeight(nav: HTMLElement): number {
-      const headerTabs = document.getElementById("nd-header-tabs")
+      const headerTabs = document.querySelector<HTMLElement>("#nd-header-tabs")
       const tabsHeight = headerTabs?.offsetHeight ?? 0
       return nav.offsetHeight + tabsHeight + 1
     }
@@ -46,7 +46,7 @@ export function NavbarScrollHide() {
     function onScroll() {
       cancelAnimationFrame(rafId)
       rafId = requestAnimationFrame(() => {
-        const nav = document.getElementById("nd-nav")
+        const nav = document.querySelector<HTMLElement>("#nd-nav")
         const currentScrollY = window.scrollY
         const delta = currentScrollY - lastScrollY
 

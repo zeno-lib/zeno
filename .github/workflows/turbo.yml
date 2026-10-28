@@ -6,10 +6,10 @@ name: Turbo CI
 on:
   workflow_call:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
-    types: [opened, synchronize]
+    branches: [ main ]
+    types: [ opened, synchronize ]
 
 jobs:
   ci:
@@ -22,40 +22,40 @@ jobs:
     # TURBO_TEAM: ${{ vars.TURBO_TEAM }}
     # TURBO_CACHE: remote:rw
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v7
-      with:
-        fetch-depth: 0
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v6.1.0
-      with:
-        run_install: false
-    - name: Setup Node.js environment
-      uses: actions/setup-node@v7
-      with:
-        node-version: lts/*
-        cache: 'pnpm'
-    - name: Install dependencies
-      run: pnpm install
-    - name: Check registry manifests are in sync
-      run: |
-        pnpm registry:build
-        git diff --exit-code -- registry.json 'packages/*/registry.json'
-    - name: Install Playwright Browsers
-      run: pnpm --filter @zeno-lib/e2e exec playwright install --with-deps chromium
-    - name: Setup Supabase CLI
-      uses: supabase/setup-cli@v3
-      with:
-        version: 2.122.0
-    - name: Start Supabase
-      working-directory: packages/db
-      run: supabase start -x=postgres-meta,studio,logflare,vector,supavisor
-    - name: Run turbo ci command
-      run: pnpm run ci
-    - name: Upload Playwright report
-      uses: actions/upload-artifact@v7
-      if: ${{ !cancelled() }}
-      with:
-        name: playwright-report
-        path: packages/e2e/playwright-report/
-        retention-days: 30
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6.1.0
+        with:
+          run_install: false
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install
+      - name: Check registry manifests are in sync
+        run: |
+          pnpm registry:build
+          git diff --exit-code -- registry.json 'packages/*/registry.json'
+      - name: Install Playwright Browsers
+        run: pnpm --filter @zeno-lib/e2e exec playwright install --with-deps chromium
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.122.0
+      - name: Start Supabase
+        working-directory: packages/db
+        run: supabase start -x=postgres-meta,studio,logflare,vector,supavisor
+      - name: Run turbo ci command
+        run: pnpm run ci
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: packages/e2e/playwright-report/
+          retention-days: 30

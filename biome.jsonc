@@ -35,10 +35,21 @@
       }
     },
     {
+      "includes": ["packages/forms/src/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noComponentHookFactories": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["packages/ui/src/**"],
       "linter": {
         "rules": {
           "a11y": {
+            "noLabelWithoutControl": "off",
             "noNoninteractiveElementInteractions": "off",
             "noRedundantRoles": "off",
             "useAriaPropsForRole": "off",
@@ -47,6 +58,7 @@
             "useSemanticElements": "off"
           },
           "correctness": {
+            "noComponentHookFactories": "off",
             "noNestedComponentDefinitions": "off",
             "useExhaustiveDependencies": "off"
           },
@@ -58,7 +70,8 @@
           },
           "style": {
             "noNestedTernary": "off",
-            "useBlockStatements": "off"
+            "useBlockStatements": "off",
+            "useUnicodeRegex": "off"
           },
           "suspicious": {
             "noArrayIndexKey": "off",
@@ -87,12 +100,7 @@
   "linter": {
     "rules": {
       "nursery": {
-        "useSortedClasses": {
-          "level": "error",
-          "options": {
-            "functions": ["clsx"]
-          }
-        }
+        "useTailwindSortedClasses": "off"
       },
       "performance": {
         "noJsxPropsBind": "off"

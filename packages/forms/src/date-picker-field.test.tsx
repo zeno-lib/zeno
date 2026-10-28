@@ -9,9 +9,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { Form, FormProvider, useForm } from "./create-form"
 import type { DateValueType } from "./lib/date-value"
 
-const DAY_LABEL = /Day/
-const OCTOBER_9_SELECTED = /October 9th, 2026, selected/
-const OCTOBER_10 = /October 10th, 2026/
+const DAY_LABEL = /Day/u
+const OCTOBER_9_SELECTED = /October 9th, 2026, selected/u
+const OCTOBER_10 = /October 10th, 2026/u
 
 afterEach(() => {
   cleanup()

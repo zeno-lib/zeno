@@ -17,7 +17,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-const NAME = /Name/
+const NAME = /Name/u
 const SUBMIT = { name: "Submit" }
 
 const schema = z.object({ name: z.string().min(1, "Required") })

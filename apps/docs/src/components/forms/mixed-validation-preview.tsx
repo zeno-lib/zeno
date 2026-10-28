@@ -15,7 +15,7 @@ import { z } from "zod"
 
 import { wrapperClass } from "./preview-utils"
 
-const slugRegex = /^[a-z0-9-]+$/
+const slugRegex = /^[a-z0-9-]+$/u
 const formSchema = z.object({
   email: z.email("Enter a valid email"),
   name: z.string().min(2, "At least 2 characters"),

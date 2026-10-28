@@ -11,9 +11,9 @@ import { z } from "zod"
 import { Form, FormProvider, useForm } from "./create-form"
 import { getNumberSeparators } from "./lib/formatted-number"
 
-const AMOUNT = /Amount/
-const RATE = /Rate/
-const YEAR = /Year/
+const AMOUNT = /Amount/u
+const RATE = /Rate/u
+const YEAR = /Year/u
 const CH = getNumberSeparators("de-CH").group
 
 afterEach(() => {

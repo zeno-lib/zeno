@@ -72,6 +72,7 @@ class QueryErrorBoundary extends Component<
     return { error }
   }
 
+  // biome-ignore lint/style/useThisInClassMethods: React calls it on the instance as a lifecycle method
   override componentDidCatch(error: Error) {
     console.error("QueryErrorBoundary:", error)
   }

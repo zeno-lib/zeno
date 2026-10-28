@@ -30,8 +30,8 @@ function Harness({ mode }: { mode?: ValidationMode }) {
   )
 }
 
-const ERROR = /Enter a valid email/i
-const EMAIL_LABEL = /Email/
+const ERROR = /Enter a valid email/iu
+const EMAIL_LABEL = /Email/u
 
 function getInput() {
   return screen.getByLabelText(EMAIL_LABEL) as HTMLInputElement

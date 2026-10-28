@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { createAdminClient } from "./clients.ts"
 
 // Use the REAL postgres driver and REAL drizzle here — postgres-js connects
 // lazily, so a pool can be built and `end()`ed without a running server. We
@@ -25,8 +26,6 @@ vi.mock("postgres", async (importOriginal) => {
     },
   }
 })
-
-import { createAdminClient } from "./clients.ts"
 
 // Pools are cached by connection string, so each test uses a fresh URL to stay
 // isolated; the pool-sharing tests deliberately reuse one URL.

@@ -9,7 +9,8 @@
  */
 type DateValueType = "date" | "iso-date" | "iso-datetime"
 
-const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/
+// biome-ignore lint/style/useNamedCaptureGroup: named groups need ES2018, past the ES6 target
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/u
 
 function pad(value: number, length: number): string {
   return String(value).padStart(length, "0")

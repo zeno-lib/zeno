@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
 import { Form, FormProvider, useForm } from "./create-form"
 
-const NAME_LABEL = /Name/
+const NAME_LABEL = /Name/u
 
 let addSpy: ReturnType<typeof vi.spyOn>
 let removeSpy: ReturnType<typeof vi.spyOn>

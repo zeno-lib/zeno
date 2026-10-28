@@ -3,8 +3,8 @@ import userEvent from "@zeno-lib/test/user-event"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import { Form, FormProvider, useForm } from "./create-form"
 
-const TAGS = /Tags/
-const CLEAR = /Clear/
+const TAGS = /Tags/u
+const CLEAR = /Clear/u
 
 afterEach(() => {
   cleanup()

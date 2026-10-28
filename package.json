@@ -23,14 +23,14 @@
     "version-packages": "changeset version"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.15",
+    "@biomejs/biome": "2.6.3",
     "@changesets/changelog-git": "^1.0.0",
     "@changesets/cli": "^3.0.3",
     "@typescript/typescript6": "^6.0.2",
     "tsx": "^4.23.15",
     "turbo": "2.11.10",
     "typescript": "7.0.2",
-    "ultracite": "7.12.4"
+    "ultracite": "8.1.0"
   },
   "packageManager": "pnpm@12.10.1",
   "engines": {

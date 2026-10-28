@@ -12,8 +12,8 @@ import { getFormSchema } from "./validation-modes"
 // accepts none of them is required. A cleared field holds its empty value,
 // and so does an untouched one whose schema rejects `""` or `[]`.
 
-const NAME_SEGMENT = /[^.[\]]+/g
-const INDEX = /^\d+$/
+const NAME_SEGMENT = /[^.[\]]+/gu
+const INDEX = /^\d+$/u
 
 // `members[2].name` (or `members.2.name`) → `["members", 2, "name"]`.
 function toPathKeys(name: string): PropertyKey[] {

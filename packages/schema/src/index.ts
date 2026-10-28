@@ -366,7 +366,8 @@ const positiveCheck = (column: Column) =>
 // minutes, up to the ±15:59 Postgres takes.
 // The groups are the date and the offset.
 const TIMESTAMP =
-  /^(\d{4}-\d{2}-\d{2})[T ](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?([+-](?:0\d|1[0-5])(?::?[0-5]\d)?|Z)?$/
+  // biome-ignore lint/style/useNamedCaptureGroup: named groups need ES2018, past the ES6 target
+  /^(\d{4}-\d{2}-\d{2})[T ](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?([+-](?:0\d|1[0-5])(?::?[0-5]\d)?|Z)?$/u
 
 // Postgres's special values, which the string mode reads back as they are.
 const INFINITIES: ReadonlySet<string> = new Set(["-infinity", "infinity"])
