@@ -4,6 +4,7 @@ import {
   findQuery,
   getBoundQueries,
   QUERY_CONTENT_TYPE,
+  QUERY_MISSING_HEADER,
   type QueryMap,
 } from "./query-map"
 
@@ -70,6 +71,11 @@ export type QueryCaller<TQueries extends QueryMap> = <
  * queries run in parallel, and TanStack's `signal` cancels them. During a
  * `QueryHydrationBoundary` prefetch, the call runs the bound server function
  * in-process instead.
+ *
+ * A route that no longer serves the name means the page runs an older bundle
+ * than the server, a tab opened before a deploy, so the call reloads the page.
+ * A host pins the framework's own requests to the page's deployment, not a
+ * plain `fetch`, so skew protection does not cover it.
  */
 export function createQueryCaller<TQueries extends QueryMap>({
   path,
@@ -108,6 +114,10 @@ export function createQueryCaller<TQueries extends QueryMap>({
       reloadOnce()
       throw new QueryRequestError(name, 401)
     }
+    if (response.headers.has(QUERY_MISSING_HEADER)) {
+      reloadOnce()
+      throw new QueryRequestError(name, response.status)
+    }
     // A page answering 200 in the route's place (a rewrite to sign in, a
     // host's password wall) is not data.
     if (
@@ -126,9 +136,10 @@ export function createQueryCaller<TQueries extends QueryMap>({
 const RELOADED_AT_KEY = "zeno-query:reloaded-at"
 
 /**
- * Reloads the page, unless a redirect already did within the last minute: a
- * redirect the reload does not clear (a trailing-slash rule, a middleware that
- * redirects only API paths) would otherwise reload forever.
+ * Reloads the page, unless a call already did within the last minute: a
+ * failure the reload does not clear (a trailing-slash rule, a middleware that
+ * redirects only API paths, a bundle that calls a name the server never had)
+ * would otherwise reload forever.
  */
 function reloadOnce() {
   const reloadedAt = Number(sessionStorage.getItem(RELOADED_AT_KEY))

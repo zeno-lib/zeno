@@ -24,6 +24,12 @@ export function findQuery(
 export const QUERY_CONTENT_TYPE = "application/json"
 
 /**
+ * Set on the route's own `404` for a name it does not serve, so the caller
+ * tells it from a host's `404` page or a wrong `path`.
+ */
+export const QUERY_MISSING_HEADER = "x-query-missing"
+
+/**
  * The queries bound to a server `QueryClient`. A query function that runs
  * against that client calls the server function in-process instead of going
  * through the route, which a server render has no URL for.

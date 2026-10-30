@@ -174,6 +174,16 @@ loop. The route answers `404` for a name the map does not serve as a function, `
 that is not JSON, `400` for one `devalue` cannot parse and `413` for one over 1 MB, the limit
 Server Functions default to.
 
+The route's own `404` reloads the page too, under the same once-a-minute limit: the page runs an
+older bundle than the server, a tab opened before a deploy removed or renamed the query. Skew
+protection does not catch it, because a host pins the framework's own requests to the page's
+deployment, not a plain `fetch`. The route marks that `404` with an `x-query-missing` header, so a
+host's `404` page or a wrong `path` rejects without a reload.
+
+**Rename a query when its input changes in a way the old input fails.** An open tab's old bundle
+then gets the `404` and reloads. Under the same name it would send the old input to the new schema
+and fail, with an error your server reports, on every refetch until someone reloads by hand.
+
 A server render has no URL to fetch. To prefetch these queries, hand the same map to
 `QueryHydrationBoundary`, and the `queryFn`s it runs call the server functions in-process:
 

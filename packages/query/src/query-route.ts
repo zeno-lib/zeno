@@ -1,5 +1,10 @@
 import { parse, stringify } from "devalue"
-import { findQuery, QUERY_CONTENT_TYPE, type QueryMap } from "./query-map"
+import {
+  findQuery,
+  QUERY_CONTENT_TYPE,
+  QUERY_MISSING_HEADER,
+  type QueryMap,
+} from "./query-map"
 
 export type { QueryMap } from "./query-map"
 
@@ -32,7 +37,10 @@ export function createQueryRoute(queries: QueryMap): {
     POST: async (request) => {
       const query = findQuery(queries, queryName(request))
       if (!query) {
-        return new Response(null, { status: 404 })
+        return new Response(null, {
+          headers: { [QUERY_MISSING_HEADER]: "1" },
+          status: 404,
+        })
       }
       // A cross-site page can only send a simple content type without a
       // preflight, so requiring JSON keeps other origins out.
