@@ -37,6 +37,7 @@ const post = (
 
 describe("createQueryRoute", () => {
   test("answers 404 for a name that is not an own key of the map", async () => {
+    expect((await post("missing")).headers.has("x-query-missing")).toBe(true)
     expect((await post("missing")).status).toBe(404)
     expect((await post("constructor")).status).toBe(404)
     expect((await post("__proto__")).status).toBe(404)
@@ -129,6 +130,33 @@ describe("createQueryCaller", () => {
     await expect(callQuery("echo", { at: new Date() })).rejects.toThrow()
 
     expect(reload).toHaveBeenCalledOnce()
+  })
+
+  test("reloads once for a name the route no longer serves, which an older bundle calls", async () => {
+    const reload = vi.fn()
+    vi.stubGlobal("location", { ...window.location, reload })
+    vi.stubGlobal("fetch", fetchThroughRoute)
+    sessionStorage.clear()
+
+    // @ts-expect-error: a name an older bundle still calls
+    const failure = callQuery("removed", undefined)
+
+    await expect(failure).rejects.toMatchObject({ status: 404 })
+    expect(reload).toHaveBeenCalledOnce()
+  })
+
+  test("does not reload for a 404 the route did not answer, as a wrong path", async () => {
+    const reload = vi.fn()
+    vi.stubGlobal("location", { ...window.location, reload })
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve(new Response("<html></html>", { status: 404 }))
+    )
+    sessionStorage.clear()
+
+    await expect(callQuery("echo", { at: new Date() })).rejects.toMatchObject({
+      status: 404,
+    })
+    expect(reload).not.toHaveBeenCalled()
   })
 
   test("calls the bound function in-process during a QueryHydrationBoundary prefetch", async () => {
