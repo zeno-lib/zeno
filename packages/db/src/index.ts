@@ -10,5 +10,8 @@ export {
   type ResolveDatabaseUrlOptions,
   type RlsClientConfig,
   resolveDatabaseUrl,
+  type SessionRevocationContext,
+  SessionRevokedError,
   type SupabaseToken,
+  UnauthenticatedError,
 } from "./clients.ts"

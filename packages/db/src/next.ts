@@ -10,6 +10,8 @@ import {
   type CreateClientConfig,
   createSupabaseClient,
   type DrizzleClient,
+  type RlsClientConfig,
+  UnauthenticatedError,
 } from "./clients.ts"
 import {
   createDefineAction,
@@ -29,6 +31,7 @@ export {
   toActionError,
   toFieldName,
 } from "./action-result.ts"
+export { SessionRevokedError, UnauthenticatedError } from "./clients.ts"
 export type {
   ActionContext,
   ActionDefinition,
@@ -50,27 +53,6 @@ export type {
   QueryDefinition,
   QueryOptions,
 } from "./define-action.ts"
-
-/**
- * Thrown when a request carries no verified session. A named class so a caller
- * with a legitimate answer for that case (a permission check, where "not signed
- * in" means "no") can tell it apart from a real failure with `instanceof`.
- */
-export class UnauthenticatedError extends Error {
-  /** The verifier's own error, when there was one (an expired token, an ended session). */
-  declare readonly cause?: unknown
-
-  constructor(
-    message = "Unauthorized: no verified session on this request",
-    options?: { cause?: unknown }
-  ) {
-    super(message)
-    this.name = "UnauthenticatedError"
-    if (options) {
-      Object.defineProperty(this, "cause", { value: options.cause })
-    }
-  }
-}
 
 /** The only part of a Supabase client the request context reads. */
 export type ClaimsSource = { auth: Pick<SupabaseClient["auth"], "getClaims"> }
@@ -146,6 +128,11 @@ export type CreateRequestDbOptions<
   connectionString?: string | (() => string)
   /** Turns on `getBearerContext`, for callers that send a token, not cookies. */
   bearer?: BearerOptions
+  /**
+   * Refuses a session the server ended in every transaction of every `db`
+   * this builds; see `RlsClientConfig`.
+   */
+  sessionRevocation?: RlsClientConfig<TRelations>["sessionRevocation"]
 }
 
 export type RequestDb<TRelations extends AnyRelations = EmptyRelations> = {

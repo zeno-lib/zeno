@@ -1,7 +1,7 @@
 // https://orm.drizzle.team/docs/rls#using-with-supabase
 import type { JwtPayload, SupabaseClient } from "@supabase/supabase-js"
 import type { AnyRelations, EmptyRelations } from "drizzle-orm"
-import { sql } from "drizzle-orm"
+import { is, SQL, sql } from "drizzle-orm"
 import type { DrizzlePgConfig } from "drizzle-orm/pg-core"
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js"
 import postgres from "postgres"
@@ -30,9 +30,20 @@ export type CreateClientConfig<
   requirePooler?: boolean
 }
 
+/** Whose session `sessionRevocation` decides on. */
+export type SessionRevocationContext = {
+  /**
+   * The claims the client runs as, verified by `getClaims()` in
+   * `createAuthClient` and `createRequestDb`.
+   */
+  claims: Partial<JwtPayload>
+  sub: string
+}
+
 /**
  * `CreateClientConfig` for a client that runs as a user, plus the `app.via`
- * marker its transactions carry and whether they may write.
+ * marker its transactions carry, whether they may write, and the check that
+ * refuses a revoked session.
  */
 export type RlsClientConfig<TRelations extends AnyRelations = EmptyRelations> =
   CreateClientConfig<TRelations> & {
@@ -47,7 +58,47 @@ export type RlsClientConfig<TRelations extends AnyRelations = EmptyRelations> =
      * fails with Postgres's own error. Default `false`.
      */
     readOnly?: boolean
+    /**
+     * A SQL expression that yields a text code once the server ended the
+     * session, or `NULL`. It runs after the claims are installed, so
+     * `auth.uid()` works, and before the role switch, as the login role.
+     */
+    sessionRevocation?: (
+      context: SessionRevocationContext
+    ) => SQL<string | null>
   }
+
+/**
+ * Thrown when a request carries no verified session. A named class so a caller
+ * with a legitimate answer for that case (a permission check, where "not signed
+ * in" means "no") can tell it apart from a real failure with `instanceof`.
+ */
+export class UnauthenticatedError extends Error {
+  /** The verifier's own error, when there was one (an expired token, an ended session). */
+  declare readonly cause?: unknown
+
+  constructor(
+    message = "Unauthorized: no verified session on this request",
+    options?: { cause?: unknown }
+  ) {
+    super(message)
+    this.name = "UnauthenticatedError"
+    if (options) {
+      Object.defineProperty(this, "cause", { value: options.cause })
+    }
+  }
+}
+
+/** Thrown when `sessionRevocation` yields a code, such as `user_banned`. */
+export class SessionRevokedError extends UnauthenticatedError {
+  readonly code: string
+
+  constructor(code: string) {
+    super(`Unauthorized: the session is revoked (${code})`)
+    this.name = "SessionRevokedError"
+    this.code = code
+  }
+}
 
 export type ResolveDatabaseUrlOptions = Pick<
   CreateClientConfig,
@@ -105,7 +156,7 @@ export function resolveDatabaseUrl({
 export type DrizzleClient<TRelations extends AnyRelations = EmptyRelations> =
   PostgresJsDatabase<TRelations> & { close: CloseFn }
 
-// The only JWT claims the RLS clients read.
+// The JWT claims every RLS client needs.
 export type SupabaseToken = Pick<JwtPayload, "role" | "sub">
 
 // The role-clamped RLS context installed into each transaction.
@@ -196,6 +247,40 @@ function buildDrizzle<TRelations extends AnyRelations>(
   return { close: makeClose(entry), db }
 }
 
+// What a client adds to the claims statement of each of its transactions.
+type TransactionSettings = { check?: SQL; readOnly: boolean; via: string }
+
+// With a `sessionRevocation` check, the claims and `app.via` go in first, the
+// check runs next, still as the login role, and the role and read-only mode
+// switch last. Each `offset 0` keeps its subquery whole, the scalar
+// `(select ...)` turns no row into NULL, and the newline ends a `--` comment
+// in the check.
+const claimsStatement = (
+  { claims, role, sub }: RlsContext,
+  { check, readOnly, via }: TransactionSettings
+) => {
+  const readOnlyClause = readOnly
+    ? sql`, set_config('transaction_read_only', 'on', true)`
+    : sql``
+  return check
+    ? sql`select set_config('role', ${role}, true)${readOnlyClause}, checked.revocation from (select (select (${check}
+)) as revocation from (select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true), set_config('app.via', ${via}, true) offset 0) as installed offset 0) as checked`
+    : sql`select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true), set_config('app.via', ${via}, true), set_config('role', ${role}, true)${readOnlyClause}`
+}
+
+// Calls the app's check with its own copy of the claims, and refuses anything
+// but SQL, such as a promise from an async callback.
+function revocationCheck(
+  sessionRevocation: NonNullable<RlsClientConfig["sessionRevocation"]>,
+  { claims, sub }: RlsContext
+): SQL {
+  const check: unknown = sessionRevocation({ claims: JSON.parse(claims), sub })
+  if (!is(check, SQL)) {
+    throw new TypeError("sessionRevocation must return a SQL expression")
+  }
+  return check
+}
+
 // Wraps a drizzle instance in the lazy RLS query proxy. Claims are resolved
 // before each transaction opens (so `createAuthClient` re-checks the live
 // session for each one), then installed transaction-locally with
@@ -209,17 +294,36 @@ function buildRlsClient<TRelations extends AnyRelations>(
   resolveContext: () => Promise<RlsContext>,
   config?: RlsClientConfig<TRelations>
 ): DrizzleClient<TRelations> {
-  const { readOnly = false, via = "", ...clientConfig } = config ?? {}
-  const readOnlyClause = readOnly
-    ? sql`, set_config('transaction_read_only', 'on', true)`
-    : sql``
+  const {
+    readOnly = false,
+    sessionRevocation,
+    via = "",
+    ...clientConfig
+  } = config ?? {}
   const { close, db } = buildDrizzle("rls", clientConfig)
   const runTransaction = async (transaction: (tx: unknown) => unknown) => {
-    const { claims, role, sub } = await resolveContext()
+    const context = await resolveContext()
+    const check =
+      sessionRevocation && context.sub
+        ? revocationCheck(sessionRevocation, context)
+        : undefined
     return db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true), set_config('app.via', ${via}, true), set_config('role', ${role}, true)${readOnlyClause}`
+      const [installed] = await tx.execute<{ revocation?: unknown }>(
+        claimsStatement(context, { check, readOnly, via })
       )
+      // Never run the caller's statements without the role switch.
+      if (!installed) {
+        throw new Error("The claims statement returned no row")
+      }
+      const code = installed.revocation ?? null
+      if (code !== null) {
+        if (typeof code !== "string") {
+          throw new TypeError(
+            "sessionRevocation must yield a text code or NULL"
+          )
+        }
+        throw new SessionRevokedError(code)
+      }
       return transaction(tx)
     })
   }
@@ -258,7 +362,8 @@ export function createSupabaseClient<
 /**
  * RLS client bound to a Supabase client. Verified claims are resolved via
  * `supabase.auth.getClaims()` before every transaction (every query outside
- * `db.transaction`), so it always reflects the live session.
+ * `db.transaction`), so it sees a sign-out at once, and a ban or a deletion
+ * with `sessionRevocation`.
  */
 export function createAuthClient<
   TRelations extends AnyRelations = EmptyRelations,

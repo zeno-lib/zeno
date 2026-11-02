@@ -1,13 +1,17 @@
+import { randomUUID } from "node:crypto"
 import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import { createRlsTestHarness, idsSeen } from "@zeno-lib/test/supabase"
-import { defineRelations, eq, inArray, sql } from "drizzle-orm"
+import { defineRelations, eq, inArray, type SQL, sql } from "drizzle-orm"
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
+import { authUserRevocation } from "../src/auth"
 import {
   createAdminClient,
   createAnonClient,
   createAuthClient,
   createServiceClient,
   createSupabaseClient,
+  type SessionRevocationContext,
+  SessionRevokedError,
   type SupabaseToken,
 } from "../src/index"
 import { createRequestDb, UnauthenticatedError } from "../src/next"
@@ -41,12 +45,14 @@ const clientOptions = {
   auth: { autoRefreshToken: false, persistSession: false },
 }
 
+const supabaseAdmin = createClient(API_URL, SERVICE_ROLE_KEY, clientOptions)
+
 // Creates real users through the Auth admin API (service_role), signs them in
 // on a publishable-key client, and exposes `db`: one createAuthClient handle
 // bound to that client, so it follows whoever is signed in. `cleanUp()` deletes
 // the users, retrying transient Auth errors, and closes the handle.
 const harness = createRlsTestHarness({
-  admin: createClient(API_URL, SERVICE_ROLE_KEY, clientOptions),
+  admin: supabaseAdmin,
   client: createClient(API_URL, ANON_KEY, clientOptions),
   createDb: (client) => createAuthClient(client, { relations }),
 })
@@ -228,6 +234,133 @@ describe("createAuthClient (real Supabase session)", () => {
     ).rejects.toThrow()
 
     await harness.signOut()
+  })
+})
+
+// A ban or a deletion lands in auth.users at once, but a token issued before it
+// stays valid until it expires, so only the claims statement's check sees it.
+describe("sessionRevocation", () => {
+  const roleOf = async (db: ReturnType<typeof createSupabaseClient>) =>
+    (
+      (await db.execute(sql`select current_user as role`))[0] as {
+        role: string
+      }
+    ).role
+  const checked = (
+    sub: string,
+    sessionRevocation: (context: SessionRevocationContext) => SQL<string | null>
+  ) => createSupabaseClient(token(sub), { sessionRevocation })
+
+  it("refuses a banned user's transactions until the ban runs out", async () => {
+    const { id } = await harness.createUser()
+    const db = checked(id, authUserRevocation)
+    expect(await roleOf(db)).toBe("authenticated")
+
+    const ban = await supabaseAdmin.auth.admin.updateUserById(id, {
+      ban_duration: "1h",
+    })
+    expect(ban.error).toBeNull()
+    const error = await roleOf(db).catch((caught: unknown) => caught)
+    expect(error).toBeInstanceOf(SessionRevokedError)
+    // A caller that treats it as signed out keeps working.
+    expect(error).toBeInstanceOf(UnauthenticatedError)
+    expect(error).toHaveProperty("code", "user_banned")
+    // Postgres reads the id without hyphens too.
+    await expect(
+      roleOf(checked(id.split("-").join(""), authUserRevocation))
+    ).rejects.toHaveProperty("code", "user_banned")
+    // Without it, the same token still runs.
+    expect(await roleOf(createSupabaseClient(token(id)))).toBe("authenticated")
+
+    // GoTrue keeps banned_until once a ban runs out.
+    await adminDb.execute(
+      sql`update auth.users set banned_until = now() - interval '1 second' where id = ${id}`
+    )
+    expect(await roleOf(db)).toBe("authenticated")
+  })
+
+  it("refuses a deleted user's token", async () => {
+    await expect(
+      roleOf(checked(randomUUID(), authUserRevocation))
+    ).rejects.toHaveProperty("code", "user_not_found")
+
+    // A soft delete keeps the row and sets deleted_at.
+    const { id } = await harness.createUser()
+    const removal = await supabaseAdmin.auth.admin.deleteUser(id, true)
+    expect(removal.error).toBeNull()
+    await expect(
+      roleOf(checked(id, authUserRevocation))
+    ).rejects.toHaveProperty("code", "user_not_found")
+  })
+
+  it("lets a sub that isn't a uuid through authUserRevocation", async () => {
+    expect(await roleOf(checked("user_2abc", authUserRevocation))).toBe(
+      "authenticated"
+    )
+  })
+
+  it("installs the claims before the check, and switches the role after it", async () => {
+    // auth.uid() already works in the check.
+    const seen = checked(
+      USER_A,
+      () => sql<string | null>`case when auth.uid() is not null then 'seen' end`
+    )
+    await expect(roleOf(seen)).rejects.toHaveProperty("code", "seen")
+    // A set-returning check that matches nothing yields no row.
+    const noRow = checked(
+      USER_A,
+      () => sql<string | null>`(regexp_matches('a', 'b'))[1]`
+    )
+    expect(await roleOf(noRow)).toBe("authenticated")
+    // A check that reads current_user still sees the login role.
+    const lateCheck = checked(
+      USER_A,
+      () =>
+        sql<
+          string | null
+        >`case when current_user = 'authenticated' then 'too_late' end`
+    )
+    expect(await roleOf(lateCheck)).toBe("authenticated")
+    // A check may end in a comment.
+    const commented = checked(USER_A, () => sql<string | null>`null -- no code`)
+    expect(await roleOf(commented)).toBe("authenticated")
+  })
+
+  it("refuses a check that doesn't yield text", async () => {
+    const predicate = checked(
+      USER_A,
+      () => sql<string | null>`exists(select 1)`
+    )
+    await expect(roleOf(predicate)).rejects.toBeInstanceOf(TypeError)
+    // An async callback hands over a promise, not SQL.
+    const promised = checked(USER_A, (async () => sql`null`) as never)
+    await expect(roleOf(promised)).rejects.toBeInstanceOf(TypeError)
+  })
+
+  it("lets an app add its own code after the ready-made one", async () => {
+    const db = checked(
+      USER_A,
+      (context) =>
+        sql<
+          string | null
+        >`coalesce(${authUserRevocation(context)}, 'account_closed')`
+    )
+    await expect(roleOf(db)).rejects.toHaveProperty("code", "account_closed")
+  })
+
+  it("still sets app.via and read-only mode", async () => {
+    const db = createSupabaseClient(token(USER_A), {
+      readOnly: true,
+      relations,
+      sessionRevocation: () => sql<string | null>`null`,
+      via: "Agent",
+    })
+
+    const [settings] = await db.execute(
+      sql`select current_setting('app.via', true) as via, current_setting('transaction_read_only') as read_only`
+    )
+
+    expect(settings).toEqual({ read_only: "on", via: "Agent" })
   })
 })
 

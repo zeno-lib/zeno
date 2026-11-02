@@ -6,6 +6,7 @@ import {
   type JwtPayload,
   type User,
 } from "@supabase/supabase-js"
+import { sql } from "drizzle-orm"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 import { FieldValidationError } from "./action-result.ts"
@@ -33,7 +34,10 @@ const { createSupabaseClientMock } = vi.hoisted(() => ({
   })),
 }))
 
-vi.mock("./clients.ts", () => ({
+// Only the factory is stubbed: the error classes `next.ts` re-exports live in
+// the same module, and importing it opens no connection.
+vi.mock("./clients.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./clients.ts")>()),
   createSupabaseClient: createSupabaseClientMock,
 }))
 
@@ -272,6 +276,20 @@ describe("createRequestDb", () => {
       connectionString: "postgresql://lazy",
     })
     await expect(getRequestDb()).resolves.toEqual({ claims, fake: true })
+  })
+
+  it("passes sessionRevocation to the RLS client", async () => {
+    const sessionRevocation = () => sql<string | null>`null`
+    const { getRequestContext } = createRequestDb({
+      sessionRevocation,
+      supabase: supabaseReturning(getClaimsResult(claims, null)),
+    })
+
+    await getRequestContext()
+
+    expect(createSupabaseClientMock).toHaveBeenCalledWith(claims, {
+      sessionRevocation,
+    })
   })
 
   it("throws UnauthenticatedError when there is no session", async () => {

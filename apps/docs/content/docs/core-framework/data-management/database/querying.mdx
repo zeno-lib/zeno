@@ -9,7 +9,9 @@ status: in progress
 
 `@zeno-lib/db` exports five client factories. Each takes an optional Drizzle
 config (`{ relations?, logger?, casing? }`) plus an optional `connectionString`
-and `requirePooler`. Without `connectionString`, it reads
+and `requirePooler`. The two that run as a user's token, `createAuthClient` and
+`createSupabaseClient`, also take `sessionRevocation` (see
+[Revoked sessions](#revoked-sessions)). Without `connectionString`, it reads
 `SUPABASE_DATABASE_URL` from the environment. For local and deployed
 connection strings, see
 [Environment](/docs/core-framework/data-management/database#environment).
@@ -57,7 +59,8 @@ installs the verified JWT claims into transaction-local Postgres settings (so
 `auth.uid()` and `auth.jwt()` work inside RLS policies), and runs the query as
 the claims' role. Each awaited statement is its own transaction unless it runs
 inside `db.transaction` (below), and the client re-resolves claims for **every**
-transaction, so a single client always reflects the live session.
+transaction, so a single client sees a sign-out at once, and a ban or a
+deletion with [`sessionRevocation`](#revoked-sessions).
 
 `createAuthClient(...)` does not take a `schema`. The client resolves types from
 the tables you reference in the query itself. Pass a `relations` object only when
@@ -160,7 +163,7 @@ export const {
   getRequestContext,
   getRequestDb,
 } = createRequestDb({ relations, supabase: () => createClient() })
-export { UnauthenticatedError } from "@zeno-lib/db/next"
+export { SessionRevokedError, UnauthenticatedError } from "@zeno-lib/db/next"
 ```
 
 `getRequestContext()` verifies the cookie session with `auth.getClaims()` once
@@ -196,14 +199,67 @@ Query rejects a query whose function resolves to `undefined`, so a query
 function can return a read action's result as it is, typed `T | null`.
 
 When being signed out is a valid answer (in a permission check, say), catch the
-named error instead:
+named error instead. A [revoked session](#revoked-sessions) throws it at the
+first query, so the catch covers the query too:
 
 ```typescript
-const db = await getRequestDb().catch((error: unknown) => {
-  if (error instanceof UnauthenticatedError) return null
-  throw error
+const posts = await getRequestDb()
+  .then((db) => db.select().from(schema.posts))
+  .catch((error: unknown) => {
+    if (error instanceof UnauthenticatedError) return null
+    throw error
+  })
+```
+
+### Revoked sessions
+
+With asymmetric signing keys, `getClaims()` verifies a token without asking
+Auth, so a token issued before a ban or a deletion keeps working until it
+expires (`jwt_expiry`, one hour by default). Pass `sessionRevocation` to check
+each transaction against the database:
+
+```typescript title="{project}-db/src/server-db.ts"
+import { authUserRevocation } from "@zeno-lib/db/auth"
+
+createRequestDb({
+  relations,
+  sessionRevocation: authUserRevocation,
+  supabase: () => createClient(),
 })
 ```
+
+`authUserRevocation` refuses what Supabase Auth refuses: a banned user, with the
+code `user_banned`, and a deleted one, with `user_not_found`. A refused
+transaction throws `SessionRevokedError`, an `UnauthenticatedError` that
+carries the code as `code`, before any of its statements run. The check runs
+with each transaction, so a handler that sends an email or uploads a file
+should query first. To sign the user out, call
+`supabase.auth.signOut({ scope: "local" })` before you redirect to the sign-in
+page, or a page that sends signed-in users away loops.
+
+A check of your own returns a scalar SQL expression that yields a text code, or
+`NULL` while the session still counts. It runs once the claims are installed,
+so `auth.uid()` works, but before the role switch, as the login role, which
+bypasses RLS: keep it a read-only lookup, and pass values as bound parameters.
+Combine checks with `coalesce`:
+
+```typescript
+import { authUserRevocation } from "@zeno-lib/db/auth"
+import { sql } from "drizzle-orm"
+import { profiles } from "./schema"
+
+createRequestDb({
+  relations,
+  sessionRevocation: (context) =>
+    sql<string | null>`coalesce(${authUserRevocation(context)}, (select 'account_closed' from ${profiles} where ${profiles.id} = auth.uid() and ${profiles.closedAt} is not null))`,
+  supabase: () => createClient(),
+})
+```
+
+The check guards the Drizzle clients only: the same token still reaches
+PostgREST, Storage and Realtime until it expires. Each transaction plans it
+afresh, so it locks the tables it reads and their indexes until commit, about
+a dozen relations for `auth.users`.
 
 ### Returning validation errors to a form
 
@@ -471,7 +527,7 @@ const db = createAnonClient()
 
 Prefer `createAuthClient` when you have a Supabase client. It resolves and
 verifies claims through `auth.getClaims()` before every transaction, so it
-always reflects the live session.
+sees a sign-out at once, and a ban or a deletion with `sessionRevocation`.
 
 ## Use admin and service queries carefully
 
