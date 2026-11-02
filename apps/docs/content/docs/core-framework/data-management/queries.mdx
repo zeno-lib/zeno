@@ -164,7 +164,9 @@ export const postsQueryOptions = (authorId: string) =>
 ```
 
 The name and the input are typed against the map, and the data comes back with the server
-function's return type. Arguments and results travel through
+function's return type. The name is the export's, also for a query built with
+[the object form](/docs/core-framework/data-management/database/querying#reads-and-actions-an-agent-can-call):
+its `name` is the tool name an agent sees, not the route's. Arguments and results travel through
 [`devalue`](https://github.com/sveltejs/devalue), so a `Date`, a `Map`, a `bigint` or an
 `undefined` property survives the trip. A failed call rejects with a `QueryRequestError` carrying
 the route's status, as does a `200` that is not the route's answer (a page rewritten to sign in).

@@ -165,8 +165,9 @@ export { UnauthenticatedError } from "@zeno-lib/db/next"
 
 `getRequestContext()` verifies the cookie session with `auth.getClaims()` once
 per server render, because React's `cache` wraps it. It returns
-`{ claims, db }`, where `db` runs as the caller with the **whole** verified
-claims object installed. It never falls back to `anon`. Without a verified
+`{ claims, db, via }`, where `db` runs as the caller with the **whole** verified
+claims object installed, and `via` is `null` (see
+[Marking who acts for the user](#marking-who-acts-for-the-user)). It never falls back to `anon`. Without a verified
 `sub`, it throws `UnauthenticatedError`. `getRequestDb()` returns just the `db`.
 
 `defineAction(schema, handler)` turns each server action into one line. The
@@ -305,12 +306,132 @@ page. Every entry in the map is a public endpoint, exactly like a server action:
 bounds what a caller can ask for. `import "server-only"` makes a client import
 of the module fail the build instead of bundling your database client.
 
+### Reads and actions an agent can call
+
+`defineQuery`, `defineAction` and `defineFormAction` also take one object, which
+adds the `name` and `description` a tool list shows a model. The export is the
+same function, with the definition on its `definition` key, so one definition
+serves the UI and an agent:
+
+```typescript title="app/posts/queries.ts"
+export const selectPostsQuery = defineQuery({
+  name: "list_posts",
+  description: "List the caller's posts, newest first. At most 20.",
+  schema: z.object({ authorId: z.string() }),
+  run: selectPosts,
+})
+```
+
+```typescript title="app/posts/actions.ts"
+"use server"
+
+export const renamePostAction = defineAction({
+  name: "rename_post",
+  description: "Rename one of the caller's posts.",
+  schema: z.object({ id: z.number().int(), title: z.string().min(1) }),
+  describeChange: async (db, { id, title }) => {
+    const post = await db.query.posts.findFirst({ where: { id } })
+    return {
+      entity: `Post ${id}`,
+      changes: [{ field: "title", from: post?.title ?? null, to: title }],
+    }
+  },
+  run: renamePost,
+})
+```
+
+- The name is a tool name: 1 to 64 letters, digits, `_` or `-`. Any other name
+  throws when the module loads.
+- `definition.readOnly` is `true` for a query and `false` for both write
+  builders. A write always needs the user's approval, so there is no switch to
+  turn it off.
+- `describeChange(db, input, context)` is optional on writes. It reads, under
+  the caller's RLS, what the write would change, so an approval step can show
+  the record and each field old → new instead of a tool name.
+- `definition.invoke(input, context)` runs the definition for a context you pass
+  in: parse, then `run`, then `undefined` → `null` (an `ActionResult` for a form
+  action). Use it where the request has no cookie session, such as a bearer
+  token below. The export itself still resolves the cookie session.
+- The positional forms keep working, and carry no definition.
+
+The definition sits on its own key because a function's `name` is read-only. It
+survives `"use server"` for the server code that imports the export.
+
+### Callers with a bearer token
+
+A client that is not the browser, such as an MCP client, sends an OAuth access
+token in `Authorization: Bearer` instead of cookies. Pass `bearer` to
+`createRequestDb` and use `getBearerContext(request)` in that route:
+
+```typescript title="{project}-db/src/server-db.ts"
+import { createClient as createTokenClient } from "@supabase/supabase-js"
+
+export const { getBearerContext, withVia /* , … */ } = createRequestDb({
+  relations,
+  supabase: () => createClient(),
+  bearer: {
+    // A client that holds no session: it only verifies the token it is given.
+    supabase: () =>
+      createTokenClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      ),
+    // Your registered OAuth clients: client_id → the label writes carry.
+    client: async (clientId) => (await registeredClients()).get(clientId) ?? null,
+    confirmSession: true,
+  },
+})
+```
+
+`getBearerContext` verifies the token with `auth.getClaims(token)` and returns
+`{ claims, db, via, clientId, token }`. It throws `UnauthenticatedError` for a
+missing or invalid token, a token with no `sub`, a token issued to no OAuth
+client (a browser session's own token), and a client `bearer.client` returns
+`null` for. Auth being unreachable rethrows as it is, so it is not mistaken for
+a bad token. It never falls back to `anon`, and it is not memoised: call it once
+per request.
+
+- **Check `client_id`, not `aud`.** Supabase Auth's
+  [OAuth server](https://supabase.com/docs/guides/auth/oauth-server) accepts a
+  `resource` parameter but keeps `aud` at `authenticated`.
+- **`confirmSession`** also asks Auth for the session (`auth.getUser(token)`) on
+  every call. Revoking a grant ends its refresh token at once, but its last
+  access token still passes `getClaims` until it expires. Without the option,
+  allow for up to the token's lifetime (one hour by default).
+
+### Marking who acts for the user
+
+Every RLS transaction sets `app.via` in the same statement as the claims. It
+names who acts for the user: the label `bearer.client` returned for a bearer
+caller, or the one you pass to `withVia` for a cookie caller:
+
+```typescript title="app/api/chat/route.ts"
+const context = withVia(await getRequestContext(), "AI assistant")
+// Every transaction of context.db now carries app.via = 'AI assistant'.
+```
+
+A trigger reads it to attribute a write. It is `''` when nothing set it, so read
+it with `nullif`:
+
+```sql
+nullif(current_setting('app.via', true), '')
+```
+
+Set it only through the client. A `set_config('app.via', …, true)` sent as its
+own statement is its own transaction, and the value is gone before the next
+statement runs. `app.via` is a label, not proof: a role that can run SQL can set
+it, so for a bearer caller also record the signed `client_id`
+(`auth.jwt() ->> 'client_id'`).
+
 ## Other RLS clients
 
 When you already hold the verified, decoded claims (for example from a prior
 `supabase.auth.getClaims()` call), skip the `getClaims()` call each transaction
 makes with
-`createSupabaseClient(accessToken, config?)`. It accepts a decoded
+`createSupabaseClient(accessToken, config?)`. Its `config` (and
+`createAuthClient`'s) also takes `via`, the
+[`app.via`](#marking-who-acts-for-the-user) label. It accepts a decoded
 `SupabaseToken` (the `role` and `sub` claims), not a raw JWT string, and does not
 re-verify it:
 
@@ -646,5 +767,8 @@ or run it in a savepoint with `tx.transaction(...)`.
 - Do not put `"use server"` in the module that calls `createRequestDb`, and do
   not export `getRequestDb` from a `"use server"` file: every export there is a
   public endpoint.
+- Do not use `getRequestContext()` in a route a bearer-token client calls. It
+  reads the cookie session, which that client never sends: use
+  `getBearerContext(request)`.
 - Do not build a fresh `relations` object literal per request. Pass a stable
   `relations` object, or a cached client built without relations may be reused.

@@ -1,11 +1,24 @@
-import { AuthError, type JwtPayload } from "@supabase/supabase-js"
+import {
+  AuthApiError,
+  AuthError,
+  AuthInvalidJwtError,
+  AuthRetryableFetchError,
+  type JwtPayload,
+  type User,
+} from "@supabase/supabase-js"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 import { FieldValidationError } from "./action-result.ts"
-import { createDefineAction, createDefineFormAction } from "./define-action.ts"
 import {
+  createDefineAction,
+  createDefineFormAction,
+  createDefineQuery,
+} from "./define-action.ts"
+import {
+  type BearerOptions,
   type ClaimsSource,
   createRequestDb,
+  type SessionSource,
   UnauthenticatedError,
 } from "./next.ts"
 
@@ -307,6 +320,314 @@ describe("createRequestDb", () => {
     await expect(action("hello")).resolves.toEqual({
       data: { input: "hello", sub: claims.sub },
       ok: true,
+    })
+  })
+})
+
+describe("the object form", () => {
+  const schema = z.object({ id: z.number().int().positive() }).strict()
+  const requestContext = { claims: { sub: "request-user" }, db: "request-db" }
+
+  it("returns the same action, with its definition on a key a spread never copies", async () => {
+    const action = createDefineQuery(() => Promise.resolve(requestContext))({
+      description: "Read one row.",
+      name: "get_row",
+      run: (db, input) => `${db}:${input.id}`,
+      schema,
+    })
+
+    await expect(action({ id: 3 })).resolves.toBe("request-db:3")
+    expect(action.definition).toMatchObject({
+      description: "Read one row.",
+      kind: "query",
+      name: "get_row",
+      readOnly: true,
+    })
+    expect(Object.keys(action)).toEqual([])
+    expect(() => {
+      ;(action as { definition: unknown }).definition = {}
+    }).toThrow(TypeError)
+  })
+
+  it("marks every write as not read-only, so it always needs approval", () => {
+    const getContext = () => Promise.resolve(requestContext)
+    const options = {
+      description: "Write one row.",
+      name: "write_row",
+      run: () => null,
+      schema,
+    }
+
+    expect(createDefineAction(getContext)(options).definition).toMatchObject({
+      kind: "action",
+      readOnly: false,
+    })
+    expect(
+      createDefineFormAction(getContext)(options).definition
+    ).toMatchObject({ kind: "formAction", readOnly: false })
+  })
+
+  it("invoke runs as the context passed in, never the request's", async () => {
+    const getContext = vi.fn(() => Promise.resolve(requestContext))
+    const handler = vi.fn(() => undefined)
+    const action = createDefineAction(getContext)({
+      description: "Write one row.",
+      name: "write_row",
+      run: handler,
+      schema,
+    })
+    const agentContext = { claims: { sub: "agent-user" }, db: "agent-db" }
+
+    await expect(
+      action.definition.invoke({ id: 1 }, agentContext)
+    ).resolves.toBeNull()
+    expect(handler).toHaveBeenCalledWith("agent-db", { id: 1 }, agentContext)
+    expect(getContext).not.toHaveBeenCalled()
+  })
+
+  it("invoke parses before it runs", async () => {
+    const handler = vi.fn()
+    const action = createDefineAction(() => Promise.resolve(requestContext))({
+      description: "Write one row.",
+      name: "write_row",
+      run: handler,
+      schema,
+    })
+
+    await expect(
+      action.definition.invoke({ id: -1 }, requestContext)
+    ).rejects.toBeInstanceOf(z.ZodError)
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it("a form action's invoke returns its failures as an ActionResult", async () => {
+    const action = createDefineFormAction(() =>
+      Promise.resolve(requestContext)
+    )({
+      description: "Write one row.",
+      name: "write_row",
+      run: () => {
+        throw new FieldValidationError({ id: "Taken" })
+      },
+      schema,
+    })
+
+    await expect(
+      action.definition.invoke({ id: 1 }, requestContext)
+    ).resolves.toEqual({
+      error: { fieldErrors: { id: ["Taken"] }, formErrors: [] },
+      ok: false,
+    })
+  })
+
+  it.each(["list rows", "", "x".repeat(65), "liste_dossiers_é"])(
+    "rejects %j, which a tool list could not use",
+    (name) => {
+      expect(() =>
+        createDefineQuery(() => Promise.resolve(requestContext))({
+          description: "Read rows.",
+          name,
+          run: () => null,
+          schema,
+        })
+      ).toThrow(TypeError)
+    }
+  )
+})
+
+describe("getBearerContext", () => {
+  const oauthClaims: JwtPayload = { ...claims, client_id: "client-1" }
+
+  function bearerRequest(authorization?: string): Request {
+    return new Request("https://app.test/mcp", {
+      headers: authorization ? { authorization } : {},
+    })
+  }
+
+  function sessionReturning(
+    result: GetClaimsResult,
+    user: Partial<User> | AuthError = { id: claims.sub }
+  ) {
+    const getUser = vi.fn(() =>
+      Promise.resolve(
+        user instanceof AuthError
+          ? { data: { user: null }, error: user }
+          : { data: { user: user as User }, error: null }
+      )
+    )
+    const source = {
+      auth: { getClaims: () => Promise.resolve(result), getUser },
+    } as unknown as SessionSource
+    return { getUser, supabase: () => source }
+  }
+
+  function bearerDb(bearer: Partial<BearerOptions> = {}) {
+    return createRequestDb({
+      bearer: {
+        client: (clientId) => (clientId === "client-1" ? "Agent" : null),
+        supabase: sessionReturning(getClaimsResult(oauthClaims, null)).supabase,
+        ...bearer,
+      },
+      supabase: supabaseReturning(getClaimsResult(null, null)),
+    })
+  }
+
+  it("verifies the token, then builds the RLS client with the client's via", async () => {
+    const client = vi.fn(() => "Agent")
+    const { getBearerContext } = bearerDb({ client })
+
+    const context = await getBearerContext(bearerRequest("Bearer token-1"))
+
+    expect(context).toMatchObject({
+      claims: oauthClaims,
+      clientId: "client-1",
+      token: "token-1",
+      via: "Agent",
+    })
+    expect(client).toHaveBeenCalledWith("client-1")
+    expect(createSupabaseClientMock).toHaveBeenCalledWith(oauthClaims, {
+      via: "Agent",
+    })
+  })
+
+  it.each([
+    { authorization: undefined, name: "no Authorization header" },
+    { authorization: "Basic dXNlcjpwYXNz", name: "another scheme" },
+    { authorization: "Bearer ", name: "an empty token" },
+  ])("refuses $name", async ({ authorization }) => {
+    const { getBearerContext } = bearerDb()
+
+    await expect(
+      getBearerContext(bearerRequest(authorization))
+    ).rejects.toBeInstanceOf(UnauthenticatedError)
+  })
+
+  it.each([
+    {
+      name: "a token that fails verification",
+      result: getClaimsResult(null, new AuthInvalidJwtError("jwt expired")),
+    },
+    {
+      name: "a token Auth rejects",
+      result: getClaimsResult(
+        null,
+        new AuthApiError("invalid JWT", 403, "bad_jwt")
+      ),
+    },
+    {
+      name: "claims without a subject",
+      result: getClaimsResult({ ...oauthClaims, sub: "" }, null),
+    },
+    {
+      name: "a token not issued to an OAuth client",
+      result: getClaimsResult(claims, null),
+    },
+    {
+      name: "a client that is not registered",
+      result: getClaimsResult({ ...oauthClaims, client_id: "other" }, null),
+    },
+  ])("refuses $name without building a client", async ({ result }) => {
+    const { getBearerContext } = bearerDb({
+      supabase: sessionReturning(result).supabase,
+    })
+
+    await expect(
+      getBearerContext(bearerRequest("Bearer token-1"))
+    ).rejects.toBeInstanceOf(UnauthenticatedError)
+    expect(createSupabaseClientMock).not.toHaveBeenCalled()
+  })
+
+  it("refuses a token whose parts are not JSON, which getClaims throws on", async () => {
+    const source = {
+      auth: {
+        getClaims: () => Promise.reject(new SyntaxError("Unexpected token")),
+      },
+    } as unknown as SessionSource
+    const { getBearerContext } = bearerDb({ supabase: () => source })
+
+    await expect(
+      getBearerContext(bearerRequest("Bearer e30.e30.e30"))
+    ).rejects.toBeInstanceOf(UnauthenticatedError)
+  })
+
+  it("rethrows Auth being unreachable, which is not the token's fault", async () => {
+    const failure = new AuthRetryableFetchError("fetch failed", 0)
+    const { getBearerContext } = bearerDb({
+      supabase: sessionReturning(getClaimsResult(null, failure)).supabase,
+    })
+
+    await expect(
+      getBearerContext(bearerRequest("Bearer token-1"))
+    ).rejects.toBe(failure)
+  })
+
+  it("with confirmSession, refuses a token whose session has ended", async () => {
+    const { getUser, supabase } = sessionReturning(
+      getClaimsResult(oauthClaims, null),
+      new AuthApiError("Session not found", 403, "session_not_found")
+    )
+    const { getBearerContext } = bearerDb({ confirmSession: true, supabase })
+
+    const error = await getBearerContext(bearerRequest("Bearer token-1")).catch(
+      (caught: unknown) => caught
+    )
+
+    expect(error).toBeInstanceOf(UnauthenticatedError)
+    expect(error).toHaveProperty("cause.code", "session_not_found")
+    expect(getUser).toHaveBeenCalledWith("token-1")
+  })
+
+  it("with confirmSession, refuses a session that belongs to someone else", async () => {
+    const { getBearerContext } = bearerDb({
+      confirmSession: true,
+      supabase: sessionReturning(getClaimsResult(oauthClaims, null), {
+        id: "someone-else",
+      }).supabase,
+    })
+
+    await expect(
+      getBearerContext(bearerRequest("Bearer token-1"))
+    ).rejects.toBeInstanceOf(UnauthenticatedError)
+  })
+
+  it("does not ask Auth for the session unless told to", async () => {
+    const { getUser, supabase } = sessionReturning(
+      getClaimsResult(oauthClaims, null)
+    )
+    const { getBearerContext } = bearerDb({ supabase })
+
+    await getBearerContext(bearerRequest("Bearer token-1"))
+
+    expect(getUser).not.toHaveBeenCalled()
+  })
+
+  it("throws a configuration error without the bearer option", async () => {
+    const { getBearerContext } = createRequestDb({
+      supabase: supabaseReturning(getClaimsResult(claims, null)),
+    })
+
+    const error = await getBearerContext(bearerRequest("Bearer token-1")).catch(
+      (caught: unknown) => caught
+    )
+
+    expect(error).toBeInstanceOf(Error)
+    expect(error).not.toBeInstanceOf(UnauthenticatedError)
+  })
+})
+
+describe("withVia", () => {
+  it("keeps the caller and rebuilds the RLS client with the via marker", async () => {
+    const { getRequestContext, withVia } = createRequestDb({
+      supabase: supabaseReturning(getClaimsResult(claims, null)),
+    })
+    const context = await getRequestContext()
+
+    const assisted = withVia(context, "Assistant")
+
+    expect(context.via).toBeNull()
+    expect(assisted).toMatchObject({ claims, via: "Assistant" })
+    expect(createSupabaseClientMock).toHaveBeenLastCalledWith(claims, {
+      via: "Assistant",
     })
   })
 })
