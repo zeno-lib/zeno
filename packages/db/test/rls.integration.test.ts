@@ -299,7 +299,7 @@ describe("sessionRevocation", () => {
     )
   })
 
-  it("installs the claims before the check, and switches the role after it", async () => {
+  it("sets the claims before the check, and switches the role after it", async () => {
     // auth.uid() already works in the check.
     const seen = checked(
       USER_A,

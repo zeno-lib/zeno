@@ -238,8 +238,8 @@ should query first. To sign the user out, call
 page, or a page that sends signed-in users away loops.
 
 A check of your own returns a scalar SQL expression that yields a text code, or
-`NULL` while the session still counts. It runs once the claims are installed,
-so `auth.uid()` works, but before the role switch, as the login role, which
+`NULL` while the session still counts. It runs once the claims are set, so
+`auth.uid()` works, but before the role switch, as the login role, which
 bypasses RLS: keep it a read-only lookup, and pass values as bound parameters.
 Combine checks with `coalesce`:
 

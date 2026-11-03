@@ -60,8 +60,8 @@ export type RlsClientConfig<TRelations extends AnyRelations = EmptyRelations> =
     readOnly?: boolean
     /**
      * A SQL expression that yields a text code once the server ended the
-     * session, or `NULL`. It runs after the claims are installed, so
-     * `auth.uid()` works, and before the role switch, as the login role.
+     * session, or `NULL`. It runs after the claims are set, so `auth.uid()`
+     * works, and before the role switch, as the login role.
      */
     sessionRevocation?: (
       context: SessionRevocationContext
@@ -264,7 +264,7 @@ const claimsStatement = (
     : sql``
   return check
     ? sql`select set_config('role', ${role}, true)${readOnlyClause}, checked.revocation from (select (select (${check}
-)) as revocation from (select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true), set_config('app.via', ${via}, true) offset 0) as installed offset 0) as checked`
+)) as revocation from (select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true), set_config('app.via', ${via}, true) offset 0) as claims offset 0) as checked`
     : sql`select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true), set_config('app.via', ${via}, true), set_config('role', ${role}, true)${readOnlyClause}`
 }
 
@@ -279,6 +279,30 @@ function revocationCheck(
     throw new TypeError("sessionRevocation must return a SQL expression")
   }
   return check
+}
+
+// Sets the claims, `app.via`, the role and read-only mode for the rest of
+// `tx`, and throws when the check yields a code.
+async function setRlsContext(
+  tx: Pick<PostgresJsDatabase, "execute">,
+  context: RlsContext,
+  settings: TransactionSettings
+): Promise<void> {
+  const [row] = await tx.execute<{ revocation?: unknown }>(
+    claimsStatement(context, settings)
+  )
+  // Never run the caller's statements without the role switch.
+  if (!row) {
+    throw new Error("The claims statement returned no row")
+  }
+  const code = row.revocation ?? null
+  if (code === null) {
+    return
+  }
+  if (typeof code !== "string") {
+    throw new TypeError("sessionRevocation must yield a text code or NULL")
+  }
+  throw new SessionRevokedError(code)
 }
 
 // Wraps a drizzle instance in the lazy RLS query proxy. Claims are resolved
@@ -308,22 +332,7 @@ function buildRlsClient<TRelations extends AnyRelations>(
         ? revocationCheck(sessionRevocation, context)
         : undefined
     return db.transaction(async (tx) => {
-      const [installed] = await tx.execute<{ revocation?: unknown }>(
-        claimsStatement(context, { check, readOnly, via })
-      )
-      // Never run the caller's statements without the role switch.
-      if (!installed) {
-        throw new Error("The claims statement returned no row")
-      }
-      const code = installed.revocation ?? null
-      if (code !== null) {
-        if (typeof code !== "string") {
-          throw new TypeError(
-            "sessionRevocation must yield a text code or NULL"
-          )
-        }
-        throw new SessionRevokedError(code)
-      }
+      await setRlsContext(tx, context, { check, readOnly, via })
       return transaction(tx)
     })
   }
