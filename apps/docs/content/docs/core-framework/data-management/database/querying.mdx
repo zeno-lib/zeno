@@ -237,6 +237,10 @@ should query first. To sign the user out, call
 `supabase.auth.signOut({ scope: "local" })` before you redirect to the sign-in
 page, or a page that sends signed-in users away loops.
 
+`getRequestContext()` still resolves for a revoked session. To let it run a
+query anyway, use a client without the option, such as
+[`createSupabaseClient(claims)`](#other-rls-clients), which still applies RLS.
+
 A check of your own returns a scalar SQL expression that yields a text code, or
 `NULL` while the session still counts. It runs once the claims are set, so
 `auth.uid()` works, but before the role switch, as the login role, which
