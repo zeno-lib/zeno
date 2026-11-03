@@ -63,8 +63,9 @@ export interface ChangeDescription {
 }
 
 /**
- * Reads, under the caller's RLS, what a write would change. Called with the
- * parsed input, before the write runs and in a transaction of its own.
+ * Reads, under the caller's RLS, what a write would change. The definition's
+ * `describe` calls it with the parsed input, before the write runs, on a
+ * read-only `db`. Wrap several reads in `db.transaction` for one snapshot.
  */
 export type DescribeChange<TContext extends ActionContext<unknown>, TOutput> = (
   db: TContext["db"],
@@ -117,7 +118,9 @@ export interface FormActionOptions<
  * What the object form keeps on the export's `definition` key, so a tool list
  * can describe it to a model and run it for a caller of its own. `invoke`
  * behaves exactly like the export, with the context passed in instead of the
- * request's: parse, then `run`, then `undefined` → `null`.
+ * request's: parse, then `run`, then `undefined` → `null`. A query runs in a
+ * read-only transaction, so a `run` that writes fails instead of skipping the
+ * approval `readOnly` lets a host skip.
  */
 export interface QueryDefinition<
   TContext extends ActionContext<unknown>,
@@ -130,25 +133,40 @@ export interface QueryDefinition<
   readonly readOnly: true
 }
 
-/** `QueryDefinition` for a write. A write always needs the user's approval. */
+/**
+ * `QueryDefinition` for a write. A write always needs the user's approval:
+ * `describe` parses the input as `invoke` would, then resolves to what
+ * `describeChange` reads, or `null` without one.
+ */
 export interface ActionDefinition<
   TContext extends ActionContext<unknown>,
   TInput,
   TOutput,
   TResult,
 > extends ActionOptions<TContext, TInput, TOutput, TResult> {
+  describe: (
+    input: unknown,
+    context: TContext
+  ) => Promise<ChangeDescription | null>
   invoke: (input: unknown, context: TContext) => Promise<ActionValue<TResult>>
   readonly kind: "action"
   readonly readOnly: false
 }
 
-/** `ActionDefinition` for a form write: `invoke` resolves to an `ActionResult`. */
+/**
+ * `ActionDefinition` for a form write: `invoke` resolves to an `ActionResult`,
+ * and `describe` throws a `FieldValidationError` for input the schema refuses.
+ */
 export interface FormActionDefinition<
   TContext extends ActionContext<unknown>,
   TInput,
   TOutput,
   TResult,
 > extends FormActionOptions<TContext, TInput, TOutput, TResult> {
+  describe: (
+    input: unknown,
+    context: TContext
+  ) => Promise<ChangeDescription | null>
   invoke: (
     input: unknown,
     context: TContext
@@ -248,43 +266,89 @@ function createRunner<
   }
 }
 
+type DefinitionKind = "action" | "formAction" | "query"
+
+type AnySchema = ActionSchema<unknown, unknown> &
+  FormActionSchema<unknown, unknown>
+
+type AnyOptions<TContext extends ActionContext<unknown>> = Omit<
+  ActionOptions<TContext, unknown, unknown, unknown>,
+  "schema"
+> & { schema: AnySchema }
+
+// What sets the builders apart: how they parse and how they run.
+const PARSERS = {
+  action: (schema: AnySchema, input: unknown) => schema.parse(input),
+  formAction: async (schema: AnySchema, input: unknown) => {
+    const parsed = await schema["~standard"].validate(input)
+    if (parsed.issues) {
+      const { fieldErrors, formErrors } = toActionError(parsed.issues)
+      throw new FieldValidationError(fieldErrors, { formErrors })
+    }
+    return parsed.value
+  },
+  query: (schema: AnySchema, input: unknown) => schema.parse(input),
+}
+
+const RUNNERS = {
+  action: createRunner,
+  formAction: createFormRunner,
+  query: createRunner,
+}
+
 function bindDefinition<TContext extends ActionContext<unknown>>(
   getContext: () => Promise<TContext>,
-  kind: "action" | "query"
+  kind: DefinitionKind,
+  readOnlyContext: (context: TContext) => TContext
 ) {
+  const createRun = RUNNERS[kind] as (
+    schema: AnySchema,
+    handler: ActionHandler<TContext, unknown, unknown>
+  ) => (
+    input: unknown,
+    getContext: () => TContext | Promise<TContext>
+  ) => Promise<unknown>
+  const parse = PARSERS[kind]
+
   return (
-    schemaOrOptions:
-      | ActionSchema<unknown, unknown>
-      | ActionOptions<TContext, unknown, unknown, unknown>,
+    schemaOrOptions: AnySchema | AnyOptions<TContext>,
     handler?: ActionHandler<TContext, unknown, unknown>
   ) => {
     if (handler) {
-      const run = createRunner(
-        schemaOrOptions as ActionSchema<unknown, unknown>,
-        handler
-      )
+      const run = createRun(schemaOrOptions as AnySchema, handler)
       return (input: unknown) => run(input, getContext)
     }
 
-    const options = schemaOrOptions as ActionOptions<
-      TContext,
-      unknown,
-      unknown,
-      unknown
-    >
-    const run = createRunner(options.schema, options.run)
-    return withDefinition((input: unknown) => run(input, getContext), {
-      ...(kind === "action" && options.describeChange
-        ? { describeChange: options.describeChange }
-        : {}),
-      description: options.description,
-      invoke: (input: unknown, context: TContext) => run(input, () => context),
-      kind,
-      name: options.name,
-      readOnly: kind === "query",
-      run: options.run,
-      schema: options.schema,
-    })
+    const options = schemaOrOptions as AnyOptions<TContext>
+    const run = createRun(options.schema, options.run)
+    const prepare =
+      kind === "query" ? readOnlyContext : (context: TContext) => context
+    const describeChange = kind === "query" ? undefined : options.describeChange
+    const describe = async (input: unknown, context: TContext) => {
+      if (!describeChange) {
+        return null
+      }
+      const parsed = await parse(options.schema, input)
+      const readOnly = readOnlyContext(context)
+      return describeChange(readOnly.db, parsed, readOnly)
+    }
+
+    return withDefinition(
+      async (input: unknown) =>
+        run(input, async () => prepare(await getContext())),
+      {
+        ...(describeChange ? { describeChange } : {}),
+        ...(kind === "query" ? {} : { describe }),
+        description: options.description,
+        invoke: (input: unknown, context: TContext) =>
+          run(input, () => prepare(context)),
+        kind,
+        name: options.name,
+        readOnly: kind === "query",
+        run: options.run,
+        schema: options.schema,
+      }
+    )
   }
 }
 
@@ -295,18 +359,33 @@ function bindDefinition<TContext extends ActionContext<unknown>>(
  *
  * Input is parsed before the context is resolved, so a malformed call fails
  * without a session round trip, and the handler never sees an unparsed value.
+ * `readOnlyContext` gives a context's read-only twin, which `describe` reads
+ * through.
  */
 export function createDefineAction<TContext extends ActionContext<unknown>>(
-  getContext: () => Promise<TContext>
+  getContext: () => Promise<TContext>,
+  readOnlyContext: (context: TContext) => TContext
 ): DefineAction<TContext> {
-  return bindDefinition(getContext, "action") as DefineAction<TContext>
+  return bindDefinition(
+    getContext,
+    "action",
+    readOnlyContext
+  ) as DefineAction<TContext>
 }
 
-/** Binds `defineQuery` to a request-context resolver, as `createDefineAction`. */
+/**
+ * Binds `defineQuery` to a request-context resolver, as `createDefineAction`.
+ * The object form runs every call through `readOnlyContext`.
+ */
 export function createDefineQuery<TContext extends ActionContext<unknown>>(
-  getContext: () => Promise<TContext>
+  getContext: () => Promise<TContext>,
+  readOnlyContext: (context: TContext) => TContext
 ): DefineQuery<TContext> {
-  return bindDefinition(getContext, "query") as DefineQuery<TContext>
+  return bindDefinition(
+    getContext,
+    "query",
+    readOnlyContext
+  ) as DefineQuery<TContext>
 }
 
 /**
@@ -358,42 +437,14 @@ export interface DefineFormAction<TContext extends ActionContext<unknown>> {
  * (an `UnauthenticatedError`, a database error) still throws.
  */
 export function createDefineFormAction<TContext extends ActionContext<unknown>>(
-  getContext: () => Promise<TContext>
+  getContext: () => Promise<TContext>,
+  readOnlyContext: (context: TContext) => TContext
 ): DefineFormAction<TContext> {
-  return ((
-    schemaOrOptions:
-      | FormActionSchema<unknown, unknown>
-      | FormActionOptions<TContext, unknown, unknown, unknown>,
-    handler?: ActionHandler<TContext, unknown, unknown>
-  ) => {
-    if (handler) {
-      const run = createFormRunner(
-        schemaOrOptions as FormActionSchema<unknown, unknown>,
-        handler
-      )
-      return (input: unknown) => run(input, getContext)
-    }
-
-    const options = schemaOrOptions as FormActionOptions<
-      TContext,
-      unknown,
-      unknown,
-      unknown
-    >
-    const run = createFormRunner(options.schema, options.run)
-    return withDefinition((input: unknown) => run(input, getContext), {
-      ...(options.describeChange
-        ? { describeChange: options.describeChange }
-        : {}),
-      description: options.description,
-      invoke: (input: unknown, context: TContext) => run(input, () => context),
-      kind: "formAction" as const,
-      name: options.name,
-      readOnly: false as const,
-      run: options.run,
-      schema: options.schema,
-    })
-  }) as DefineFormAction<TContext>
+  return bindDefinition(
+    getContext,
+    "formAction",
+    readOnlyContext
+  ) as DefineFormAction<TContext>
 }
 
 function createFormRunner<

@@ -32,7 +32,7 @@ export type CreateClientConfig<
 
 /**
  * `CreateClientConfig` for a client that runs as a user, plus the `app.via`
- * marker its transactions carry.
+ * marker its transactions carry and whether they may write.
  */
 export type RlsClientConfig<TRelations extends AnyRelations = EmptyRelations> =
   CreateClientConfig<TRelations> & {
@@ -42,6 +42,11 @@ export type RlsClientConfig<TRelations extends AnyRelations = EmptyRelations> =
      * `nullif(current_setting('app.via', true), '')`. Unset, it is `''`.
      */
     via?: string
+    /**
+     * Runs every transaction read-only (`transaction_read_only`), so a write
+     * fails with Postgres's own error. Default `false`.
+     */
+    readOnly?: boolean
   }
 
 export type ResolveDatabaseUrlOptions = Pick<
@@ -198,18 +203,22 @@ function buildDrizzle<TRelations extends AnyRelations>(
 // `set_config('role', ...)`, which is what `set local role` does, so claims,
 // via and role cost one round trip, and the role is a bound parameter. `app.via`
 // must stay in this statement: a separate one is its own transaction, and the
-// value is gone before the write it labels.
+// value is gone before the write it labels. Turning a transaction read-only
+// is allowed after its first query; only the way back is not.
 function buildRlsClient<TRelations extends AnyRelations>(
   resolveContext: () => Promise<RlsContext>,
   config?: RlsClientConfig<TRelations>
 ): DrizzleClient<TRelations> {
-  const { via = "", ...clientConfig } = config ?? {}
+  const { readOnly = false, via = "", ...clientConfig } = config ?? {}
+  const readOnlyClause = readOnly
+    ? sql`, set_config('transaction_read_only', 'on', true)`
+    : sql``
   const { close, db } = buildDrizzle("rls", clientConfig)
   const runTransaction = async (transaction: (tx: unknown) => unknown) => {
     const { claims, role, sub } = await resolveContext()
     return db.transaction(async (tx) => {
       await tx.execute(
-        sql`select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true), set_config('app.via', ${via}, true), set_config('role', ${role}, true)`
+        sql`select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true), set_config('app.via', ${via}, true), set_config('role', ${role}, true)${readOnlyClause}`
       )
       return transaction(tx)
     })

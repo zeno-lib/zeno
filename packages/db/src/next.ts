@@ -113,11 +113,14 @@ export type BearerOptions = {
   supabase: () => SessionSource | Promise<SessionSource>
   /**
    * Resolves the token's `client_id` to the `app.via` label its writes carry
-   * ("Claude"), or `null` for a client you did not register. Supabase accepts a
-   * `resource` parameter but keeps `aud` at `authenticated`, so `client_id` is
-   * what tells your registered clients apart.
+   * ("Claude"), or `null` or `undefined` for a client you did not register.
+   * Supabase accepts a `resource` parameter but keeps `aud` at
+   * `authenticated`, so `client_id` is what tells your registered clients
+   * apart. An empty label refuses the client too.
    */
-  client: (clientId: string) => string | null | Promise<string | null>
+  client: (
+    clientId: string
+  ) => string | null | undefined | Promise<string | null | undefined>
   /**
    * Also confirms the session with Auth (`getUser`) on every call. A revoked
    * grant ends its refresh token at once, but its last access token still
@@ -150,9 +153,10 @@ export type RequestDb<TRelations extends AnyRelations = EmptyRelations> = {
   /**
    * The context of a caller that sends `Authorization: Bearer <token>`, such as
    * an MCP client. Needs the `bearer` option. Throws `UnauthenticatedError` for
-   * a missing or invalid token, a token with no `sub` or no `client_id`, a
-   * client `bearer.client` refuses and, with `confirmSession`, an ended
-   * session. Not memoised: call it once per request.
+   * a missing or invalid token, a token with no `sub`, a role other than
+   * `authenticated` or no `client_id`, a client `bearer.client` refuses and,
+   * with `confirmSession`, an ended session. Not memoised: call it once per
+   * request.
    */
   getBearerContext: (request: Request) => Promise<BearerContext<TRelations>>
   /**
@@ -199,7 +203,11 @@ export function createRequestDb<
 >(options: CreateRequestDbOptions<TRelations>): RequestDb<TRelations> {
   const { bearer, connectionString, supabase, ...config } = options
 
-  const createDb = (claims: JwtPayload, via: string | null) => {
+  const createDb = (
+    claims: JwtPayload,
+    via: string | null,
+    readOnly = false
+  ) => {
     const url =
       typeof connectionString === "function"
         ? connectionString()
@@ -208,8 +216,15 @@ export function createRequestDb<
       ...config,
       ...(url === undefined ? {} : { connectionString: url }),
       ...(via === null ? {} : { via }),
+      ...(readOnly ? { readOnly } : {}),
     })
   }
+  const readOnlyContext = <TContext extends RequestContext<TRelations>>(
+    context: TContext
+  ): TContext => ({
+    ...context,
+    db: createDb(context.claims, context.via, true),
+  })
 
   const getRequestContext = cache(
     async (): Promise<RequestContext<TRelations>> => {
@@ -247,6 +262,12 @@ export function createRequestDb<
 
     const client = await bearer.supabase()
     const claims = await verifyToken(client, token)
+    // `createSupabaseClient` would run any other role as `anon`.
+    if (claims.role !== "authenticated") {
+      throw new UnauthenticatedError(
+        "Unauthorized: the token's role is not authenticated"
+      )
+    }
     const clientId = claims.client_id
     if (typeof clientId !== "string" || !clientId) {
       throw new UnauthenticatedError(
@@ -254,7 +275,7 @@ export function createRequestDb<
       )
     }
     const via = await bearer.client(clientId)
-    if (via === null) {
+    if (!via) {
       throw new UnauthenticatedError(
         "Unauthorized: the token's OAuth client is not registered"
       )
@@ -267,9 +288,12 @@ export function createRequestDb<
   }
 
   return {
-    defineAction: createDefineAction(getRequestContext),
-    defineFormAction: createDefineFormAction(getRequestContext),
-    defineQuery: createDefineQuery(getRequestContext),
+    defineAction: createDefineAction(getRequestContext, readOnlyContext),
+    defineFormAction: createDefineFormAction(
+      getRequestContext,
+      readOnlyContext
+    ),
+    defineQuery: createDefineQuery(getRequestContext, readOnlyContext),
     getBearerContext,
     getRequestContext,
     getRequestDb: async () => (await getRequestContext()).db,
@@ -286,10 +310,12 @@ export function createRequestDb<
 const BEARER_SCHEME = /^Bearer +/iu
 const WHITESPACE = /\s/u
 
-// Auth or the JWKS could not answer: a server failure the caller should see
-// as one, not a bad token that sends the client back to sign in.
+// Auth or the JWKS could not answer, or asked to slow down: a server failure
+// the caller should see as one, not a bad token that sends the client back to
+// sign in.
 function isServerFailure(error: AuthError): boolean {
-  return isAuthRetryableFetchError(error) || (error.status ?? 0) >= 500
+  const status = error.status ?? 0
+  return isAuthRetryableFetchError(error) || status === 429 || status >= 500
 }
 
 async function verifyToken(
@@ -300,14 +326,12 @@ async function verifyToken(
   try {
     result = await client.auth.getClaims(token)
   } catch (error) {
-    // `getClaims` throws, rather than returns, a token whose parts are
-    // base64url but not JSON.
-    if (error instanceof SyntaxError) {
-      throw new UnauthenticatedError("Unauthorized: invalid bearer token", {
-        cause: error,
-      })
-    }
-    throw error
+    // `getClaims` returns Auth's and the JWKS's failures, and throws only on
+    // the token itself: parts that are not JSON, an `alg` it cannot verify,
+    // a key that does not fit it.
+    throw new UnauthenticatedError("Unauthorized: invalid bearer token", {
+      cause: error,
+    })
   }
 
   if (result.error) {

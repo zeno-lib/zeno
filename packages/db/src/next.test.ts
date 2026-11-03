@@ -10,9 +10,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 import { FieldValidationError } from "./action-result.ts"
 import {
-  createDefineAction,
-  createDefineFormAction,
-  createDefineQuery,
+  type ActionContext,
+  createDefineAction as bindAction,
+  createDefineFormAction as bindFormAction,
+  createDefineQuery as bindQuery,
 } from "./define-action.ts"
 import {
   type BearerOptions,
@@ -74,6 +75,19 @@ function supabaseReturning(result: GetClaimsResult): () => ClaimsSource {
 beforeEach(() => {
   createSupabaseClientMock.mockClear()
 })
+
+// The builders with a read-only twin that changes nothing, for the tests that
+// are not about it.
+const asIs = <TContext>(context: TContext) => context
+const createDefineAction = <TContext extends ActionContext<unknown>>(
+  getContext: () => Promise<TContext>
+) => bindAction(getContext, asIs)
+const createDefineFormAction = <TContext extends ActionContext<unknown>>(
+  getContext: () => Promise<TContext>
+) => bindFormAction(getContext, asIs)
+const createDefineQuery = <TContext extends ActionContext<unknown>>(
+  getContext: () => Promise<TContext>
+) => bindQuery(getContext, asIs)
 
 describe("defineAction", () => {
   const schema = z.object({ id: z.number().int().positive() }).strict()
@@ -324,6 +338,27 @@ describe("createRequestDb", () => {
   })
 })
 
+describe("createRequestDb's read-only twin", () => {
+  it("builds a query's object form on a read-only client, and a write's on a writable one", async () => {
+    const { defineAction, defineQuery } = createRequestDb({
+      supabase: supabaseReturning(getClaimsResult(claims, null)),
+    })
+    const options = {
+      description: "Touch a row.",
+      name: "touch_row",
+      run: () => null,
+      schema: z.string(),
+    }
+
+    await defineQuery(options)("a")
+    expect(createSupabaseClientMock).toHaveBeenLastCalledWith(claims, {
+      readOnly: true,
+    })
+    await defineAction(options)("a")
+    expect(createSupabaseClientMock).toHaveBeenLastCalledWith(claims, {})
+  })
+})
+
 describe("the object form", () => {
   const schema = z.object({ id: z.number().int().positive() }).strict()
   const requestContext = { claims: { sub: "request-user" }, db: "request-db" }
@@ -418,6 +453,84 @@ describe("the object form", () => {
       error: { fieldErrors: { id: ["Taken"] }, formErrors: [] },
       ok: false,
     })
+  })
+
+  it("runs a query's object form, export and invoke, on the read-only twin", async () => {
+    const readOnly = vi.fn((context: typeof requestContext) => ({
+      ...context,
+      db: `read-only ${context.db}`,
+    }))
+    const define = bindQuery(() => Promise.resolve(requestContext), readOnly)
+    const query = define({
+      description: "Read one row.",
+      name: "get_row",
+      run: (db, input) => `${db}:${input.id}`,
+      schema,
+    })
+
+    await expect(query({ id: 1 })).resolves.toBe("read-only request-db:1")
+    await expect(
+      query.definition.invoke({ id: 2 }, requestContext)
+    ).resolves.toBe("read-only request-db:2")
+    await expect(
+      define(schema, (db, input) => `${db}:${input.id}`)({ id: 3 })
+    ).resolves.toBe("request-db:3")
+  })
+
+  it("describe parses the input, then reads the change on the read-only twin", async () => {
+    const describeChange = vi.fn((db: string, input: { id: number }) => ({
+      changes: [{ field: "status", from: "open", to: "closed" }],
+      entity: `${db} row ${input.id}`,
+    }))
+    const action = bindAction(
+      () => Promise.resolve(requestContext),
+      (context) => ({ ...context, db: "read-only-db" })
+    )({
+      describeChange,
+      description: "Close one row.",
+      name: "close_row",
+      run: () => null,
+      schema,
+    })
+
+    await expect(
+      action.definition.describe({ id: 4 }, requestContext)
+    ).resolves.toMatchObject({ entity: "read-only-db row 4" })
+    await expect(
+      action.definition.describe({ id: -1 }, requestContext)
+    ).rejects.toBeInstanceOf(z.ZodError)
+    expect(describeChange).toHaveBeenCalledTimes(1)
+  })
+
+  it("describe resolves to null for a write without describeChange", async () => {
+    const action = createDefineAction(() => Promise.resolve(requestContext))({
+      description: "Write one row.",
+      name: "write_row",
+      run: () => null,
+      schema,
+    })
+
+    await expect(
+      action.definition.describe({ id: 1 }, requestContext)
+    ).resolves.toBeNull()
+  })
+
+  it("a form action's describe throws a FieldValidationError for refused input", async () => {
+    const describeChange = vi.fn(() => ({ changes: [], entity: "row" }))
+    const action = createDefineFormAction(() =>
+      Promise.resolve(requestContext)
+    )({
+      describeChange,
+      description: "Write one row.",
+      name: "write_row",
+      run: () => null,
+      schema,
+    })
+
+    await expect(
+      action.definition.describe({ id: "one" }, requestContext)
+    ).rejects.toBeInstanceOf(FieldValidationError)
+    expect(describeChange).not.toHaveBeenCalled()
   })
 
   it.each(["list rows", "", "x".repeat(65), "liste_dossiers_é"])(
@@ -519,6 +632,10 @@ describe("getBearerContext", () => {
       result: getClaimsResult({ ...oauthClaims, sub: "" }, null),
     },
     {
+      name: "a role other than authenticated, which would run as anon",
+      result: getClaimsResult({ ...oauthClaims, role: "staff" }, null),
+    },
+    {
       name: "a token not issued to an OAuth client",
       result: getClaimsResult(claims, null),
     },
@@ -537,29 +654,62 @@ describe("getBearerContext", () => {
     expect(createSupabaseClientMock).not.toHaveBeenCalled()
   })
 
-  it("refuses a token whose parts are not JSON, which getClaims throws on", async () => {
+  it("refuses a client the lookup does not know, even as undefined", async () => {
+    const labels: Record<string, string> = { "client-2": "Agent" }
+    const { getBearerContext } = bearerDb({ client: (id) => labels[id] })
+
+    await expect(
+      getBearerContext(bearerRequest("Bearer token-1"))
+    ).rejects.toBeInstanceOf(UnauthenticatedError)
+    expect(createSupabaseClientMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    {
+      error: new SyntaxError("Unexpected token"),
+      name: "parts that are not JSON",
+    },
+    {
+      error: new TypeError("Cannot read properties of null"),
+      name: "a null header",
+    },
+    { error: new Error("Invalid alg claim"), name: "an alg it cannot verify" },
+  ])("refuses a token getClaims throws on: $name", async ({ error }) => {
     const source = {
-      auth: {
-        getClaims: () => Promise.reject(new SyntaxError("Unexpected token")),
-      },
+      auth: { getClaims: () => Promise.reject(error) },
     } as unknown as SessionSource
     const { getBearerContext } = bearerDb({ supabase: () => source })
 
     await expect(
-      getBearerContext(bearerRequest("Bearer e30.e30.e30"))
+      getBearerContext(bearerRequest("Bearer bnVsbA.e30.AA"))
     ).rejects.toBeInstanceOf(UnauthenticatedError)
   })
 
-  it("rethrows Auth being unreachable, which is not the token's fault", async () => {
-    const failure = new AuthRetryableFetchError("fetch failed", 0)
-    const { getBearerContext } = bearerDb({
-      supabase: sessionReturning(getClaimsResult(null, failure)).supabase,
-    })
+  it.each([
+    {
+      failure: new AuthRetryableFetchError("fetch failed", 0),
+      name: "unreachable",
+    },
+    {
+      failure: new AuthApiError(
+        "Too many requests",
+        429,
+        "over_request_rate_limit"
+      ),
+      name: "rate limiting",
+    },
+  ])(
+    "rethrows Auth $name, which is not the token's fault",
+    async ({ failure }) => {
+      const { getBearerContext } = bearerDb({
+        supabase: sessionReturning(getClaimsResult(null, failure)).supabase,
+      })
 
-    await expect(
-      getBearerContext(bearerRequest("Bearer token-1"))
-    ).rejects.toBe(failure)
-  })
+      await expect(
+        getBearerContext(bearerRequest("Bearer token-1"))
+      ).rejects.toBe(failure)
+    }
+  )
 
   it("with confirmSession, refuses a token whose session has ended", async () => {
     const { getUser, supabase } = sessionReturning(

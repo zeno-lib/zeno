@@ -42,8 +42,6 @@ This node holds what the code and the guide don't make obvious.
 - **Claims are set with `set_config(..., true)`** inside each transaction, so they reset at commit
   or rollback and never leak across requests. `app.via` must stay in that same prologue statement:
   set alone, it is its own transaction and is gone before the write it labels.
-- **`getBearerContext` authorizes on `client_id`, never `aud`.** Supabase's OAuth server keeps
-  `aud` at `authenticated` whatever `resource` the client asked for.
 - **A statement joins only an open `db.transaction` of its own handle.** The `AsyncLocalStorage` is
   per handle, so a handle that runs as someone else never joins. The scope closes only after the
   statements it started have settled: postgres-js returns the connection to the pool at commit, and
@@ -110,8 +108,6 @@ This node holds what the code and the guide don't make obvious.
 - **Never `close()` a `/next` handle.** It shares the reference-counted `rls` pool, so closing it per
   request forces a cold reconnect for everyone.
 - **`getRequestContext` memoises only inside a server render**, not across server actions.
-- **The object form's definition lives on a `definition` key.** A function's `name` is
-  read-only, so `Object.assign(action, { name })` throws.
 - **`defineAction` parses before it authenticates**, so a signed-out caller with a bad payload gets
   the schema error, not `UnauthenticatedError`.
 - **Next redacts a thrown server-action error in production.** That's why `defineFormAction` returns

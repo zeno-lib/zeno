@@ -2,7 +2,12 @@ import type { JwtPayload } from "@supabase/supabase-js"
 import { expectTypeOf, test } from "vitest"
 import { z } from "zod"
 import type { DrizzleClient } from "./clients.ts"
-import { type ActionError, type ActionResult, createRequestDb } from "./next.ts"
+import {
+  type ActionError,
+  type ActionResult,
+  type ChangeDescription,
+  createRequestDb,
+} from "./next.ts"
 
 const { defineAction, defineFormAction, defineQuery } = createRequestDb({
   supabase: () => ({
@@ -102,6 +107,9 @@ test("the object form types its handler from the schema and keeps the action's t
     Promise<number>
   >()
   expectTypeOf(action.definition.readOnly).toEqualTypeOf<false>()
+  expectTypeOf(action.definition.describe).returns.toEqualTypeOf<
+    Promise<ChangeDescription | null>
+  >()
 })
 
 test("a query's definition is read-only and has no describeChange", () => {
@@ -114,6 +122,7 @@ test("a query's definition is read-only and has no describeChange", () => {
 
   expectTypeOf(query.definition.readOnly).toEqualTypeOf<true>()
   expectTypeOf(query.definition).not.toHaveProperty("describeChange")
+  expectTypeOf(query.definition).not.toHaveProperty("describe")
 })
 
 test("the object form of defineFormAction resolves to an ActionResult", () => {

@@ -344,10 +344,17 @@ export const renamePostAction = defineAction({
   throws when the module loads.
 - `definition.readOnly` is `true` for a query and `false` for both write
   builders. A write always needs the user's approval, so there is no switch to
-  turn it off.
+  turn it off. A query's object form runs in a read-only transaction, export
+  and `invoke` alike, so a `run` that writes fails with Postgres's error instead
+  of slipping past the approval a host skips for it.
 - `describeChange(db, input, context)` is optional on writes. It reads, under
   the caller's RLS, what the write would change, so an approval step can show
-  the record and each field old → new instead of a tool name.
+  the record and each field old → new instead of a tool name. Call it through
+  `definition.describe(input, context)`, which parses the input as `invoke`
+  would, hands `describeChange` a read-only `db`, and resolves to `null` for a
+  write without one. A form action's `describe` throws a `FieldValidationError`
+  for input its schema refuses. Wrap several reads in `db.transaction` for one
+  snapshot.
 - `definition.invoke(input, context)` runs the definition for a context you pass
   in: parse, then `run`, then `undefined` → `null` (an `ActionResult` for a form
   action). Use it where the request has no cookie session, such as a bearer
@@ -378,7 +385,7 @@ export const { getBearerContext, withVia /* , … */ } = createRequestDb({
         { auth: { autoRefreshToken: false, persistSession: false } }
       ),
     // Your registered OAuth clients: client_id → the label writes carry.
-    client: async (clientId) => (await registeredClients()).get(clientId) ?? null,
+    client: async (clientId) => (await registeredClients()).get(clientId),
     confirmSession: true,
   },
 })
@@ -386,11 +393,12 @@ export const { getBearerContext, withVia /* , … */ } = createRequestDb({
 
 `getBearerContext` verifies the token with `auth.getClaims(token)` and returns
 `{ claims, db, via, clientId, token }`. It throws `UnauthenticatedError` for a
-missing or invalid token, a token with no `sub`, a token issued to no OAuth
-client (a browser session's own token), and a client `bearer.client` returns
-`null` for. Auth being unreachable rethrows as it is, so it is not mistaken for
-a bad token. It never falls back to `anon`, and it is not memoised: call it once
-per request.
+missing or invalid token, a token with no `sub` or a role other than
+`authenticated`, a token issued to no OAuth client (a browser session's own
+token), and a client `bearer.client` gives no label for (`null`, `undefined` or
+`''`). Auth being unreachable or rate-limiting (`429`) rethrows as it is, so it
+is not mistaken for a bad token. It never falls back to `anon`, and it is not
+memoised: call it once per request.
 
 - **Check `client_id`, not `aud`.** Supabase Auth's
   [OAuth server](https://supabase.com/docs/guides/auth/oauth-server) accepts a
@@ -398,7 +406,9 @@ per request.
 - **`confirmSession`** also asks Auth for the session (`auth.getUser(token)`) on
   every call. Revoking a grant ends its refresh token at once, but its last
   access token still passes `getClaims` until it expires. Without the option,
-  allow for up to the token's lifetime (one hour by default).
+  allow for up to the token's lifetime (one hour by default). On a project
+  still signing with the legacy HS256 secret, `getClaims` already asks Auth, so
+  the option costs a second round trip.
 
 ### Marking who acts for the user
 
@@ -431,7 +441,8 @@ When you already hold the verified, decoded claims (for example from a prior
 makes with
 `createSupabaseClient(accessToken, config?)`. Its `config` (and
 `createAuthClient`'s) also takes `via`, the
-[`app.via`](#marking-who-acts-for-the-user) label. It accepts a decoded
+[`app.via`](#marking-who-acts-for-the-user) label, and `readOnly`, which runs
+every transaction read-only. It accepts a decoded
 `SupabaseToken` (the `role` and `sub` claims), not a raw JWT string, and does not
 re-verify it:
 

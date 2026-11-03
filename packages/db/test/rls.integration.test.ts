@@ -299,6 +299,39 @@ describe("app.via", () => {
   })
 })
 
+describe("readOnly", () => {
+  const readOnlyDb = () =>
+    createSupabaseClient(token(USER_A), { readOnly: true, relations })
+
+  it("lets a read through and fails a write with Postgres's own error", async () => {
+    const db = readOnlyDb()
+
+    await expect(db.select().from(posts)).resolves.toBeInstanceOf(Array)
+    const error = await db
+      .update(posts)
+      .set({ title: "changed" })
+      .where(sql`false`)
+      .catch((caught: unknown) => caught)
+    expect(error).toHaveProperty("cause.code", "25006")
+  })
+
+  it("holds inside a transaction, and is gone for the next ones on the pool", async () => {
+    const readSetting = sql`select current_setting('transaction_read_only') as on`
+
+    const inside = await readOnlyDb().transaction(
+      async (tx) => (await tx.execute(readSetting))[0]
+    )
+    const later = await Promise.all(
+      Array.from({ length: 5 }, () => authClient(USER_A).execute(readSetting))
+    )
+
+    expect(inside).toEqual({ on: "on" })
+    expect(later.map((rows) => rows[0])).toEqual(
+      Array.from({ length: 5 }, () => ({ on: "off" }))
+    )
+  })
+})
+
 describe("getBearerContext (real Supabase tokens)", () => {
   const { getBearerContext } = createRequestDb({
     bearer: {
