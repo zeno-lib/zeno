@@ -19,6 +19,11 @@
           "type": "registry:component"
         },
         {
+          "path": "src/confirm/safe-next-path.ts",
+          "target": "@components/auth/confirm/safe-next-path.ts",
+          "type": "registry:component"
+        },
+        {
           "path": "src/layout.tsx",
           "target": "@components/auth/layout.tsx",
           "type": "registry:component"
@@ -29,6 +34,29 @@
         "sonner"
       ],
       "title": "Auth layout",
+      "type": "registry:block"
+    },
+    {
+      "dependencies": [
+        "@supabase/supabase-js",
+        "@zeno-lib/supabase",
+        "sonner"
+      ],
+      "description": "The apps a user allowed through your OAuth server, each with a Disconnect button.",
+      "files": [
+        {
+          "path": "src/connected-apps/index.tsx",
+          "target": "@components/auth/connected-apps/index.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "name": "connected-apps",
+      "registryDependencies": [
+        "alert-dialog",
+        "button",
+        "sonner"
+      ],
+      "title": "Connected apps",
       "type": "registry:block"
     },
     {
@@ -56,6 +84,11 @@
         {
           "path": "src/components/title.tsx",
           "target": "@components/auth/components/title.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/confirm/safe-next-path.ts",
+          "target": "@components/auth/confirm/safe-next-path.ts",
           "type": "registry:component"
         },
         {
@@ -108,6 +141,67 @@
     {
       "dependencies": [
         "@supabase/supabase-js",
+        "@zeno-lib/supabase",
+        "sonner"
+      ],
+      "description": "Admin list of your OAuth clients: register, rotate the secret, delete. Server actions behind an access check you fill in.",
+      "files": [
+        {
+          "path": "src/oauth-clients/access.ts",
+          "target": "@components/auth/oauth-clients/access.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/oauth-clients/actions.ts",
+          "target": "@components/auth/oauth-clients/actions.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/oauth-clients/index.tsx",
+          "target": "@components/auth/oauth-clients/index.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "name": "oauth-clients",
+      "registryDependencies": [
+        "alert-dialog",
+        "button",
+        "dialog",
+        "field",
+        "input",
+        "native-select",
+        "sonner",
+        "textarea"
+      ],
+      "title": "OAuth clients",
+      "type": "registry:block"
+    },
+    {
+      "dependencies": [
+        "@supabase/supabase-js",
+        "@zeno-lib/supabase",
+        "sonner"
+      ],
+      "description": "Consent screen for Supabase Auth's OAuth 2.1 server: sign in and back, then allow or deny an app.",
+      "files": [
+        {
+          "path": "src/oauth-consent/index.tsx",
+          "target": "@components/auth/oauth-consent/index.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "name": "oauth-consent",
+      "registryDependencies": [
+        "button",
+        "card",
+        "sonner"
+      ],
+      "title": "OAuth consent",
+      "type": "registry:block"
+    },
+    {
+      "dependencies": [
+        "@supabase/supabase-js",
         "sonner"
       ],
       "description": "Request a password recovery email.",
@@ -135,6 +229,11 @@
         {
           "path": "src/components/title.tsx",
           "target": "@components/auth/components/title.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/confirm/safe-next-path.ts",
+          "target": "@components/auth/confirm/safe-next-path.ts",
           "type": "registry:component"
         },
         {
@@ -186,6 +285,11 @@
           "type": "registry:component"
         },
         {
+          "path": "src/confirm/safe-next-path.ts",
+          "target": "@components/auth/confirm/safe-next-path.ts",
+          "type": "registry:component"
+        },
+        {
           "path": "src/reset-password/index.tsx",
           "target": "@components/auth/reset-password/index.tsx",
           "type": "registry:component"
@@ -231,6 +335,11 @@
         {
           "path": "src/components/title.tsx",
           "target": "@components/auth/components/title.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/confirm/safe-next-path.ts",
+          "target": "@components/auth/confirm/safe-next-path.ts",
           "type": "registry:component"
         },
         {
@@ -304,6 +413,11 @@
         {
           "path": "src/components/title.tsx",
           "target": "@components/auth/components/title.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "src/confirm/safe-next-path.ts",
+          "target": "@components/auth/confirm/safe-next-path.ts",
           "type": "registry:component"
         },
         {

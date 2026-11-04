@@ -404,6 +404,30 @@ const AUTH_FLOWS: BlockConfig[] = [
     title: "Sign out",
   },
   {
+    description:
+      "Consent screen for Supabase Auth's OAuth 2.1 server: sign in and back, then allow or deny an app.",
+    entry: "oauth-consent/index.tsx",
+    name: "oauth-consent",
+    targetPrefix: "auth",
+    title: "OAuth consent",
+  },
+  {
+    description:
+      "The apps a user allowed through your OAuth server, each with a Disconnect button.",
+    entry: "connected-apps/index.tsx",
+    name: "connected-apps",
+    targetPrefix: "auth",
+    title: "Connected apps",
+  },
+  {
+    description:
+      "Admin list of your OAuth clients: register, rotate the secret, delete. Server actions behind an access check you fill in.",
+    entry: "oauth-clients/index.tsx",
+    name: "oauth-clients",
+    targetPrefix: "auth",
+    title: "OAuth clients",
+  },
+  {
     description: "Auth layout shell + AuthProvider.",
     entry: "layout.tsx",
     name: "auth-layout",

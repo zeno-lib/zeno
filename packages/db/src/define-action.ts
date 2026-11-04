@@ -185,6 +185,16 @@ export type Defined<TFunction, TDefinition> = TFunction & {
 }
 
 /**
+ * A write definition built with a `describeChange`, typed as having one. A
+ * tool list that must show every change before it runs (`@zeno-lib/ai`)
+ * requires it.
+ */
+export type Described<TDefinition extends { describeChange?: unknown }> =
+  TDefinition & {
+    readonly describeChange: NonNullable<TDefinition["describeChange"]>
+  }
+
+/**
  * `defineAction(schema, handler)` returns the server action itself: an async
  * function that parses its argument, resolves the request context, then calls
  * `handler(db, input, context)`. A handler that resolves to `undefined`, such
@@ -200,6 +210,14 @@ export interface DefineAction<TContext extends ActionContext<unknown>> {
     schema: ActionSchema<TInput, TOutput>,
     handler: ActionHandler<TContext, TOutput, TResult>
   ): (input: TInput) => Promise<ActionValue<TResult>>
+  <TInput, TOutput, TResult>(
+    options: ActionOptions<TContext, TInput, TOutput, TResult> & {
+      describeChange: DescribeChange<TContext, TOutput>
+    }
+  ): Defined<
+    (input: TInput) => Promise<ActionValue<TResult>>,
+    Described<ActionDefinition<TContext, TInput, TOutput, TResult>>
+  >
   <TInput, TOutput, TResult>(
     options: ActionOptions<TContext, TInput, TOutput, TResult>
   ): Defined<
@@ -421,6 +439,14 @@ export interface DefineFormAction<TContext extends ActionContext<unknown>> {
     schema: FormActionSchema<TInput, TOutput>,
     handler: ActionHandler<TContext, TOutput, TResult>
   ): (input: TInput) => Promise<ActionResult<Awaited<TResult>>>
+  <TInput, TOutput, TResult>(
+    options: FormActionOptions<TContext, TInput, TOutput, TResult> & {
+      describeChange: DescribeChange<TContext, TOutput>
+    }
+  ): Defined<
+    (input: TInput) => Promise<ActionResult<Awaited<TResult>>>,
+    Described<FormActionDefinition<TContext, TInput, TOutput, TResult>>
+  >
   <TInput, TOutput, TResult>(
     options: FormActionOptions<TContext, TInput, TOutput, TResult>
   ): Defined<

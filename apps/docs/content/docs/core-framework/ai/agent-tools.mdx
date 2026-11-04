@@ -1,0 +1,89 @@
+---
+title: Agent tools
+description: The tool list, reads sized for a model, and approvals that show the change
+icon: Wrench
+---
+
+An agent tool is an object-form export of `defineQuery`, `defineAction` or `defineFormAction`.
+[Reads and actions an agent can call](/docs/core-framework/data-management/database/querying#reads-and-actions-an-agent-can-call)
+covers the definitions themselves; this page covers turning them into a tool list.
+
+## The tool list
+
+Keep one list per app, next to your query map, and add a definition to it on purpose:
+
+```typescript title="app/agent-tools.ts"
+import { listPostsForAgentQuery } from "@/app/posts/agent-reads"
+import { renamePostAction } from "@/app/posts/actions"
+
+// The MCP route serves reads only, so keep them in a list of their own.
+export const agentReads = [listPostsForAgentQuery]
+export const agentTools = [...agentReads, renamePostAction]
+```
+
+The list is checked when an adapter is built from it, and the adapter throws when:
+
+- an entry is a positional export, which has no definition;
+- two entries share a name;
+- a write has no `describeChange` (this one also fails to type-check);
+- a schema can't describe itself as JSON Schema (use Zod 4.2 or later).
+
+## Reads sized for a model
+
+A screen's read returns what the screen draws: every column, every relation, every row. A model pays
+for each token of it and reads it less well. Give an agent its own thin read over the same tables:
+
+- **A limit**, small by default, with a maximum the schema enforces.
+- **Filters** the model can fill from a question ("my drafts"), described in the
+  schema with `.describe()`.
+- **Trimmed columns**: names, states and dates, not every relation. Add a second tool for the detail
+  of one record.
+
+```typescript title="app/posts/agent-reads.ts"
+export const listPostsForAgentQuery = defineQuery({
+  name: "list_posts",
+  description: "List the caller's posts, newest first. 20 by default, at most 50.",
+  schema: z.object({
+    status: z.enum(["draft", "published"]).optional().describe("Only posts in this state"),
+    limit: z.number().int().min(1).max(50).default(20),
+  }),
+  run: (db, { status, limit }) =>
+    db.query.posts.findMany({
+      columns: { id: true, status: true, title: true, updatedAt: true },
+      where: status ? { status } : undefined,
+      orderBy: { updatedAt: "desc" },
+      limit,
+    }),
+})
+```
+
+## Approvals that show the change
+
+Every write needs a `describeChange`: it reads, under the user's row level security, what the write
+is about to change. The approval shows it, formatted by `formatChange` from `@zeno-lib/ai`:
+
+```text
+Post 12 (Launch notes)
+title: "Draft" → "Launch notes"
+status: "draft" → "published"
+```
+
+- **Name the record the way the user knows it** in `entity`: a reference and a label, not a bare id.
+- **List every field the write moves**, with its current value as `from`. A field the write creates
+  has `from: null`, which shows as `(empty)`.
+- **Read in one snapshot** when you read more than once: wrap the reads in `db.transaction`.
+- When `describeChange` throws (the record isn't visible to the user, say), the call is denied with
+  the error as its reason. The user is never asked to approve a change nobody could read.
+
+`formatChange` quotes text values and escapes their newlines, so text stored in your data can't add
+a line that looks like another change.
+
+## What the model reads back
+
+- A read's result, as JSON.
+- A form action's `{ ok: false, error }`, as data, so the model can correct its input.
+- A thrown error, as a tool error carrying its message. That includes a database error's text, which
+  the model needs to recover; don't put anything in an error message the user may not see.
+
+The adapters validate the model's input with your schema before anything runs, so input the schema
+refuses never reaches an approval. Your definition then parses it once, as the export would.

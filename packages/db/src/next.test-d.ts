@@ -112,6 +112,29 @@ test("the object form types its handler from the schema and keeps the action's t
   >()
 })
 
+test("a write's definition has describeChange only when it was given", () => {
+  const described = defineAction({
+    describeChange: () => ({ changes: [], entity: "Row" }),
+    description: "Save a row.",
+    name: "save_row",
+    run: (_db, input) => input,
+    schema: z.number(),
+  })
+  const undescribed = defineFormAction({
+    description: "Save a row.",
+    name: "save_row",
+    run: (_db, input) => input,
+    schema: z.number(),
+  })
+
+  expectTypeOf<undefined>().not.toExtend<
+    typeof described.definition.describeChange
+  >()
+  expectTypeOf<undefined>().toExtend<
+    typeof undescribed.definition.describeChange
+  >()
+})
+
 test("a query's definition is read-only and has no describeChange", () => {
   const query = defineQuery({
     description: "Read a row.",

@@ -1,0 +1,150 @@
+---
+title: MCP server
+description: Serve your agent tools to MCP clients such as Claude, behind Supabase Auth's OAuth 2.1 server
+icon: Plug
+---
+
+An MCP client the user brings (Claude, for one) connects to your app's `/mcp` route. The user signs
+in to your app once, approves the client on your consent page, and from then on the client calls
+your tools with an access token that Supabase Auth issued for that user. Every call runs as the user,
+under row level security.
+
+```text
+client → /mcp ── 401, WWW-Authenticate ──→ /.well-known/oauth-protected-resource/mcp
+       → Supabase Auth's OAuth server → your /oauth/consent page → access token
+       → /mcp with Authorization: Bearer → getBearerContext → your tools, as the user
+```
+
+<Callout type="warn">
+  `createMcpRoute` serves **reads only** for now. An MCP client asks before each tool call, but its
+  prompt names the tool, not the change, so a write would run without the user seeing what it
+  changes. The route refuses a write tool until that is solved.
+</Callout>
+
+## Turn on the OAuth server
+
+Supabase Auth's [OAuth 2.1 server](https://supabase.com/docs/guides/auth/oauth-server) issues the
+tokens. Turn it on locally in `supabase/config.toml` (recent CLI versions already have the section,
+with `enabled = false`: edit it rather than adding a second one):
+
+```toml title="supabase/config.toml"
+[auth.oauth_server]
+enabled = true
+authorization_url_path = "/oauth/consent"
+allow_dynamic_registration = false
+```
+
+On a hosted project, set the same under **Authentication** > **OAuth Server**. The consent page lives
+at your Site URL plus that path. Keep dynamic registration off: you register each client yourself,
+below, and the bearer context refuses any other.
+
+## The consent page
+
+```npm
+pnpm dlx shadcn@latest add zeno-lib/zeno/oauth-consent
+```
+
+```tsx title="app/oauth/consent/page.tsx"
+import { OAuthConsent } from "@/components/auth/oauth-consent"
+
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ authorization_id?: string }>
+}) {
+  const { authorization_id } = await searchParams
+  return (
+    <main className="flex min-h-svh items-center justify-center p-6">
+      <OAuthConsent authorizationId={authorization_id} productName="Acme" />
+    </main>
+  )
+}
+```
+
+It shows the app, where it returns, the signed-in account and the scopes, then approves or denies.
+An app the user already approved goes straight back to it.
+
+- **Add `/oauth/consent` to the middleware's `publicPaths`.** A signed-out user must reach the page,
+  which sends them to `/sign-in?next=…` itself. The middleware's own redirect would drop the request.
+- **The sign-in flows return to `next`** when it is a path on your app. For a magic link, add the
+  page to your Redirect URLs (`https://app.example.com/**`), and have the Magic Link email template
+  pass `{{ .RedirectTo }}` on as `next`:
+
+  ```html
+  <a href="{{ .SiteURL }}/verify?token_hash={{ .TokenHash }}&type=magiclink&next={{ .RedirectTo }}">
+  ```
+
+## Register the clients
+
+Each MCP client gets an OAuth client of its own, which you register in your app:
+
+```npm
+pnpm dlx shadcn@latest add zeno-lib/zeno/oauth-clients zeno-lib/zeno/connected-apps
+```
+
+- **`OAuthClients`**, for admins: register a client, rotate its secret, delete it. It runs server
+  actions with the secret key, so `canManageOAuthClients` in
+  `components/auth/oauth-clients/access.ts` refuses everyone until you fill it in from the caller's
+  claims. The secret is shown once.
+- **`ConnectedApps`**, for every user: the apps they approved, each with a Disconnect button.
+
+Pick how the client sends its secret to match it, or its token request fails. Claude's custom
+connectors send it in the request body: register them with `client_secret_post`. A connector's
+client can't be edited from Claude, only replaced, so a new secret means updating the connector.
+
+## The bearer context
+
+The `/mcp` route resolves its caller from the token with `getBearerContext`, from
+[`createRequestDb`'s `bearer` option](/docs/core-framework/data-management/database/querying#callers-with-a-bearer-token).
+Its `client` callback is your allowlist: map each registered client to the label its calls carry
+(`app.via`), from `auth.admin.oauth.listClients()`, cached:
+
+```typescript
+client: async (clientId) => (await registeredClients()).get(clientId), // "Claude"
+```
+
+Disconnecting an app ends its refresh token at once, but its last access token keeps working until it
+expires (an hour by default). Set `confirmSession: true` to check the session on every call instead.
+
+## The `/mcp` route
+
+```typescript title="app/mcp/route.ts"
+import { createMcpRoute } from "@zeno-lib/ai/mcp"
+import { getOAuthProtectedResourceMetadataUrl } from "@modelcontextprotocol/server"
+import { agentReads } from "@/app/agent-tools"
+import { getBearerContext } from "@/lib/server-db"
+
+export const { GET, POST, DELETE } = createMcpRoute({
+  name: "acme",
+  version: "1.0.0",
+  tools: agentReads,
+  getContext: getBearerContext,
+  resourceMetadataUrl: () =>
+    getOAuthProtectedResourceMetadataUrl(new URL(process.env.MCP_URL!)),
+})
+```
+
+- `MCP_URL` is the route's public URL (`https://app.example.com/mcp`), from config: behind a proxy,
+  or called on `127.0.0.1`, `request.url` names a host clients can't use.
+- Every request needs a token. Without a valid one, the route answers 401 with a
+  `WWW-Authenticate` header that points at the metadata below.
+- The route is stateless: each request gets a fresh MCP server. It answers the 2026-07-28 revision
+  and the 2025-era `initialize` handshake clients fall back to.
+- `setup(server, context)` runs on each request's server after the tools are registered, to add a
+  resource or a tool of your own.
+
+The metadata tells the client which authorization server issues tokens for this resource. Serve it
+at the RFC 9728 path with `@supabase/server` (`pnpm add @supabase/server`):
+
+```typescript title="app/.well-known/oauth-protected-resource/mcp/route.ts"
+import { resourceMetadataResponse } from "@supabase/server/oauth-protected-resource"
+
+export const GET = (request: Request) =>
+  resourceMetadataResponse(request, {
+    resource: process.env.MCP_URL!,
+    authorizationServers: [`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1`],
+  })
+```
+
+Add `/mcp` and `/.well-known/oauth-protected-resource` to the middleware's `publicPaths`: both do
+their own bearer auth, and a redirect to sign-in would break the client.

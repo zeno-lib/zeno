@@ -2,6 +2,7 @@ import type { EmailOtpType } from "@supabase/supabase-js"
 import { createClient } from "@zeno-lib/supabase/next-server"
 import { redirect } from "next/navigation"
 import type { NextRequest } from "next/server"
+import { safeNextPath } from "./safe-next-path"
 
 const defaultNexts: Record<EmailOtpType, string> = {
   email: "/",
@@ -13,10 +14,15 @@ const defaultNexts: Record<EmailOtpType, string> = {
 }
 
 export async function getRoute(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
+  const { origin, searchParams } = new URL(request.url)
   const token_hash = searchParams.get("token_hash")
   const type = searchParams.get("type") as EmailOtpType | null
-  const next = searchParams.get("next") ?? (type && defaultNexts[type]) ?? "/"
+  // Only a path on this app: a `next` that leaves it would make the link an
+  // open redirect, signed in.
+  const next =
+    safeNextPath(searchParams.get("next"), origin) ??
+    (type && defaultNexts[type]) ??
+    "/"
 
   if (token_hash && type) {
     const supabase = await createClient()

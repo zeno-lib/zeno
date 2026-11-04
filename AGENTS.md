@@ -20,6 +20,7 @@ it and the root.** How to use each package is documented for users in the docs a
   - [`supabase/`](packages/supabase/AGENTS.md): `@zeno-lib/supabase`, the SSR clients and middleware
   - [`query/`](packages/query/AGENTS.md): `@zeno-lib/query`, the suspense and SSR prefetch boundaries and timing presets
   - [`db/`](packages/db/AGENTS.md): `@zeno-lib/db`, Drizzle clients, schema helpers, the config preset and RLS
+  - [`ai/`](packages/ai/AGENTS.md): `@zeno-lib/ai`, definitions as AI SDK tools and an MCP endpoint
   - [`e2e/`](packages/e2e/AGENTS.md): `@zeno-lib/e2e`, the Playwright preset, dependency verifier and API sign-in
   - [`test/`](packages/test/AGENTS.md): `@zeno-lib/test`, the Vitest presets and the Supabase RLS test harness
   - `typescript/`: shared `tsconfig` presets, with no node
@@ -40,7 +41,8 @@ npm.**
 - **Primitives** come from **shadcn directly**; Zeno does not re-publish them. `@zeno-lib/ui` is a
   private workspace mirror for internal use and tests, and the alias target the registry-source
   packages resolve `@/components/ui/*` / `@/lib/utils` to (via tsconfig `paths`).
-- **Registry** (`shadcn add zeno-lib/zeno/<item>`): the `theme`, the auth flows, the forms field kit
+- **Registry** (`shadcn add zeno-lib/zeno/<item>`): the `theme`, the auth flows (with the OAuth
+  `oauth-consent`, `connected-apps` and `oauth-clients`), the forms field kit
   and `create-form`, `form-dialog`, and `query-error-fallback`. Their source under `packages/*/src/**`
   is written in the shadcn consumer dialect (`@/components/ui/*`, `@/lib/utils`,
   `@zeno-lib/forms/lib/*`, `sonner`) and served **verbatim** from `src/`. `pnpm registry:build`
@@ -49,7 +51,7 @@ npm.**
 - **npm**: `@zeno-lib/supabase`, `@zeno-lib/test`, `@zeno-lib/e2e`, `@zeno-lib/authentication`
   (`confirm` only), `@zeno-lib/forms` (headless factory and `lib/*`; `./create-form` and
   `./form-dialog` are opt-in entries), `@zeno-lib/query` (its error fallback is the registry item),
-  `@zeno-lib/db` and `@zeno-lib/schema`.
+  `@zeno-lib/db`, `@zeno-lib/schema` and `@zeno-lib/ai`.
 
 **Never commit `dist/`.** Every compiled npm package gitignores it and builds it in `prepack`, which
 `changeset publish` and `pnpm pack` both run. In the workspace, Turbo's `dev`, `test:watch`,

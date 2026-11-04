@@ -1,8 +1,9 @@
 # `@zeno-lib/authentication`
 
-Supabase auth flows. The UI flows ship through the shadcn registry (`shadcn add
-zeno-lib/zeno/sign-in`, …) and drop into `@/components/auth/*`; only the server-side `confirm`
-handler is on npm, so `exports` and `files` cover `src/confirm` alone. The user guide is in
+Supabase auth flows, plus the consent and connected-apps screens of Supabase Auth's OAuth server.
+The UI flows ship through the shadcn registry (`shadcn add zeno-lib/zeno/sign-in`, …) and drop into
+`@/components/auth/*`; only the server-side `confirm` handler is on npm, so `exports` and `files`
+cover `src/confirm` alone. The user guide is in
 [`user-management/authentication`](../../apps/docs/content/docs/core-framework/user-management/authentication.mdx).
 
 ## The email-prefetch guard
@@ -29,6 +30,13 @@ rationale is in the docstring at the top of `src/verify/index.tsx`.
   `<Toaster />`.
 - **The flows push to `/email-sent` and `/confirm?token_hash=…&type=…`.** There is no route map, so
   consuming apps mount exactly those paths.
+- **Every `next` goes through `safeNextPath` (`src/confirm/safe-next-path.ts`)**: the sign-in flows
+  and `confirm` alike. An unchecked `next` makes a signed-in link an open redirect. It lives under
+  `src/confirm/` because only that folder ships on npm.
+- **`oauth-clients/access.ts` refuses everyone by default.** Its actions use the secret key, and each
+  is a public endpoint, so the shipped `canManageOAuthClients` stays `false` until the app fills it in.
+- **The OAuth admin actions return their failures** (`{ ok: false, error }`): Next redacts a thrown
+  server action error in production, and Auth's message is the one the admin needs.
 - **A new `AuthView` needs a `case` in `AuthProvider`'s submit `switch`.** Sign-up submission is
   deliberately not wired there (see the comment at the bottom of `context.tsx`).
 

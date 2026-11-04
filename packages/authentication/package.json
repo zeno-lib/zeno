@@ -12,6 +12,7 @@
     "src/confirm"
   ],
   "scripts": {
+    "test": "vitest --run",
     "types:check": "tsc --noEmit"
   },
   "dependencies": {
@@ -21,9 +22,13 @@
     "@types/node": "26.6.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
     "@zeno-lib/ui": "workspace:^",
-    "sonner": "^2.0.8"
+    "sonner": "^2.0.8",
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "zod": "^4.6.7"
   },
   "peerDependencies": {
     "@supabase/supabase-js": ">=2",

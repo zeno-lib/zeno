@@ -12,6 +12,7 @@ import {
   useState,
 } from "react"
 import { toast } from "sonner"
+import { safeNextPath } from "../confirm/safe-next-path"
 
 // Helper function to safely get origin
 const getBaseUrl = () => {
@@ -25,6 +26,19 @@ const getBaseUrl = () => {
   // Using NEXT_PUBLIC_SITE_URL environment variable is a common pattern
   return process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
 }
+
+/**
+ * Where to go after signing in: the `next` query parameter of the current page,
+ * when it is a path on this app (the OAuth consent page sends a signed-out user
+ * to `/sign-in?next=…`).
+ */
+const getNextPath = () =>
+  typeof globalThis.location === "undefined"
+    ? null
+    : safeNextPath(
+        new URLSearchParams(globalThis.location.search).get("next"),
+        globalThis.location.origin
+      )
 
 export type AuthView =
   | "recover-password"
@@ -91,7 +105,8 @@ async function submitResetPassword(
 async function submitSignInPassword(
   supabase: SupabaseClient,
   email: string,
-  password: string
+  password: string,
+  router: ReturnType<typeof useRouter>
 ): Promise<void> {
   const { error } = await supabase.auth.signInWithPassword({
     email,
@@ -99,6 +114,11 @@ async function submitSignInPassword(
   })
   if (error) {
     toast.error(error.message)
+    return
+  }
+  const next = getNextPath()
+  if (next) {
+    router.push(next)
   }
 }
 
@@ -108,10 +128,12 @@ async function submitSignInMagicLink(
   redirectTo: string,
   router: ReturnType<typeof useRouter>
 ): Promise<void> {
+  // The email's `{{ .RedirectTo }}`, which the template passes on as `next`.
+  const next = getNextPath()
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: redirectTo,
+      emailRedirectTo: next ? new URL(next, redirectTo).toString() : redirectTo,
       shouldCreateUser: false,
     },
   })
@@ -173,7 +195,7 @@ export const AuthProvider = ({
             await submitResetPassword(supabase, password, router)
             break
           case "sign-in-password":
-            await submitSignInPassword(supabase, email, password)
+            await submitSignInPassword(supabase, email, password, router)
             break
           case "sign-in-magic-link":
             await submitSignInMagicLink(supabase, email, redirectTo, router)
