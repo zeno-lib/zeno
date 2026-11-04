@@ -10,6 +10,7 @@ import {
   createSupabaseClient,
   type SupabaseToken,
 } from "../src/index"
+import { createRequestDb, UnauthenticatedError } from "../src/next"
 // biome-ignore lint/performance/noNamespaceImport: drizzle schema needs every table
 import * as schema from "./schema"
 import { posts } from "./schema"
@@ -252,6 +253,129 @@ describe("db.transaction (multi-statement)", () => {
     // Both statements observed the same authenticated, sub-bearing context.
     expect(result.role).toEqual({ role: "authenticated" })
     expect(result.uid).toEqual({ uid: USER_A })
+  })
+})
+
+describe("app.via", () => {
+  const readVia = sql`select current_setting('app.via', true) as via`
+
+  it("is set on every statement of a transaction of a client built with it", async () => {
+    const db = createSupabaseClient(token(USER_A), { relations, via: "Agent" })
+
+    const [single] = await db.execute(readVia)
+    const both = await db.transaction(async (tx) => [
+      (await tx.execute(readVia))[0],
+      (await db.execute(readVia))[0],
+    ])
+
+    expect(single).toEqual({ via: "Agent" })
+    expect(both).toEqual([{ via: "Agent" }, { via: "Agent" }])
+  })
+
+  it("is gone for the next transactions on the same pool", async () => {
+    await createSupabaseClient(token(USER_A), {
+      relations,
+      via: "Agent",
+    }).execute(readVia)
+
+    const later = await Promise.all(
+      Array.from({ length: 5 }, () => authClient(USER_A).execute(readVia))
+    )
+
+    expect(later.map((rows) => rows[0])).toEqual(
+      Array.from({ length: 5 }, () => ({ via: "" }))
+    )
+  })
+
+  it("is not visible to a write when set in a separate statement", async () => {
+    const db = authClient(USER_A)
+
+    // Each awaited statement is its own transaction, so the value is reset at
+    // its commit, before the next one runs.
+    await db.execute(sql`select set_config('app.via', 'Agent', true)`)
+    const [after] = await db.execute(readVia)
+
+    expect(after).toEqual({ via: "" })
+  })
+})
+
+describe("readOnly", () => {
+  const readOnlyDb = () =>
+    createSupabaseClient(token(USER_A), { readOnly: true, relations })
+
+  it("lets a read through and fails a write with Postgres's own error", async () => {
+    const db = readOnlyDb()
+
+    await expect(db.select().from(posts)).resolves.toBeInstanceOf(Array)
+    const error = await db
+      .update(posts)
+      .set({ title: "changed" })
+      .where(sql`false`)
+      .catch((caught: unknown) => caught)
+    expect(error).toHaveProperty("cause.code", "25006")
+  })
+
+  it("holds inside a transaction, and is gone for the next ones on the pool", async () => {
+    const readSetting = sql`select current_setting('transaction_read_only') as on`
+
+    const inside = await readOnlyDb().transaction(
+      async (tx) => (await tx.execute(readSetting))[0]
+    )
+    const later = await Promise.all(
+      Array.from({ length: 5 }, () => authClient(USER_A).execute(readSetting))
+    )
+
+    expect(inside).toEqual({ on: "on" })
+    expect(later.map((rows) => rows[0])).toEqual(
+      Array.from({ length: 5 }, () => ({ on: "off" }))
+    )
+  })
+})
+
+describe("getBearerContext (real Supabase tokens)", () => {
+  const { getBearerContext } = createRequestDb({
+    bearer: {
+      client: () => "Agent",
+      supabase: () => createClient(API_URL, ANON_KEY, clientOptions),
+    },
+    relations,
+    supabase: () => createClient(API_URL, ANON_KEY, clientOptions),
+  })
+
+  async function accessToken(): Promise<string> {
+    const user = await harness.createUser()
+    const client = createClient(API_URL, ANON_KEY, clientOptions)
+    const { data, error } = await client.auth.signInWithPassword(user)
+    if (error) {
+      throw error
+    }
+    return data.session.access_token
+  }
+
+  const request = (bearer: string) =>
+    new Request("http://127.0.0.1/mcp", {
+      headers: { authorization: `Bearer ${bearer}` },
+    })
+
+  it("refuses a first-party session token, which carries no client_id", async () => {
+    const error = await getBearerContext(request(await accessToken())).catch(
+      (caught: unknown) => caught
+    )
+
+    expect(error).toBeInstanceOf(UnauthenticatedError)
+    expect(error).toHaveProperty(
+      "message",
+      "Unauthorized: the token was not issued to an OAuth client"
+    )
+  })
+
+  it("refuses a token whose signature was tampered with", async () => {
+    const [header, payload] = (await accessToken()).split(".")
+    const forged = `${header}.${payload}.${"A".repeat(43)}`
+
+    await expect(getBearerContext(request(forged))).rejects.toBeInstanceOf(
+      UnauthenticatedError
+    )
   })
 })
 

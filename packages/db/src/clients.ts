@@ -30,6 +30,25 @@ export type CreateClientConfig<
   requirePooler?: boolean
 }
 
+/**
+ * `CreateClientConfig` for a client that runs as a user, plus the `app.via`
+ * marker its transactions carry and whether they may write.
+ */
+export type RlsClientConfig<TRelations extends AnyRelations = EmptyRelations> =
+  CreateClientConfig<TRelations> & {
+    /**
+     * Who acts for the user ("Claude", "AI assistant"). Every transaction sets
+     * it as `app.via` in the same statement as the claims, so a trigger reads
+     * `nullif(current_setting('app.via', true), '')`. Unset, it is `''`.
+     */
+    via?: string
+    /**
+     * Runs every transaction read-only (`transaction_read_only`), so a write
+     * fails with Postgres's own error. Default `false`.
+     */
+    readOnly?: boolean
+  }
+
 export type ResolveDatabaseUrlOptions = Pick<
   CreateClientConfig,
   "connectionString" | "requirePooler"
@@ -181,18 +200,25 @@ function buildDrizzle<TRelations extends AnyRelations>(
 // before each transaction opens (so `createAuthClient` re-checks the live
 // session for each one), then installed transaction-locally with
 // `set_config(..., true)`, which auto-resets at commit. The role goes through
-// `set_config('role', ...)`, which is what `set local role` does, so claims and
-// role cost one round trip, and the role is a bound parameter.
+// `set_config('role', ...)`, which is what `set local role` does, so claims,
+// via and role cost one round trip, and the role is a bound parameter. `app.via`
+// must stay in this statement: a separate one is its own transaction, and the
+// value is gone before the write it labels. Turning a transaction read-only
+// is allowed after its first query; only the way back is not.
 function buildRlsClient<TRelations extends AnyRelations>(
   resolveContext: () => Promise<RlsContext>,
-  config?: CreateClientConfig<TRelations>
+  config?: RlsClientConfig<TRelations>
 ): DrizzleClient<TRelations> {
-  const { close, db } = buildDrizzle("rls", config)
+  const { readOnly = false, via = "", ...clientConfig } = config ?? {}
+  const readOnlyClause = readOnly
+    ? sql`, set_config('transaction_read_only', 'on', true)`
+    : sql``
+  const { close, db } = buildDrizzle("rls", clientConfig)
   const runTransaction = async (transaction: (tx: unknown) => unknown) => {
     const { claims, role, sub } = await resolveContext()
     return db.transaction(async (tx) => {
       await tx.execute(
-        sql`select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true), set_config('role', ${role}, true)`
+        sql`select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true), set_config('app.via', ${via}, true), set_config('role', ${role}, true)${readOnlyClause}`
       )
       return transaction(tx)
     })
@@ -223,7 +249,7 @@ export function createSupabaseClient<
   TRelations extends AnyRelations = EmptyRelations,
 >(
   accessToken: SupabaseToken,
-  config?: CreateClientConfig<TRelations>
+  config?: RlsClientConfig<TRelations>
 ): DrizzleClient<TRelations> {
   const context = clampClaims(accessToken)
   return buildRlsClient(() => Promise.resolve(context), config)
@@ -238,7 +264,7 @@ export function createAuthClient<
   TRelations extends AnyRelations = EmptyRelations,
 >(
   supabase: SupabaseClient,
-  config?: CreateClientConfig<TRelations>
+  config?: RlsClientConfig<TRelations>
 ): DrizzleClient<TRelations> {
   return buildRlsClient(async () => {
     const { data, error } = await supabase.auth.getClaims()

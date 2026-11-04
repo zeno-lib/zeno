@@ -2,9 +2,14 @@ import type { JwtPayload } from "@supabase/supabase-js"
 import { expectTypeOf, test } from "vitest"
 import { z } from "zod"
 import type { DrizzleClient } from "./clients.ts"
-import { type ActionError, type ActionResult, createRequestDb } from "./next.ts"
+import {
+  type ActionError,
+  type ActionResult,
+  type ChangeDescription,
+  createRequestDb,
+} from "./next.ts"
 
-const { defineAction, defineFormAction } = createRequestDb({
+const { defineAction, defineFormAction, defineQuery } = createRequestDb({
   supabase: () => ({
     auth: {
       getClaims: () => Promise.resolve({ data: null, error: null }),
@@ -73,4 +78,69 @@ test("an ActionResult narrows on ok", async () => {
       Record<string, string[]>
     >()
   }
+})
+
+test("the object form types its handler from the schema and keeps the action's types", () => {
+  const schema = z.object({ id: z.string().transform(Number) })
+  const action = defineAction({
+    describeChange: (_db, input) => {
+      expectTypeOf(input).toEqualTypeOf<{ id: number }>()
+      return {
+        changes: [{ field: "id", from: null, to: input.id }],
+        entity: "Row",
+      }
+    },
+    description: "Save a row.",
+    name: "save_row",
+    run: (db, input, context) => {
+      expectTypeOf(db).toEqualTypeOf<DrizzleClient>()
+      expectTypeOf(input).toEqualTypeOf<{ id: number }>()
+      expectTypeOf(context.via).toEqualTypeOf<string | null>()
+      return Promise.resolve(input.id)
+    },
+    schema,
+  })
+
+  expectTypeOf(action).parameter(0).toEqualTypeOf<{ id: string }>()
+  expectTypeOf(action).returns.toEqualTypeOf<Promise<number>>()
+  expectTypeOf(action.definition.invoke).returns.toEqualTypeOf<
+    Promise<number>
+  >()
+  expectTypeOf(action.definition.readOnly).toEqualTypeOf<false>()
+  expectTypeOf(action.definition.describe).returns.toEqualTypeOf<
+    Promise<ChangeDescription | null>
+  >()
+})
+
+test("a query's definition is read-only and has no describeChange", () => {
+  const query = defineQuery({
+    description: "Read a row.",
+    name: "get_row",
+    run: (_db, input) => input,
+    schema: z.number(),
+  })
+
+  expectTypeOf(query.definition.readOnly).toEqualTypeOf<true>()
+  expectTypeOf(query.definition).not.toHaveProperty("describeChange")
+  expectTypeOf(query.definition).not.toHaveProperty("describe")
+})
+
+test("the object form of defineFormAction resolves to an ActionResult", () => {
+  const action = defineFormAction({
+    description: "Save a row.",
+    name: "save_row",
+    run: (_db, input) => ({ saved: input }),
+    schema: z.number(),
+  })
+
+  expectTypeOf(action.definition.invoke).returns.toEqualTypeOf<
+    Promise<ActionResult<{ saved: number }>>
+  >()
+})
+
+test("a positional action carries no definition", () => {
+  const action = defineAction(z.number(), (_db, input) => input)
+
+  // @ts-expect-error: only the object form has one
+  expectTypeOf(action.definition).toBeUnknown()
 })
