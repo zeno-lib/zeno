@@ -347,7 +347,9 @@ export const renamePostAction = defineAction({
   turn it off. A query's object form runs in a read-only transaction, export
   and `invoke` alike, so a `run` that writes fails with Postgres's error instead
   of slipping past the approval a host skips for it.
-- `describeChange(db, input, context)` is optional on writes. It reads, under
+- `describeChange(db, input, context)` is optional on writes, but an
+  [agent tool list](/docs/core-framework/ai/agent-tools) requires it: a write
+  given one has it in its definition's type. It reads, under
   the caller's RLS, what the write would change, so an approval step can show
   the record and each field old → new instead of a tool name. Call it through
   `definition.describe(input, context)`, which parses the input as `invoke`
@@ -363,6 +365,9 @@ export const renamePostAction = defineAction({
 
 The definition sits on its own key because a function's `name` is read-only. It
 survives `"use server"` for the server code that imports the export.
+
+[AI & agents](/docs/core-framework/ai) turns a list of these into AI SDK tools
+and an MCP endpoint.
 
 ### Callers with a bearer token
 

@@ -20,7 +20,8 @@ pnpm dlx shadcn@latest add zeno-lib/zeno/sign-in zeno-lib/zeno/auth-layout
 ```
 
 Other flows: `sign-up`, `email-sent`, `verify`, `error`, `recover-password`, `reset-password`,
-`sign-out`. Then install the server handler and the Supabase client:
+`sign-out`. For Supabase Auth's OAuth server, `oauth-consent`, `connected-apps` and `oauth-clients`
+are covered in [MCP server](/docs/core-framework/ai/mcp-server). Then install the server handler and the Supabase client:
 
 ```npm
 pnpm add @zeno-lib/authentication @zeno-lib/supabase
@@ -75,6 +76,9 @@ The flows navigate to hard-coded paths, so mount these routes (or wire your own 
 - The verify screen's button opens `/confirm?token_hash=…&type=…`.
 - The middleware (`@zeno-lib/supabase/next-middleware`) redirects unauthenticated users to
   `/sign-in`.
+- Sign-in returns to the page's `next` query parameter when it is a path on your app: password
+  sign-in pushes to it, and a magic link carries it as its redirect, which `confirm` follows. Any
+  other `next` (another origin, `//host`) is ignored.
 
 <Callout type="warn">
   **Don't auto-redirect from the verify screen.** The manual button click is a security measure.

@@ -1,0 +1,70 @@
+{
+  "name": "@zeno-lib/ai",
+  "version": "0.0.0",
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/ai"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./mcp": {
+      "types": "./dist/mcp.d.mts",
+      "import": "./dist/mcp.mjs",
+      "default": "./dist/mcp.mjs"
+    },
+    "./tools": {
+      "types": "./dist/tools.d.mts",
+      "import": "./dist/tools.mjs",
+      "default": "./dist/tools.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch --no-clean",
+    "prepack": "tsdown",
+    "test": "vitest --run",
+    "test:watch": "vitest watch",
+    "types:check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@standard-schema/spec": "^1.1.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "@modelcontextprotocol/server": "2.4.0",
+    "@types/node": "26.6.5",
+    "@zeno-lib/db": "workspace:^",
+    "@zeno-lib/test": "workspace:*",
+    "@zeno-lib/typescript": "workspace:^",
+    "ai": "7.0.162",
+    "tsdown": "^0.23.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/server": ">=2",
+    "@zeno-lib/db": ">=0.16",
+    "ai": ">=7"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/server": {
+      "optional": true
+    },
+    "ai": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

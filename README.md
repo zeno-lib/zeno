@@ -18,6 +18,7 @@ The repo holds these apps and packages:
 - `@zeno-lib/forms`: the headless form factory (npm) and the registry field kit
 - `@zeno-lib/db`: Drizzle clients, schema helpers, the config preset and RLS
 - `@zeno-lib/schema`: Drizzle table to Zod schema helpers
+- `@zeno-lib/ai`: definitions as AI SDK tools and a Supabase OAuth-protected MCP endpoint
 - `@zeno-lib/e2e`: the Playwright preset, dependency verifier and API sign-in
 
 Every package and app is written in [TypeScript](https://www.typescriptlang.org/).

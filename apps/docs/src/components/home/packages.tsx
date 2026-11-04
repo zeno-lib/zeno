@@ -1,5 +1,6 @@
 import {
   ArrowUpRight,
+  Bot,
   Braces,
   Component,
   Database,
@@ -51,6 +52,15 @@ const PACKAGES: Entry[] = [
     icon: Hourglass,
     label: "@zeno-lib/query",
     title: "Queries",
+  },
+  {
+    description:
+      "Your reads and writes as tools for a chat sidebar and for MCP clients such as Claude, run as the signed-in user, with every write approved.",
+    domain: "d",
+    href: "/docs/core-framework/ai",
+    icon: Bot,
+    label: "@zeno-lib/ai",
+    title: "AI & agents",
   },
   {
     description:
