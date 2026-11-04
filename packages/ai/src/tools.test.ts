@@ -108,6 +108,20 @@ describe("toAiSdkTools", () => {
     expect(received).toEqual([{ id: 7, title: "Launch" }])
   })
 
+  it("still asks before a write when the route forgets toolApproval", async () => {
+    const { tools } = toAiSdkTools([renamePost], context)
+    const result = await generateText({
+      model: callTool("rename_post", { id: "7", title: "Launch" }),
+      prompt: "Go.",
+      tools,
+    })
+
+    expect(result.content.map((part) => part.type)).toContain(
+      "tool-approval-request"
+    )
+    expect(received).toEqual([])
+  })
+
   it("denies a write whose change can't be read, without asking the user", async () => {
     const result = await run("rename_hidden_post", {})
 

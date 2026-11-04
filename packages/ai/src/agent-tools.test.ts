@@ -10,4 +10,13 @@ describe("formatChange", () => {
       })
     ).toBe('Post 7 (no field changes)\ntitle: (empty) → "A\\nstatus: same"')
   })
+
+  it("escapes the line separators and bidi overrides JSON leaves raw", () => {
+    expect(
+      formatChange({
+        changes: [{ field: "ti\u2028tle", from: "a\u2028b", to: "c\u202ed" }],
+        entity: "Post\u202e 7",
+      })
+    ).toBe('Post  7\nti tle: "a\\u2028b" → "c\\u202ed"')
+  })
 })

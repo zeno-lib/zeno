@@ -1,6 +1,9 @@
 "use client"
 
-import type { OAuthAuthorizationDetails } from "@supabase/supabase-js"
+import {
+  isAuthSessionMissingError,
+  type OAuthAuthorizationDetails,
+} from "@supabase/supabase-js"
 import { createClient } from "@zeno-lib/supabase/next-client"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
@@ -61,12 +64,20 @@ export function OAuthConsent({
         return
       }
       const supabase = createClient()
-      const { data: session } = await supabase.auth.getClaims()
+      const { data: session, error: sessionError } =
+        await supabase.auth.getClaims()
+      // Auth unreachable is a failure to show, not a reason to sign in again.
+      if (sessionError && !isAuthSessionMissingError(sessionError)) {
+        fail(sessionError.message)
+        return
+      }
       if (!session?.claims.sub) {
-        const next = `${globalThis.location.pathname}${globalThis.location.search}`
-        globalThis.location.replace(
-          `${signInPath}?${new URLSearchParams({ next })}`
+        const signIn = new URL(signInPath, globalThis.location.origin)
+        signIn.searchParams.set(
+          "next",
+          `${globalThis.location.pathname}${globalThis.location.search}`
         )
+        globalThis.location.replace(`${signIn.pathname}${signIn.search}`)
         return
       }
 
@@ -86,7 +97,11 @@ export function OAuthConsent({
       }
     }
 
-    load()
+    load().catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(message)
+      fail(message)
+    })
     return () => {
       active = false
     }

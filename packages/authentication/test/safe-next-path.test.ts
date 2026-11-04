@@ -19,10 +19,23 @@ describe("safeNextPath", () => {
     ).toBe("/oauth/consent?authorization_id=a1")
   })
 
+  it("accepts a URL on any of the app's origins", () => {
+    expect(
+      safeNextPath("https://app.example.com/oauth/consent", [
+        "http://internal:3000",
+        origin,
+      ])
+    ).toBe("/oauth/consent")
+  })
+
   it.each([
     "https://evil.example.com/",
     "//evil.example.com/",
     "/\\evil.example.com/",
+    "/.//evil.example.com/",
+    "/..//evil.example.com/",
+    "/./\\evil.example.com/",
+    "https://app.example.com//evil.example.com/",
     "javascript:alert(1)",
     "",
     null,

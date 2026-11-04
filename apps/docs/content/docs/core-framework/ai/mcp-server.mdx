@@ -74,6 +74,9 @@ An app the user already approved goes straight back to it.
   <a href="{{ .SiteURL }}/verify?token_hash={{ .TokenHash }}&type=magiclink&next={{ .RedirectTo }}">
   ```
 
+  `confirm` follows that `next` only on your app's origin: the request's, or `NEXT_PUBLIC_SITE_URL`
+  when a proxy sits in front.
+
 ## Register the clients
 
 Each MCP client gets an OAuth client of its own, which you register in your app:

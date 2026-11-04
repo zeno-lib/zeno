@@ -80,7 +80,7 @@ a line that looks like another change.
 
 ## What the model reads back
 
-- A read's result, as JSON.
+- A read's result, as JSON. A `bigint` comes back as its decimal string.
 - A form action's `{ ok: false, error }`, as data, so the model can correct its input.
 - A thrown error, as a tool error carrying its message. That includes a database error's text, which
   the model needs to recover; don't put anything in an error message the user may not see.

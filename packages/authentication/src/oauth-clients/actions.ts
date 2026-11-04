@@ -130,9 +130,11 @@ export async function rotateOAuthClientSecret(
   if (!(await canManageOAuthClients())) {
     return refused
   }
-  const { data, error } = await oauthAdmin().regenerateClientSecret(
-    clientIdSchema.parse(clientId)
-  )
+  const parsed = clientIdSchema.safeParse(clientId)
+  if (!parsed.success) {
+    return { error: "No such client", ok: false }
+  }
+  const { data, error } = await oauthAdmin().regenerateClientSecret(parsed.data)
   if (error) {
     return { error: error.message, ok: false }
   }
@@ -146,9 +148,11 @@ export async function deleteOAuthClient(
   if (!(await canManageOAuthClients())) {
     return refused
   }
-  const { error } = await oauthAdmin().deleteClient(
-    clientIdSchema.parse(clientId)
-  )
+  const parsed = clientIdSchema.safeParse(clientId)
+  if (!parsed.success) {
+    return { error: "No such client", ok: false }
+  }
+  const { error } = await oauthAdmin().deleteClient(parsed.data)
   if (error) {
     return { error: error.message, ok: false }
   }

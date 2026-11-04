@@ -3,6 +3,7 @@ import {
   type AgentTool,
   checkAgentTools,
   formatChange,
+  toJsonText,
   toolSchema,
 } from "./agent-tools.ts"
 
@@ -37,6 +38,11 @@ const errorMessage = (error: unknown) =>
  *   `definition.describe`, formatted by `formatChange`. When `describe` throws
  *   (the record is not visible to the caller, say), the call is denied with
  *   the error as its reason, never put to the user without the change.
+ * - A write also carries the tool-level `needsApproval`, which AI SDK reads only
+ *   when `toolApproval` has no entry for it. A route that forgets
+ *   `toolApproval` still asks before each write, without the change, rather
+ *   than running it.
+ * - The output is JSON: a `bigint` becomes its decimal string.
  *
  * Throws when two tools share a name, a write has no `describeChange`, or a
  * schema can't describe itself as JSON Schema.
@@ -53,8 +59,10 @@ export function toAiSdkTools<TContext>(
   for (const { definition } of agentTools) {
     tools[definition.name] = tool({
       description: definition.description,
-      execute: (input: unknown) => definition.invoke(input, context),
+      execute: async (input: unknown) =>
+        JSON.parse(toJsonText(await definition.invoke(input, context))),
       inputSchema: toolSchema(definition),
+      ...(definition.readOnly ? {} : { needsApproval: true }),
     })
 
     if (!definition.readOnly) {

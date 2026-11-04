@@ -32,6 +32,7 @@ import {
   deleteOAuthClient,
   listOAuthClients,
   type OAuthClientSummary,
+  type OAuthClientsResult,
   registerOAuthClient,
   rotateOAuthClientSecret,
 } from "./actions"
@@ -52,6 +53,21 @@ const AUTH_METHODS: {
 ]
 
 const LINE_BREAK = /\s+/u
+
+// The actions return their failures, but a call can still throw: the network,
+// or a server error Next.js redacts. Either way the admin sees a toast.
+async function call<TData>(
+  action: () => Promise<OAuthClientsResult<TData>>
+): Promise<OAuthClientsResult<TData>> {
+  try {
+    return await action()
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "The request failed",
+      ok: false,
+    }
+  }
+}
 
 /** Shows a secret once, with the warning that it won't be shown again. */
 function SecretDialog({
@@ -105,15 +121,17 @@ function RegisterDialog({
     event.preventDefault()
     const form = new FormData(event.currentTarget)
     setPending(true)
-    const result = await registerOAuthClient({
-      name: String(form.get("name") ?? ""),
-      redirectUris: String(form.get("redirectUris") ?? "")
-        .split(LINE_BREAK)
-        .filter(Boolean),
-      tokenEndpointAuthMethod: String(
-        form.get("tokenEndpointAuthMethod")
-      ) as OAuthClientTokenEndpointAuthMethod,
-    })
+    const result = await call(() =>
+      registerOAuthClient({
+        name: String(form.get("name") ?? ""),
+        redirectUris: String(form.get("redirectUris") ?? "")
+          .split(LINE_BREAK)
+          .filter(Boolean),
+        tokenEndpointAuthMethod: String(
+          form.get("tokenEndpointAuthMethod")
+        ) as OAuthClientTokenEndpointAuthMethod,
+      })
+    )
     setPending(false)
     if (!result.ok) {
       toast.error(result.error)
@@ -227,7 +245,7 @@ export function OAuthClients() {
   )
 
   const load = useCallback(async () => {
-    const result = await listOAuthClients()
+    const result = await call(listOAuthClients)
     if (!result.ok) {
       toast.error(result.error)
       setClients([])
@@ -241,7 +259,7 @@ export function OAuthClients() {
   }, [load])
 
   const rotate = async (client: OAuthClientSummary) => {
-    const result = await rotateOAuthClientSecret(client.client_id)
+    const result = await call(() => rotateOAuthClientSecret(client.client_id))
     if (!result.ok) {
       toast.error(result.error)
       return
@@ -252,7 +270,7 @@ export function OAuthClients() {
   }
 
   const remove = async (client: OAuthClientSummary) => {
-    const result = await deleteOAuthClient(client.client_id)
+    const result = await call(() => deleteOAuthClient(client.client_id))
     if (!result.ok) {
       toast.error(result.error)
       return

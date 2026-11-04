@@ -66,21 +66,43 @@ export type AgentQuery<TContext> = AgentTool<
 export type ToolSchema = StandardSchemaV1<unknown, unknown> &
   StandardJSONSchemaV1<unknown, unknown>
 
-// Replaces each control character (a newline, say) with a space, so a name
-// can't fake a line of the approval text.
-const singleLine = (text: string) =>
+// A character that can break, reorder or hide text where the approval shows:
+// C0 and C1 controls (newline, NEL), DEL, the Unicode line and paragraph
+// separators, and the bidirectional marks and overrides.
+const isUnsafeCharacter = (code: number) =>
+  code < 0x20 ||
+  (code >= 0x7f && code <= 0x9f) ||
+  code === 0x20_28 ||
+  code === 0x20_29 ||
+  code === 0x20_0e ||
+  code === 0x20_0f ||
+  (code >= 0x20_2a && code <= 0x20_2e) ||
+  (code >= 0x20_66 && code <= 0x20_69)
+
+const replaceUnsafe = (text: string, replace: (code: number) => string) =>
   Array.from(text, (character) => {
     const code = character.charCodeAt(0)
-    return code < 0x20 || code === 0x7f ? " " : character
+    return isUnsafeCharacter(code) ? replace(code) : character
   }).join("")
 
+// A name on one line: each unsafe character becomes a space.
+const singleLine = (text: string) => replaceUnsafe(text, () => " ")
+
+// A value quoted as JSON, with what JSON leaves raw (U+2028, the bidi marks)
+// escaped as well.
 const formatValue = (value: ChangeValue) =>
-  value === null ? "(empty)" : JSON.stringify(value)
+  value === null
+    ? "(empty)"
+    : replaceUnsafe(
+        JSON.stringify(value),
+        (code) => `\\u${code.toString(16).padStart(4, "0")}`
+      )
 
 /**
  * The approval text for a change: the record on the first line, then one line
- * per field, old → new. Strings are quoted with their newlines escaped, so a
- * value read from the database can't add a line that isn't a change.
+ * per field, old → new. Strings are quoted, with every character that could
+ * break or reorder a line escaped, so a value read from the database can't add
+ * a line that isn't a change.
  *
  * ```text
  * Post 12 (Launch notes)
@@ -102,6 +124,16 @@ export function formatChange(change: ChangeDescription): string {
 
 const isFunction = (value: unknown): value is (...args: never[]) => unknown =>
   typeof value === "function"
+
+/**
+ * `value` as JSON text for a model. A `bigint` (a Drizzle `bigint` column in
+ * `bigint` mode) becomes its decimal string instead of throwing.
+ */
+export function toJsonText(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) =>
+    typeof item === "bigint" ? item.toString() : item
+  )
+}
 
 /**
  * Checks a tool list when it is built: one tool per name, a `describeChange` on

@@ -5,7 +5,12 @@ import {
   OAuthError,
   OAuthErrorCode,
 } from "@modelcontextprotocol/server"
-import { type AgentQuery, checkAgentTools, toolSchema } from "./agent-tools.ts"
+import {
+  type AgentQuery,
+  checkAgentTools,
+  toJsonText,
+  toolSchema,
+} from "./agent-tools.ts"
 
 export type McpRouteHandler = (request: Request) => Promise<Response>
 
@@ -84,24 +89,29 @@ export function createMcpRoute<TContext>(options: McpRouteOptions<TContext>): {
     version,
   } = options
   checkAgentTools(tools, { readOnly: true })
+  // Once per route, not per request: the schemas never change.
+  const registrations = tools.map(({ definition }) => ({
+    definition,
+    inputSchema: toolSchema(definition),
+  }))
 
   const buildServer = async (context: TContext) => {
     const server = new McpServer(
       { name, version },
       instructions === undefined ? {} : { instructions }
     )
-    for (const { definition } of tools) {
+    for (const { definition, inputSchema } of registrations) {
       server.registerTool(
         definition.name,
         {
           annotations: { openWorldHint: false, readOnlyHint: true },
           description: definition.description,
-          inputSchema: toolSchema(definition),
+          inputSchema,
         },
         async (input: unknown) => {
           const value = await definition.invoke(input, context)
           return {
-            content: [{ text: JSON.stringify(value), type: "text" as const }],
+            content: [{ text: toJsonText(value), type: "text" as const }],
           }
         }
       )

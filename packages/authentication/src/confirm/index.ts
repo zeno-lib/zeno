@@ -18,9 +18,14 @@ export async function getRoute(request: NextRequest) {
   const token_hash = searchParams.get("token_hash")
   const type = searchParams.get("type") as EmailOtpType | null
   // Only a path on this app: a `next` that leaves it would make the link an
-  // open redirect, signed in.
+  // open redirect, signed in. Behind a proxy, `request.url` names the internal
+  // host, so the public `NEXT_PUBLIC_SITE_URL` counts as this app too.
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
   const next =
-    safeNextPath(searchParams.get("next"), origin) ??
+    safeNextPath(
+      searchParams.get("next"),
+      siteUrl ? [origin, siteUrl] : origin
+    ) ??
     (type && defaultNexts[type]) ??
     "/"
 
