@@ -1,5 +1,11 @@
 # @zeno-lib/db
 
+## 0.16.0
+
+### Minor Changes
+
+- 4f931ad: A write built with `describeChange` now has it in its definition's type (`Described<…>`), so a tool list can require it: `@zeno-lib/ai` refuses a write without one.
+
 ## 0.15.0
 
 ### Minor Changes
