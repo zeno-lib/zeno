@@ -1,9 +1,0 @@
----
-"@zeno-lib/db": minor
----
-
-`defineQuery`, `defineAction` and `defineFormAction` take an object form, `{ name, description, schema, run }` (plus an optional `describeChange` on the two write builders), so one definition serves the UI and an agent. The export is the same function, with the definition on a non-enumerable `definition` key: its `kind`, `readOnly` (`true` only for a query), and `invoke(input, context)`, which runs it for a context you pass in with the export's exact behaviour. A query's object form runs in a read-only transaction, export and `invoke` alike, so a host can trust `readOnly` to skip approval. `describeChange(db, input, context)` returns the record and each field old → new, for an approval step to show; call it through `definition.describe(input, context)`, which parses the input first and reads on a read-only `db`. The positional forms are unchanged.
-
-`createRequestDb` takes a `bearer` option and returns `getBearerContext(request)`, for callers that send an OAuth access token from Supabase Auth's OAuth server in `Authorization: Bearer`. It verifies the token with `getClaims`, refuses a role other than `authenticated` and a token issued to no client or to a client you did not register (by `client_id`, since `aud` stays `authenticated`), and with `confirmSession` asks Auth for the session on every call, so a revoked grant stops before its last token expires. It never falls back to `anon`.
-
-Every RLS transaction now sets `app.via` in the same statement as the claims: the registered client's label for a bearer caller, or the one `withVia(context, via)` adds to a cookie caller. A trigger reads it with `nullif(current_setting('app.via', true), '')`. `RequestContext` gains `via` (`null` for a cookie caller), and `createSupabaseClient` and `createAuthClient` take `via` and `readOnly` in their config. `UnauthenticatedError` keeps the verifier's error as its `cause`.
