@@ -40,15 +40,15 @@
   "devDependencies": {
     "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/server": "2.4.0",
-    "@types/node": "26.6.5",
+    "@types/node": "26.6.6",
     "@zeno-lib/db": "workspace:^",
     "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
     "ai": "7.0.162",
-    "tsdown": "^0.23.1",
+    "tsdown": "^0.23.5",
     "typescript": "7.0.2",
     "vite": "8.3.5",
-    "vitest": "5.0.5",
+    "vitest": "5.1.0",
     "zod": "^4.6.7"
   },
   "peerDependencies": {

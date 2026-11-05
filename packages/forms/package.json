@@ -41,17 +41,17 @@
     "@tanstack/react-form": "1.33.5"
   },
   "devDependencies": {
-    "@types/node": "26.6.5",
+    "@types/node": "26.6.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@zeno-lib/test": "workspace:^",
     "@zeno-lib/typescript": "workspace:^",
     "@zeno-lib/ui": "workspace:^",
-    "lucide-react": "^1.62.0",
-    "tsdown": "^0.23.1",
+    "lucide-react": "^1.68.0",
+    "tsdown": "^0.23.5",
     "typescript": "7.0.2",
     "vite": "8.3.5",
-    "vitest": "5.0.5",
+    "vitest": "5.1.0",
     "zod": "^4.6.7"
   },
   "peerDependencies": {
