@@ -253,10 +253,18 @@ import { authUserRevocation } from "@zeno-lib/db/auth"
 import { sql } from "drizzle-orm"
 import { profiles } from "./schema"
 
+// `account_closed` once the user's profile is closed, else NULL.
+const accountClosed = sql<string | null>`(
+  select 'account_closed'
+  from ${profiles}
+  where ${profiles.id} = auth.uid() and ${profiles.closedAt} is not null
+)`
+
 createRequestDb({
   relations,
+  // The first code wins: Supabase Auth's, then the app's own.
   sessionRevocation: (context) =>
-    sql<string | null>`coalesce(${authUserRevocation(context)}, (select 'account_closed' from ${profiles} where ${profiles.id} = auth.uid() and ${profiles.closedAt} is not null))`,
+    sql<string | null>`coalesce(${authUserRevocation(context)}, ${accountClosed})`,
   supabase: () => createClient(),
 })
 ```
