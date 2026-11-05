@@ -13,9 +13,9 @@
       "default": "./dist/index.mjs"
     },
     "./auth": {
-      "types": "./dist/auth-schema.d.mts",
-      "import": "./dist/auth-schema.mjs",
-      "default": "./dist/auth-schema.mjs"
+      "types": "./dist/auth.d.mts",
+      "import": "./dist/auth.mjs",
+      "default": "./dist/auth.mjs"
     },
     "./config": {
       "types": "./dist/config.d.mts",

@@ -18,7 +18,7 @@ export default defineConfig({
   },
   dts: true,
   entry: {
-    "auth-schema": "src/auth-schema.ts",
+    auth: "src/auth.ts",
     config: "src/config.ts",
     errors: "src/errors.ts",
     index: "src/index.ts",
