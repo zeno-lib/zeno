@@ -253,22 +253,38 @@ function buildDrizzle<TRelations extends AnyRelations>(
 // What a client adds to the claims statement of each of its transactions.
 type TransactionSettings = { check?: SQL; readOnly: boolean; via: string }
 
-// With a `sessionRevocation` check, the claims and `app.via` go in first, the
-// check runs next, still as the login role, and the role and read-only mode
-// switch last. Each `offset 0` keeps its subquery whole, the scalar
-// `(select ...)` turns no row into NULL, and the newline ends a `--` comment
-// in the check.
+// The statement that opens every transaction. It sets the caller (the claims
+// and `app.via`), then makes the rest of the transaction run as the caller:
+// their role and, for a read-only client, read-only mode. A `sessionRevocation`
+// check runs in between: it sees the caller, so `auth.uid()` works, but still
+// runs as the login role, so it can read `auth.users`.
 const claimsStatement = (
   { claims, role, sub }: RlsContext,
   { check, readOnly, via }: TransactionSettings
 ) => {
-  const readOnlyClause = readOnly
-    ? sql`, set_config('transaction_read_only', 'on', true)`
-    : sql``
-  return check
-    ? sql`select set_config('role', ${role}, true)${readOnlyClause}, checked.revocation from (select (select (${check}
-)) as revocation from (select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true), set_config('app.via', ${via}, true) offset 0) as claims offset 0) as checked`
-    : sql`select set_config('request.jwt.claims', ${claims}, true), set_config('request.jwt.claim.sub', ${sub}, true), set_config('app.via', ${via}, true), set_config('role', ${role}, true)${readOnlyClause}`
+  const setCaller = sql`
+    set_config('request.jwt.claims', ${claims}, true),
+    set_config('request.jwt.claim.sub', ${sub}, true),
+    set_config('app.via', ${via}, true)`
+  const runAsCaller = readOnly
+    ? sql`set_config('role', ${role}, true), set_config('transaction_read_only', 'on', true)`
+    : sql`set_config('role', ${role}, true)`
+
+  if (!check) {
+    return sql`select ${setCaller}, ${runAsCaller}`
+  }
+  // Postgres runs the innermost select first. `offset 0` stops it from folding
+  // the subqueries together, which would lose that order. `(select (…))` turns
+  // a check that returns no row into NULL, and the newline after the check
+  // ends a `--` comment in it.
+  return sql`
+    select ${runAsCaller}, checked.revocation
+    from (
+      select (select (${check}
+      )) as revocation
+      from (select ${setCaller} offset 0) as caller
+      offset 0
+    ) as checked`
 }
 
 // Calls the app's check with its own copy of the claims, and refuses anything
