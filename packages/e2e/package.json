@@ -41,14 +41,14 @@
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@zeno-lib/docs": "workspace:*",
     "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
-    "tsdown": "^0.23.1",
+    "tsdown": "^0.23.5",
     "typescript": "7.0.2",
     "vite": "8.3.5",
-    "vitest": "5.0.5"
+    "vitest": "5.1.0"
   },
   "peerDependencies": {
     "@playwright/test": ">=1"
