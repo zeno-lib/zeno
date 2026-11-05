@@ -24,9 +24,19 @@ const toUuid = (sub: string) => {
  */
 export const authUserRevocation = ({ sub }: SessionRevocationContext) => {
   const id = toUuid(sub)
-  return id
-    ? sql<
-        string | null
-      >`(select case when ${authUsers.id} is null then 'user_not_found' when ${authUsers.bannedUntil} > now() then 'user_banned' end from (select ${id}::uuid as id) as token left join ${authUsers} on ${authUsers.id} = token.id and ${authUsers.deletedAt} is null)`
-    : sql<string | null>`null`
+  if (!id) {
+    return sql<string | null>`null`
+  }
+  // The left join from a one-row `token` select always returns a row, so a
+  // user who is gone or soft-deleted gets `user_not_found`. A plain lookup
+  // would return no row for them, and no row passes.
+  return sql<string | null>`(
+    select case
+      when ${authUsers.id} is null then 'user_not_found'
+      when ${authUsers.bannedUntil} > now() then 'user_banned'
+    end
+    from (select ${id}::uuid as id) as token
+    left join ${authUsers}
+      on ${authUsers.id} = token.id and ${authUsers.deletedAt} is null
+  )`
 }
