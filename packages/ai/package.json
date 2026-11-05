@@ -53,7 +53,7 @@
   },
   "peerDependencies": {
     "@modelcontextprotocol/server": ">=2",
-    "@zeno-lib/db": ">=0.16.0",
+    "@zeno-lib/db": ">=0.17.0",
     "ai": ">=7"
   },
   "peerDependenciesMeta": {
