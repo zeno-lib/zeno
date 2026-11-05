@@ -1,5 +1,11 @@
 # @zeno-lib/test
 
+## 0.1.3
+
+### Patch Changes
+
+- ac2435d: Update `@vitejs/plugin-react` to 6.2.1.
+
 ## 0.1.2
 
 ### Patch Changes
