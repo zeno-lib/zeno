@@ -13,7 +13,7 @@ const { postgresSpy, endSpies } = vi.hoisted(() => ({
 }))
 
 vi.mock("postgres", async (importOriginal) => {
-  const actual = await importOriginal<{ default: typeof import("postgres") }>()
+  const actual = await importOriginal<typeof import("postgres")>()
   return {
     default: (connectionString: string, options?: unknown) => {
       postgresSpy(connectionString, options)
