@@ -2,6 +2,7 @@ import {
   Client,
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client"
+import { SessionRevokedError } from "@zeno-lib/db/next"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import {
   getBearerContext,
@@ -98,6 +99,30 @@ describe("createMcpRoute", () => {
     expect(response.headers.get("www-authenticate")).toContain(
       `resource_metadata="${METADATA_URL}"`
     )
+  })
+
+  it("answers a revoked session with a 401 too", async () => {
+    // A context that queries throws this for a banned user's valid token.
+    const revokedRoute = createMcpRoute({
+      getContext: () => Promise.reject(new SessionRevokedError("user_banned")),
+      name: "example",
+      resourceMetadataUrl: METADATA_URL,
+      tools: [getPost],
+      version: "1.0.0",
+    })
+
+    const response = await revokedRoute.POST(
+      new Request("https://app.example.com/mcp", {
+        body: JSON.stringify({ id: 1, jsonrpc: "2.0", method: "tools/list" }),
+        headers: {
+          authorization: "Bearer good",
+          "content-type": "application/json",
+        },
+        method: "POST",
+      })
+    )
+
+    expect(response.status).toBe(401)
   })
 
   it("refuses a write tool", () => {

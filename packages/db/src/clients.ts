@@ -89,13 +89,16 @@ export class UnauthenticatedError extends Error {
   }
 }
 
-/** Thrown when `sessionRevocation` yields a code, such as `user_banned`. */
+/**
+ * Thrown when `sessionRevocation` yields a code, such as `user_banned`. Its
+ * `name` stays `UnauthenticatedError`, so code that matches the error by name
+ * across copies of the package (`@zeno-lib/ai`) treats it as signed out.
+ */
 export class SessionRevokedError extends UnauthenticatedError {
   readonly code: string
 
   constructor(code: string) {
     super(`Unauthorized: the session is revoked (${code})`)
-    this.name = "SessionRevokedError"
     this.code = code
   }
 }

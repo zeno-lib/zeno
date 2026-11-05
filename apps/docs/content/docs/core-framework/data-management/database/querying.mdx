@@ -230,9 +230,10 @@ createRequestDb({
 
 `authUserRevocation` refuses what Supabase Auth refuses: a banned user, with the
 code `user_banned`, and a deleted one, with `user_not_found`. A refused
-transaction throws `SessionRevokedError`, an `UnauthenticatedError` that
-carries the code as `code`, before any of its statements run. The check runs
-with each transaction, so a handler that sends an email or uploads a file
+transaction throws `SessionRevokedError` before any of its statements run. It
+is an `UnauthenticatedError` with the same `name`, so code that catches
+signed-out callers catches it too, and it carries the code as `code`. The check
+runs with each transaction, so a handler that sends an email or uploads a file
 should query first. To sign the user out, call
 `supabase.auth.signOut({ scope: "local" })` before you redirect to the sign-in
 page, or a page that sends signed-in users away loops.
@@ -263,7 +264,11 @@ createRequestDb({
 The check guards the Drizzle clients only: the same token still reaches
 PostgREST, Storage and Realtime until it expires. Each transaction plans it
 afresh, so it locks the tables it reads and their indexes until commit, about
-a dozen relations for `auth.users`.
+a dozen relations for `auth.users`. Postgres 17 and older keep only 16 locks
+per transaction on their fast path, so the check leaves about 4 for the rest of
+the transaction. Locks past 16 go through a shared lock table, which can slow
+transactions down under heavy load. Postgres 18 sizes the fast path from
+`max_locks_per_transaction`: 64 locks by default.
 
 ### Returning validation errors to a form
 
