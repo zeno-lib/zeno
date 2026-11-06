@@ -25,14 +25,14 @@
   --secondary: var(--color-gray-100);
   --secondary-foreground: var(--color-gray-900);
   --muted: var(--color-gray-100);
-  --muted-foreground: oklch(53.1% 0.013 61);
+  --muted-foreground: var(--color-gray-600);
   --accent: var(--color-gray-100);
   --accent-foreground: var(--color-gray-900);
   --destructive: var(--color-red-600);
   --destructive-foreground: var(--color-red-100);
   --border: var(--color-gray-200);
-  --input: oklch(63.1% 0.012 57);
-  --ring: var(--color-gray-500);
+  --input: var(--color-gray-500);
+  --ring: var(--color-gray-600);
   --chart-1: var(--color-orange-600);
   --chart-2: var(--color-teal-600);
   --chart-3: var(--color-cyan-900);
@@ -45,7 +45,7 @@
   --sidebar-accent: var(--color-gray-100);
   --sidebar-accent-foreground: var(--color-gray-900);
   --sidebar-border: var(--color-gray-200);
-  --sidebar-ring: var(--color-gray-500);
+  --sidebar-ring: var(--color-gray-600);
 }
 
 .dark {
@@ -53,15 +53,15 @@
   --foreground: var(--color-gray-50);
   --card: var(--color-gray-900);
   --card-foreground: var(--color-gray-50);
-  --popover: var(--color-gray-800);
+  --popover: var(--color-gray-900);
   --popover-foreground: var(--color-gray-50);
   --primary: var(--color-gray-50);
   --primary-foreground: var(--color-gray-900);
   --secondary: var(--color-gray-800);
   --secondary-foreground: var(--color-gray-50);
   --muted: var(--color-gray-800);
-  --muted-foreground: oklch(74.9% 0.009 56);
-  --accent: var(--color-gray-700);
+  --muted-foreground: var(--color-gray-400);
+  --accent: var(--color-gray-800);
   --accent-foreground: var(--color-gray-50);
   --destructive: var(--color-red-400);
   --destructive-foreground: var(--color-red-100);

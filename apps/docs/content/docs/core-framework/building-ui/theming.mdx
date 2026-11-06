@@ -75,8 +75,8 @@ The default tokens meet WCAG 2.2 in both themes. When you override one, keep the
 | `--ring` (the focus border) | `--background`, `--card`, `--popover` | 3:1 |
 | `--muted-foreground` | `--background`, `--muted`, `--secondary`, `--accent` | 4.5:1 |
 
-`--border` only draws dividers and outlines, so it can stay faint. A few defaults sit between two
-steps of the gray scale, as raw `oklch(...)` values, because the nearest step misses its ratio.
+`--border` only draws dividers and outlines, so it can stay faint. Keep `--ring` a step away from
+`--input`, so focus changes the border.
 
 ## Fonts
 
