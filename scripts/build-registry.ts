@@ -97,7 +97,13 @@ function declarations(body: string | null): CssVars {
       continue
     }
     const key = line.slice(2, colon).trim()
-    const value = line.slice(colon + 1).trim()
+    // A value the formatter wraps over several lines goes into the manifest on one line.
+    const value = line
+      .slice(colon + 1)
+      .replace(/\(\s+/gu, "(")
+      .replace(/\s+\)/gu, ")")
+      .replace(/\s+/gu, " ")
+      .trim()
     if (key && value) {
       out[key] = value
     }

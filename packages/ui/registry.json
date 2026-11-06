@@ -52,7 +52,7 @@
           "destructive": "var(--color-red-600)",
           "destructive-foreground": "var(--color-red-100)",
           "foreground": "var(--color-gray-950)",
-          "input": "var(--color-gray-500)",
+          "input": "color-mix(in oklch, var(--color-gray-400) 60%, var(--color-gray-500))",
           "muted": "var(--color-gray-100)",
           "muted-foreground": "var(--color-gray-600)",
           "popover": "var(--color-white)",
