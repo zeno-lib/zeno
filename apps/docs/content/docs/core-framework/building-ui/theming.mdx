@@ -65,6 +65,19 @@ theme:
 
 Use the shared theme for tokens the app should inherit, and only list the ones it changes.
 
+## Keep the contrast
+
+The default tokens meet WCAG 2.2 in both themes. When you override one, keep these ratios:
+
+| Token | Against | At least |
+|---|---|---|
+| `--input` (the edge of inputs, selects, checkboxes and radios) | `--background`, `--card`, `--popover` | 3:1 |
+| `--ring` (the focus border) | `--background`, `--card`, `--popover` | 3:1 |
+| `--muted-foreground` | `--background`, `--muted`, `--secondary`, `--accent` | 4.5:1 |
+
+`--border` only draws dividers and outlines, so it can stay faint. Keep `--ring` a step away from
+`--input`, so focus changes the border.
+
 ## Fonts
 
 The theme ships two font tokens, `--font-text` (body) and `--font-title` (headings).
