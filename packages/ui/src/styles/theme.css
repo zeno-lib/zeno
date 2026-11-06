@@ -31,7 +31,11 @@
   --destructive: var(--color-red-600);
   --destructive-foreground: var(--color-red-100);
   --border: var(--color-gray-200);
-  --input: color-mix(in oklch, var(--color-gray-400) 60%, var(--color-gray-500));
+  --input: color-mix(
+    in oklch,
+    var(--color-gray-400) 60%,
+    var(--color-gray-500)
+  );
   --ring: var(--color-gray-600);
   --chart-1: var(--color-orange-600);
   --chart-2: var(--color-teal-600);
