@@ -53,15 +53,15 @@
   --foreground: var(--color-gray-50);
   --card: var(--color-gray-900);
   --card-foreground: var(--color-gray-50);
-  --popover: var(--color-gray-800);
+  --popover: var(--color-gray-900);
   --popover-foreground: var(--color-gray-50);
-  --primary: var(--color-gray-50);
+  --primary: var(--color-gray-200);
   --primary-foreground: var(--color-gray-900);
   --secondary: var(--color-gray-800);
   --secondary-foreground: var(--color-gray-50);
   --muted: var(--color-gray-800);
   --muted-foreground: var(--color-gray-400);
-  --accent: var(--color-gray-700);
+  --accent: var(--color-gray-800);
   --accent-foreground: var(--color-gray-50);
   --destructive: var(--color-red-400);
   --destructive-foreground: var(--color-red-100);
@@ -80,7 +80,7 @@
   --sidebar-accent: var(--color-gray-800);
   --sidebar-accent-foreground: var(--color-gray-50);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: var(--color-gray-600);
+  --sidebar-ring: var(--color-gray-500);
 }
 
 @theme inline {

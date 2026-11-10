@@ -4,7 +4,7 @@
     {
       "cssVars": {
         "dark": {
-          "accent": "var(--color-gray-700)",
+          "accent": "var(--color-gray-800)",
           "accent-foreground": "var(--color-gray-50)",
           "background": "var(--color-gray-950)",
           "border": "oklch(1 0 0 / 10%)",
@@ -21,9 +21,9 @@
           "input": "oklch(1 0 0 / 15%)",
           "muted": "var(--color-gray-800)",
           "muted-foreground": "var(--color-gray-400)",
-          "popover": "var(--color-gray-800)",
+          "popover": "var(--color-gray-900)",
           "popover-foreground": "var(--color-gray-50)",
-          "primary": "var(--color-gray-50)",
+          "primary": "var(--color-gray-200)",
           "primary-foreground": "var(--color-gray-900)",
           "ring": "var(--color-gray-500)",
           "secondary": "var(--color-gray-800)",
@@ -35,7 +35,7 @@
           "sidebar-foreground": "var(--color-gray-50)",
           "sidebar-primary": "var(--color-blue-700)",
           "sidebar-primary-foreground": "var(--color-gray-50)",
-          "sidebar-ring": "var(--color-gray-600)"
+          "sidebar-ring": "var(--color-gray-500)"
         },
         "light": {
           "accent": "var(--color-gray-100)",
