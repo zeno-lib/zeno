@@ -292,6 +292,19 @@ describe("createRequestDb", () => {
     })
   })
 
+  it("refuses a session made from an OAuth client's token", async () => {
+    const { getRequestDb } = createRequestDb({
+      supabase: supabaseReturning(
+        getClaimsResult({ ...claims, client_id: "client-1" }, null)
+      ),
+    })
+
+    const error = await getRequestDb().catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(UnauthenticatedError)
+    expect(createSupabaseClientMock).not.toHaveBeenCalled()
+  })
+
   it("throws UnauthenticatedError when there is no session", async () => {
     const { getRequestDb } = createRequestDb({
       supabase: supabaseReturning(getClaimsResult(null, null)),
