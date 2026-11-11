@@ -1,5 +1,11 @@
 # @zeno-lib/db
 
+## 0.19.0
+
+### Minor Changes
+
+- 9ad1e2b: `getRequestContext` now refuses a session whose token carries `client_id`, a token issued to an OAuth client, with `UnauthenticatedError`. Such a token carries the user's full rights, and with its refresh token it makes a valid cookie session, so whoever held it could run every server action as the user. It still works through `getBearerContext`.
+
 ## 0.18.1
 
 ### Patch Changes
