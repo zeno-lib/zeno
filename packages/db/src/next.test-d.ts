@@ -180,6 +180,21 @@ test("a paged query hands run limit and offset, and must resolve to a page", () 
   })
 })
 
+test("a paged query takes bounds declared as const", () => {
+  const bounds = { maxLimit: 10 } as const
+  defineQuery({
+    description: "List rows.",
+    name: "list_rows",
+    paged: bounds,
+    run: (_db, { limit, offset }) => ({
+      hasMore: false,
+      items: [],
+      total: limit + offset,
+    }),
+    schema: z.object({}),
+  })
+})
+
 test("the object form of defineFormAction resolves to an ActionResult", () => {
   const action = defineFormAction({
     description: "Save a row.",
