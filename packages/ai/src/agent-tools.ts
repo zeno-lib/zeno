@@ -63,7 +63,7 @@ export type AgentQuery<TContext> = AgentTool<
 >
 
 /** The schema shape both AI SDK and the MCP SDK take. */
-export type ToolSchema = StandardSchemaV1<unknown, unknown> &
+export type ToolSchema<TValue = unknown> = StandardSchemaV1<unknown, TValue> &
   StandardJSONSchemaV1<unknown, unknown>
 
 // A character that can break, reorder or hide text where the approval shows:

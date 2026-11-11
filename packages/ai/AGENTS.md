@@ -8,8 +8,9 @@ is in [`ai`](../../apps/docs/content/docs/core-framework/ai/index.mdx).
 - **Never hand a library the definition's schema itself; use `toolSchema`.** AI SDK and the MCP SDK
   both validate a tool's input and pass the **parsed output** on, and the tool is `invoke` or
   `describe`, which parse again. A schema whose output is not valid input (a `transform` from string
-  to number) then fails. `toolSchema` validates and passes the raw input on. Its vendor must not be
-  `zod`: AI SDK parses a Zod schema on its own path and would return the output.
+  to number) then fails. `toolSchema` validates and passes the raw input on. `createMcpRoute` keeps
+  the parsed input too, for `onToolCall`: `invoke` still takes the raw one, never `parsed`. Its
+  vendor must not be `zod`: AI SDK parses a Zod schema on its own path and would return the output.
   `src/tools.test.ts` and `src/mcp.test.ts` cover it with such a schema.
 - **A write is never put to the user without its change.** `checkAgentTools` refuses a write with no
   `describeChange`, and a `describe` that throws or returns `null` denies the call. Don't fall back to
