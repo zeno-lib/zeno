@@ -3,7 +3,8 @@ import {
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client"
 import { SessionRevokedError } from "@zeno-lib/db/next"
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { CARD_URI, PROPOSAL_META_KEY } from "./approval-protocol.ts"
 import {
   getBearerContext,
   getCheckedPost,
@@ -12,8 +13,17 @@ import {
   listPosts,
   received,
   renamePost,
+  retitlePost,
+  titles,
 } from "./fixtures.test-utils.ts"
-import { createMcpRoute, type McpToolCall, ToolInputError } from "./mcp.ts"
+import {
+  createMcpRoute,
+  type McpToolCall,
+  type McpWrites,
+  ProposalRefusedError,
+  ToolInputError,
+  type UsedProposal,
+} from "./mcp.ts"
 
 const METADATA_URL =
   "https://app.example.com/.well-known/oauth-protected-resource/mcp"
@@ -36,19 +46,21 @@ const routeFetch =
     return target[method](request)
   }
 
-let client: Client | undefined
+const clients: Client[] = []
 
 const connect = async (
   mode: "legacy" | { pin: string },
-  target: typeof route = route
+  target: typeof route = route,
+  token = "good"
 ) => {
-  client = new Client(
+  const client = new Client(
     { name: "test", version: "1.0.0" },
     { versionNegotiation: { mode } }
   )
+  clients.push(client)
   await client.connect(
     new StreamableHTTPClientTransport(new URL("https://app.example.com/mcp"), {
-      fetch: routeFetch("good", target),
+      fetch: routeFetch(token, target),
     })
   )
   return client
@@ -59,8 +71,8 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
-  await client?.close()
-  client = undefined
+  await Promise.all(clients.map((client) => client.close()))
+  clients.length = 0
 })
 
 describe("createMcpRoute", () => {
@@ -306,5 +318,314 @@ describe("createMcpRoute", () => {
         expect(errors).toEqual([failure])
       }
     )
+  })
+})
+
+describe("createMcpRoute writes", () => {
+  const SECRET = "a-test-secret-that-is-long-enough-to-sign"
+  const used = new Set<string>()
+  const marked: UsedProposal[] = []
+  const calls: McpToolCall[] = []
+
+  const writeRoute = (
+    writes: Partial<
+      McpWrites<Awaited<ReturnType<typeof getBearerContext>>>
+    > = {}
+  ) =>
+    createMcpRoute({
+      getContext: getBearerContext,
+      name: "example",
+      onToolCall: (call) => {
+        calls.push(call)
+      },
+      resourceMetadataUrl: METADATA_URL,
+      tools: [getPost],
+      version: "1.0.0",
+      writes: {
+        markUsed: (proposal) => {
+          marked.push(proposal)
+          if (used.has(proposal.id)) {
+            return false
+          }
+          used.add(proposal.id)
+          return true
+        },
+        secret: SECRET,
+        tools: [retitlePost],
+        ...writes,
+      },
+    })
+
+  type Result = Awaited<ReturnType<Client["callTool"]>>
+
+  const proposalOf = (result: Result) =>
+    (result._meta as Record<string, unknown> | undefined)?.[
+      PROPOSAL_META_KEY
+    ] as string
+
+  const propose = async (connected: Client, title = "Launch") => {
+    const result = await connected.callTool({
+      arguments: { id: "7", title },
+      name: "retitle_post",
+    })
+    return { proposal: proposalOf(result), result }
+  }
+
+  const apply = (connected: Client, proposal: string) =>
+    connected.callTool({ arguments: { proposal }, name: "apply_change" })
+
+  beforeEach(() => {
+    titles.clear()
+    titles.set(7, "Draft")
+    used.clear()
+    marked.length = 0
+    calls.length = 0
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it.each([
+    ["2026-07-28", { pin: "2026-07-28" }],
+    ["the 2025 initialize fallback", "legacy"],
+  ] as const)(
+    "proposes the change for the card and writes nothing, over %s",
+    async (_, mode) => {
+      const connected = await connect(mode, writeRoute())
+
+      const { tools } = await connected.listTools()
+      const { proposal, result } = await propose(connected)
+      const card = await connected.readResource({ uri: CARD_URI })
+
+      expect(tools).toMatchObject([
+        { name: "get_post" },
+        {
+          _meta: { ui: { resourceUri: CARD_URI } },
+          annotations: { readOnlyHint: true },
+          name: "retitle_post",
+        },
+        {
+          _meta: { ui: { resourceUri: CARD_URI, visibility: ["app"] } },
+          name: "apply_change",
+        },
+      ])
+      expect(result.isError).toBeFalsy()
+      expect(result.structuredContent).toEqual({
+        change: {
+          changes: [{ field: "title", from: "Draft", to: "Launch" }],
+          entity: "Post 7",
+        },
+        status: "proposed",
+      })
+      expect(proposal).toEqual(expect.any(String))
+      expect(result.content).toEqual([
+        {
+          text: expect.stringContaining("Nothing is saved until they confirm"),
+          type: "text",
+        },
+      ])
+      expect(card.contents).toMatchObject([
+        {
+          mimeType: "text/html;profile=mcp-app",
+          text: expect.stringContaining('<script type="module">'),
+          uri: CARD_URI,
+        },
+      ])
+      expect(received).toEqual([])
+      expect(titles.get(7)).toBe("Draft")
+    }
+  )
+
+  it("applies a confirmed proposal once, and refuses it again", async () => {
+    const connected = await connect({ pin: "2026-07-28" }, writeRoute())
+    const { proposal } = await propose(connected)
+
+    const applied = await apply(connected, proposal)
+    const replayed = await apply(connected, proposal)
+
+    expect(applied.isError).toBeFalsy()
+    expect(applied.structuredContent).toMatchObject({ status: "applied" })
+    expect(replayed).toMatchObject({
+      isError: true,
+      structuredContent: { status: "used" },
+    })
+    expect(received).toEqual([{ id: 7, title: "Launch" }])
+    expect(titles.get(7)).toBe("Launch")
+    expect(marked).toEqual([
+      expect.objectContaining({ tool: "retitle_post", user: "user-1" }),
+      expect.objectContaining({ id: marked[0]?.id }),
+    ])
+  })
+
+  it("reports the propose and apply calls to onToolCall", async () => {
+    const connected = await connect({ pin: "2026-07-28" }, writeRoute())
+    const { proposal } = await propose(connected)
+    await apply(connected, proposal)
+    await apply(connected, proposal)
+
+    const proposalId = marked[0]?.id
+    expect(calls).toMatchObject([
+      {
+        input: { id: 7, title: "Launch" },
+        name: "retitle_post",
+        ok: true,
+        result: { change: { entity: "Post 7" }, proposalId },
+      },
+      {
+        input: {
+          input: { id: "7", title: "Launch" },
+          proposalId,
+          tool: "retitle_post",
+        },
+        name: "apply_change",
+        ok: true,
+        result: { retitled: 7 },
+      },
+      { name: "apply_change", ok: false },
+    ])
+    const [, , refused] = calls
+    expect(refused?.ok === false && refused.error).toBeInstanceOf(
+      ProposalRefusedError
+    )
+    expect(refused?.ok === false && refused.error).toMatchObject({
+      reason: "used",
+    })
+  })
+
+  // Swaps the sealed payload's title, keeping the signature.
+  const tamper = (proposal: string) => {
+    const [version, payload, signature] = proposal.split(".")
+    const decoded = JSON.parse(
+      Buffer.from(payload ?? "", "base64url").toString()
+    )
+    decoded.input.title = "Hijacked"
+    const forged = Buffer.from(JSON.stringify(decoded)).toString("base64url")
+    return `${version}.${forged}.${signature}`
+  }
+
+  it.each([
+    ["an edited proposal", tamper],
+    ["a made-up proposal", () => "zp1.e30.AAAA"],
+    ["not a proposal", () => "anything"],
+  ])("refuses %s as invalid", async (_, forge) => {
+    const connected = await connect({ pin: "2026-07-28" }, writeRoute())
+    const { proposal } = await propose(connected)
+
+    const result = await apply(connected, forge(proposal))
+
+    expect(result).toMatchObject({
+      isError: true,
+      structuredContent: { status: "invalid" },
+    })
+    expect(received).toEqual([])
+    expect(marked).toEqual([])
+  })
+
+  it("refuses a proposal another server's secret sealed", async () => {
+    const other = await connect(
+      { pin: "2026-07-28" },
+      writeRoute({ secret: "another-secret-that-is-also-long-enough" })
+    )
+    const { proposal } = await propose(other)
+    const connected = await connect({ pin: "2026-07-28" }, writeRoute())
+
+    await expect(apply(connected, proposal)).resolves.toMatchObject({
+      structuredContent: { status: "invalid" },
+    })
+    expect(received).toEqual([])
+  })
+
+  it("verifies with a rotated-out secret while it is still listed", async () => {
+    const old = await connect({ pin: "2026-07-28" }, writeRoute())
+    const { proposal } = await propose(old)
+    const connected = await connect(
+      { pin: "2026-07-28" },
+      writeRoute({
+        secret: ["a-new-secret-that-is-long-enough-to-sign", SECRET],
+      })
+    )
+
+    await expect(apply(connected, proposal)).resolves.toMatchObject({
+      structuredContent: { status: "applied" },
+    })
+  })
+
+  it("refuses an expired proposal", async () => {
+    const connected = await connect({ pin: "2026-07-28" }, writeRoute())
+    const { proposal } = await propose(connected)
+    const now = Date.now()
+    vi.spyOn(Date, "now").mockReturnValue(now + 600_001)
+
+    const result = await apply(connected, proposal)
+
+    expect(result).toMatchObject({
+      isError: true,
+      structuredContent: { status: "expired" },
+    })
+    expect(received).toEqual([])
+    expect(marked).toEqual([])
+  })
+
+  it("refuses another user's proposal", async () => {
+    const target = writeRoute()
+    const mine = await connect({ pin: "2026-07-28" }, target)
+    const { proposal } = await propose(mine)
+    const theirs = await connect({ pin: "2026-07-28" }, target, "other")
+
+    const result = await apply(theirs, proposal)
+
+    expect(result).toMatchObject({
+      isError: true,
+      structuredContent: { status: "wrong-user" },
+    })
+    expect(received).toEqual([])
+    expect(marked).toEqual([])
+  })
+
+  it("refuses a stale proposal with the new change, which the user can confirm", async () => {
+    const connected = await connect({ pin: "2026-07-28" }, writeRoute())
+    const { proposal } = await propose(connected)
+    titles.set(7, "Edited elsewhere")
+
+    const stale = await apply(connected, proposal)
+
+    expect(stale).toMatchObject({
+      isError: true,
+      structuredContent: {
+        change: {
+          changes: [{ field: "title", from: "Edited elsewhere", to: "Launch" }],
+        },
+        status: "stale",
+      },
+    })
+    expect(received).toEqual([])
+
+    const fresh = proposalOf(stale)
+    expect(fresh).not.toBe(proposal)
+    await expect(apply(connected, fresh)).resolves.toMatchObject({
+      structuredContent: { status: "applied" },
+    })
+    expect(titles.get(7)).toBe("Launch")
+  })
+
+  it.each([
+    ["without writes", route],
+    ["with writes its enabled refuses", writeRoute({ enabled: () => false })],
+  ])("serves reads alone %s", async (_, target) => {
+    const connected = await connect({ pin: "2026-07-28" }, target)
+
+    const { tools } = await connected.listTools()
+
+    expect(tools.map(({ name }) => name)).not.toContain("apply_change")
+    expect(tools.map(({ name }) => name)).not.toContain("retitle_post")
+    expect(connected.getServerCapabilities()?.resources).toBeUndefined()
+  })
+
+  it.each([
+    [{ secret: "too-short" }, "at least 32 characters"],
+    [{ tools: [getPost as never] }, '"get_post" reads: serve it in tools'],
+  ])("refuses writes configured with %o", (writes, message) => {
+    expect(() => writeRoute(writes)).toThrow(message)
   })
 })
