@@ -21,12 +21,18 @@ import {
   type PgQueryResultHKT,
   PgTable,
 } from "drizzle-orm/pg-core"
+import type { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query"
 import {
   DEFAULT_FUNCTION_PREFIX,
   FUNCTION_POLICY_OPERATIONS,
   type FunctionPolicyOperation,
   functionPolicyName,
 } from "./function-names.ts"
+import type { Page, PageInput } from "./pages.ts"
+
+export type { Page, PageInput } from "./pages.ts"
+// biome-ignore lint/performance/noBarrelFile: a page's type and mapper belong on the entry `findPage` is on.
+export { mapPage } from "./pages.ts"
 
 /**
  * PostgREST's `.single()`: exactly one row, or an error.
@@ -792,5 +798,81 @@ export const selectFunctionPermissions = async (
     insert: row.insert === true,
     select: row.select === true,
     update: row.update === true,
+  }
+}
+
+/** A relational query builder, such as `db.query.posts`. */
+// biome-ignore lint/suspicious/noExplicitAny: any schema, table and query kind
+export type PageQueryBuilder = RelationalQueryBuilder<any, any, any>
+
+type FindManyConfig<TBuilder extends PageQueryBuilder> = NonNullable<
+  Parameters<TBuilder["findMany"]>[0]
+>
+
+/** The type of the `id` column of the builder's table. */
+export type PageRowId<TBuilder extends PageQueryBuilder> =
+  // biome-ignore lint/suspicious/noExplicitAny: matches any schema and query kind
+  TBuilder extends RelationalQueryBuilder<any, infer TFields, any>
+    ? TFields["table"] extends { $inferSelect: { id: infer TId } }
+      ? TId
+      : never
+    : never
+
+export type FindPageOptions<
+  TBuilder extends PageQueryBuilder,
+  TRow extends { id: PageRowId<TBuilder> },
+> = {
+  /**
+   * The page's order. End it on a unique column, such as `id`, or rows that
+   * tie may show on two pages, or on none.
+   */
+  orderBy: FindManyConfig<TBuilder>["orderBy"]
+  /** Reads the page's rows in full, in any order, by their ids. */
+  rows: (ids: PageRowId<TBuilder>[]) => PromiseLike<TRow[]>
+  /** Which rows the list holds. */
+  where?: FindManyConfig<TBuilder>["where"]
+}
+
+/**
+ * A page of a relational query, keyed by the table's `id` column: the rows
+ * `where` matches, in `orderBy` order, `limit` of them after `offset`, with how
+ * many match in all.
+ *
+ * Two statements, because once a query reads relations (`with`), Drizzle
+ * moves `limit` and `offset` into a subquery, where a `count(*) over ()` would
+ * count only the page. The first reads the page's ids and the total, and
+ * `rows` reads those rows with whatever columns and relations it wants. They
+ * come back in the first statement's order, so `rows` needs no `orderBy`.
+ *
+ * An offset past the last row reads no row to carry the count, so `total` is
+ * then `null`, unless nothing matches at all.
+ */
+export async function findPage<
+  TBuilder extends PageQueryBuilder,
+  TRow extends { id: PageRowId<TBuilder> },
+>(
+  builder: TBuilder,
+  { limit, offset }: PageInput,
+  { orderBy, rows, where }: FindPageOptions<TBuilder, TRow>
+): Promise<Page<TRow>> {
+  const ids = (await builder.findMany({
+    columns: { id: true },
+    extras: { pageTotal: () => sql<number>`count(*) over ()`.mapWith(Number) },
+    limit,
+    offset,
+    orderBy,
+    where,
+  })) as { id: PageRowId<TBuilder>; pageTotal: number }[]
+  const found = ids.length > 0 ? await rows(ids.map(({ id }) => id)) : []
+  const rowsById = new Map(found.map((row) => [row.id, row]))
+  const total = ids[0]?.pageTotal ?? (offset === 0 ? 0 : null)
+
+  return {
+    hasMore: total !== null && offset + ids.length < total,
+    items: ids.flatMap(({ id }) => {
+      const row = rowsById.get(id)
+      return row ? [row] : []
+    }),
+    total,
   }
 }

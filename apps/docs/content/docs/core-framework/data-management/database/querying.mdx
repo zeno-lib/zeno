@@ -434,6 +434,14 @@ export const renamePostAction = defineAction({
   in: parse, then `run`, then `undefined` → `null` (an `ActionResult` for a form
   action). Use it where the request has no cookie session, such as a bearer
   token below. The export itself still resolves the cookie session.
+- `paged: true` (or `paged: { defaultLimit, maxLimit, maxOffset }`, 20, 50 and
+  10,000 by default) makes a query a paged read. It adds `limit` and `offset`
+  to `schema`, which must be an object schema without them, checks and
+  defaults both before `run`, and adds them to the JSON Schema a tool list
+  shows. `run` receives them with the rest of the input and must resolve to a
+  `Page`, such as [`findPage`](#paging-a-list)'s, and the description gains a
+  sentence on `items`, `total`, `hasMore` and how to ask for the next page.
+  `definition.paged` holds the bounds.
 - The positional forms keep working, and carry no definition.
 
 The definition sits on its own key because a function's `name` is read-only. It
@@ -620,6 +628,44 @@ column keys). When the caller supplied nothing else, the set falls back to
 `id = excluded.id`, because Drizzle refuses an empty set while building the
 statement. A table without that column (a junction keyed by its foreign keys)
 gets an empty set; use `onConflictDoNothing` there.
+
+### Paging a list
+
+`findPage(builder, { limit, offset }, { where, orderBy, rows })` reads one page
+of a relational query and says how many rows match in all. It resolves to a
+`Page`: `{ items, total, hasMore }`.
+
+```typescript
+import { findPage, mapPage } from "@zeno-lib/db/query"
+
+const page = await findPage(
+  db.query.posts,
+  { limit: 20, offset: 40 },
+  {
+    where: { status: "draft" },
+    orderBy: { updatedAt: "desc", id: "desc" },
+    rows: (ids) =>
+      db.query.posts.findMany({
+        columns: { id: true, title: true },
+        where: { id: { in: ids } },
+        with: { author: { columns: { name: true } } },
+      }),
+  }
+)
+const titles = mapPage(page, ({ author, title }) => `${title} (${author.name})`)
+```
+
+- It takes two statements. Once a query reads relations (`with`), Drizzle moves
+  `limit` and `offset` into a subquery, where `count(*) over ()` would count only
+  the page. The first statement reads the page's ids and the total; `rows`
+  reads those rows with any columns and relations.
+- `rows` can read in any order: the items come back in `orderBy` order, so the
+  order is written once. End `orderBy` on a unique column, or rows that tie can
+  show on two pages, or on none.
+- The table needs an `id` column; `rows` receives the ids typed as that column.
+- `total` is `null` past the last row, where no row is left to carry the count,
+  and `0` when nothing matches at all.
+- `mapPage(page, toItem)` maps the items and keeps `total` and `hasMore`.
 
 ### Syncing a parent's rows
 

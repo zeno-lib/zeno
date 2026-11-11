@@ -4,6 +4,15 @@ import {
   FieldValidationError,
   toActionError,
 } from "./action-result.ts"
+import {
+  describePage,
+  type Page,
+  type PageInput,
+  type PageLimits,
+  type PageOptions,
+  toPageLimits,
+  withPageSchema,
+} from "./pages.ts"
 
 /**
  * The slice of a schema `defineAction` needs: a throwing `parse`, plus the
@@ -90,6 +99,22 @@ export interface QueryOptions<
   schema: ActionSchema<TInput, TOutput>
 }
 
+/**
+ * The object form of `defineQuery` for a paged read: `paged` adds `limit` and
+ * `offset` to `schema`, which must be an object schema without them, and `run`
+ * receives both with the rest of the input and resolves to a `Page`.
+ * `paged: true` takes the default bounds.
+ */
+export interface PagedQueryOptions<
+  TContext extends ActionContext<unknown>,
+  TInput,
+  TOutput,
+  TResult extends Page<unknown>,
+> extends Omit<QueryOptions<TContext, TInput, TOutput, TResult>, "run"> {
+  paged: true | PageOptions
+  run: ActionHandler<TContext, TOutput & PageInput, TResult>
+}
+
 /** The object form of `defineAction`: a query's fields, plus `describeChange`. */
 export interface ActionOptions<
   TContext extends ActionContext<unknown>,
@@ -130,6 +155,11 @@ export interface QueryDefinition<
 > extends QueryOptions<TContext, TInput, TOutput, TResult> {
   invoke: (input: unknown, context: TContext) => Promise<ActionValue<TResult>>
   readonly kind: "query"
+  /**
+   * The bounds of `limit` and `offset` on a paged read, which its schema
+   * already checks; absent on any other.
+   */
+  readonly paged?: PageLimits
   readonly readOnly: true
 }
 
@@ -235,6 +265,17 @@ export interface DefineQuery<TContext extends ActionContext<unknown>> {
     schema: ActionSchema<TInput, TOutput>,
     handler: ActionHandler<TContext, TOutput, TResult>
   ): (input: TInput) => Promise<ActionValue<TResult>>
+  <TInput, TOutput, TResult extends Page<unknown>>(
+    options: PagedQueryOptions<TContext, TInput, TOutput, TResult>
+  ): Defined<
+    (input: TInput & Partial<PageInput>) => Promise<ActionValue<TResult>>,
+    QueryDefinition<
+      TContext,
+      TInput & Partial<PageInput>,
+      TOutput & PageInput,
+      TResult
+    > & { readonly paged: PageLimits }
+  >
   <TInput, TOutput, TResult>(
     options: QueryOptions<TContext, TInput, TOutput, TResult>
   ): Defined<
@@ -292,7 +333,7 @@ type AnySchema = ActionSchema<unknown, unknown> &
 type AnyOptions<TContext extends ActionContext<unknown>> = Omit<
   ActionOptions<TContext, unknown, unknown, unknown>,
   "schema"
-> & { schema: AnySchema }
+> & { paged?: true | PageOptions; schema: AnySchema }
 
 // What sets the builders apart: how they parse and how they run.
 const PARSERS = {
@@ -337,7 +378,14 @@ function bindDefinition<TContext extends ActionContext<unknown>>(
       return (input: unknown) => run(input, getContext)
     }
 
-    const options = schemaOrOptions as AnyOptions<TContext>
+    const { paged: pagedOption, ...options } =
+      schemaOrOptions as AnyOptions<TContext>
+    const paged =
+      kind === "query" && pagedOption ? toPageLimits(pagedOption) : undefined
+    if (paged) {
+      options.schema = withPageSchema(options.schema, paged) as AnySchema
+      options.description = `${options.description} ${describePage(paged)}`
+    }
     const run = createRun(options.schema, options.run)
     const prepare =
       kind === "query" ? readOnlyContext : (context: TContext) => context
@@ -362,6 +410,7 @@ function bindDefinition<TContext extends ActionContext<unknown>>(
           run(input, () => prepare(context)),
         kind,
         name: options.name,
+        ...(paged ? { paged } : {}),
         readOnly: kind === "query",
         run: options.run,
         schema: options.schema,

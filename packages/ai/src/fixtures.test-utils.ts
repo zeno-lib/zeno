@@ -63,6 +63,19 @@ export const getPost = defineQuery({
   schema: idSchema,
 })
 
+export const listPosts = defineQuery({
+  description: "List posts.",
+  name: "list_posts",
+  paged: true,
+  run: (_db, input) => {
+    received.push(input)
+    return { hasMore: false, items: [], total: 0 }
+  },
+  schema: z
+    .object({ status: z.enum(["draft", "published"]).optional() })
+    .strict(),
+})
+
 export const renamePost = defineAction({
   describeChange: (_db, input) => ({
     changes: [{ field: "title", from: "Draft", to: input.title }],

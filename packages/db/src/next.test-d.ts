@@ -148,6 +148,38 @@ test("a query's definition is read-only and has no describeChange", () => {
   expectTypeOf(query.definition).not.toHaveProperty("describe")
 })
 
+test("a paged query hands run limit and offset, and must resolve to a page", () => {
+  const query = defineQuery({
+    description: "List rows.",
+    name: "list_rows",
+    paged: true,
+    run: (_db, input) => {
+      expectTypeOf(input).toEqualTypeOf<
+        { status?: string } & {
+          readonly limit: number
+          readonly offset: number
+        }
+      >()
+      return { hasMore: false, items: [input.status], total: 1 }
+    },
+    schema: z.object({ status: z.string().optional() }),
+  })
+
+  expectTypeOf(query)
+    .parameter(0)
+    .toExtend<{ limit?: number; offset?: number }>()
+  expectTypeOf(query.definition.paged.maxLimit).toEqualTypeOf<number>()
+
+  defineQuery({
+    description: "List rows.",
+    name: "list_rows",
+    // @ts-expect-error: a paged read resolves to `{ items, total, hasMore }`
+    paged: true,
+    run: () => [1, 2],
+    schema: z.object({}),
+  })
+})
+
 test("the object form of defineFormAction resolves to an ActionResult", () => {
   const action = defineFormAction({
     description: "Save a row.",

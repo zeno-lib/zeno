@@ -113,6 +113,12 @@ This node holds what the code and the guide don't make obvious.
 - **Next redacts a thrown server-action error in production.** That's why `defineFormAction` returns
   its failures, and why `FieldValidationError` is only special inside it.
 - **Any `postgres-js` client on the transaction pooler (port 6543) needs `prepare: false`.**
+- **`paged` wraps the schema without Zod** (`src/pages.ts`), because Zod is an optional peer. Never
+  call `.extend()` there; the wrapper adds `limit` and `offset` to the Standard Schema and its JSON
+  Schema, which `src/next.test.ts` and `@zeno-lib/ai`'s `mcp.test.ts` cover.
+- **`PageRowId` imports `RelationalQueryBuilder` from `drizzle-orm/pg-core/query-builders/query`**, a
+  deep, type-only path. After a Drizzle upgrade, `test/find-page.integration.test.ts` stops
+  type-checking if `rows` receives `unknown[]` ids.
 
 ## Regenerating auth.users
 
