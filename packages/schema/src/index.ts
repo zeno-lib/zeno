@@ -42,12 +42,14 @@ const COLUMN_RULES_KEY = "~zeno"
  * writes the column when a client doesn't: `"server"` code (`serverManaged`),
  * or only the `"database"` (`databaseManaged`, which the audit columns of
  * `timestamps()` and `authorship()` carry). `refine` runs on it in insert and
- * update, and `hint` goes to the form field that edits it.
+ * update, `hint` goes to the form field that edits it, and `description`
+ * (`described`) goes on its schema in every variant.
  */
 type ColumnRule = {
   readonly writer?: "database" | "server"
   readonly refine?: unknown
   readonly hint?: FieldHint
+  readonly description?: string
 }
 
 type Writer = NonNullable<ColumnRule["writer"]>
@@ -67,6 +69,14 @@ type TableColumnRules<TTable extends ZenoTable> =
 type WrittenByKeys<TTable extends ZenoTable, TWriter extends Writer> = {
   [K in keyof TableColumnRules<TTable>]: TableColumnRules<TTable>[K] extends {
     readonly writer: TWriter
+  }
+    ? K
+    : never
+}[keyof TableColumnRules<TTable>]
+
+type DescribedKeys<TTable extends ZenoTable> = {
+  [K in keyof TableColumnRules<TTable>]: TableColumnRules<TTable>[K] extends {
+    readonly description: string
   }
     ? K
     : never
@@ -448,6 +458,51 @@ const withChecks = (
   return composeRefinements(refinements, generated)
 }
 
+// The description on a field or on the schema inside its `.optional()` and
+// `.nullable()`, where drizzle wraps what a caller's function refinement
+// returns.
+const ownDescription = (schema: z.core.$ZodType): string | undefined => {
+  const description = z.globalRegistry.get(schema)?.description
+  const { innerType, type } = schema._zod.def as {
+    innerType?: z.core.$ZodType
+    type: string
+  }
+
+  if (
+    description === undefined &&
+    innerType !== undefined &&
+    (type === "optional" || type === "nullable")
+  ) {
+    return ownDescription(innerType)
+  }
+
+  return description
+}
+
+// Each described column's description, on the field itself rather than on the
+// schema inside its `.nullable()` and `.optional()`, so the JSON Schema
+// property and the field's `.description` carry it. A description the caller
+// gave the column's schema wins, and moves up to the field the same way.
+const describeColumns = (table: ZenoTable, schema: z.ZodObject) => {
+  const rules = columnRules(table)
+  const described: Record<string, z.ZodType> = {}
+
+  for (const key of Object.keys(rules)) {
+    const description = rules[key]?.description
+    const field = schema.shape[key]
+
+    if (
+      description !== undefined &&
+      field !== undefined &&
+      field.description === undefined
+    ) {
+      described[key] = field.describe(ownDescription(field) ?? description)
+    }
+  }
+
+  return Object.keys(described).length === 0 ? schema : schema.extend(described)
+}
+
 // Zod rejects an omit key the shape lacks, which a generated or managed column
 // would be.
 const omitPresent = <TSchema extends z.ZodObject>(
@@ -465,19 +520,23 @@ const omitPresent = <TSchema extends z.ZodObject>(
   return schema.omit(mask)
 }
 
+// The type already refuses a plain drizzle table. This catches a cast, or a
+// caller without TypeScript, before its markers are silently ignored.
+const assertZenoTable = (name: string, table: ZenoTable) => {
+  if (!(COLUMN_RULES_KEY in table)) {
+    throw new TypeError(
+      `${name} reads the column rules of a table from table(), unsecureTable() or schema(...).table in @zeno-lib/db/schema, and "${getTableName(table)}" has none.`
+    )
+  }
+}
+
 const buildTableSchema = (
   name: string,
   table: ZenoTable,
   options: DefineTableSchemaOptions<ZenoTable, CoerceOptions> | undefined,
   excludes: ReadonlySet<Writer>
 ) => {
-  // The type already refuses a plain drizzle table. This catches a cast, or a
-  // caller without TypeScript, before its markers are silently ignored.
-  if (!(COLUMN_RULES_KEY in table)) {
-    throw new TypeError(
-      `${name} reads the column rules of a table from table(), unsecureTable() or schema(...).table in @zeno-lib/db/schema, and "${getTableName(table)}" has none.`
-    )
-  }
+  assertZenoTable(name, table)
 
   const schemaFactory = createDrizzleSchemaFactory(options?.factory)
   const unwritable = unwritableKeys(table, excludes)
@@ -496,22 +555,28 @@ const buildTableSchema = (
     variant: "insert" | "update",
     create: (typeof factory)["createInsertSchema"]
   ) =>
-    omitUnwritable(
-      create(
-        table,
-        withChecks(
+    describeColumns(
+      table,
+      omitUnwritable(
+        create(
           table,
-          formatCheck,
-          withRuleRefinements(table, options?.[variant] as Refinements)
+          withChecks(
+            table,
+            formatCheck,
+            withRuleRefinements(table, options?.[variant] as Refinements)
+          )
         )
       )
     )
 
   return {
     insert: write("insert", factory.createInsertSchema),
-    select: factory.createSelectSchema(
+    select: describeColumns(
       table,
-      withChecks(table, positiveCheck, options?.select as Refinements)
+      factory.createSelectSchema(
+        table,
+        withChecks(table, positiveCheck, options?.select as Refinements)
+      )
     ),
     table,
     update: write("update", factory.createUpdateSchema),
@@ -670,6 +735,41 @@ const ownedRows = <
   >
 }
 
+/**
+ * The description `described` gives a column of `table`, for a schema built
+ * anew around the column, which starts without it:
+ *
+ * ```ts
+ * const taskFilters = z.object({
+ *   statuses: z
+ *     .array(z.enum(tasks.status.enumValues))
+ *     .describe(columnDescription(tasks, "status")),
+ * })
+ * ```
+ *
+ * Only a described column's key type-checks, so removing a description fails
+ * the build where it was read.
+ */
+const columnDescription = <
+  TTable extends ZenoTable,
+  TKey extends Extract<DescribedKeys<TTable>, string>,
+>(
+  table: TTable,
+  key: TKey
+): string => {
+  assertZenoTable("columnDescription", table)
+
+  const description = columnRules(table)[key]?.description
+
+  if (description === undefined) {
+    throw new TypeError(
+      `Column "${key}" of "${getTableName(table)}" has no description: mark it with described() from @zeno-lib/db/schema.`
+    )
+  }
+
+  return description
+}
+
 const isZenoTable = (value: unknown): value is ZenoTable =>
   is(value, Table) && COLUMN_RULES_KEY in value
 
@@ -706,6 +806,7 @@ export type {
   ZenoTable,
 }
 export {
+  columnDescription,
   defineServerTableSchema,
   defineTableSchema,
   ownedRows,

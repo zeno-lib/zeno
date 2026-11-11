@@ -110,8 +110,10 @@ export type FieldHint = {
   readonly field: string
   readonly [key: string]: unknown
 }
+// What the column is, for `defineTableSchema` to carry into its schemas.
+type DescriptionRule = { readonly description: string }
 type ColumnRule = Partial<
-  WriterRule<"database" | "server"> & RefineRule<unknown>
+  WriterRule<"database" | "server"> & RefineRule<unknown> & DescriptionRule
 >
 
 type WithColumnRule<TBuilder, TRule extends ColumnRule> = TBuilder & {
@@ -161,7 +163,7 @@ const markColumn = <
 export const serverManaged = <
   TBuilder extends AnyPgColumnBuilder & {
     readonly [COLUMN_RULES_KEY]?: Partial<
-      WriterRule<"server"> & RefineRule<unknown>
+      WriterRule<"server"> & RefineRule<unknown> & DescriptionRule
     >
   },
 >(
@@ -178,12 +180,32 @@ export const serverManaged = <
 export const databaseManaged = <
   TBuilder extends AnyPgColumnBuilder & {
     readonly [COLUMN_RULES_KEY]?: Partial<
-      WriterRule<"database"> & RefineRule<unknown>
+      WriterRule<"database"> & RefineRule<unknown> & DescriptionRule
     >
   },
 >(
   builder: TBuilder
 ) => markColumn(builder, DATABASE_MANAGED)
+
+/**
+ * What the column holds, said once on the table: `defineTableSchema` puts it
+ * on the column's `insert`, `update` and `select` schemas, so their JSON
+ * Schema carries it, and so does a schema picked from them. The SQL column is
+ * unchanged.
+ *
+ * ```ts
+ * status: described(taskStatus().notNull(), "The stage the task is at")
+ * ```
+ *
+ * A schema built anew around the column, such as `z.array(...)` or
+ * `z.enum(table.status.enumValues)`, starts without it: read it back with
+ * `columnDescription` from `@zeno-lib/schema`. It composes with the other
+ * markers, in any order.
+ */
+export const described = <TBuilder extends AnyPgColumnBuilder>(
+  builder: TBuilder,
+  description: string
+) => markColumn(builder, { description })
 
 // The schema drizzle's Zod bridge generates for the column, before it adds
 // `.nullable()` or `.optional()`: what a function refinement receives.

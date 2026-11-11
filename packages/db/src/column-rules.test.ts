@@ -1,10 +1,15 @@
-import { defineServerTableSchema, defineTableSchema } from "@zeno-lib/schema"
+import {
+  columnDescription,
+  defineServerTableSchema,
+  defineTableSchema,
+} from "@zeno-lib/schema"
 import { generateDrizzleJson } from "drizzle-kit/api-postgres"
 import { sql } from "drizzle-orm"
 import {
   bigint,
   type ExtraConfigColumn,
   index,
+  pgEnum,
   primaryKey,
   text,
   unique,
@@ -16,6 +21,7 @@ import {
   authUserId,
   createdBy,
   databaseManaged,
+  described,
   email,
   functionPolicies,
   percentage,
@@ -233,4 +239,119 @@ describe("ruled columns", () => {
 
 it("refuses a second writer for an audit column", () => {
   expect(() => serverManaged(createdBy() as never)).toThrow(TypeError)
+})
+
+describe("described columns", () => {
+  const taskStatus = pgEnum("task_status", ["todo", "doing", "done"])
+  const tasks = table("tasks", {
+    id: sequentialId(),
+    note: described(text(), "A free note on the task"),
+    progress: described(percentage(), "How much of the task is done"),
+    status: described(taskStatus().notNull(), "The stage the task is at"),
+    tags: described(text().array(), "Labels for search"),
+    title: text().notNull(),
+  })
+  const schemas = defineTableSchema(tasks)
+  const properties = (object: z.ZodType) =>
+    (z.toJSONSchema(object) as { properties: Record<string, object> })
+      .properties
+
+  it("describes the column in every variant and in its JSON Schema", () => {
+    for (const variant of [schemas.insert, schemas.update, schemas.select]) {
+      expect(variant.shape.status.description).toBe("The stage the task is at")
+      expect(properties(variant)).toMatchObject({
+        note: { description: "A free note on the task" },
+        progress: { description: "How much of the task is done" },
+        status: { description: "The stage the task is at" },
+        tags: { description: "Labels for search" },
+      })
+      expect(properties(variant).title).not.toHaveProperty("description")
+    }
+
+    // What an AI tool reads: the schema's Standard JSON Schema.
+    expect(
+      schemas.insert["~standard"].jsonSchema.input({ target: "draft-2020-12" })
+    ).toMatchObject({
+      properties: { status: { description: "The stage the task is at" } },
+    })
+  })
+
+  it("keeps the description through .pick and .partial", () => {
+    const filters = schemas.select.pick({ note: true, status: true }).partial()
+
+    expect(properties(filters)).toMatchObject({
+      note: { description: "A free note on the task" },
+      status: { description: "The stage the task is at" },
+    })
+  })
+
+  it("keeps the column's rule and form hint", () => {
+    const hints = (globalThis as Record<symbol, z.core.$ZodRegistry>)[
+      Symbol.for("@zeno-lib/field-hints")
+    ]
+
+    expect(
+      schemas.insert.safeParse({ progress: 2, status: "todo", title: "x" })
+        .success
+    ).toBe(false)
+    expect(hints?.get(schemas.insert.shape.progress.unwrap().unwrap())).toEqual(
+      { field: "percentage", scale: "fraction" }
+    )
+  })
+
+  it("lets a caller's description win, inside drizzle's wrappers too", () => {
+    const { insert, select, update } = defineTableSchema(tasks, {
+      insert: { note: (base) => base.describe("A note for the reviewer") },
+      select: { note: (base) => base.describe("A note for the reviewer") },
+      update: { status: (base) => base.describe("Where the task stands") },
+    })
+
+    // An optional status in update, a nullable note in insert and select.
+    expect(update.shape.status.description).toBe("Where the task stands")
+    for (const variant of [insert, select]) {
+      expect(variant.shape.note.description).toBe("A note for the reviewer")
+      expect(JSON.stringify(properties(variant).note)).not.toContain(
+        "A free note on the task"
+      )
+    }
+    // A function refinement that doesn't describe keeps the column's.
+    expect(
+      defineTableSchema(tasks, { insert: { note: (base) => base.min(1) } })
+        .insert.shape.note.description
+    ).toBe("A free note on the task")
+  })
+
+  it("reads the description back for a schema built anew", () => {
+    const filters = z.object({
+      statuses: z
+        .array(z.enum(tasks.status.enumValues))
+        .describe(columnDescription(tasks, "status")),
+    })
+
+    expect(properties(filters).statuses).toMatchObject({
+      description: "The stage the task is at",
+    })
+    expect(() => columnDescription(tasks, "title" as never)).toThrow(TypeError)
+    expect(() =>
+      columnDescription(
+        snakeCase.table("raw", { label: text() }) as never,
+        "label" as never
+      )
+    ).toThrow("reads the column rules of a table from table()")
+  })
+
+  it("changes no DDL", async () => {
+    const undescribed = table("tasks", {
+      id: sequentialId(),
+      note: text(),
+      progress: percentage(),
+      status: taskStatus().notNull(),
+      tags: text().array(),
+      title: text().notNull(),
+    })
+
+    expect((await generateDrizzleJson({ taskStatus, tasks })).ddl).toEqual(
+      (await generateDrizzleJson({ taskStatus, tasks: undescribed })).ddl
+    )
+  })
 })

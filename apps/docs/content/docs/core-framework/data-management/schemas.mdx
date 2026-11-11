@@ -259,6 +259,71 @@ userId: authUserId({ defaultToCurrentUser: true, notNull: true })
 - The markers only work inside Zeno's `table`, `unsecureTable` and
   `schema(...).table`. Drizzle's own `pgTable` drops them.
 
+### Describe a column once
+
+What a column means belongs on the column as well. `described(builder,
+description)` records it, and `defineTableSchema` puts it on the column's schema
+in `insert`, `update` and `select`, so the JSON Schema an AI tool or an MCP
+endpoint sends carries it. The SQL column is unchanged: Drizzle Kit sees the
+same column and generates no migration.
+
+```ts title="{project}-db/src/schema/posts.ts"
+import { described, primaryId, table } from "@zeno-lib/db/schema"
+import { pgEnum, text } from "drizzle-orm/pg-core"
+
+export const postStatus = pgEnum("post_status", ["draft", "review", "published"])
+
+export const posts = table("posts", {
+  id: primaryId("uuid"),
+  status: described(
+    postStatus("status").notNull(),
+    "Where the post is in its review"
+  ),
+  summary: described(text("summary"), "A one-line teaser shown in listings"),
+  title: text("title").notNull(),
+})
+```
+
+A schema you derive from a variant keeps the description, because `.pick`,
+`.omit`, `.extend` and `.partial()` reuse the column's schema. A tool's filter
+picks what it takes, with no description of its own:
+
+```ts title="{project}-forms/src/posts/schemas.ts"
+export const postFiltersSchema = postSchema.select
+  .pick({ status: true })
+  .partial()
+```
+
+`.partial()` wraps each field, so its JSON Schema keeps the description but
+the wrapped field's `.description` reads `undefined`; read it before.
+
+A schema built anew around the column starts without it: `z.array(...)`,
+`.array()` on the field (which moves the description to the items), or
+`z.enum(posts.status.enumValues)`. Read the description back with
+`columnDescription(table, key)` and describe the new schema with it:
+
+```ts title="{project}-forms/src/posts/schemas.ts"
+import { columnDescription } from "@zeno-lib/schema"
+import { posts } from "{project}-db"
+import { z } from "zod"
+
+export const postSearchSchema = z.object({
+  statuses: z
+    .array(postSchema.select.shape.status)
+    .describe(columnDescription(posts, "status")),
+})
+```
+
+- `columnDescription` only takes the key of a described column, so removing a
+  description fails the build where it was read, instead of a prompt silently
+  losing it.
+- `described` composes with `withRule`, `serverManaged` and `databaseManaged`,
+  in any order, and with `.array()`, which describes the array column.
+- A schema you pass as a refinement that has a description of its own keeps
+  it. To word a filter differently, call `.describe()` on it yourself.
+- Zeno doesn't derive filter schemas or `where` clauses from a table. Pick what
+  a filter takes from a variant, as above.
+
 ### Review what clients may write
 
 A column is writable unless something marks it, so adding a column to a table
