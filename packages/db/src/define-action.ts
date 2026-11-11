@@ -276,8 +276,14 @@ export interface DefineQuery<TContext extends ActionContext<unknown>> {
       TResult
     > & { readonly paged: PageLimits }
   >
+  // `paged?: undefined`, or TypeScript's first, stricter pass over the
+  // overloads picks this one for `paged: BOUNDS` with `BOUNDS` declared
+  // `as const`, which lacks `PageOptions`' other keys, and `run` loses
+  // `limit` and `offset`.
   <TInput, TOutput, TResult>(
-    options: QueryOptions<TContext, TInput, TOutput, TResult>
+    options: QueryOptions<TContext, TInput, TOutput, TResult> & {
+      readonly paged?: undefined
+    }
   ): Defined<
     (input: TInput) => Promise<ActionValue<TResult>>,
     QueryDefinition<TContext, TInput, TOutput, TResult>
