@@ -566,6 +566,152 @@ describe("the object form", () => {
   )
 })
 
+describe("a paged query", () => {
+  const requestContext = { claims: { sub: "request-user" }, db: "request-db" }
+  // Strict, as a tool's schema is: it would refuse `limit` and `offset`.
+  const filters = z
+    .object({ status: z.enum(["open", "done"]).optional() })
+    .strict()
+  const definePaged = (paged: true | { maxLimit: number }) =>
+    createDefineQuery(() => Promise.resolve(requestContext))({
+      description: "List rows.",
+      name: "list_rows",
+      paged,
+      run: (_db, input) => ({ hasMore: false, items: [input], total: 1 }),
+      schema: filters,
+    })
+
+  it("hands run the parsed filters with limit and offset, defaulted", async () => {
+    const query = definePaged({ maxLimit: 10 })
+
+    await expect(query({ status: "open" })).resolves.toMatchObject({
+      items: [{ limit: 10, offset: 0, status: "open" }],
+    })
+    // A model often sends `null` for an argument it leaves out.
+    await expect(
+      query.definition.invoke(
+        { limit: null, offset: null } as never,
+        requestContext
+      )
+    ).resolves.toMatchObject({ items: [{ limit: 10, offset: 0 }] })
+    await expect(
+      query.definition.invoke({ limit: 5, offset: 10 }, requestContext)
+    ).resolves.toMatchObject({ items: [{ limit: 5, offset: 10 }] })
+    expect(query.definition.paged.maxLimit).toBe(10)
+    expect(query.definition.description).toContain("at most 10")
+  })
+
+  it("refuses a limit or an offset out of bounds before it runs", async () => {
+    const query = definePaged({ maxLimit: 10 })
+
+    await expect(query({ limit: 11 })).rejects.toThrow("limit")
+    await expect(query({ limit: 1.5 })).rejects.toThrow("limit")
+    await expect(query({ offset: -1 })).rejects.toThrow("offset")
+    await expect(query({ offset: 10_001 })).rejects.toThrow("offset")
+    await expect(query({ status: "lost" } as never)).rejects.toBeInstanceOf(
+      z.ZodError
+    )
+  })
+
+  it("describes limit and offset to a tool list, and validates them there", async () => {
+    const standard = definePaged({ maxLimit: 10 }).definition.schema[
+      "~standard"
+    ] as {
+      jsonSchema: { input: (options: { target: string }) => unknown }
+      validate: (value: unknown) => Promise<unknown>
+    }
+
+    expect(
+      standard.jsonSchema.input({ target: "draft-2020-12" })
+    ).toMatchObject({
+      additionalProperties: false,
+      properties: {
+        limit: { default: 10, maximum: 10, minimum: 1, type: "integer" },
+        offset: { default: 0, minimum: 0, type: "integer" },
+        status: { enum: ["open", "done"] },
+      },
+      type: "object",
+    })
+    await expect(
+      standard.validate({ limit: 0, status: "lost" })
+    ).resolves.toMatchObject({
+      issues: [{ path: ["limit"] }, { path: ["status"] }],
+    })
+    await expect(standard.validate({ status: "open" })).resolves.toEqual({
+      value: { limit: 10, offset: 0, status: "open" },
+    })
+  })
+
+  it("refuses a schema that takes limit or offset itself, and bounds that cross", () => {
+    const define = createDefineQuery(() => Promise.resolve(requestContext))
+    const options = {
+      description: "List rows.",
+      name: "list_rows",
+      run: () => ({ hasMore: false, items: [], total: 0 }),
+    }
+    const toJsonSchema = (schema: unknown) =>
+      (
+        schema as {
+          "~standard": { jsonSchema: { input: (o: object) => unknown } }
+        }
+      )["~standard"].jsonSchema.input({ target: "draft-2020-12" })
+
+    expect(() =>
+      toJsonSchema(
+        define({
+          ...options,
+          paged: true,
+          schema: z.object({ limit: z.number() }),
+        }).definition.schema
+      )
+    ).toThrow("neither limit nor offset")
+    expect(() =>
+      define({
+        ...options,
+        paged: { defaultLimit: 60 },
+        schema: filters,
+      })
+    ).toThrow(RangeError)
+  })
+
+  it("converts to JSON Schema only for a tool list, and reads a schema behind a $ref", async () => {
+    const define = createDefineQuery(() => Promise.resolve(requestContext))
+    const options = {
+      description: "List rows.",
+      name: "list_rows",
+      paged: true as const,
+      run: (_db: unknown, input: object) => ({
+        hasMore: false,
+        items: [input],
+        total: 1,
+      }),
+    }
+    // JSON Schema has no `Date`, yet a screen can still call the read.
+    const byDate = define({
+      ...options,
+      schema: z.object({ before: z.date().optional() }),
+    })
+    const named = define({
+      ...options,
+      schema: z.object({ status: z.string() }).meta({ id: "Filters" }),
+    })
+
+    await expect(byDate({ before: new Date(0) })).resolves.toMatchObject({
+      items: [{ limit: 20 }],
+    })
+    expect(
+      (
+        named.definition.schema as unknown as {
+          "~standard": { jsonSchema: { input: (o: object) => unknown } }
+        }
+      )["~standard"].jsonSchema.input({ target: "draft-2020-12" })
+    ).toMatchObject({
+      properties: { limit: {}, offset: {}, status: { type: "string" } },
+      type: "object",
+    })
+  })
+})
+
 describe("getBearerContext", () => {
   const oauthClaims: JwtPayload = { ...claims, client_id: "client-1" }
 

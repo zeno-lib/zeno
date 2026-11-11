@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import {
   getBearerContext,
   getPost,
+  listPosts,
   received,
   renamePost,
 } from "./fixtures.test-utils.ts"
@@ -19,7 +20,7 @@ const route = createMcpRoute({
   getContext: getBearerContext,
   name: "example",
   resourceMetadataUrl: () => METADATA_URL,
-  tools: [getPost],
+  tools: [getPost, listPosts],
   version: "1.0.0",
 })
 
@@ -76,11 +77,35 @@ describe("createMcpRoute", () => {
         inputSchema: { properties: { id: { type: "string" } } },
         name: "get_post",
       },
+      { name: "list_posts" },
     ])
     expect(result.content).toEqual([
       { text: '{"id":7,"title":"Draft"}', type: "text" },
     ])
     expect(received).toEqual([{ id: 7 }])
+  })
+
+  it("lists a paged query's limit and offset, and checks them before it runs", async () => {
+    const connected = await connect({ pin: "2026-07-28" })
+    const { tools } = await connected.listTools()
+
+    expect(tools.find(({ name }) => name === "list_posts")).toMatchObject({
+      inputSchema: {
+        properties: {
+          limit: { type: "integer" },
+          offset: { type: "integer" },
+          status: { enum: ["draft", "published"] },
+        },
+      },
+    })
+    await expect(
+      connected.callTool({ arguments: { limit: 1000 }, name: "list_posts" })
+    ).resolves.toMatchObject({ isError: true })
+    await connected.callTool({
+      arguments: { status: "draft" },
+      name: "list_posts",
+    })
+    expect(received).toMatchObject([{ offset: 0, status: "draft" }])
   })
 
   it("answers a request without a valid token with a 401 that points at the metadata", async () => {

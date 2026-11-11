@@ -13,11 +13,11 @@ covers the definitions themselves; this page covers turning them into a tool lis
 Keep one list per app, next to your query map, and add a definition to it on purpose:
 
 ```typescript title="app/agent-tools.ts"
-import { listPostsForAgentQuery } from "@/app/posts/agent-reads"
+import { listPostsQuery } from "@/app/posts/reads"
 import { renamePostAction } from "@/app/posts/actions"
 
 // The MCP route serves reads only, so keep them in a list of their own.
-export const agentReads = [listPostsForAgentQuery]
+export const agentReads = [listPostsQuery]
 export const agentTools = [...agentReads, renamePostAction]
 ```
 
@@ -33,29 +33,37 @@ The list is checked when an adapter is built from it, and the adapter throws whe
 A screen's read returns what the screen draws: every column, every relation, every row. A model pays
 for each token of it and reads it less well. Give an agent its own thin read over the same tables:
 
-- **A limit**, small by default, with a maximum the schema enforces.
+- **A page**, small by default, with a maximum the schema enforces: `paged` adds `limit` and
+  `offset`, and [`findPage`](/docs/core-framework/data-management/database/querying#paging-a-list)
+  returns the page with how many rows match in all, so the model knows when to ask for more.
 - **Filters** the model can fill from a question ("my drafts"), described in the
   schema with `.describe()`.
 - **Trimmed columns**: names, states and dates, not every relation. Add a second tool for the detail
   of one record.
 
-```typescript title="app/posts/agent-reads.ts"
-export const listPostsForAgentQuery = defineQuery({
+```typescript title="app/posts/reads.ts"
+export const listPostsQuery = defineQuery({
   name: "list_posts",
-  description: "List the caller's posts, newest first. 20 by default, at most 50.",
+  description: "List the caller's posts, newest first.",
+  paged: true,
   schema: z.object({
     status: z.enum(["draft", "published"]).optional().describe("Only posts in this state"),
-    limit: z.number().int().min(1).max(50).default(20),
   }),
-  run: (db, { status, limit }) =>
-    db.query.posts.findMany({
-      columns: { id: true, status: true, title: true, updatedAt: true },
+  run: (db, { status, limit, offset }) =>
+    findPage(db.query.posts, { limit, offset }, {
       where: status ? { status } : undefined,
-      orderBy: { updatedAt: "desc" },
-      limit,
+      orderBy: { updatedAt: "desc", id: "desc" },
+      rows: (ids) =>
+        db.query.posts.findMany({
+          columns: { id: true, status: true, title: true, updatedAt: true },
+          where: { id: { in: ids } },
+        }),
     }),
 })
 ```
+
+`paged: true` takes 20 rows by default and at most 50, and adds the sentence that tells the model
+how to read `total` and `hasMore` and ask for the next page.
 
 ## Approvals that show the change
 
