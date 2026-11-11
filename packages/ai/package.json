@@ -1,6 +1,6 @@
 {
   "name": "@zeno-lib/ai",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "repository": {
     "url": "https://github.com/zeno-lib/zeno.git",
     "directory": "packages/ai"
@@ -53,7 +53,7 @@
   },
   "peerDependencies": {
     "@modelcontextprotocol/server": ">=2",
-    "@zeno-lib/db": ">=0.19.0",
+    "@zeno-lib/db": ">=0.20.0",
     "ai": ">=7"
   },
   "peerDependenciesMeta": {
