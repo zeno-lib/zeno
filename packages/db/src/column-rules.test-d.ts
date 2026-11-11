@@ -1,4 +1,8 @@
-import { defineServerTableSchema, defineTableSchema } from "@zeno-lib/schema"
+import {
+  columnDescription,
+  defineServerTableSchema,
+  defineTableSchema,
+} from "@zeno-lib/schema"
 import { sql } from "drizzle-orm"
 import {
   bigint,
@@ -16,6 +20,7 @@ import {
   authUserId,
   createdBy,
   databaseManaged,
+  described,
   percentage,
   schema as pgSchema,
   sequentialId,
@@ -207,4 +212,21 @@ test("a table in an existing schema keeps its column rules", () => {
   const { insert } = defineTableSchema(invoices)
 
   expectTypeOf<keyof z.infer<typeof insert>>().toEqualTypeOf<"note">()
+})
+
+test("a description reads back only from a described column, and composes with the other markers", () => {
+  const notes = table("notes", {
+    body: described(text().notNull(), "The note itself"),
+    ownerId: serverManaged(described(authUserId(), "Who wrote it")),
+    share: described(percentage(), "The share it covers"),
+    title: text().notNull(),
+  })
+
+  expectTypeOf(columnDescription(notes, "body")).toEqualTypeOf<string>()
+  // @ts-expect-error: `title` has no description.
+  columnDescription(notes, "title")
+
+  expectTypeOf<
+    keyof z.infer<ReturnType<typeof defineTableSchema<typeof notes>>["insert"]>
+  >().toEqualTypeOf<"body" | "share" | "title">()
 })
