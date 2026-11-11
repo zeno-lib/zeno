@@ -76,6 +76,15 @@ export const listPosts = defineQuery({
     .strict(),
 })
 
+export const getHiddenPost = defineQuery({
+  description: "Read a post the user can't see.",
+  name: "get_hidden_post",
+  run: () => {
+    throw new Error("No post 9 for this user")
+  },
+  schema: z.object({}),
+})
+
 export const renamePost = defineAction({
   describeChange: (_db, input) => ({
     changes: [{ field: "title", from: "Draft", to: input.title }],

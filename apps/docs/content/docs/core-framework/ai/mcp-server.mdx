@@ -151,3 +151,46 @@ export const GET = (request: Request) =>
 
 Add `/mcp` and `/.well-known/oauth-protected-resource` to the middleware's `publicPaths`: both do
 their own bearer auth, and a redirect to sign-in would break the client.
+
+## Audit tool calls
+
+`onToolCall(call, context)` runs once after each call to one of `tools`, with the caller's context,
+to keep a record of who called what:
+
+```typescript title="app/mcp/route.ts"
+export const { GET, POST, DELETE } = createMcpRoute({
+  // …
+  onToolCall: async (call, { claims, via }) => {
+    // A paged read returns { items, total, hasMore }.
+    const page = call.ok
+      ? (call.result as { items?: unknown[]; total?: number } | null)
+      : null
+    await adminDb.insert(mcpToolCalls).values({
+      userId: claims.sub,
+      client: via,
+      tool: call.name,
+      input: call.input,
+      rows: page?.items?.length ?? null,
+      total: page?.total ?? null,
+      error: call.ok ? null : String(call.error),
+      durationMs: Math.round(call.durationMs),
+    })
+  },
+  onError: (error) => console.error(error),
+})
+```
+
+- `call.input` is the input as the tool's schema parsed it, with a paged read's `limit` and `offset`
+  filled in. `call.result` is what the definition returned, before it became JSON text: what to
+  count from it is yours to pick.
+- A failed call has `ok: false` and the `error` the tool threw. Input the schema refuses is reported
+  too, with the arguments the client sent and a `ToolInputError` whose `issues` say why; the tool
+  never ran.
+- The answer waits for `onToolCall`, so the record is written before the client sees the result:
+  on a serverless host, work left running after the response can be frozen or dropped. Its time
+  adds to every call's, so keep it to one write and bound it (a statement timeout).
+- Whatever `onToolCall` throws goes to `onError`, and the client's answer is unchanged. Set
+  `onError` too, or a failing audit write goes unnoticed.
+- A call naming a tool the route doesn't serve is refused by the MCP SDK before any of the route's
+  code runs, so it is not reported. Neither are the tools `setup` registers: instrument their
+  handlers yourself.
