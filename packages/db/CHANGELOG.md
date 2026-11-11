@@ -1,5 +1,11 @@
 # @zeno-lib/db
 
+## 0.18.1
+
+### Patch Changes
+
+- 209d75f: `defineQuery({ paged: BOUNDS, … })` with `BOUNDS` declared `as const` now types `run`'s `limit` and `offset`. TypeScript used to pick the non-paged overload for it, so the input lost both.
+
 ## 0.18.0
 
 ### Minor Changes
