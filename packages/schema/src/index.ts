@@ -458,10 +458,31 @@ const withChecks = (
   return composeRefinements(refinements, generated)
 }
 
+// The description on a field or on the schema inside its `.optional()` and
+// `.nullable()`, where drizzle wraps what a caller's function refinement
+// returns.
+const ownDescription = (schema: z.core.$ZodType): string | undefined => {
+  const description = z.globalRegistry.get(schema)?.description
+  const { innerType, type } = schema._zod.def as {
+    innerType?: z.core.$ZodType
+    type: string
+  }
+
+  if (
+    description === undefined &&
+    innerType !== undefined &&
+    (type === "optional" || type === "nullable")
+  ) {
+    return ownDescription(innerType)
+  }
+
+  return description
+}
+
 // Each described column's description, on the field itself rather than on the
 // schema inside its `.nullable()` and `.optional()`, so the JSON Schema
-// property and the field's `.description` carry it. A caller's schema that
-// has a description of its own keeps it.
+// property and the field's `.description` carry it. A description the caller
+// gave the column's schema wins, and moves up to the field the same way.
 const describeColumns = (table: ZenoTable, schema: z.ZodObject) => {
   const rules = columnRules(table)
   const described: Record<string, z.ZodType> = {}
@@ -475,7 +496,7 @@ const describeColumns = (table: ZenoTable, schema: z.ZodObject) => {
       field !== undefined &&
       field.description === undefined
     ) {
-      described[key] = field.describe(description)
+      described[key] = field.describe(ownDescription(field) ?? description)
     }
   }
 
@@ -499,19 +520,23 @@ const omitPresent = <TSchema extends z.ZodObject>(
   return schema.omit(mask)
 }
 
+// The type already refuses a plain drizzle table. This catches a cast, or a
+// caller without TypeScript, before its markers are silently ignored.
+const assertZenoTable = (name: string, table: ZenoTable) => {
+  if (!(COLUMN_RULES_KEY in table)) {
+    throw new TypeError(
+      `${name} reads the column rules of a table from table(), unsecureTable() or schema(...).table in @zeno-lib/db/schema, and "${getTableName(table)}" has none.`
+    )
+  }
+}
+
 const buildTableSchema = (
   name: string,
   table: ZenoTable,
   options: DefineTableSchemaOptions<ZenoTable, CoerceOptions> | undefined,
   excludes: ReadonlySet<Writer>
 ) => {
-  // The type already refuses a plain drizzle table. This catches a cast, or a
-  // caller without TypeScript, before its markers are silently ignored.
-  if (!(COLUMN_RULES_KEY in table)) {
-    throw new TypeError(
-      `${name} reads the column rules of a table from table(), unsecureTable() or schema(...).table in @zeno-lib/db/schema, and "${getTableName(table)}" has none.`
-    )
-  }
+  assertZenoTable(name, table)
 
   const schemaFactory = createDrizzleSchemaFactory(options?.factory)
   const unwritable = unwritableKeys(table, excludes)
@@ -530,9 +555,9 @@ const buildTableSchema = (
     variant: "insert" | "update",
     create: (typeof factory)["createInsertSchema"]
   ) =>
-    omitUnwritable(
-      describeColumns(
-        table,
+    describeColumns(
+      table,
+      omitUnwritable(
         create(
           table,
           withChecks(
@@ -732,11 +757,9 @@ const columnDescription = <
   table: TTable,
   key: TKey
 ): string => {
-  const description = (
-    table[COLUMN_RULES_KEY]?.columns as
-      | Record<string, ColumnRule | undefined>
-      | undefined
-  )?.[key]?.description
+  assertZenoTable("columnDescription", table)
+
+  const description = columnRules(table)[key]?.description
 
   if (description === undefined) {
     throw new TypeError(

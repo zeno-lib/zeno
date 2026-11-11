@@ -299,12 +299,26 @@ describe("described columns", () => {
     )
   })
 
-  it("lets a caller's described schema keep its own description", () => {
-    const { insert } = defineTableSchema(tasks, {
-      insert: { status: (base) => base.describe("Where the task stands") },
+  it("lets a caller's description win, inside drizzle's wrappers too", () => {
+    const { insert, select, update } = defineTableSchema(tasks, {
+      insert: { note: (base) => base.describe("A note for the reviewer") },
+      select: { note: (base) => base.describe("A note for the reviewer") },
+      update: { status: (base) => base.describe("Where the task stands") },
     })
 
-    expect(insert.shape.status.description).toBe("Where the task stands")
+    // An optional status in update, a nullable note in insert and select.
+    expect(update.shape.status.description).toBe("Where the task stands")
+    for (const variant of [insert, select]) {
+      expect(variant.shape.note.description).toBe("A note for the reviewer")
+      expect(JSON.stringify(properties(variant).note)).not.toContain(
+        "A free note on the task"
+      )
+    }
+    // A function refinement that doesn't describe keeps the column's.
+    expect(
+      defineTableSchema(tasks, { insert: { note: (base) => base.min(1) } })
+        .insert.shape.note.description
+    ).toBe("A free note on the task")
   })
 
   it("reads the description back for a schema built anew", () => {
@@ -318,6 +332,12 @@ describe("described columns", () => {
       description: "The stage the task is at",
     })
     expect(() => columnDescription(tasks, "title" as never)).toThrow(TypeError)
+    expect(() =>
+      columnDescription(
+        snakeCase.table("raw", { label: text() }) as never,
+        "label" as never
+      )
+    ).toThrow("reads the column rules of a table from table()")
   })
 
   it("changes no DDL", async () => {

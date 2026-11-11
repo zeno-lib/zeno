@@ -19,7 +19,7 @@ from Drizzle tables. The user guide is in
   type and value, on the table. An omit the inferred type doesn't also make offers a key the
   runtime strips; `packages/db/src/column-rules.test.ts` and `.test-d.ts` pin both sides.
 - **`COLUMN_RULES_KEY` in `src/index.ts` mirrors `@zeno-lib/db/schema`.** Rename both together,
-  along with the rule shapes (`writer`, `refine`).
+  along with the rule shapes (`writer`, `refine`, `hint`, `description`).
 - **Never leave a column out of a write for its name.** Only an identity or a marker does that.
 - **Never point `exports` back at `src/`.** A consumer's Next build doesn't transpile
   `node_modules` and fails with "Unknown module type". `dist/` is gitignored and built by
@@ -31,7 +31,8 @@ from Drizzle tables. The user guide is in
   restores `.optional()` for a nullable or defaulted column. Keep it until Drizzle's
   `HandleRefinement` does the same.
 - **Option refinements are per variant.** A rule under `insert` doesn't reach `select` or
-  `update`. A column rule reaches `insert` and `update`, never `select`, and a caller's function
-  refinement for the same column receives the rule's schema.
+  `update`. A column rule (`refine`) reaches `insert` and `update`, never `select`, and a caller's
+  function refinement for the same column receives the rule's schema. A `description` reaches all
+  three.
 - **Identity columns leave `insert` and `update`**, `by default` ones included. In `select`, those
   counting from 1 get `.positive()`, and a function refinement on one receives the positive schema.
