@@ -11,13 +11,12 @@ export interface PageInput {
 
 /**
  * A paged read's result: its items, how many rows match in all, and whether
- * more follow this page. `total` is `null` when unknown: an offset past the
- * last row reads no row to count with.
+ * more follow this page.
  */
 export interface Page<TItem> {
   readonly hasMore: boolean
   readonly items: TItem[]
-  readonly total: number | null
+  readonly total: number
 }
 
 /** The bounds of a paged read's `limit` and `offset`. */
@@ -43,10 +42,11 @@ export const toPageLimits = (paged: true | PageOptions): PageLimits => {
   const options = paged === true ? {} : paged
   const maxLimit = options.maxLimit ?? DEFAULT_PAGE_LIMITS.maxLimit
   const limits = {
-    defaultLimit: Math.min(DEFAULT_PAGE_LIMITS.defaultLimit, maxLimit),
-    maxOffset: DEFAULT_PAGE_LIMITS.maxOffset,
-    ...options,
+    defaultLimit:
+      options.defaultLimit ??
+      Math.min(DEFAULT_PAGE_LIMITS.defaultLimit, maxLimit),
     maxLimit,
+    maxOffset: options.maxOffset ?? DEFAULT_PAGE_LIMITS.maxOffset,
   }
   const { defaultLimit, maxOffset } = limits
   if (
@@ -102,9 +102,14 @@ type StandardParts = {
   ) => Validation<unknown> | Promise<Validation<unknown>>
 }
 
-/** `limit` and `offset` read off the input, with the problems found. */
+/**
+ * `limit` and `offset` read off the input, with the problems found. A missing
+ * or `null` one takes its default: a model often sends `null` for an optional
+ * argument it means to leave out.
+ */
 const readPage = (value: Record<string, unknown>, limits: PageLimits) => {
-  const { limit = limits.defaultLimit, offset = 0 } = value
+  const limit = value.limit ?? limits.defaultLimit
+  const offset = value.offset ?? 0
   const issues: Issue[] = []
   if (!isInteger(limit, 1, limits.maxLimit)) {
     issues.push({
@@ -148,8 +153,27 @@ const pageProperties = ({ defaultLimit, maxLimit, maxOffset }: PageLimits) => ({
   },
 })
 
-// The JSON Schema an AI app reads: the read's own object schema, plus
-// `limit` and `offset`. In the output both are always present.
+const DEFS_REF = "#/$defs/"
+
+/**
+ * The object schema a JSON Schema describes: itself, or the `$defs` entry its
+ * top-level `$ref` names, as Zod writes a schema given an `id` in `.meta()`.
+ */
+const resolveObject = (schema: Record<string, unknown>) => {
+  const ref = schema.$ref
+  if (typeof ref !== "string" || !ref.startsWith(DEFS_REF)) {
+    return schema
+  }
+  const defs = schema.$defs as
+    | Record<string, Record<string, unknown>>
+    | undefined
+  return defs?.[ref.slice(DEFS_REF.length)] ?? schema
+}
+
+// The JSON Schema an AI app reads: the read's own object schema, plus `limit`
+// and `offset`, both always present in the output. It converts only when a
+// tool list asks, so a schema JSON Schema can't express (a `Date`) still
+// works on a screen.
 const withPageProperties =
   (
     convert: JsonSchemaConverter,
@@ -157,23 +181,49 @@ const withPageProperties =
     io: "input" | "output"
   ): JsonSchemaConverter =>
   (options) => {
-    const schema = convert(options)
+    const converted = convert(options)
+    const target = resolveObject(converted)
+    const { $ref: _ref, ...rest } = converted
+    // Keeps `$defs`, which the object's own properties may still point into.
+    const schema = target === converted ? converted : { ...rest, ...target }
     const properties = schema.properties as Record<string, unknown> | undefined
     if (schema.type !== "object" || !properties) {
       throw new TypeError("paged needs an object schema")
+    }
+    if ("limit" in properties || "offset" in properties) {
+      throw new TypeError(
+        "A paged read's schema takes neither limit nor offset: paged adds both"
+      )
     }
     const required = (schema.required as string[] | undefined) ?? []
     return {
       ...schema,
       properties: { ...properties, ...pageProperties(limits) },
-      ...(io === "output" || required.length > 0
-        ? {
-            required:
-              io === "output" ? [...required, "limit", "offset"] : required,
-          }
+      ...(io === "output"
+        ? { required: [...required, "limit", "offset"] }
         : {}),
     }
   }
+
+/** The wrapped schema's validation, as issues even when it only throws. */
+const validateOwn = async (
+  schema: ActionSchema<unknown, unknown>,
+  standard: StandardParts,
+  input: unknown
+): Promise<Validation<unknown>> => {
+  if (standard.validate) {
+    return await standard.validate(input)
+  }
+  try {
+    return { value: schema.parse(input) }
+  } catch (error) {
+    return {
+      issues: [
+        { message: error instanceof Error ? error.message : String(error) },
+      ],
+    }
+  }
+}
 
 /**
  * A paged read's schema: the read's own schema, which never sees `limit` or
@@ -187,15 +237,6 @@ export function withPageSchema<TInput, TOutput>(
 ): ActionSchema<TInput & Partial<PageInput>, TOutput & PageInput> {
   const standard = schema["~standard"] as StandardParts
   const { jsonSchema } = standard
-  if (jsonSchema) {
-    const properties = jsonSchema.input({ target: "draft-2020-12" })
-      .properties as Record<string, unknown> | undefined
-    if (properties && ("limit" in properties || "offset" in properties)) {
-      throw new TypeError(
-        "A paged read's schema takes neither limit nor offset: paged adds both"
-      )
-    }
-  }
   const parse = (input: unknown) => {
     const { issues, page } = readPage(isRecord(input) ? input : {}, limits)
     if (issues.length > 0) {
@@ -205,9 +246,7 @@ export function withPageSchema<TInput, TOutput>(
   }
   const validate = async (input: unknown): Promise<Validation<unknown>> => {
     const { issues, page } = readPage(isRecord(input) ? input : {}, limits)
-    const own = standard.validate
-      ? await standard.validate(withoutPage(input))
-      : { value: schema.parse(withoutPage(input)) }
+    const own = await validateOwn(schema, standard, withoutPage(input))
     if (own.issues || issues.length > 0) {
       return { issues: [...issues, ...(own.issues ?? [])] }
     }

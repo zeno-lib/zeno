@@ -108,7 +108,7 @@ it("pages the matching rows in order, with their relations and the total", async
   })
 })
 
-it("knows the total is 0 when nothing matches, and not past the last row", async () => {
+it("counts every match even on a page past the last row", async () => {
   await withPosts(async (tx) => {
     await expect(readPage(tx, 0, 4)).resolves.toEqual({
       hasMore: false,
@@ -118,7 +118,12 @@ it("knows the total is 0 when nothing matches, and not past the last row", async
     await expect(readPage(tx, 6)).resolves.toEqual({
       hasMore: false,
       items: [],
-      total: null,
+      total: 5,
+    })
+    await expect(readPage(tx, 2, 4)).resolves.toEqual({
+      hasMore: false,
+      items: [],
+      total: 0,
     })
   })
 })

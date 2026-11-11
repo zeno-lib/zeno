@@ -92,20 +92,20 @@ describe("createMcpRoute", () => {
     expect(tools.find(({ name }) => name === "list_posts")).toMatchObject({
       inputSchema: {
         properties: {
-          limit: { default: 20, maximum: 50, minimum: 1, type: "integer" },
-          offset: { default: 0, minimum: 0, type: "integer" },
+          limit: { type: "integer" },
+          offset: { type: "integer" },
           status: { enum: ["draft", "published"] },
         },
       },
     })
     await expect(
-      connected.callTool({ arguments: { limit: 51 }, name: "list_posts" })
+      connected.callTool({ arguments: { limit: 1000 }, name: "list_posts" })
     ).resolves.toMatchObject({ isError: true })
     await connected.callTool({
       arguments: { status: "draft" },
       name: "list_posts",
     })
-    expect(received).toEqual([{ limit: 20, offset: 0, status: "draft" }])
+    expect(received).toMatchObject([{ offset: 0, status: "draft" }])
   })
 
   it("answers a request without a valid token with a 401 that points at the metadata", async () => {

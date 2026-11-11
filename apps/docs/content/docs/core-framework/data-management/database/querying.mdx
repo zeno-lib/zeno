@@ -437,8 +437,10 @@ export const renamePostAction = defineAction({
 - `paged: true` (or `paged: { defaultLimit, maxLimit, maxOffset }`, 20, 50 and
   10,000 by default) makes a query a paged read. It adds `limit` and `offset`
   to `schema`, which must be an object schema without them, checks and
-  defaults both before `run`, and adds them to the JSON Schema a tool list
-  shows. `run` receives them with the rest of the input and must resolve to a
+  defaults both before `run` (`null` takes the default, as a model often sends
+  it), and adds them to the JSON Schema a tool list shows. The JSON Schema is
+  built only when a tool list asks for it, so a schema it can't express (a
+  `Date`) still works on a screen. `run` receives them with the rest of the input and must resolve to a
   `Page`, such as [`findPage`](#paging-a-list)'s, and the description gains a
   sentence on `items`, `total`, `hasMore` and how to ask for the next page.
   `definition.paged` holds the bounds.
@@ -663,8 +665,8 @@ const titles = mapPage(page, ({ author, title }) => `${title} (${author.name})`)
   order is written once. End `orderBy` on a unique column, or rows that tie can
   show on two pages, or on none.
 - The table needs an `id` column; `rows` receives the ids typed as that column.
-- `total` is `null` past the last row, where no row is left to carry the count,
-  and `0` when nothing matches at all.
+- `total` counts every match on any page. A page past the last row has no row
+  to carry the count, so it takes a third statement.
 - `mapPage(page, toItem)` maps the items and keeps `total` and `hasMore`.
 
 ### Syncing a parent's rows

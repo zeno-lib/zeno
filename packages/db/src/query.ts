@@ -844,8 +844,8 @@ export type FindPageOptions<
  * `rows` reads those rows with whatever columns and relations it wants. They
  * come back in the first statement's order, so `rows` needs no `orderBy`.
  *
- * An offset past the last row reads no row to carry the count, so `total` is
- * then `null`, unless nothing matches at all.
+ * A page past the last row has no row to carry the count, so it takes a
+ * third statement to count.
  */
 export async function findPage<
   TBuilder extends PageQueryBuilder,
@@ -855,20 +855,27 @@ export async function findPage<
   { limit, offset }: PageInput,
   { orderBy, rows, where }: FindPageOptions<TBuilder, TRow>
 ): Promise<Page<TRow>> {
-  const ids = (await builder.findMany({
-    columns: { id: true },
-    extras: { pageTotal: () => sql<number>`count(*) over ()`.mapWith(Number) },
-    limit,
-    offset,
-    orderBy,
-    where,
-  })) as { id: PageRowId<TBuilder>; pageTotal: number }[]
+  const readIds = (page: PageInput) =>
+    builder.findMany({
+      columns: { id: true },
+      extras: {
+        pageTotal: () => sql<number>`count(*) over ()`.mapWith(Number),
+      },
+      ...page,
+      orderBy,
+      where,
+    }) as Promise<{ id: PageRowId<TBuilder>; pageTotal: number }[]>
+  const ids = await readIds({ limit, offset })
+  const counted =
+    ids.length > 0 || (offset === 0 && limit > 0)
+      ? ids
+      : await readIds({ limit: 1, offset: 0 })
+  const total = counted[0]?.pageTotal ?? 0
   const found = ids.length > 0 ? await rows(ids.map(({ id }) => id)) : []
   const rowsById = new Map(found.map((row) => [row.id, row]))
-  const total = ids[0]?.pageTotal ?? (offset === 0 ? 0 : null)
 
   return {
-    hasMore: total !== null && offset + ids.length < total,
+    hasMore: offset + ids.length < total,
     items: ids.flatMap(({ id }) => {
       const row = rowsById.get(id)
       return row ? [row] : []

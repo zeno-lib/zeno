@@ -50,9 +50,11 @@ export type {
   FormActionDefinition,
   FormActionOptions,
   FormActionSchema,
+  PagedQueryOptions,
   QueryDefinition,
   QueryOptions,
 } from "./define-action.ts"
+export type { Page, PageInput, PageLimits, PageOptions } from "./pages.ts"
 
 /** The only part of a Supabase client the request context reads. */
 export type ClaimsSource = { auth: Pick<SupabaseClient["auth"], "getClaims"> }
