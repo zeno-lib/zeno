@@ -6,6 +6,7 @@ import { SessionRevokedError } from "@zeno-lib/db/next"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import {
   getBearerContext,
+  getCheckedPost,
   getHiddenPost,
   getPost,
   listPosts,
@@ -185,7 +186,7 @@ describe("createMcpRoute", () => {
         onError: (error) => errors.push(error),
         onToolCall,
         resourceMetadataUrl: METADATA_URL,
-        tools: [getPost, getHiddenPost, listPosts],
+        tools: [getPost, getHiddenPost, getCheckedPost, listPosts],
         version: "1.0.0",
       })
 
@@ -257,7 +258,28 @@ describe("createMcpRoute", () => {
       expect(call?.ok === false && call.error).toBeInstanceOf(ToolInputError)
       expect(call?.ok === false && call.error).toMatchObject({
         issues: [expect.objectContaining({ path: ["limit"] })],
+        message: expect.stringContaining("list_posts: limit: "),
       })
+    })
+
+    it("reports a schema that throws, before the tool runs", async () => {
+      const connected = await connect({ pin: "2026-07-28" }, auditedRoute())
+
+      const result = await connected.callTool({
+        arguments: {},
+        name: "get_checked_post",
+      })
+
+      expect(result).toMatchObject({ isError: true })
+      expect(received).toEqual([])
+      expect(calls.map(([call]) => call)).toMatchObject([
+        {
+          error: new Error("Lookup unavailable"),
+          input: {},
+          name: "get_checked_post",
+          ok: false,
+        },
+      ])
     })
 
     it.each([

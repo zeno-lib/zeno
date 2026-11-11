@@ -85,6 +85,20 @@ export const getHiddenPost = defineQuery({
   schema: z.object({}),
 })
 
+// A schema whose check throws instead of reporting an issue: a refinement
+// that looks something up and fails, say.
+export const getCheckedPost = defineQuery({
+  description: "Read a post after a check that fails.",
+  name: "get_checked_post",
+  run: () => {
+    received.push("ran")
+    return null
+  },
+  schema: z.object({}).superRefine(() => {
+    throw new Error("Lookup unavailable")
+  }),
+})
+
 export const renamePost = defineAction({
   describeChange: (_db, input) => ({
     changes: [{ field: "title", from: "Draft", to: input.title }],

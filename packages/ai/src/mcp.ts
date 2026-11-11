@@ -27,7 +27,8 @@ export type McpToolOutcome =
       readonly ok: false
       /**
        * What the tool threw, or a `ToolInputError` when its schema refused
-       * the input and it never ran.
+       * the input and it never ran. A schema that throws is reported with
+       * what it threw.
        */
       readonly error: unknown
     }
@@ -61,10 +62,20 @@ export class ToolInputError extends Error {
 
   constructor(tool: string, issues: readonly StandardSchemaV1.Issue[]) {
     super(
-      `Invalid arguments for tool ${tool}: ${issues.map(({ message }) => message).join(", ")}`
+      `Invalid arguments for tool ${tool}: ${issues.map(describeIssue).join(", ")}`
     )
     this.issues = issues
   }
+}
+
+// `limit: Too big`: the field first, so a stored message says which one.
+const describeIssue = ({ message, path = [] }: StandardSchemaV1.Issue) => {
+  const field = path
+    .map((segment) =>
+      String(typeof segment === "object" ? segment.key : segment)
+    )
+    .join(".")
+  return field ? `${field}: ${message}` : message
 }
 
 export type McpRouteOptions<TContext> = {
@@ -173,10 +184,11 @@ export function createMcpRoute<TContext>(options: McpRouteOptions<TContext>): {
     version,
   } = options
   checkAgentTools(tools, { readOnly: true })
-  // Once per route, not per request: the schemas never change.
+  // Once per route: `toolSchema` checks the schema and keeps its JSON Schema.
   const registrations = tools.map(({ definition }) => ({
     definition,
-    schema: toolSchema(definition, (input, parsed) => ({ input, parsed })),
+    jsonSchema: toolSchema(definition)["~standard"].jsonSchema,
+    validate: (definition.schema as ToolSchema)["~standard"].validate,
   }))
 
   const reportError = (error: unknown) => {
@@ -202,34 +214,49 @@ export function createMcpRoute<TContext>(options: McpRouteOptions<TContext>): {
     }
   }
 
-  // The route's schema, timed, with a refused input reported. The MCP SDK
-  // refuses the call itself; this only watches.
+  // Each request's schema for a tool: it checks the input like `toolSchema`,
+  // passes the raw input on for `invoke` beside the parsed one, and reports a
+  // refusal. The MCP SDK still refuses the call itself; this only watches.
   const reportingSchema = (
-    toolName: string,
-    { "~standard": standard }: (typeof registrations)[number]["schema"],
+    { definition, jsonSchema, validate }: (typeof registrations)[number],
     context: TContext
   ): ToolSchema<CheckedInput> => ({
     "~standard": {
-      jsonSchema: standard.jsonSchema,
+      jsonSchema,
       validate: async (input) => {
         const startedAt = performance.now()
-        const result = await standard.validate(input)
-        if (result.issues) {
-          await report(
+        const refused = (error: unknown) =>
+          report(
             {
               durationMs: performance.now() - startedAt,
-              error: new ToolInputError(toolName, result.issues),
+              error,
               input,
-              name: toolName,
+              name: definition.name,
               ok: false,
             },
             context
           )
+        let result: StandardSchemaV1.Result<unknown>
+        try {
+          result = await validate(input)
+        } catch (error) {
+          await refused(error)
+          throw error
+        }
+        // Refused only with an issue, as the MCP SDK reads it.
+        if (result.issues?.length) {
+          await refused(new ToolInputError(definition.name, result.issues))
           return result
         }
-        return { value: { ...result.value, startedAt } }
+        return {
+          value: {
+            input,
+            parsed: (result as StandardSchemaV1.SuccessResult<unknown>).value,
+            startedAt,
+          },
+        }
       },
-      vendor: standard.vendor,
+      vendor: "zeno-lib",
       version: 1,
     },
   })
@@ -239,14 +266,15 @@ export function createMcpRoute<TContext>(options: McpRouteOptions<TContext>): {
       { name, version },
       instructions === undefined ? {} : { instructions }
     )
-    for (const { definition, schema } of registrations) {
+    for (const registration of registrations) {
+      const { definition } = registration
       const toolName = definition.name
       server.registerTool(
         toolName,
         {
           annotations: { openWorldHint: false, readOnlyHint: true },
           description: definition.description,
-          inputSchema: reportingSchema(toolName, schema, context),
+          inputSchema: reportingSchema(registration, context),
         },
         async ({ input, parsed, startedAt }: CheckedInput) => {
           const ended = (outcome: McpToolOutcome) =>

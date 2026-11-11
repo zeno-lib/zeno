@@ -183,21 +183,9 @@ export function checkAgentTools<TContext>(
  *
  * The vendor is not `zod`: AI SDK sends a Zod schema down its own path, which
  * parses with Zod directly and would return the output.
- *
- * `toValue` builds what valid input validates to, from the raw input and the
- * parsed output; the raw input itself by default. Whatever it returns, the
- * tool must still hand `invoke` the raw input.
  */
 export function toolSchema(
   definition: Pick<AgentDefinitionBase<never>, "name" | "schema">
-): ToolSchema
-export function toolSchema<TValue>(
-  definition: Pick<AgentDefinitionBase<never>, "name" | "schema">,
-  toValue: (input: unknown, parsed: unknown) => TValue
-): ToolSchema<TValue>
-export function toolSchema(
-  definition: Pick<AgentDefinitionBase<never>, "name" | "schema">,
-  toValue: (input: unknown, parsed: unknown) => unknown = (input) => input
 ): ToolSchema {
   const standard = (definition.schema as Partial<ToolSchema>)["~standard"]
   if (
@@ -213,7 +201,7 @@ export function toolSchema(
       jsonSchema,
       validate: async (value) => {
         const result = await validate(value)
-        return result.issues ? result : { value: toValue(value, result.value) }
+        return result.issues ? result : { value }
       },
       vendor: "zeno-lib",
       version: 1,

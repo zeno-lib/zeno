@@ -169,7 +169,7 @@ export const { GET, POST, DELETE } = createMcpRoute({
       userId: claims.sub,
       client: via,
       tool: call.name,
-      input: call.input,
+      input: toText(call.input).slice(0, 4096),
       rows: page?.items?.length ?? null,
       total: page?.total ?? null,
       error: call.ok ? null : String(call.error),
@@ -178,14 +178,23 @@ export const { GET, POST, DELETE } = createMcpRoute({
   },
   onError: (error) => console.error(error),
 })
+
+// JSON text, with a bigint (a transform's output, a bigint column) as its digits.
+const toText = (value: unknown) =>
+  JSON.stringify(value, (_key, item: unknown) =>
+    typeof item === "bigint" ? item.toString() : item
+  )
 ```
 
 - `call.input` is the input as the tool's schema parsed it, with a paged read's `limit` and `offset`
-  filled in. `call.result` is what the definition returned, before it became JSON text: what to
-  count from it is yours to pick.
+  filled in. It can hold what JSON can't (a `bigint` from a transform), and a refused call's input
+  is whatever the client sent, at any size: turn it into bounded text before you store it.
+  `call.result` is what the definition returned, before it became JSON text: what to count from it
+  is yours to pick.
 - A failed call has `ok: false` and the `error` the tool threw. Input the schema refuses is reported
-  too, with the arguments the client sent and a `ToolInputError` whose `issues` say why; the tool
-  never ran.
+  too, with the arguments the client sent and a `ToolInputError` whose message names each refused
+  field and whose `issues` hold the details; the tool never ran. A schema that throws is reported
+  with what it threw.
 - The answer waits for `onToolCall`, so the record is written before the client sees the result:
   on a serverless host, work left running after the response can be frozen or dropped. Its time
   adds to every call's, so keep it to one write and bound it (a statement timeout).
