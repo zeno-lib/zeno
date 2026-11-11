@@ -38,6 +38,9 @@ This node holds what the code and the guide don't make obvious.
   `context.claims.sub`).
 - **`getRequestContext` never falls back to `anon`.** Without a verified `sub` it throws
   `UnauthenticatedError`.
+- **`getRequestContext` refuses a token that carries `client_id`.** An OAuth client's token has
+  the user's full rights, and with its refresh token it makes a cookie session. Only
+  `getBearerContext` takes it, where `bearer.client` decides which clients get in.
 - **Errors never echo the database URL**, which carries the password.
 - **Claims are set with `set_config(..., true)`** inside each transaction, so they reset at commit
   or rollback and never leak across requests. `app.via` must stay in that same prologue statement:

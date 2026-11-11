@@ -491,6 +491,10 @@ memoised: call it once per request.
 - **Check `client_id`, not `aud`.** Supabase Auth's
   [OAuth server](https://supabase.com/docs/guides/auth/oauth-server) accepts a
   `resource` parameter but keeps `aud` at `authenticated`.
+- **A client's token works only here.** `getRequestContext` refuses a session
+  whose token carries `client_id`. The token carries the user's full rights,
+  and with its refresh token it makes a valid cookie session, so without this
+  check whoever holds it could run every server action as the user.
 - **`confirmSession`** also asks Auth for the session (`auth.getUser(token)`) on
   every call. Revoking a grant ends its refresh token at once, but its last
   access token still passes `getClaims` until it expires. Without the option,

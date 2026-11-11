@@ -180,7 +180,8 @@ export type RequestDb<TRelations extends AnyRelations = EmptyRelations> = {
  * claims object, so custom claims reach `auth.jwt()` in policies. There is no
  * fallback to `anon`: a caller without a verified `sub` gets
  * `UnauthenticatedError` rather than the empty result of a policy it never
- * satisfied.
+ * satisfied. So does a session made from a token issued to an OAuth client
+ * (one with `client_id`), which only `getBearerContext` takes.
  *
  * `getRequestContext` is wrapped in React's `cache`, so one server render shares
  * one verification and one handle. A server action invoked from the browser
@@ -226,6 +227,14 @@ export function createRequestDb<
       }
       if (!data?.claims.sub) {
         throw new UnauthenticatedError()
+      }
+      // An AI app's token carries the user's full rights, and with its refresh
+      // token it makes a cookie session that would reach every action. It
+      // works only through `getBearerContext`.
+      if (data.claims.client_id !== undefined) {
+        throw new UnauthenticatedError(
+          "Unauthorized: a token issued to an OAuth client works only as a bearer token"
+        )
       }
 
       return { claims: data.claims, db: createDb(data.claims, null), via: null }
