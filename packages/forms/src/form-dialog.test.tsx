@@ -8,7 +8,15 @@ import {
 } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
 import { type ReactNode, StrictMode, useState } from "react"
-import { afterEach, describe, expect, onTestFinished, test, vi } from "vitest"
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  onTestFinished,
+  test,
+  vi,
+} from "vitest"
 import { z } from "zod"
 import { useForm } from "./create-form"
 import {
@@ -27,6 +35,12 @@ const INNER_NAME = /Inner name/u
 const animatable = HTMLElement.prototype as {
   getAnimations?: () => unknown[]
 }
+
+// A thrown submit goes to `reportError`, which jsdom turns into an error event
+// that fails the run. Tests that check the report stub their own spy.
+beforeEach(() => {
+  vi.stubGlobal("reportError", vi.fn())
+})
 
 afterEach(() => {
   animatable.getAnimations = undefined

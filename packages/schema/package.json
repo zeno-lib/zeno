@@ -27,7 +27,7 @@
   "devDependencies": {
     "@zeno-lib/typescript": "workspace:^",
     "drizzle-orm": "1.0.0-rc.5",
-    "tsdown": "^0.23.5",
+    "tsdown": "^0.23.7",
     "typescript": "7.0.2",
     "vitest": "5.1.0",
     "zod": "^4.6.7"
