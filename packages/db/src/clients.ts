@@ -41,12 +41,29 @@ export type SessionRevocationContext = {
 }
 
 /**
- * `CreateClientConfig` for a client that runs as a user, plus the `app.via`
+ * `CreateClientConfig` for a client that switches role in every transaction
+ * (`createAnonClient`, `createServiceClient` and the RLS clients), plus the
+ * `app.source` label those transactions carry.
+ */
+export type SourceClientConfig<
+  TRelations extends AnyRelations = EmptyRelations,
+> = CreateClientConfig<TRelations> & {
+  /**
+   * Which part of your system writes through this client ("web", "worker").
+   * Every transaction sets it as `app.source` in the same statement as the
+   * role, so a trigger reads `nullif(current_setting('app.source', true), '')`.
+   * Unset, it is `''`.
+   */
+  source?: string
+}
+
+/**
+ * `SourceClientConfig` for a client that runs as a user, plus the `app.via`
  * marker its transactions carry, whether they may write, and the check that
  * refuses a revoked session.
  */
 export type RlsClientConfig<TRelations extends AnyRelations = EmptyRelations> =
-  CreateClientConfig<TRelations> & {
+  SourceClientConfig<TRelations> & {
     /**
      * Who acts for the user ("Claude", "AI assistant"). Every transaction sets
      * it as `app.via` in the same statement as the claims, so a trigger reads
@@ -251,21 +268,27 @@ function buildDrizzle<TRelations extends AnyRelations>(
 }
 
 // What a client adds to the claims statement of each of its transactions.
-type TransactionSettings = { check?: SQL; readOnly: boolean; via: string }
+type TransactionSettings = {
+  check?: SQL
+  readOnly: boolean
+  source: string
+  via: string
+}
 
-// The statement that opens every transaction. It sets the caller (the claims
-// and `app.via`), then makes the rest of the transaction run as the caller:
+// The statement that opens every transaction. It sets the caller (the claims,
+// `app.via` and `app.source`), then makes the rest of the transaction run as the caller:
 // their role and, for a read-only client, read-only mode. A `sessionRevocation`
 // check runs in between: it sees the caller, so `auth.uid()` works, but still
 // runs as the login role, so it can read `auth.users`.
 const claimsStatement = (
   { claims, role, sub }: RlsContext,
-  { check, readOnly, via }: TransactionSettings
+  { check, readOnly, source, via }: TransactionSettings
 ) => {
   const setCaller = sql`
     set_config('request.jwt.claims', ${claims}, true),
     set_config('request.jwt.claim.sub', ${sub}, true),
-    set_config('app.via', ${via}, true)`
+    set_config('app.via', ${via}, true),
+    set_config('app.source', ${source}, true)`
   const runAsCaller = readOnly
     ? sql`set_config('role', ${role}, true), set_config('transaction_read_only', 'on', true)`
     : sql`set_config('role', ${role}, true)`
@@ -300,7 +323,7 @@ function revocationCheck(
   return check
 }
 
-// Sets the claims, `app.via`, the role and read-only mode for the rest of
+// Sets the claims, `app.via`, `app.source`, the role and read-only mode for the rest of
 // `tx`, and throws when the check yields a code.
 async function setRlsContext(
   tx: Pick<PostgresJsDatabase, "execute">,
@@ -329,8 +352,8 @@ async function setRlsContext(
 // session for each one), then installed transaction-locally with
 // `set_config(..., true)`, which auto-resets at commit. The role goes through
 // `set_config('role', ...)`, which is what `set local role` does, so claims,
-// via and role cost one round trip, and the role is a bound parameter. `app.via`
-// must stay in this statement: a separate one is its own transaction, and the
+// labels and role cost one round trip, and the role is a bound parameter. The
+// labels (`app.via`, `app.source`) must stay in this statement: a separate one is its own transaction, and the
 // value is gone before the write it labels. Turning a transaction read-only
 // is allowed after its first query; only the way back is not.
 function buildRlsClient<TRelations extends AnyRelations>(
@@ -340,6 +363,7 @@ function buildRlsClient<TRelations extends AnyRelations>(
   const {
     readOnly = false,
     sessionRevocation,
+    source = "",
     via = "",
     ...clientConfig
   } = config ?? {}
@@ -351,7 +375,7 @@ function buildRlsClient<TRelations extends AnyRelations>(
         ? revocationCheck(sessionRevocation, context)
         : undefined
     return db.transaction(async (tx) => {
-      await setRlsContext(tx, context, { check, readOnly, via })
+      await setRlsContext(tx, context, { check, readOnly, source, via })
       return transaction(tx)
     })
   }
@@ -364,7 +388,8 @@ function buildRlsClient<TRelations extends AnyRelations>(
 /**
  * RLS-bypassing client (the docs' `admin`). Connects with
  * `SUPABASE_DATABASE_URL` and queries drizzle directly. Use for webhooks,
- * background jobs, and seeding, never for user-scoped reads/writes.
+ * background jobs, and seeding, never for user-scoped reads/writes. It opens
+ * no transaction of its own, so it sets no `app.via` or `app.source`.
  */
 export function createAdminClient<
   TRelations extends AnyRelations = EmptyRelations,
@@ -411,7 +436,7 @@ export function createAuthClient<
 /** RLS client that runs every query as the `anon` role. */
 export function createAnonClient<
   TRelations extends AnyRelations = EmptyRelations,
->(config?: CreateClientConfig<TRelations>): DrizzleClient<TRelations> {
+>(config?: SourceClientConfig<TRelations>): DrizzleClient<TRelations> {
   return buildRlsClient(() => Promise.resolve(fixedContext("anon")), config)
 }
 
@@ -421,7 +446,7 @@ export function createAnonClient<
  */
 export function createServiceClient<
   TRelations extends AnyRelations = EmptyRelations,
->(config?: CreateClientConfig<TRelations>): DrizzleClient<TRelations> {
+>(config?: SourceClientConfig<TRelations>): DrizzleClient<TRelations> {
   return buildRlsClient(
     () => Promise.resolve(fixedContext("service_role")),
     config

@@ -526,6 +526,39 @@ statement runs. `app.via` is a label, not proof: a role that can run SQL can set
 it, so for a bearer caller also record the signed `client_id`
 (`auth.jwt() ->> 'client_id'`).
 
+### Labelling where a write comes from
+
+When several apps or jobs share one database, give each its own `source`. Every
+transaction of the client then sets `app.source` in the same statement as the
+role, so an audit trigger can tell a write from the web app apart from one from
+a worker:
+
+```typescript title="{project}-db/src/server-db.ts"
+export const { getBearerContext, getRequestDb /* , … */ } = createRequestDb({
+  relations,
+  source: "web",
+  supabase: () => createClient(),
+  bearer: {
+    // A bearer caller's own label. Without it, it takes `source`.
+    source: "api",
+    supabase: () => createTokenClient(/* … */),
+    client: async (clientId) => (await registeredClients()).get(clientId),
+  },
+})
+```
+
+`createServiceClient`, `createAnonClient`, `createSupabaseClient` and
+`createAuthClient` take `source` in their config too. `createAdminClient` opens
+no transaction of its own, so it sets nothing. Read it with `nullif`, since it is
+`''` when nothing set it:
+
+```sql
+nullif(current_setting('app.source', true), '')
+```
+
+Like `app.via`, it is a label: set it only through the client, and treat it as
+proof of nothing a role that can run SQL could not also write.
+
 ## Other RLS clients
 
 When you already hold the verified, decoded claims (for example from a prior
@@ -533,7 +566,8 @@ When you already hold the verified, decoded claims (for example from a prior
 makes with
 `createSupabaseClient(accessToken, config?)`. Its `config` (and
 `createAuthClient`'s) also takes `via`, the
-[`app.via`](#marking-who-acts-for-the-user) label, and `readOnly`, which runs
+[`app.via`](#marking-who-acts-for-the-user) label, `source`, the
+[`app.source`](#labelling-where-a-write-comes-from) label, and `readOnly`, which runs
 every transaction read-only. It accepts a decoded
 `SupabaseToken` (the `role` and `sub` claims), not a raw JWT string, and does not
 re-verify it:

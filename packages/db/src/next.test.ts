@@ -958,3 +958,136 @@ describe("withVia", () => {
     })
   })
 })
+
+describe("source", () => {
+  const readRow = {
+    description: "Read a row.",
+    name: "read_row",
+    run: () => null,
+    schema: z.string(),
+  }
+
+  it("labels a cookie caller's client, its read-only twin and withVia's with createRequestDb's source", async () => {
+    const { defineQuery, getRequestContext, withVia } = createRequestDb({
+      bearer: {
+        client: () => "Agent",
+        source: "api",
+        supabase: () => ({}) as SessionSource,
+      },
+      source: "web",
+      supabase: supabaseReturning(getClaimsResult(claims, null)),
+    })
+    const context = await getRequestContext()
+    expect(createSupabaseClientMock).toHaveBeenLastCalledWith(claims, {
+      source: "web",
+    })
+
+    await defineQuery(readRow)("a")
+    expect(createSupabaseClientMock).toHaveBeenLastCalledWith(claims, {
+      readOnly: true,
+      source: "web",
+    })
+    withVia(context, "Assistant")
+    expect(createSupabaseClientMock).toHaveBeenLastCalledWith(claims, {
+      source: "web",
+      via: "Assistant",
+    })
+  })
+
+  it("labels a bearer caller's client, and its read-only twin, with bearer.source", async () => {
+    const oauthClaims: JwtPayload = { ...claims, client_id: "client-1" }
+    const tokenSource = {
+      auth: {
+        getClaims: () => Promise.resolve(getClaimsResult(oauthClaims, null)),
+      },
+    } as unknown as SessionSource
+    const { defineQuery, getBearerContext } = createRequestDb({
+      bearer: {
+        client: () => "Agent",
+        source: "api",
+        supabase: () => tokenSource,
+      },
+      source: "web",
+      supabase: supabaseReturning(getClaimsResult(null, null)),
+    })
+    const request = new Request("https://app.test/mcp", {
+      headers: { authorization: "Bearer token-1" },
+    })
+
+    const context = await getBearerContext(request)
+    expect(createSupabaseClientMock).toHaveBeenLastCalledWith(oauthClaims, {
+      source: "api",
+      via: "Agent",
+    })
+    await defineQuery(readRow).definition.invoke("a", context)
+    expect(createSupabaseClientMock).toHaveBeenLastCalledWith(oauthClaims, {
+      readOnly: true,
+      source: "api",
+      via: "Agent",
+    })
+  })
+
+  it("keeps a bearer caller's source on a context rebuilt without its clientId", async () => {
+    const oauthClaims: JwtPayload = { ...claims, client_id: "client-1" }
+    const { getBearerContext, withVia } = createRequestDb({
+      bearer: {
+        client: () => "Agent",
+        source: "api",
+        supabase: () =>
+          ({
+            auth: {
+              getClaims: () =>
+                Promise.resolve(getClaimsResult(oauthClaims, null)),
+            },
+          }) as unknown as SessionSource,
+      },
+      source: "web",
+      supabase: supabaseReturning(getClaimsResult(null, null)),
+    })
+    const {
+      claims: bearerClaims,
+      db,
+      via,
+    } = await getBearerContext(
+      new Request("https://app.test/mcp", {
+        headers: { authorization: "Bearer token-1" },
+      })
+    )
+
+    withVia({ claims: bearerClaims, db, via }, "Assistant")
+
+    expect(createSupabaseClientMock).toHaveBeenLastCalledWith(oauthClaims, {
+      source: "api",
+      via: "Assistant",
+    })
+  })
+
+  it("labels a bearer caller with createRequestDb's source when bearer sets none", async () => {
+    const oauthClaims: JwtPayload = { ...claims, client_id: "client-1" }
+    const { getBearerContext } = createRequestDb({
+      bearer: {
+        client: () => "Agent",
+        supabase: () =>
+          ({
+            auth: {
+              getClaims: () =>
+                Promise.resolve(getClaimsResult(oauthClaims, null)),
+            },
+          }) as unknown as SessionSource,
+      },
+      source: "web",
+      supabase: supabaseReturning(getClaimsResult(null, null)),
+    })
+
+    await getBearerContext(
+      new Request("https://app.test/mcp", {
+        headers: { authorization: "Bearer token-1" },
+      })
+    )
+
+    expect(createSupabaseClientMock).toHaveBeenLastCalledWith(oauthClaims, {
+      source: "web",
+      via: "Agent",
+    })
+  })
+})

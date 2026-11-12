@@ -7,10 +7,10 @@ import {
 import type { AnyRelations, EmptyRelations } from "drizzle-orm"
 import { cache } from "react"
 import {
-  type CreateClientConfig,
   createSupabaseClient,
   type DrizzleClient,
   type RlsClientConfig,
+  type SourceClientConfig,
   UnauthenticatedError,
 } from "./clients.ts"
 import {
@@ -113,11 +113,16 @@ export type BearerOptions = {
    * Default `false`.
    */
   confirmSession?: boolean
+  /**
+   * The `app.source` of a bearer caller's transactions ("api"), when it is not
+   * the cookie callers'. Default: `createRequestDb`'s `source`.
+   */
+  source?: string
 }
 
 export type CreateRequestDbOptions<
   TRelations extends AnyRelations = EmptyRelations,
-> = Omit<CreateClientConfig<TRelations>, "connectionString"> & {
+> = Omit<SourceClientConfig<TRelations>, "connectionString"> & {
   /**
    * Builds the request's Supabase client, e.g. `createClient` from
    * `@zeno-lib/supabase/next-server` (cookie session via `next/headers`).
@@ -192,29 +197,38 @@ export type RequestDb<TRelations extends AnyRelations = EmptyRelations> = {
 export function createRequestDb<
   TRelations extends AnyRelations = EmptyRelations,
 >(options: CreateRequestDbOptions<TRelations>): RequestDb<TRelations> {
-  const { bearer, connectionString, supabase, ...config } = options
+  const { bearer, connectionString, source, supabase, ...config } = options
+  // The `source` each handle was built with, so a twin built from a context
+  // keeps it whatever shape the context has by then.
+  const sources = new WeakMap<object, string | undefined>()
+  const sourceOf = (context: RequestContext<TRelations>) =>
+    sources.has(context.db) ? sources.get(context.db) : source
 
   const createDb = (
     claims: JwtPayload,
     via: string | null,
+    dbSource: string | undefined,
     readOnly = false
   ) => {
     const url =
       typeof connectionString === "function"
         ? connectionString()
         : connectionString
-    return createSupabaseClient<TRelations>(claims, {
+    const db = createSupabaseClient<TRelations>(claims, {
       ...config,
       ...(url === undefined ? {} : { connectionString: url }),
       ...(via === null ? {} : { via }),
       ...(readOnly ? { readOnly } : {}),
+      ...(dbSource === undefined ? {} : { source: dbSource }),
     })
+    sources.set(db, dbSource)
+    return db
   }
   const readOnlyContext = <TContext extends RequestContext<TRelations>>(
     context: TContext
   ): TContext => ({
     ...context,
-    db: createDb(context.claims, context.via, true),
+    db: createDb(context.claims, context.via, sourceOf(context), true),
   })
 
   const getRequestContext = cache(
@@ -237,7 +251,11 @@ export function createRequestDb<
         )
       }
 
-      return { claims: data.claims, db: createDb(data.claims, null), via: null }
+      return {
+        claims: data.claims,
+        db: createDb(data.claims, null, source),
+        via: null,
+      }
     }
   )
 
@@ -283,7 +301,13 @@ export function createRequestDb<
       await confirmSession(client, token, claims.sub)
     }
 
-    return { claims, clientId, db: createDb(claims, via), token, via }
+    return {
+      claims,
+      clientId,
+      db: createDb(claims, via, bearer.source ?? source),
+      token,
+      via,
+    }
   }
 
   return {
@@ -298,7 +322,7 @@ export function createRequestDb<
     getRequestDb: async () => (await getRequestContext()).db,
     withVia: (context, via) => ({
       ...context,
-      db: createDb(context.claims, via),
+      db: createDb(context.claims, via, sourceOf(context)),
       via,
     }),
   }

@@ -43,8 +43,8 @@ This node holds what the code and the guide don't make obvious.
   `getBearerContext` takes it, where `bearer.client` decides which clients get in.
 - **Errors never echo the database URL**, which carries the password.
 - **Claims are set with `set_config(..., true)`** inside each transaction, so they reset at commit
-  or rollback and never leak across requests. `app.via` must stay in that same prologue statement:
-  set alone, it is its own transaction and is gone before the write it labels.
+  or rollback and never leak across requests. `app.via` and `app.source` must stay in that same prologue
+  statement: set alone, each is its own transaction and is gone before the write it labels.
 - **A statement joins only an open `db.transaction` of its own handle.** The `AsyncLocalStorage` is
   per handle, so a handle that runs as someone else never joins. The scope closes only after the
   statements it started have settled: postgres-js returns the connection to the pool at commit, and
