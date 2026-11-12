@@ -103,7 +103,7 @@ function setSubmitError(form: SubmitErrorForm, error: unknown): void {
  */
 function reportSubmitError(error: unknown): void {
   if (!isNavigationError(error)) {
-    // Missing in jsdom and older browsers.
+    // Missing in older browsers and in jsdom before 31.
     globalThis.reportError?.(error)
   }
 }

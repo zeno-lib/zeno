@@ -6,11 +6,17 @@ import {
   within,
 } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
-import { afterEach, describe, expect, test, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
 import { Form, FormProvider, useForm } from "./create-form"
 import type { ActionResult } from "./lib/action-result"
 import { submitAction } from "./lib/submit-action"
+
+// A thrown submit goes to `reportError`, which jsdom turns into an error event
+// that fails the run. Tests that check the report stub their own spy.
+beforeEach(() => {
+  vi.stubGlobal("reportError", vi.fn())
+})
 
 afterEach(() => {
   cleanup()

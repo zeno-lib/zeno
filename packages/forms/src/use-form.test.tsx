@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
 import { useRef } from "react"
-import { afterEach, describe, expect, test, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { z } from "zod"
 import { Form, FormProvider, useForm } from "./create-form"
 import { ValidationError } from "./lib/validation-error"
@@ -10,12 +10,19 @@ const EMAIL_LABEL = /Email/u
 const VALID_EMAIL_MSG = /Enter a valid email/iu
 const SUBMIT_NAME = /Submit/u
 
+// A thrown submit goes to `reportError`, which jsdom turns into an error event
+// that fails the run. Tests that check the report stub their own spy.
+beforeEach(() => {
+  vi.stubGlobal("reportError", vi.fn())
+})
+
 // @testing-library auto-cleanup only runs with `globals: true`. Our vitest
 // config keeps globals off (we import test helpers explicitly), so add the
 // hook ourselves to keep tests isolated.
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
+  vi.unstubAllGlobals()
 })
 
 describe("useForm — schema-derived defaults", () => {
