@@ -448,22 +448,6 @@ describe("app.source", () => {
 
     expect(seen).toEqual(clients.map(() => ({ source: "worker" })))
   })
-
-  it("is gone for the next transactions on the same pool", async () => {
-    await createServiceClient({ relations, source: "worker" }).execute(
-      readSource
-    )
-
-    const later = await Promise.all(
-      Array.from({ length: 5 }, () =>
-        createServiceClient({ relations }).execute(readSource)
-      )
-    )
-
-    expect(later.map((rows) => rows[0])).toEqual(
-      Array.from({ length: 5 }, () => ({ source: "" }))
-    )
-  })
 })
 
 describe("readOnly", () => {

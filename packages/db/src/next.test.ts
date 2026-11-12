@@ -1027,6 +1027,41 @@ describe("source", () => {
     })
   })
 
+  it("keeps a bearer caller's source on a context rebuilt without its clientId", async () => {
+    const oauthClaims: JwtPayload = { ...claims, client_id: "client-1" }
+    const { getBearerContext, withVia } = createRequestDb({
+      bearer: {
+        client: () => "Agent",
+        source: "api",
+        supabase: () =>
+          ({
+            auth: {
+              getClaims: () =>
+                Promise.resolve(getClaimsResult(oauthClaims, null)),
+            },
+          }) as unknown as SessionSource,
+      },
+      source: "web",
+      supabase: supabaseReturning(getClaimsResult(null, null)),
+    })
+    const {
+      claims: bearerClaims,
+      db,
+      via,
+    } = await getBearerContext(
+      new Request("https://app.test/mcp", {
+        headers: { authorization: "Bearer token-1" },
+      })
+    )
+
+    withVia({ claims: bearerClaims, db, via }, "Assistant")
+
+    expect(createSupabaseClientMock).toHaveBeenLastCalledWith(oauthClaims, {
+      source: "api",
+      via: "Assistant",
+    })
+  })
+
   it("labels a bearer caller with createRequestDb's source when bearer sets none", async () => {
     const oauthClaims: JwtPayload = { ...claims, client_id: "client-1" }
     const { getBearerContext } = createRequestDb({

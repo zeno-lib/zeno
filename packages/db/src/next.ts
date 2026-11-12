@@ -197,37 +197,38 @@ export type RequestDb<TRelations extends AnyRelations = EmptyRelations> = {
 export function createRequestDb<
   TRelations extends AnyRelations = EmptyRelations,
 >(options: CreateRequestDbOptions<TRelations>): RequestDb<TRelations> {
-  const { bearer, connectionString, supabase, ...config } = options
-  const bearerSource = bearer?.source ?? config.source
-  // A bearer context carries its `clientId`, a cookie one does not.
+  const { bearer, connectionString, source, supabase, ...config } = options
+  // The `source` each handle was built with, so a twin built from a context
+  // keeps it whatever shape the context has by then.
+  const sources = new WeakMap<object, string | undefined>()
   const sourceOf = (context: RequestContext<TRelations>) =>
-    "clientId" in context ? bearerSource : config.source
+    sources.has(context.db) ? sources.get(context.db) : source
 
   const createDb = (
     claims: JwtPayload,
     via: string | null,
-    { readOnly = false, source = config.source } = {}
+    dbSource: string | undefined,
+    readOnly = false
   ) => {
     const url =
       typeof connectionString === "function"
         ? connectionString()
         : connectionString
-    return createSupabaseClient<TRelations>(claims, {
+    const db = createSupabaseClient<TRelations>(claims, {
       ...config,
       ...(url === undefined ? {} : { connectionString: url }),
       ...(via === null ? {} : { via }),
       ...(readOnly ? { readOnly } : {}),
-      ...(source === undefined ? {} : { source }),
+      ...(dbSource === undefined ? {} : { source: dbSource }),
     })
+    sources.set(db, dbSource)
+    return db
   }
   const readOnlyContext = <TContext extends RequestContext<TRelations>>(
     context: TContext
   ): TContext => ({
     ...context,
-    db: createDb(context.claims, context.via, {
-      readOnly: true,
-      source: sourceOf(context),
-    }),
+    db: createDb(context.claims, context.via, sourceOf(context), true),
   })
 
   const getRequestContext = cache(
@@ -250,7 +251,11 @@ export function createRequestDb<
         )
       }
 
-      return { claims: data.claims, db: createDb(data.claims, null), via: null }
+      return {
+        claims: data.claims,
+        db: createDb(data.claims, null, source),
+        via: null,
+      }
     }
   )
 
@@ -299,7 +304,7 @@ export function createRequestDb<
     return {
       claims,
       clientId,
-      db: createDb(claims, via, { source: bearerSource }),
+      db: createDb(claims, via, bearer.source ?? source),
       token,
       via,
     }
@@ -317,7 +322,7 @@ export function createRequestDb<
     getRequestDb: async () => (await getRequestContext()).db,
     withVia: (context, via) => ({
       ...context,
-      db: createDb(context.claims, via, { source: sourceOf(context) }),
+      db: createDb(context.claims, via, sourceOf(context)),
       via,
     }),
   }
