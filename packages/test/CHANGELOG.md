@@ -1,5 +1,11 @@
 # @zeno-lib/test
 
+## 0.2.0
+
+### Minor Changes
+
+- fe63757: Update `jsdom` to 31.0.0, `@vitejs/plugin-react` to 6.3.0 and `@testing-library/user-event` to 14.6.9. jsdom 31 computes CSS through a new engine and moves focus off elements that stop being focusable, so tests that assert computed styles or focus can see different values.
+
 ## 0.1.3
 
 ### Patch Changes
