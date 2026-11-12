@@ -7,10 +7,10 @@ import {
 import type { AnyRelations, EmptyRelations } from "drizzle-orm"
 import { cache } from "react"
 import {
-  type CreateClientConfig,
   createSupabaseClient,
   type DrizzleClient,
   type RlsClientConfig,
+  type SourceClientConfig,
   UnauthenticatedError,
 } from "./clients.ts"
 import {
@@ -113,11 +113,16 @@ export type BearerOptions = {
    * Default `false`.
    */
   confirmSession?: boolean
+  /**
+   * The `app.source` of a bearer caller's transactions ("api"), when it is not
+   * the cookie callers'. Default: `createRequestDb`'s `source`.
+   */
+  source?: string
 }
 
 export type CreateRequestDbOptions<
   TRelations extends AnyRelations = EmptyRelations,
-> = Omit<CreateClientConfig<TRelations>, "connectionString"> & {
+> = Omit<SourceClientConfig<TRelations>, "connectionString"> & {
   /**
    * Builds the request's Supabase client, e.g. `createClient` from
    * `@zeno-lib/supabase/next-server` (cookie session via `next/headers`).
@@ -193,11 +198,15 @@ export function createRequestDb<
   TRelations extends AnyRelations = EmptyRelations,
 >(options: CreateRequestDbOptions<TRelations>): RequestDb<TRelations> {
   const { bearer, connectionString, supabase, ...config } = options
+  const bearerSource = bearer?.source ?? config.source
+  // A bearer context carries its `clientId`, a cookie one does not.
+  const sourceOf = (context: RequestContext<TRelations>) =>
+    "clientId" in context ? bearerSource : config.source
 
   const createDb = (
     claims: JwtPayload,
     via: string | null,
-    readOnly = false
+    { readOnly = false, source = config.source } = {}
   ) => {
     const url =
       typeof connectionString === "function"
@@ -208,13 +217,17 @@ export function createRequestDb<
       ...(url === undefined ? {} : { connectionString: url }),
       ...(via === null ? {} : { via }),
       ...(readOnly ? { readOnly } : {}),
+      ...(source === undefined ? {} : { source }),
     })
   }
   const readOnlyContext = <TContext extends RequestContext<TRelations>>(
     context: TContext
   ): TContext => ({
     ...context,
-    db: createDb(context.claims, context.via, true),
+    db: createDb(context.claims, context.via, {
+      readOnly: true,
+      source: sourceOf(context),
+    }),
   })
 
   const getRequestContext = cache(
@@ -283,7 +296,13 @@ export function createRequestDb<
       await confirmSession(client, token, claims.sub)
     }
 
-    return { claims, clientId, db: createDb(claims, via), token, via }
+    return {
+      claims,
+      clientId,
+      db: createDb(claims, via, { source: bearerSource }),
+      token,
+      via,
+    }
   }
 
   return {
@@ -298,7 +317,7 @@ export function createRequestDb<
     getRequestDb: async () => (await getRequestContext()).db,
     withVia: (context, via) => ({
       ...context,
-      db: createDb(context.claims, via),
+      db: createDb(context.claims, via, { source: sourceOf(context) }),
       via,
     }),
   }

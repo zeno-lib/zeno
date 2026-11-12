@@ -432,6 +432,40 @@ describe("app.via", () => {
   })
 })
 
+describe("app.source", () => {
+  const readSource = sql`select current_setting('app.source', true) as source`
+
+  it("is set on every transaction of the RLS, anon and service clients built with it", async () => {
+    const clients = [
+      createSupabaseClient(token(USER_A), { relations, source: "worker" }),
+      createAnonClient({ relations, source: "worker" }),
+      createServiceClient({ relations, source: "worker" }),
+    ]
+
+    const seen = await Promise.all(
+      clients.map(async (db) => (await db.execute(readSource))[0])
+    )
+
+    expect(seen).toEqual(clients.map(() => ({ source: "worker" })))
+  })
+
+  it("is gone for the next transactions on the same pool", async () => {
+    await createServiceClient({ relations, source: "worker" }).execute(
+      readSource
+    )
+
+    const later = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        createServiceClient({ relations }).execute(readSource)
+      )
+    )
+
+    expect(later.map((rows) => rows[0])).toEqual(
+      Array.from({ length: 5 }, () => ({ source: "" }))
+    )
+  })
+})
+
 describe("readOnly", () => {
   const readOnlyDb = () =>
     createSupabaseClient(token(USER_A), { readOnly: true, relations })

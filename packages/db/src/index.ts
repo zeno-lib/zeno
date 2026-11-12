@@ -12,6 +12,7 @@ export {
   resolveDatabaseUrl,
   type SessionRevocationContext,
   SessionRevokedError,
+  type SourceClientConfig,
   type SupabaseToken,
   UnauthenticatedError,
 } from "./clients.ts"
