@@ -507,6 +507,8 @@ describe("createMcpRoute writes", () => {
   it.each([
     ["an edited proposal", tamper],
     ["a made-up proposal", () => "zp1.e30.AAAA"],
+    // A base64url length `atob` throws on.
+    ["an undecodable signature", () => "zp1.e30.A"],
     ["not a proposal", () => "anything"],
   ])("refuses %s as invalid", async (_, forge) => {
     const connected = await connect({ pin: "2026-07-28" }, writeRoute())

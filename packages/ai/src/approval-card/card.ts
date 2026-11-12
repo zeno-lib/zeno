@@ -165,14 +165,22 @@ const showOutcome = async (result: ToolResult) => {
       }
       return
     }
-    case "expired":
     case "used":
+      // Confirmed before, which may or may not have saved: never "not saved",
+      // or the model proposes the change again.
+      eyebrow.textContent = "Already confirmed"
+      say(content.message)
+      close()
+      await tellModel(
+        `The change to ${entityName} was already confirmed: this Confirm saved nothing more.`
+      )
+      return
+    case "expired":
     case "wrong-user":
     case "invalid":
     case "failed":
-      eyebrow.textContent =
-        content.status === "used" ? "Already saved" : "Change not saved"
-      say(content.message, content.status === "used" ? "info" : "danger")
+      eyebrow.textContent = "Change not saved"
+      say(content.message, "danger")
       close()
       await tellModel(
         `The change to ${entityName} was not saved: ${content.message}`

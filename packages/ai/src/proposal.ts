@@ -79,12 +79,18 @@ export const fromValues = (change: ChangeDescription): Proposal["from"] =>
 export const startsFrom = (
   sealed: Proposal["from"],
   change: ChangeDescription
-): boolean =>
-  sealed.length === change.changes.length &&
-  change.changes.every(({ field, from }, index) => {
-    const [sealedField, sealedFrom] = sealed[index] ?? []
-    return sealedField === field && sealedFrom === from
-  })
+): boolean => {
+  // Through JSON like the sealed values, so a `from` JSON can't keep
+  // (`NaN`, `Infinity`, `undefined`) compares as it was sealed, not as stale.
+  const now: Proposal["from"] = JSON.parse(JSON.stringify(fromValues(change)))
+  return (
+    sealed.length === now.length &&
+    now.every(([field, from], index) => {
+      const [sealedField, sealedFrom] = sealed[index] ?? []
+      return sealedField === field && sealedFrom === from
+    })
+  )
+}
 
 /**
  * Seals proposals with HMAC-SHA-256 and opens them again. The first secret
@@ -123,7 +129,13 @@ export function createProposalSeal(secrets: readonly string[]): {
       ) {
         return null
       }
-      const mac = fromBase64Url(signature)
+      let mac: Uint8Array<ArrayBuffer>
+      try {
+        mac = fromBase64Url(signature)
+      } catch {
+        // `atob` throws on a length no encoder makes (4n + 1).
+        return null
+      }
       const data = signed(payload)
       // `verify` compares in constant time.
       const verified = await Promise.all(

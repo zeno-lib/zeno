@@ -429,11 +429,13 @@ export function prepareWrites<TContext>(
         let change: ChangeDescription | null
         let proposal: Awaited<ReturnType<typeof propose>>
         try {
+          // The user first: no record is read for a context that can't confirm.
+          const user = userOf(context)
           change = await definition.describe(input, context)
           if (!change) {
             throw new Error("This change can't be described")
           }
-          proposal = await propose(toolName, input, change, userOf(context))
+          proposal = await propose(toolName, input, change, user)
         } catch (error) {
           await ended(toolName, parsed, startedAt, { error, ok: false })
           throw error
@@ -467,13 +469,18 @@ export function prepareWrites<TContext>(
         inputSchema: schema(APPLY_TOOL, applyJsonSchema, validateApply),
       },
       async ({ input, startedAt }: CheckedInput) => {
-        const proposal = await seal.open(
-          (input as { proposal: string }).proposal
-        )
-        const opened = proposal
-          ? await open(proposal, context)
-          : refused("invalid", "This proposal was not made by this server.")
-        const done = "outcome" in opened ? opened : await apply(opened, context)
+        let proposal: Proposal | null = null
+        let done: Answer
+        // Every path ends in `ended`, so `onToolCall` sees each Confirm.
+        try {
+          proposal = await seal.open((input as { proposal: string }).proposal)
+          const opened = proposal
+            ? await open(proposal, context)
+            : refused("invalid", "This proposal was not made by this server.")
+          done = "outcome" in opened ? opened : await apply(opened, context)
+        } catch (error) {
+          done = failed(error)
+        }
         await ended(
           APPLY_TOOL,
           proposal && definitions.has(proposal.tool)

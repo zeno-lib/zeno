@@ -19,7 +19,8 @@ export const inlineScript = () => ({
     const { output } = await build({
       input,
       logLevel: "warn",
-      output: { format: "esm", minify: true },
+      // One chunk: only the first is inlined, and the CSP loads no other.
+      output: { codeSplitting: false, format: "esm", minify: true },
       platform: "browser",
       write: false,
     })
