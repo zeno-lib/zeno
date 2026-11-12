@@ -16,9 +16,10 @@ Keep one list per app, next to your query map, and add a definition to it on pur
 import { listPostsQuery } from "@/app/posts/reads"
 import { renamePostAction } from "@/app/posts/actions"
 
-// The MCP route serves reads only, so keep them in a list of their own.
+// The MCP route takes reads and writes apart, so keep two lists.
 export const agentReads = [listPostsQuery]
-export const agentTools = [...agentReads, renamePostAction]
+export const agentWrites = [renamePostAction]
+export const agentTools = [...agentReads, ...agentWrites]
 ```
 
 The list is checked when an adapter is built from it, and the adapter throws when:

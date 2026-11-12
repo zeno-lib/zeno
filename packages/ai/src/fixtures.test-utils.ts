@@ -14,21 +14,24 @@ const { defineAction, defineFormAction, defineQuery, getBearerContext } =
       supabase: () =>
         ({
           auth: {
-            getClaims: (token?: string) =>
-              Promise.resolve(
-                token === "good"
+            // "good" is user-1's token, "other" user-2's.
+            getClaims: (token?: string) => {
+              const sub = { good: "user-1", other: "user-2" }[token ?? ""]
+              return Promise.resolve(
+                sub
                   ? {
                       data: {
                         claims: {
                           client_id: "claude",
                           role: "authenticated",
-                          sub: "user-1",
+                          sub,
                         },
                       },
                       error: null,
                     }
                   : { data: null, error: new UnauthenticatedError("bad token") }
-              ),
+              )
+            },
             getUser: () => Promise.reject(new Error("not used")),
           },
         }) as never,
@@ -109,6 +112,26 @@ export const renamePost = defineAction({
   run: (_db, input) => {
     received.push(input)
     return { renamed: input.id }
+  },
+  schema: z.object({ id: z.string().transform(Number), title: z.string() }),
+})
+
+/** Each post's title, which `retitlePost` reads and writes. */
+export const titles = new Map<number, string>()
+
+export const retitlePost = defineAction({
+  describeChange: (_db, input) => ({
+    changes: [
+      { field: "title", from: titles.get(input.id) ?? null, to: input.title },
+    ],
+    entity: `Post ${input.id}`,
+  }),
+  description: "Retitle a post.",
+  name: "retitle_post",
+  run: (_db, input) => {
+    received.push(input)
+    titles.set(input.id, input.title)
+    return { retitled: input.id }
   },
   schema: z.object({ id: z.string().transform(Number), title: z.string() }),
 })

@@ -15,10 +15,9 @@ client → /mcp ── 401, WWW-Authenticate ──→ /.well-known/oauth-protec
        → /mcp with Authorization: Bearer → getBearerContext → your tools, as the user
 ```
 
-<Callout type="warn">
-  `createMcpRoute` serves **reads only** for now. An MCP client asks before each tool call, but its
-  prompt names the tool, not the change, so a write would run without the user seeing what it
-  changes. The route refuses a write tool until that is solved.
+<Callout>
+  Reads run when the model calls them. A write runs only once the user confirms its change in a card
+  the client shows in the chat: see [Writes the user approves](#writes-the-user-approves).
 </Callout>
 
 ## Turn on the OAuth server
@@ -152,6 +151,112 @@ export const GET = (request: Request) =>
 Add `/mcp` and `/.well-known/oauth-protected-resource` to the middleware's `publicPaths`: both do
 their own bearer auth, and a redirect to sign-in would break the client.
 
+## Writes the user approves
+
+An MCP client asks before each tool call, but its prompt names the tool, not the change. So with
+`writes`, a write never runs from the model's call: its tool only proposes the change, and the user
+confirms it in an [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) card the client
+renders in the chat.
+
+```text
+model → rename_post({ id, title }) → describe → card: Post 12, title "Draft" → "Launch"   nothing written
+user  → Confirm → apply_change({ proposal }) → checks → describe again → invoke            written once
+```
+
+1. The write's tool (`rename_post`) is read-only. It runs `describe` and answers with the change,
+   for the card, and a **proposal**: the write, its input, the user, each field's old value, an id
+   and an expiry, signed with your secret. The model reads that nothing is saved until the user
+   confirms.
+2. The card shows the record and each field, old → new, with Confirm and Cancel.
+3. Confirm calls `apply_change`, a tool only the card can call. It checks the signature, the expiry
+   and that the caller is the proposal's user, marks the proposal used, reads the record again, and
+   writes through `invoke` only if every field still holds the value the card showed.
+
+```typescript title="app/mcp/route.ts"
+import { createMcpRoute } from "@zeno-lib/ai/mcp"
+import { agentReads, agentWrites } from "@/app/agent-tools"
+
+export const { GET, POST, DELETE } = createMcpRoute({
+  // …
+  tools: agentReads,
+  writes: {
+    tools: agentWrites,
+    secret: process.env.MCP_PROPOSAL_SECRET!,
+    markUsed: async ({ id, expiresAt }) => {
+      const rows = await adminDb
+        .insert(usedProposals)
+        .values({ id, expiresAt })
+        .onConflictDoNothing()
+        .returning({ id: usedProposals.id })
+      return rows.length === 1
+    },
+    // Only clients you know render the card and hide app-only tools.
+    enabled: ({ via }) => via === "Claude",
+  },
+})
+```
+
+### What you provide
+
+- **`secret`**: at least 32 characters, from config (`openssl rand -base64 32`), never committed.
+  It signs every proposal. To rotate it, pass `[newSecret, oldSecret]`: the first signs and both
+  verify. Drop the old one once its proposals have expired (after 10 minutes; `ttlSeconds` changes
+  that).
+- **`markUsed`**, the replay guard: insert the proposal's id under a unique key and resolve whether
+  this call inserted it. It must be atomic, so two Confirms at once can't both win. It runs before
+  the record is read again, so a proposal whose write then fails is spent and the user asks again.
+  Delete rows past `expiresAt` whenever you like.
+
+  ```typescript title="{project}-db/src/schemas/used-proposals.ts"
+  // RLS on with no policy: only the server's admin client reads or writes it.
+  export const usedProposals = table("used_proposals", {
+    id: uuid().primaryKey(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+  })
+  ```
+
+- **`enabled(context)`**: which callers get the writes, per request. Return `true` only for clients
+  you know render MCP Apps cards and keep app-only tools from their model. A client that can't
+  render the card gets proposals nobody can confirm, and one that hands app-only tools to its model
+  lets the model confirm its own change. Without `enabled`, every client gets the writes.
+- **A context with the user's `claims.sub`**, as `getBearerContext` returns: every proposal is sealed
+  for it. `writes` doesn't type-check with a context that lacks it.
+
+### What the card shows
+
+The route serves the card itself, as a `ui://` resource: one HTML page that follows the client's
+theme. After Confirm, it shows one outcome:
+
+| Outcome | What happened |
+| --- | --- |
+| Saved | The write ran, once. |
+| Record changed | A field's value moved since the proposal. Nothing was written; the card shows the change as it would be now, to confirm again. |
+| Expired | The proposal is past its expiry. The user asks again. |
+| Already confirmed | The proposal was confirmed before: a second click, or a reloaded chat. Nothing more was written. |
+| Not saved | The write threw, or a form write refused its input. The card shows why. |
+
+When the client supports it, the card also tells the model what the user did: confirmed, cancelled,
+or not saved.
+
+### The trust model
+
+The route trusts the client with one thing: keeping the proposal and `apply_change` from the model.
+A client that renders MCP Apps leaves a tool marked app-only (`visibility: ["app"]`) off the model's
+tool list, and passes a result's `structuredContent` and `_meta` to the card, not the model. That is
+why `enabled` matters: **a plain MCP client lists `apply_change` like any other tool.**
+
+Whatever the client, the route checks on every `apply_change` call:
+
+- the signature, so no one can make up a proposal or edit its input, user or old values;
+- the expiry;
+- that the caller is the user the proposal was made for;
+- that the proposal was never used (`markUsed`);
+- that the record still holds each old value the card showed.
+
+The write then runs as the user, under row level security, through the same `invoke` as in your app.
+The proposal is signed, not encrypted: the card can read the input and the values, which the user
+sees anyway.
+
 ## Audit tool calls
 
 `onToolCall(call, context)` runs once after each call to one of `tools`, with the caller's context,
@@ -200,6 +305,10 @@ const toText = (value: unknown) =>
   adds to every call's, so keep it to one write and bound it (a statement timeout).
 - Whatever `onToolCall` throws goes to `onError`, and the client's answer is unchanged. Set
   `onError` too, or a failing audit write goes unnoticed.
+- A write is reported twice. Its propose call has `result: { change, proposalId }`. The
+  `apply_change` call has `input: { proposalId, tool, input }` (the write and the input the model
+  sent it) and what the write returned. A proposal it refused is reported with a
+  `ProposalRefusedError` whose `reason` is `invalid`, `expired`, `wrong-user`, `stale` or `used`.
 - A call naming a tool the route doesn't serve is refused by the MCP SDK before any of the route's
   code runs, so it is not reported. Neither are the tools `setup` registers: instrument their
   handlers yourself.

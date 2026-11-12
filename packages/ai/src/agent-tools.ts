@@ -85,12 +85,15 @@ const replaceUnsafe = (text: string, replace: (code: number) => string) =>
     return isUnsafeCharacter(code) ? replace(code) : character
   }).join("")
 
-// A name on one line: each unsafe character becomes a space.
-const singleLine = (text: string) => replaceUnsafe(text, () => " ")
+/** A name on one line: each unsafe character becomes a space. */
+export const singleLine = (text: string): string =>
+  replaceUnsafe(text, () => " ")
 
-// A value quoted as JSON, with what JSON leaves raw (U+2028, the bidi marks)
-// escaped as well.
-const formatValue = (value: ChangeValue) =>
+/**
+ * A value quoted as JSON, with what JSON leaves raw (U+2028, the bidi marks)
+ * escaped as well. `null` reads `(empty)`.
+ */
+export const formatValue = (value: ChangeValue): string =>
   value === null
     ? "(empty)"
     : replaceUnsafe(
@@ -206,5 +209,19 @@ export function toolSchema(
       vendor: "zeno-lib",
       version: 1,
     },
+  }
+}
+
+/**
+ * What a route registers a definition with: the JSON Schema `toolSchema`
+ * checked, and the schema's own `validate`, for a schema that also keeps what
+ * it parsed (`createMcpRoute`'s, for `onToolCall`).
+ */
+export function schemaParts(
+  definition: Pick<AgentDefinitionBase<never>, "name" | "schema">
+): Pick<ToolSchema["~standard"], "jsonSchema" | "validate"> {
+  return {
+    jsonSchema: toolSchema(definition)["~standard"].jsonSchema,
+    validate: (definition.schema as ToolSchema)["~standard"].validate,
   }
 }

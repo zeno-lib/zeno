@@ -11,7 +11,7 @@ import {
   renamePost,
   undescribedWrite,
 } from "./fixtures.test-utils.ts"
-import { createMcpRoute } from "./mcp.ts"
+import { type AgentWrite, createMcpRoute } from "./mcp.ts"
 import { toAiSdkTools } from "./tools.ts"
 
 type Context = typeof context
@@ -26,7 +26,7 @@ test("only an object-form export with describeChange on a write is a tool", () =
   expectTypeOf(positional).not.toExtend<AgentTool<Context>>()
 })
 
-test("createMcpRoute takes reads only, run as the bearer caller", () => {
+test("createMcpRoute takes reads in tools, run as the bearer caller", () => {
   createMcpRoute({
     getContext: getBearerContext,
     name: "example",
@@ -38,9 +38,34 @@ test("createMcpRoute takes reads only, run as the bearer caller", () => {
     getContext: getBearerContext,
     name: "example",
     resourceMetadataUrl: "https://app.example.com/.well-known/x",
-    // @ts-expect-error: MCP serves no writes yet
+    // @ts-expect-error: a write goes in writes, never in tools
     tools: [renamePost],
     version: "1.0.0",
+  })
+})
+
+test("createMcpRoute takes writes only with a context that names its user", () => {
+  const writes = { markUsed: () => true, secret: "x", tools: [renamePost] }
+  createMcpRoute({
+    getContext: getBearerContext,
+    name: "example",
+    resourceMetadataUrl: "https://app.example.com/.well-known/x",
+    tools: [getPost],
+    version: "1.0.0",
+    writes,
+  })
+  type Anonymous = { via: string }
+  createMcpRoute({
+    getContext: () => Promise.resolve<Anonymous>({ via: "Claude" }),
+    name: "example",
+    resourceMetadataUrl: "https://app.example.com/.well-known/x",
+    tools: [],
+    version: "1.0.0",
+    // @ts-expect-error: a proposal is sealed for claims.sub
+    writes: {
+      ...writes,
+      tools: [renamePost as unknown as AgentWrite<Anonymous>],
+    },
   })
 })
 
