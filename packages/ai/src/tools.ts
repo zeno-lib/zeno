@@ -2,6 +2,7 @@ import { type ModelMessage, type Tool, type ToolApprovalStatus, tool } from "ai"
 import {
   type AgentTool,
   type AgentWriteDefinition,
+  approvedFrom,
   checkAgentTools,
   formatChange,
   toJsonText,
@@ -64,10 +65,9 @@ const checkApproved = async <TContext>(
   if (!change) {
     throw new Error("Not saved: this change can't be described")
   }
-  const now = formatChange(change)
-  if (now !== approved) {
+  if (!approvedFrom(approved, change)) {
     throw new Error(
-      `Not saved: the record changed since the user approved this. The change is now:\n${now}\nAsk the user to approve it again.`
+      `Not saved: the record changed since the user approved this. The change is now:\n${formatChange(change)}\nAsk the user to approve it again.`
     )
   }
 }
@@ -84,14 +84,13 @@ const checkApproved = async <TContext>(
  *   `definition.describe`, formatted by `formatChange`. When `describe` throws
  *   (the record is not visible to the caller, say), the call is denied with
  *   the error as its reason, never put to the user without the change.
- * - An approved write runs only while `describe` still returns the change the
- *   user approved, read back from the approval request in the messages. When
- *   the record changed in between, the write is refused with the change now,
- *   and the model can ask again.
- * - A write also carries the tool-level `needsApproval`, which AI SDK reads only
- *   when `toolApproval` has no entry for it. A route that forgets
- *   `toolApproval` still asks before each write, without the change, rather
- *   than running it, and the approved write is then refused.
+ * - An approved write runs only while `describe` still starts from the change
+ *   the user approved (the same fields, each with the same old value), read
+ *   back from the approval request in the messages. When the record changed in
+ *   between, the write is refused with the change now, and the model can ask
+ *   again. The check and the write are not one transaction.
+ * - A write with no approval request in the messages is refused, so a route
+ *   that forgets `toolApproval` saves nothing and its model reads why.
  * - The output is JSON: a `bigint` becomes its decimal string.
  *
  * Throws when two tools share a name, a write has no `describeChange`, or a
@@ -121,7 +120,6 @@ export function toAiSdkTools<TContext>(
         return JSON.parse(toJsonText(await definition.invoke(input, context)))
       },
       inputSchema: toolSchema(definition),
-      ...(definition.readOnly ? {} : { needsApproval: true }),
     })
 
     if (!definition.readOnly) {

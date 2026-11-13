@@ -8,6 +8,7 @@ import {
   received,
   renamePost,
   retitlePost,
+  stampPost,
   titles,
   undescribedWrite,
 } from "./fixtures.test-utils.ts"
@@ -61,7 +62,8 @@ const run = (toolName: string, input: unknown) => {
 
 /**
  * Asks for `toolName`, runs `between`, then approves the call and runs the
- * next step, as a chat does across two requests. Returns what the model read
+ * next step, as a chat does across two requests. Throws when the first step
+ * asks for no approval. Returns what the model read
  * back about the write: the last prompt's last message.
  */
 const approveAndRun = async (
@@ -75,8 +77,11 @@ const approveAndRun = async (
   const request = first.content.find(
     (part) => part.type === "tool-approval-request"
   )
+  if (!request) {
+    throw new Error(`${toolName} ran without asking for approval`)
+  }
   const approval: ToolApprovalResponse = {
-    approvalId: request?.approvalId ?? "",
+    approvalId: request.approvalId,
     approved: true,
     type: "tool-approval-response",
   }
@@ -128,6 +133,12 @@ describe("toAiSdkTools", () => {
     expect(received).toEqual([{ id: 7, title: "Launch" }])
   })
 
+  it("runs an approved write whose describeChange computes a value on each read", async () => {
+    await approveAndRun(toAiSdkTools([stampPost], context), "stamp_post")
+
+    expect(received).toEqual([{ id: 7, title: "Launch" }])
+  })
+
   it("refuses an approved write whose record changed since the approval", async () => {
     const told = await approveAndRun(
       toAiSdkTools([retitlePost], context),
@@ -137,24 +148,27 @@ describe("toAiSdkTools", () => {
 
     expect(received).toEqual([])
     expect(titles.get(7)).toBe("Edited elsewhere")
-    expect(told).toContain("the record changed since the user approved this")
+    // The model reads the change as it is now, to ask again.
     expect(told).toContain('title: \\"Edited elsewhere\\" → \\"Launch\\"')
   })
 
-  it("still asks before a write when the route forgets toolApproval, then refuses it", async () => {
+  it("saves no write when the route forgets toolApproval, and tells the model why", async () => {
     const { tools } = toAiSdkTools([renamePost], context)
     const result = await generateText({
       model: callTool("rename_post", { id: "7", title: "Launch" }),
       prompt: "Go.",
       tools,
     })
-    const told = await approveAndRun({ tools }, "rename_post")
 
-    expect(result.content.map((part) => part.type)).toContain(
-      "tool-approval-request"
-    )
     expect(received).toEqual([])
-    expect(told).toContain("approved without its change")
+    expect(result.content).toContainEqual(
+      expect.objectContaining({
+        error: expect.objectContaining({
+          message: expect.stringContaining("toolApproval"),
+        }),
+        type: "tool-error",
+      })
+    )
   })
 
   it("denies a write whose change can't be read, without asking the user", async () => {

@@ -136,6 +136,32 @@ export const retitlePost = defineAction({
   schema: z.object({ id: z.string().transform(Number), title: z.string() }),
 })
 
+let stamps = 0
+
+/**
+ * Like `retitlePost`, but its `describeChange` computes a value on each read,
+ * as a timestamp would be, and names the record with it.
+ */
+export const stampPost = defineAction({
+  describeChange: (_db, input) => {
+    stamps += 1
+    return {
+      changes: [
+        { field: "title", from: titles.get(input.id) ?? null, to: input.title },
+        { field: "stamp", from: null, to: stamps },
+      ],
+      entity: `Post ${input.id} (read ${stamps})`,
+    }
+  },
+  description: "Retitle a post and stamp it.",
+  name: "stamp_post",
+  run: (_db, input) => {
+    received.push(input)
+    return { stamped: input.id }
+  },
+  schema: z.object({ id: z.string().transform(Number), title: z.string() }),
+})
+
 export const hiddenPost = defineAction({
   describeChange: () => {
     throw new Error("No post 9 for this user")

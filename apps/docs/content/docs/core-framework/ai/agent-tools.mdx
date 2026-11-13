@@ -84,9 +84,10 @@ status: "draft" → "published"
 - When `describeChange` throws (the record isn't visible to the user, say), the call is denied with
   the error as its reason. The user is never asked to approve a change nobody could read.
 - **An approval holds only for the change it showed.** Before an approved write runs,
-  `describeChange` reads the record again. If the change no longer reads the same (someone edited
-  the record in between), the write is refused, and the model reads the change as it is now so it
-  can ask again.
+  `describeChange` reads the record again. If a field it lists now starts from a different value
+  (someone edited the record in between), the write is refused, and the model reads the change as
+  it is now so it can ask again. That read and the write are not one transaction, so an edit landing
+  between them still goes through.
 
 `formatChange` quotes text values and escapes their newlines, so text stored in your data can't add
 a line that looks like another change.
