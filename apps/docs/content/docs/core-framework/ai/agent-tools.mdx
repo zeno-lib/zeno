@@ -83,6 +83,10 @@ status: "draft" → "published"
 - **Read in one snapshot** when you read more than once: wrap the reads in `db.transaction`.
 - When `describeChange` throws (the record isn't visible to the user, say), the call is denied with
   the error as its reason. The user is never asked to approve a change nobody could read.
+- **An approval holds only for the change it showed.** Before an approved write runs,
+  `describeChange` reads the record again. If the change no longer reads the same (someone edited
+  the record in between), the write is refused, and the model reads the change as it is now so it
+  can ask again.
 
 `formatChange` quotes text values and escapes their newlines, so text stored in your data can't add
 a line that looks like another change.

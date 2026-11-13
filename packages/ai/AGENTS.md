@@ -18,6 +18,9 @@ is in [`ai`](../../apps/docs/content/docs/core-framework/ai/index.mdx).
 - **Keep the tool-level `needsApproval` on writes**, deprecated as it is. AI SDK reads it only when
   `toolApproval` has no entry for the tool, so a route that forgets `toolApproval` asks before a
   write instead of running it.
+- **`toAiSdkTools` checks an approved write by comparing text**: the approval's reason against
+  `formatChange` of a fresh `describe`. Keep the reason exactly `formatChange(change)`, nothing
+  added; any other wording refuses every approved write.
 - **Over MCP, a write's own tool only proposes; only `apply_change` writes.** An MCP client's prompt
   names the tool, not the change, so the change is shown in the approval card instead. Never let a
   propose tool write, and keep every check in `apply_change` (seal, expiry, user, replay, stale):
