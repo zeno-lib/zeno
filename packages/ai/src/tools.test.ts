@@ -7,9 +7,12 @@ import {
   hiddenPost,
   received,
   renamePost,
+  retitlePost,
+  stampPost,
+  titles,
   undescribedWrite,
 } from "./fixtures.test-utils.ts"
-import { toAiSdkTools } from "./tools.ts"
+import { type AiSdkTools, toAiSdkTools } from "./tools.ts"
 
 const usage = {
   inputTokens: { cacheRead: 0, cacheWrite: 0, noCache: 1, total: 1 },
@@ -57,8 +60,52 @@ const run = (toolName: string, input: unknown) => {
   })
 }
 
+/**
+ * Asks for `toolName`, runs `between`, then approves the call and runs the
+ * next step, as a chat does across two requests. Throws when the first step
+ * asks for no approval. Returns what the model read
+ * back about the write: the last prompt's last message.
+ */
+const approveAndRun = async (
+  { toolApproval, tools }: Partial<AiSdkTools> & Pick<AiSdkTools, "tools">,
+  toolName: string,
+  between: () => void = () => undefined
+) => {
+  const model = callTool(toolName, { id: "7", title: "Launch" })
+  const messages: ModelMessage[] = [{ content: "Go.", role: "user" }]
+  const first = await generateText({ messages, model, toolApproval, tools })
+  const request = first.content.find(
+    (part) => part.type === "tool-approval-request"
+  )
+  if (!request) {
+    throw new Error(`${toolName} ran without asking for approval`)
+  }
+  const approval: ToolApprovalResponse = {
+    approvalId: request.approvalId,
+    approved: true,
+    type: "tool-approval-response",
+  }
+  between()
+  await generateText({
+    messages: [
+      ...messages,
+      ...first.response.messages,
+      { content: [approval], role: "tool" },
+    ],
+    model,
+    toolApproval,
+    tools,
+  })
+  // The package's `lib` predates `Array.prototype.at`.
+  const [last] = model.doGenerateCalls.slice(-1)
+  const [message] = (last?.prompt ?? []).slice(-1)
+  return JSON.stringify(message)
+}
+
 beforeEach(() => {
   received.length = 0
+  titles.clear()
+  titles.set(7, "Draft")
 })
 
 describe("toAiSdkTools", () => {
@@ -81,34 +128,31 @@ describe("toAiSdkTools", () => {
   })
 
   it("runs an approved write once, from the raw input", async () => {
-    const { toolApproval, tools } = toAiSdkTools([renamePost], context)
-    const model = callTool("rename_post", { id: "7", title: "Launch" })
-    const messages: ModelMessage[] = [{ content: "Go.", role: "user" }]
-    const first = await generateText({ messages, model, toolApproval, tools })
-    const request = first.content.find(
-      (part) => part.type === "tool-approval-request"
-    )
-    const approval: ToolApprovalResponse = {
-      approvalId: request?.approvalId ?? "",
-      approved: true,
-      type: "tool-approval-response",
-    }
-
-    await generateText({
-      messages: [
-        ...messages,
-        ...first.response.messages,
-        { content: [approval], role: "tool" },
-      ],
-      model,
-      toolApproval,
-      tools,
-    })
+    await approveAndRun(toAiSdkTools([renamePost], context), "rename_post")
 
     expect(received).toEqual([{ id: 7, title: "Launch" }])
   })
 
-  it("still asks before a write when the route forgets toolApproval", async () => {
+  it("runs an approved write whose describeChange computes a value on each read", async () => {
+    await approveAndRun(toAiSdkTools([stampPost], context), "stamp_post")
+
+    expect(received).toEqual([{ id: 7, title: "Launch" }])
+  })
+
+  it("refuses an approved write whose record changed since the approval", async () => {
+    const told = await approveAndRun(
+      toAiSdkTools([retitlePost], context),
+      "retitle_post",
+      () => titles.set(7, "Edited elsewhere")
+    )
+
+    expect(received).toEqual([])
+    expect(titles.get(7)).toBe("Edited elsewhere")
+    // The model reads the change as it is now, to ask again.
+    expect(told).toContain('title: \\"Edited elsewhere\\" → \\"Launch\\"')
+  })
+
+  it("saves no write when the route forgets toolApproval, and tells the model why", async () => {
     const { tools } = toAiSdkTools([renamePost], context)
     const result = await generateText({
       model: callTool("rename_post", { id: "7", title: "Launch" }),
@@ -116,10 +160,15 @@ describe("toAiSdkTools", () => {
       tools,
     })
 
-    expect(result.content.map((part) => part.type)).toContain(
-      "tool-approval-request"
-    )
     expect(received).toEqual([])
+    expect(result.content).toContainEqual(
+      expect.objectContaining({
+        error: expect.objectContaining({
+          message: expect.stringContaining("toolApproval"),
+        }),
+        type: "tool-error",
+      })
+    )
   })
 
   it("denies a write whose change can't be read, without asking the user", async () => {

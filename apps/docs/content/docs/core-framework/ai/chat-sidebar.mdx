@@ -46,7 +46,11 @@ export async function POST(request: Request) {
 
 - **`toolApproval`** holds every write until the user answers. Its reason is the change, from the
   write's `describeChange`. To add tools of your own, merge both objects rather than replacing them.
-  A route that leaves `toolApproval` out still asks before each write, but without the change.
+  A route that leaves `toolApproval` out saves no write: each one is refused, and the model reads
+  why.
+- **An approved write runs only while its record still reads the same.** The route reads the change
+  back from the approval request in the messages the browser sends, so keep each approval's
+  `requestReason` in the stored history if you persist the chat.
 - **`experimental_toolApprovalSecret`** signs each approval request. The browser sends the whole
   conversation back on every turn, so without it the browser could approve a request the server
   never made. Use 32 random bytes or more, the same on every server instance.

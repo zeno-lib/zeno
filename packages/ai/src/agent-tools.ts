@@ -125,6 +125,30 @@ export function formatChange(change: ChangeDescription): string {
   return [entity, ...lines].join("\n")
 }
 
+/**
+ * Whether `approved`, a `formatChange` text, starts from where `change` does:
+ * the same fields, in the same order, each with the same `from`. The entity
+ * line and each `to` are not compared, as `apply_change` compares a proposal:
+ * the input decides `to`, and a `describeChange` may compute it when it reads.
+ */
+export function approvedFrom(
+  approved: string,
+  change: ChangeDescription
+): boolean {
+  const [, ...lines] = approved.split("\n")
+  if (change.changes.length === 0) {
+    return lines.length === 1 && lines[0] === "(no field changes)"
+  }
+  // A quoted value ends at its closing quote and JSON has no raw spaces, so a
+  // different `from` can't share this prefix.
+  return (
+    lines.length === change.changes.length &&
+    change.changes.every(({ field, from }, index) =>
+      lines[index]?.startsWith(`${singleLine(field)}: ${formatValue(from)} → `)
+    )
+  )
+}
+
 const isFunction = (value: unknown): value is (...args: never[]) => unknown =>
   typeof value === "function"
 

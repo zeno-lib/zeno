@@ -40,7 +40,8 @@ yours to keep.
    the user approves it, and the approval shows the record and each field, old → new, which the
    write's `describeChange` reads. An approval that only names the tool gets approved unread, and
    it is the main guard against a prompt injected through your own data. A write without
-   `describeChange` is not a valid tool.
+   `describeChange` is not a valid tool, and a write whose record changed after the approval is
+   refused.
 3. **Never a tool, even with approval:** anything whose damage leaves the app or can't be undone.
    Sending email, sharing files or granting access, user administration, deletes, and anything that
    runs with the secret key and bypasses row level security.

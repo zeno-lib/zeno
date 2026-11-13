@@ -15,9 +15,12 @@ is in [`ai`](../../apps/docs/content/docs/core-framework/ai/index.mdx).
 - **A write is never put to the user without its change.** `checkAgentTools` refuses a write with no
   `describeChange`, and a `describe` that throws or returns `null` denies the call. Don't fall back to
   an approval that only names the tool.
-- **Keep the tool-level `needsApproval` on writes**, deprecated as it is. AI SDK reads it only when
-  `toolApproval` has no entry for the tool, so a route that forgets `toolApproval` asks before a
-  write instead of running it.
+- **A write's `execute` refuses unless the messages hold its approval request**, and is the only
+  guard when a route forgets `toolApproval`. No tool-level `needsApproval`: it would ask for an
+  approval with no change, which `execute` then refuses anyway.
+- **`toAiSdkTools` reads the approved change back from the approval's reason text**, through
+  `approvedFrom`. Keep the reason exactly `formatChange(change)`, and keep `approvedFrom` in step with
+  `formatChange`'s line format; any other wording refuses every approved write.
 - **Over MCP, a write's own tool only proposes; only `apply_change` writes.** An MCP client's prompt
   names the tool, not the change, so the change is shown in the approval card instead. Never let a
   propose tool write, and keep every check in `apply_change` (seal, expiry, user, replay, stale):
