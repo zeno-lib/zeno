@@ -1,0 +1,6 @@
+{
+  "extends": "@zeno-lib/typescript/strictest.json",
+  "compilerOptions": {
+    "types": ["node"]
+  }
+}
