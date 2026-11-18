@@ -15,16 +15,20 @@ The user guide is in
   `includeEntryExports`, fallow still reports the exports of an entry.
 - **Prefix every plugin name with `zeno-`.** fallow keeps one plugin per name, so a preset plugin
   that shares its name with a built-in or with an app's plugin can be dropped.
+- **Point apps at root `fallow-plugin-<name>.jsonc` files for their own plugins**, never at
+  `.fallow/plugins/`. fallow writes a `.gitignore` of `*` into `.fallow/`, its cache folder, so a
+  plugin there never reaches git.
 - **Raise `minimumVersion` when a credit or a rule needs a newer fallow.** It is the only version
   guard. Before you drop a credit, check that the minimum version credits the file itself.
 
 ## Traps
 
-- **Zeno doesn't install or run fallow**, so nothing in CI loads the preset. Check a change in a
-  scratch repo that extends `fallow.jsonc` by a relative path: `fallow config` prints the merged
-  config, and `fallow list --plugins` shows which `zeno-*` plugins are active.
-- **Never declare `fallow` as a peer dependency, even an optional one.** pnpm installs it, so Zeno
-  would install fallow. `minimumVersion` stops an older fallow at load instead.
+- **`pnpm fallow` at the root loads your change.** The root `.fallowrc.jsonc` extends this package
+  through `npm:`, as an app does. Zeno has no next-intl or image loader, so check those credits in a
+  scratch repo: `fallow config` prints the merged config, and `fallow list --plugins` shows which
+  `zeno-*` plugins are active.
+- **Don't add a `fallow` peer dependency.** `minimumVersion` is the version guard, and pnpm would
+  install even an optional peer into this package.
 - **`toolingDependencies` doesn't reach the root `package.json`.** fallow applies an external
   plugin's tooling credit to workspace manifests only, so a root devDependency such as
   `@zeno-lib/fallow` itself needs the app's `ignoreDependencies`.

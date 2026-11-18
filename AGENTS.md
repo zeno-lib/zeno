@@ -76,7 +76,8 @@ The full list is in [package.json](package.json). The ones with a catch:
 | `pnpm e2e` | Needs `pnpm exec playwright install --with-deps` once in `packages/e2e/`. |
 | `pnpm registry:build` | Run after editing any registry-distributed source. CI checks the manifests are in sync. |
 | `pnpm changeset` | Add a release note for any change to a publishable package. |
-| `pnpm run ci` | The full pre-PR pipeline: `lint → types:check → build → test → e2e`. Bare `pnpm ci` is pnpm's built-in clean install, not this script. |
+| `pnpm fallow` | Fails on new unused code and on new complex functions. The functions in `fallow-baselines/health.json` were complex before fallow came in. Never save that baseline again to make a run pass. After you simplify one, run `pnpm exec fallow baselines prune --health-baseline fallow-baselines/health.json`. `fallow-plugin-registry.jsonc` makes every file a `registry.json` lists an entry. |
+| `pnpm run ci` | The full pre-PR pipeline: `lint → fallow → types:check → build → test → e2e`. Bare `pnpm ci` is pnpm's built-in clean install, not this script. |
 
 Scope a command to one package with `pnpm turbo run <task> --filter <pkg-name>`.
 

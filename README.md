@@ -30,6 +30,7 @@ The repo comes configured with:
 
 - [TypeScript](https://www.typescriptlang.org/) for static type checking
 - [Ultracite](https://www.ultracite.ai/) for linting and formatting
+- [fallow](https://fallow.tools) for unused code, duplication and complexity, through the `@zeno-lib/fallow` preset
 
 ### Build
 

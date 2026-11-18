@@ -1,0 +1,206 @@
+{
+  "kind": "health",
+  "finding_counts": {
+    "packages/forms/src/create-zeno-form.tsx": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/checkbox-field.tsx": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/checkbox-group-field.tsx": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/combobox-field.tsx": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/date-picker-field.tsx": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/multi-select-field.tsx": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/otp-field.tsx": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/radio-group-field.tsx": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/select-field.tsx": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/slider-field.tsx": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/switch-field.tsx": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/form-dialog.tsx": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/lib/schema-defaults.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/lib/use-field-control.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/lib/validation-logic.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    }
+  },
+  "identity_finding_counts": {
+    "packages/forms/src/create-zeno-form.tsx\u0000useForm": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/checkbox-field.tsx\u0000CheckboxField": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/checkbox-group-field.tsx\u0000CheckboxGroupField": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/combobox-field.tsx\u0000ComboboxField": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/date-picker-field.tsx\u0000DatePickerField": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/multi-select-field.tsx\u0000MultiSelectField": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/otp-field.tsx\u0000OtpField": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/radio-group-field.tsx\u0000RadioGroupField": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/select-field.tsx\u0000SelectField": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/slider-field.tsx\u0000SliderField": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/fields/switch-field.tsx\u0000SwitchField": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/form-dialog.tsx\u0000FormDialog": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/lib/schema-defaults.ts\u0000pickShape": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/lib/use-field-control.ts\u0000useFieldControl": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "packages/forms/src/lib/validation-logic.ts\u0000fieldLevelLogic": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    }
+  },
+  "runtime_coverage_findings": [],
+  "target_keys": [
+    "packages/forms/src/lib/schema-defaults.ts:high impact",
+    "packages/forms/src/fields/combobox-field.tsx:complexity",
+    "packages/forms/src/form-dialog.tsx:complexity",
+    "packages/forms/src/fields/multi-select-field.tsx:hidden coupling",
+    "packages/forms/src/fields/select-field.tsx:hidden coupling",
+    "packages/forms/src/fields/date-picker-field.tsx:hidden coupling",
+    "packages/forms/src/fields/slider-field.tsx:hidden coupling",
+    "packages/forms/src/lib/aria.ts:high impact",
+    "apps/docs/src/components/forms/dynamic-preview.tsx:hidden coupling",
+    "packages/forms/src/fields/radio-group-field.tsx:hidden coupling",
+    "packages/forms/src/fields/checkbox-field.tsx:hidden coupling",
+    "packages/forms/src/fields/switch-field.tsx:hidden coupling",
+    "apps/docs/src/components/forms/newsletter-preview.tsx:hidden coupling",
+    "packages/forms/src/fields/otp-field.tsx:hidden coupling",
+    "packages/forms/src/fields/input-field.tsx:hidden coupling",
+    "packages/db/src/schema.ts:hidden coupling",
+    "apps/docs/src/components/forms/login-preview.tsx:hidden coupling",
+    "apps/docs/src/components/forms/signup-preview.tsx:hidden coupling",
+    "packages/forms/src/lib/focus-first-invalid.ts:hidden coupling",
+    "packages/schema/src/index.ts:hidden coupling",
+    "packages/forms/src/fields/textarea-field.tsx:hidden coupling",
+    "packages/forms/src/form-dialog.test.tsx:hidden coupling",
+    "packages/forms/src/use-app-fields.test.tsx:hidden coupling",
+    "apps/docs/src/components/forms/custom-field-preview.tsx:hidden coupling",
+    "packages/db/src/next.test-d.ts:hidden coupling",
+    "apps/docs/src/components/forms/dialog-preview.tsx:hidden coupling",
+    "packages/db/src/next.test.ts:hidden coupling",
+    "packages/forms/src/use-app-fields.test-d.ts:hidden coupling",
+    "packages/db/src/casing.test.ts:hidden coupling",
+    "packages/db/src/column-rules.test.ts:hidden coupling",
+    "packages/forms/src/use-form.test.tsx:hidden coupling",
+    "apps/docs/src/components/forms/array-preview.tsx:hidden coupling",
+    "packages/forms/src/use-form.validation-modes.test.tsx:hidden coupling",
+    "packages/db/src/column-rules.test-d.ts:hidden coupling",
+    "packages/forms/src/use-form.test-d.ts:hidden coupling",
+    "packages/forms/src/use-form.unsaved-warning.test.tsx:hidden coupling",
+    "packages/forms/src/lib/apply-validation-error.test.ts:hidden coupling",
+    "packages/schema/src/index.test.ts:hidden coupling",
+    "packages/forms/src/use-form.cascade.test.tsx:hidden coupling",
+    "packages/forms/src/lib/schema-required.test.ts:hidden coupling",
+    "apps/docs/src/components/forms/field-previews.tsx:hidden coupling",
+    "packages/forms/src/lib/schema-defaults.test.ts:hidden coupling",
+    "packages/forms/src/lib/validation-error.test.ts:hidden coupling",
+    "packages/schema/src/index.test-d.ts:hidden coupling",
+    "packages/forms/src/lib/validation-logic.test.ts:hidden coupling",
+    "packages/forms/src/lib/validation-modes.test.ts:hidden coupling"
+  ]
+}

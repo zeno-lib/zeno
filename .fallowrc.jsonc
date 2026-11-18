@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/fallow/schema.json",
+  // The workspace preset, read the way an app reads it. The registry source files are entries
+  // through `.fallow/plugins/registry.jsonc`.
+  "extends": "npm:@zeno-lib/fallow",
+  "ignoreDependencies": [
+    // fallow reads the preset through `extends`, and no code imports it.
+    "@zeno-lib/fallow",
+    // The registry source reaches `@zeno-lib/ui` through the tsconfig `paths` of
+    // `@/components/ui/*`, never by its name.
+    "@zeno-lib/ui",
+    // Listed so that Turbo builds the docs app before the e2e tests run.
+    "@zeno-lib/docs"
+  ],
+  "health": {
+    // The shadcn primitives, which Zeno mirrors and doesn't refactor.
+    "ignore": ["packages/ui/src/**"]
+  }
+}
