@@ -56,9 +56,9 @@ fallow already knows the files that Next.js, Drizzle, Playwright, PostCSS and Vi
 
 | File or package | What uses it |
 |---|---|
-| The `default` export of `i18n/request.ts` | next-intl's plugin |
+| The `default` export of `i18n/request.ts` or `src/i18n/request.ts` | next-intl's plugin |
 | `generateStaticParams` in a route handler, `app/**/route.ts` | Next.js, which prerenders the route under a dynamic segment |
-| `image-loader.ts` and its `default` export, in a package that depends on `@zeno-lib/supabase` | Next.js `images.loaderFile`, as in the [Storage image loader](/docs/core-framework/data-management/supabase#nextjs-storage-image-loader) |
+| `image-loader.ts` or `src/image-loader.ts` and its `default` export, in a package that depends on `@zeno-lib/supabase` | Next.js `images.loaderFile`, as in the [Storage image loader](/docs/core-framework/data-management/supabase#nextjs-storage-image-loader) |
 | `*.test-d.ts` and `*.spec-d.ts`, as tests | Vitest's typecheck, which the [`@zeno-lib/test` presets](/docs/core-framework/testing/unit-testing) turn on |
 | The `postcss-load-config` package | The JSDoc type at the top of the PostCSS config that `create-next-app` writes |
 
@@ -104,6 +104,7 @@ A few findings depend on names that only your repo knows:
 - An app that the e2e package lists in `devDependencies`, so that Turbo builds it before the tests, is never imported. Add each app to `ignoreDependencies`.
 - The output of `supabase gen types` is generated. Add it to `ignoreFindings` and `duplicates.ignore`.
 - A script that only a CI workflow or a person runs has no importer. Add it to `entry`.
+- A next-intl request config or an image loader at another path gets no credit. Add the file to `entry`, and with `includeEntryExports` on, its `default` export to `ignoreExports`.
 
 ## Existing complexity
 

@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/fallow/schema.json",
   // The workspace preset, read the way an app reads it. The registry source files are entries
-  // through `.fallow/plugins/registry.jsonc`.
+  // through `fallow-plugin-registry.jsonc`.
   "extends": "npm:@zeno-lib/fallow",
   "ignoreDependencies": [
     // fallow reads the preset through `extends`, and no code imports it.

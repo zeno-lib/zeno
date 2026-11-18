@@ -11,7 +11,8 @@
   "minimumVersion": "3.43.1",
   "framework": [
     {
-      // next-intl's plugin loads the request config's default export.
+      // next-intl's plugin loads the request config's default export, at its default path,
+      // `i18n/request.ts` or `src/i18n/request.ts`.
       "name": "zeno-next-intl",
       "enablers": ["next-intl"],
       "usedExports": [
@@ -37,13 +38,20 @@
     },
     {
       // Next.js loads `images.loaderFile` by path, and the Supabase Storage loader's docs name it
-      // `image-loader.ts`.
+      // `image-loader.ts`, at the root of the app or in `src/`.
       "name": "zeno-supabase-image-loader",
       "enablers": ["@zeno-lib/supabase"],
       "entryPointRole": "runtime",
-      "entryPoints": ["image-loader.{ts,mts,js,mjs}"],
+      "entryPoints": [
+        "image-loader.{ts,mts,js,mjs}",
+        "src/image-loader.{ts,mts,js,mjs}"
+      ],
       "usedExports": [
-        { "pattern": "image-loader.{ts,mts,js,mjs}", "exports": ["default"] }
+        { "pattern": "image-loader.{ts,mts,js,mjs}", "exports": ["default"] },
+        {
+          "pattern": "src/image-loader.{ts,mts,js,mjs}",
+          "exports": ["default"]
+        }
       ]
     },
     {
@@ -52,7 +60,7 @@
       "name": "zeno-vitest-typecheck",
       "enablers": ["vitest"],
       "entryPointRole": "test",
-      "entryPoints": ["**/*.{test,spec}-d.{ts,tsx,mts,cts}"]
+      "entryPoints": ["**/*.{test,spec}-d.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"]
     }
   ],
   "health": {

@@ -1,6 +1,6 @@
 {
   // shadcn serves each file that a package's `registry.json` lists, and no workspace imports it.
-  "name": "registry",
+  "name": "zeno-registry-source",
   "detection": { "type": "fileExists", "pattern": "packages/*/registry.json" },
   "entryPointRole": "runtime",
   "manifestEntries": [
