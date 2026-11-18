@@ -23,6 +23,7 @@ it and the root.** How to use each package is documented for users in the docs a
   - [`ai/`](packages/ai/AGENTS.md): `@zeno-lib/ai`, definitions as AI SDK tools and an MCP endpoint
   - [`e2e/`](packages/e2e/AGENTS.md): `@zeno-lib/e2e`, the Playwright preset, dependency verifier and API sign-in
   - [`test/`](packages/test/AGENTS.md): `@zeno-lib/test`, the Vitest presets and the Supabase RLS test harness
+  - [`fallow/`](packages/fallow/AGENTS.md): `@zeno-lib/fallow`, the fallow preset
   - `typescript/`: shared `tsconfig` presets, with no node
 
 **Edit an `AGENTS.md` only for a rule an agent would otherwise get wrong.** That means a trap, an

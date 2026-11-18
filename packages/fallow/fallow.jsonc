@@ -1,0 +1,83 @@
+// The fallow preset for a Next.js, Supabase and Drizzle monorepo. An app extends it with
+// `"extends": "npm:@zeno-lib/fallow"`.
+//
+// fallow's `extends` merges objects key by key, but an array in the app replaces the preset's. So
+// the preset sets no array that an app writes. Its credits are plugins in `framework`, and its
+// settings sit in `health` and `rules`, which merge. An app never sets `framework`. It writes its own
+// plugins in `.fallow/plugins/`, and fallow loads them next to these.
+{
+  // The fallow release this preset was checked against. Older releases miss some exports that
+  // Next.js and Playwright use, and this preset leaves those to fallow.
+  "minimumVersion": "3.43.1",
+  "framework": [
+    {
+      // next-intl's plugin loads the request config's default export.
+      "name": "zeno-next-intl",
+      "enablers": ["next-intl"],
+      "usedExports": [
+        {
+          "pattern": "**/i18n/request.{ts,tsx,js,jsx}",
+          "exports": ["default"]
+        }
+      ]
+    },
+    {
+      // The PostCSS config of `create-next-app` types itself with a JSDoc import of
+      // `postcss-load-config`, a package the app doesn't install.
+      "name": "zeno-next-postcss",
+      "enablers": ["next"],
+      "toolingDependencies": ["postcss-load-config"]
+    },
+    {
+      // Next.js loads `images.loaderFile` by path, and the Supabase Storage loader's docs name it
+      // `image-loader.ts`.
+      "name": "zeno-supabase-image-loader",
+      "enablers": ["@zeno-lib/supabase"],
+      "entryPointRole": "runtime",
+      "entryPoints": ["image-loader.{ts,mts,js,mjs}"],
+      "usedExports": [
+        { "pattern": "image-loader.{ts,mts,js,mjs}", "exports": ["default"] }
+      ]
+    },
+    {
+      // Vitest's typecheck runs type tests, and nothing imports them. The `@zeno-lib/test` presets
+      // turn it on.
+      "name": "zeno-vitest-typecheck",
+      "enablers": ["vitest"],
+      "entryPointRole": "test",
+      "entryPoints": ["**/*.{test,spec}-d.{ts,tsx,mts,cts}"]
+    }
+  ],
+  "health": {
+    // CRAP needs a coverage report. Without one, fallow counts a file that no Vitest test imports
+    // as untested, and Playwright imports nothing, so every component with 5 branches fails. Set
+    // `health.coverage`, and `maxCrap` back to fallow's 30, once CI writes a report.
+    "maxCrap": 0
+  },
+  "rules": {
+    // Next.js ignores a misplaced directive and rejects a server-only export from a client file, a
+    // mixed barrel pulls server code into the client bundle, and a client file must never reach a
+    // server secret (`fallow security`).
+    "invalid-client-export": "error",
+    "misplaced-directive": "error",
+    "mixed-client-server-barrel": "error",
+    "security-client-server-leak": "error",
+    // A server action that nothing calls, or a prop that its component never reads, is dead code.
+    "unused-component-props": "error",
+    "unused-server-actions": "error",
+    // Workspace packages and barrels never import each other in a loop.
+    "package-cycle": "error",
+    "re-export-cycle": "error",
+    // Each dependency sits in the list of the package that uses it, and in the right one.
+    "dev-dependencies-in-production": "error",
+    "test-only-dependencies": "error",
+    "type-only-dependencies": "error",
+    "unused-dependency-overrides": "error",
+    "unused-dev-dependencies": "error",
+    // A suppression says why, and goes when its finding does.
+    "require-suppression-reason": "error",
+    "stale-suppressions": "error",
+    // `fallow audit` only: production code that branches on running under a test.
+    "test-only-branch": "error"
+  }
+}
