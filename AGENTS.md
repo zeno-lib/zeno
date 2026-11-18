@@ -23,6 +23,7 @@ it and the root.** How to use each package is documented for users in the docs a
   - [`ai/`](packages/ai/AGENTS.md): `@zeno-lib/ai`, definitions as AI SDK tools and an MCP endpoint
   - [`e2e/`](packages/e2e/AGENTS.md): `@zeno-lib/e2e`, the Playwright preset, dependency verifier and API sign-in
   - [`test/`](packages/test/AGENTS.md): `@zeno-lib/test`, the Vitest presets and the Supabase RLS test harness
+  - [`fallow/`](packages/fallow/AGENTS.md): `@zeno-lib/fallow`, the fallow preset
   - `typescript/`: shared `tsconfig` presets, with no node
 
 **Edit an `AGENTS.md` only for a rule an agent would otherwise get wrong.** That means a trap, an
@@ -75,7 +76,8 @@ The full list is in [package.json](package.json). The ones with a catch:
 | `pnpm e2e` | Needs `pnpm exec playwright install --with-deps` once in `packages/e2e/`. |
 | `pnpm registry:build` | Run after editing any registry-distributed source. CI checks the manifests are in sync. |
 | `pnpm changeset` | Add a release note for any change to a publishable package. |
-| `pnpm run ci` | The full pre-PR pipeline: `lint → types:check → build → test → e2e`. Bare `pnpm ci` is pnpm's built-in clean install, not this script. |
+| `pnpm fallow` | Fails on new unused code and on new complex functions. The functions in `fallow-baselines/health.json` were complex before fallow came in. Never save that baseline again to make a run pass. After you simplify one, run `pnpm exec fallow baselines prune --health-baseline fallow-baselines/health.json`. |
+| `pnpm run ci` | The full pre-PR pipeline: `lint → fallow → types:check → build → test → e2e`. Bare `pnpm ci` is pnpm's built-in clean install, not this script. |
 
 Scope a command to one package with `pnpm turbo run <task> --filter <pkg-name>`.
 

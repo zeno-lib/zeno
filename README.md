@@ -11,6 +11,7 @@ The repo holds these apps and packages:
 - `docs`: the Fumadocs documentation site, a [Next.js](https://nextjs.org/) app
 - `@zeno-lib/ui`: the private workspace mirror of the shadcn `base-nova` primitives, shared by the Zeno packages, the docs app and the tests
 - `@zeno-lib/typescript`: the shared `tsconfig` presets
+- `@zeno-lib/fallow`: the shared [fallow](https://fallow.tools) preset, for unused code, duplication and complexity
 - `@zeno-lib/supabase`: the Supabase SSR clients and middleware for Next.js
 - `@zeno-lib/query`: suspense boundaries, route prefetching and timing presets for TanStack Query
 - `@zeno-lib/test`: shared [Vitest](https://vitest.dev/) configs, the Supabase RLS test harness and re-exported testing utilities
@@ -29,6 +30,7 @@ The repo comes configured with:
 
 - [TypeScript](https://www.typescriptlang.org/) for static type checking
 - [Ultracite](https://www.ultracite.ai/) for linting and formatting
+- [fallow](https://fallow.tools) for unused code, duplication and complexity, through the `@zeno-lib/fallow` preset
 
 ### Build
 

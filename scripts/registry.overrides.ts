@@ -99,6 +99,3 @@ export const DEP_OVERRIDES: Record<string, string[]> = {}
 
 /** Registry item names to skip entirely (e.g. dev-only or non-distributable). */
 export const SKIP = new Set<string>([])
-
-export const REPO = "zeno-lib/zeno"
-export const HOMEPAGE = "https://github.com/zeno-lib/zeno"

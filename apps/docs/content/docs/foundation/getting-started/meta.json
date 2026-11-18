@@ -6,6 +6,7 @@
     "ide",
     "typescript",
     "linting-formatting",
+    "dead-code",
     "ai-setup"
   ]
 }
