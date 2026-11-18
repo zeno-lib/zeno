@@ -8,7 +8,7 @@ const isIgnored = (value: string) =>
 describe("ignoreErrors", () => {
   it.each([
     "Failed to fetch",
-    // Sentry's fetch instrumentation names the host of an absolute URL.
+    // Sentry's fetch instrumentation appends the request's host.
     "Failed to fetch (abcd.supabase.co)",
     "Load failed",
     "NetworkError when attempting to fetch resource.",

@@ -24,7 +24,7 @@ export type SharedOptionsConfig = {
  * A browser `fetch` that got no answer: the network dropped, the laptop woke
  * from sleep, the page unloaded. No change to the code can fix one, so it is
  * not reported. Chrome, Firefox and Safari each word it differently, Sentry's
- * fetch instrumentation appends the host of an absolute URL, and supabase-js
+ * fetch instrumentation appends the request's host, and supabase-js
  * rethrows it under its own error type with the same message. A server that
  * answers with an error status resolves `fetch`, so it is still reported. The
  * cost: a CORS or CSP block fails the same way, and is dropped too.

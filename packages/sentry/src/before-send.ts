@@ -23,7 +23,11 @@ export const groupServerReportedErrors = ((
     return event
   }
 
-  event.fingerprint = ["server-function-error", event.transaction ?? "unknown"]
+  // A fingerprint the app set on the scope or the capture call wins.
+  event.fingerprint ??= [
+    "server-function-error",
+    event.transaction ?? "unknown",
+  ]
   event.tags = { ...event.tags, digest }
   return event
 }) satisfies SentryOptions["beforeSend"]

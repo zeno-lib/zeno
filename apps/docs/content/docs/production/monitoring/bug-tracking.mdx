@@ -147,7 +147,7 @@ you pass your own `deniedQueryParams` and sign in with PKCE, keep `code` in the 
 
 A browser `fetch` that gets no answer (the network dropped, the laptop woke from sleep, the page
 unloaded) is not reported. Chrome, Firefox and Safari word it differently, and Sentry appends the
-host of an absolute URL, so the pattern matches all of these:
+request's host, so the pattern matches all of these:
 
 - `Failed to fetch`, with or without `TypeError: ` and a `(host)` suffix
 - `Load failed`
@@ -167,7 +167,10 @@ too. Both events carry a `digest` tag, so searching `digest:<value>` in Sentry f
 The browser copy only exists to carry the replay. Replay keeps its buffered recording only once an
 error event is sent, so dropping the copy would lose it. Instead, `groupServerReportedErrors`
 fingerprints every copy from one page into a single issue, `server-function-error` plus the page,
-which keeps the replays without a duplicate issue per server error.
+which keeps the replays without a duplicate issue per server error. A fingerprint you set yourself,
+on the scope or in `captureException`, wins. Errors from `redirect()`, `notFound()`, `forbidden()`
+and `unauthorized()` are left to default grouping: the server reports nothing for them, so there is
+no pair to link.
 
 <Callout type="warn">
 Keep `groupServerReportedErrors` out of the Node.js and edge configs. The original error carries
@@ -215,7 +218,8 @@ Sentry.init({
 On Vercel, the middleware runs before the tunnel route. The
 [Supabase middleware](/docs/core-framework/data-management/supabase#nextjs-middleware) redirects a
 request without a session to `/sign-in`, which drops every event from a signed-out page, the
-sign-in page included. Exclude the path from the matcher:
+sign-in page included. Exclude the exact path from the matcher, anchored with `$` so a page such
+as `/monitoring-dashboard` still runs the auth check:
 
 ```typescript title="middleware.ts"
 import { createMiddleware } from "@zeno-lib/supabase/next-middleware"
@@ -224,7 +228,7 @@ export const middleware = createMiddleware()
 
 export const config = {
   matcher: [
-    "/((?!monitoring|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!monitoring$|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 }
 ```

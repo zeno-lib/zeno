@@ -27,11 +27,26 @@ describe("groupServerReportedErrors", () => {
     expect(beforeSend(serverError)).not.toBeNull()
   })
 
-  it("falls back when the page is unknown", () => {
-    expect(beforeSend(serverError).fingerprint).toEqual([
-      "server-function-error",
-      "unknown",
-    ])
+  it("keeps a fingerprint the app set", () => {
+    const event = groupServerReportedErrors(
+      { fingerprint: ["checkout-failure"], type: undefined },
+      { originalException: serverError }
+    )
+
+    expect(event.fingerprint).toEqual(["checkout-failure"])
+    expect(event.tags).toEqual({ digest: "1234567" })
+  })
+
+  // `notFound()`, `forbidden()` and `unauthorized()` have no server event to
+  // join, so they must not land in the page's server error issue.
+  it("leaves a Next.js control-flow error to default grouping", () => {
+    const forbidden = Object.assign(new Error("redacted"), {
+      digest: "NEXT_HTTP_ERROR_FALLBACK;403",
+    })
+    const event = beforeSend(forbidden, "/projects/[projectId]")
+
+    expect(event.fingerprint).toBeUndefined()
+    expect(event.tags).toEqual({ existing: "kept" })
   })
 
   it("leaves a browser error to default grouping", () => {
