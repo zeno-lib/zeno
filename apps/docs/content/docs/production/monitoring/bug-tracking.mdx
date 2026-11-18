@@ -1,8 +1,232 @@
 ---
 title: Bug tracking
-description: Error tracking and bug monitoring
+description: Report errors to Sentry from a Next.js app, with one setup shared by the browser, Node.js and edge runtimes
 icon: Bug
-status: todo
 ---
 
-The bug tracking guide is coming soon.
+`@zeno-lib/sentry` is the setup a Next.js app shares across its three
+[Sentry](https://sentry.io) configs: browser, Node.js and edge. It adds three things to
+`@sentry/nextjs`:
+
+- **Shared options** that keep secrets out of events and drop browser network failures no code
+  change can fix.
+- **A `digest` tag on both sides of a server error.** Next.js hands the browser a redacted copy of a
+  server error, with a `digest` in place of the message. Tagging both events with it lets one search
+  find the server event, which has the stack trace, and the browser event, which has the replay.
+- **A `beforeSend` for the browser** that groups those copies, so each server error doesn't open a
+  second issue.
+
+Everything else is Sentry's own setup, which this page links to rather than wraps.
+
+## Installation
+
+```npm
+pnpm add @zeno-lib/sentry @sentry/nextjs
+```
+
+It needs `@sentry/nextjs` 11 or later.
+
+## Setup
+
+Sentry's [manual setup](https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/)
+puts four files next to your `app` directory, and wraps `next.config.ts` in `withSentryConfig` for
+source maps. Follow it, then spread `sharedOptions()` first in each `Sentry.init`.
+
+The Node.js and edge configs are the same:
+
+```typescript title="sentry.server.config.ts"
+import { sharedOptions } from "@zeno-lib/sentry/options"
+import * as Sentry from "@sentry/nextjs"
+
+Sentry.init({
+  ...sharedOptions(),
+  dsn: "https://<key>@o<orgId>.ingest.sentry.io/<projectId>",
+})
+```
+
+`instrumentation.ts` loads them and exports Zeno's `onRequestError` in place of
+`Sentry.captureRequestError`. It reports the same event, with the `digest` tag added:
+
+```typescript title="instrumentation.ts"
+export { onRequestError } from "@zeno-lib/sentry/request-error"
+
+export async function register() {
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    await import("./sentry.server.config")
+  }
+  if (process.env.NEXT_RUNTIME === "edge") {
+    await import("./sentry.edge.config")
+  }
+}
+```
+
+The browser config adds `groupServerReportedErrors` and Replay:
+
+```typescript title="instrumentation-client.ts"
+import { groupServerReportedErrors } from "@zeno-lib/sentry/before-send"
+import { sharedOptions } from "@zeno-lib/sentry/options"
+import * as Sentry from "@sentry/nextjs"
+
+Sentry.init({
+  ...sharedOptions(),
+  beforeSend: groupServerReportedErrors,
+  dsn: "https://<key>@o<orgId>.ingest.sentry.io/<projectId>",
+  integrations: [Sentry.replayIntegration()],
+  replaysOnErrorSampleRate: 1,
+  replaysSessionSampleRate: 0.1,
+})
+
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart
+```
+
+## Turning it on
+
+Sentry stays off until `NEXT_PUBLIC_ENVIRONMENT` is `production`. Set that variable on your
+production deployment only, before `next build`, since Next.js inlines it into the browser bundle.
+`NODE_ENV` can't do the job: `next build` and `next start` run as `production` on preview
+deployments and in CI too, which would report every test run.
+
+To use your own condition, pass `enabled`:
+
+```typescript
+Sentry.init({
+  ...sharedOptions({ enabled: process.env.NEXT_PUBLIC_VERCEL_ENV === "production" }),
+  dsn: "https://<key>@o<orgId>.ingest.sentry.io/<projectId>",
+})
+```
+
+<Callout type="warn">
+Without `NEXT_PUBLIC_ENVIRONMENT` or `enabled`, nothing is reported, in production either.
+</Callout>
+
+## Shared options
+
+`sharedOptions(config?)` returns plain `Sentry.init` options:
+
+| Option | Value | Why |
+|---|---|---|
+| `enabled` | `config.enabled` | See [Turning it on](#turning-it-on). |
+| `dataCollection.stackFrameVariables` | `false` | The SDK filters local variables by name, but production server bundles are minified, so a secret held in a local goes out under a mangled name. |
+| `dataCollection.urlQueryParams` | `{ deny: config.deniedQueryParams }` | Filters query params the SDK's own list misses. |
+| `ignoreErrors` | browser network failures | See [Network failures](#network-failures). |
+| `tracesSampleRate` | `1` | Traces every request. Lower it for a busy app. |
+
+It takes:
+
+| Option | Type | What it does |
+|---|---|---|
+| `enabled?` | `boolean` | Whether this runtime sends events. Defaults to `process.env.NEXT_PUBLIC_ENVIRONMENT === "production"`. |
+| `deniedQueryParams?` | `string[]` | Query params whose value is replaced with `[Filtered]`. Defaults to `["code"]`. Passing a list replaces the default. |
+
+A key set after the spread wins:
+
+```typescript
+const shared = sharedOptions()
+
+Sentry.init({
+  ...shared,
+  // Spread the shared value too, or the deny lists above are lost.
+  dataCollection: { ...shared.dataCollection, cookies: { deny: ["cart"] } },
+  tracesSampleRate: 0.2,
+})
+```
+
+### Secrets
+
+In v11, the SDK
+[collects everything by default](https://docs.sentry.io/platforms/javascript/guides/nextjs/migration/v10-to-v11/),
+and always filters header, cookie and query values whose key contains a snippet such as `auth`,
+`token`, `secret`, `session`, `password` or `key`. So for request data, the shared options only add
+what that list misses: the PKCE auth `code` on sign-in links. Everything else stays on; deny it key
+by key as it shows up in Sentry.
+
+A deny entry matches any key that contains it, ignoring case, so `code` also filters `postcode`. If
+you pass your own `deniedQueryParams` and sign in with PKCE, keep `code` in the list.
+
+### Network failures
+
+A browser `fetch` that gets no answer (the network dropped, the laptop woke from sleep, the page
+unloaded) is not reported. Chrome, Firefox and Safari word it differently, and Sentry appends the
+host of an absolute URL, so the pattern matches all of these:
+
+- `Failed to fetch`, with or without `TypeError: ` and a `(host)` suffix
+- `Load failed`
+- `NetworkError when attempting to fetch resource.`
+- `The network connection was lost.`
+- `The Internet connection appears to be offline.`
+
+A server that answers with an error status resolves `fetch`, so that is still reported. The cost:
+a request blocked by CORS or a Content Security Policy fails the same way, and is dropped too.
+
+## Linking browser and server errors
+
+When a Server Function or a server render fails, `onRequestError` reports the original error on
+the server. The browser gets a copy with a redacted message and the same `digest`, and reports it
+too. Both events carry a `digest` tag, so searching `digest:<value>` in Sentry finds the pair.
+
+The browser copy only exists to carry the replay. Replay keeps its buffered recording only once an
+error event is sent, so dropping the copy would lose it. Instead, `groupServerReportedErrors`
+fingerprints every copy from one page into a single issue, `server-function-error` plus the page,
+which keeps the replays without a duplicate issue per server error.
+
+<Callout type="warn">
+Keep `groupServerReportedErrors` out of the Node.js and edge configs. The original error carries
+the same `digest`, so on the server it would merge every server error from a page into one issue.
+</Callout>
+
+With your own `beforeSend`, call it first:
+
+```typescript
+Sentry.init({
+  ...sharedOptions(),
+  beforeSend(event, hint) {
+    const grouped = groupServerReportedErrors(event, hint)
+    // ...your own filtering...
+    return grouped
+  },
+})
+```
+
+## Getting past ad-blockers
+
+Ad-blockers drop requests to Sentry. Sentry's
+[tunnel](https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/tunneling/) sends
+browser events through your own server instead. It needs `@sentry/nextjs` 11.13 or later. Use a
+fixed path, so the middleware can skip it (see below). Set it in the browser:
+
+```typescript title="instrumentation-client.ts"
+Sentry.init({
+  ...sharedOptions(),
+  tunnel: "/monitoring",
+  // ...
+})
+```
+
+And on the server, in both `sentry.server.config.ts` and `sentry.edge.config.ts`:
+
+```typescript title="sentry.server.config.ts"
+Sentry.init({
+  ...sharedOptions(),
+  integrations: [Sentry.serveTunnelIntegration({ path: "/monitoring" })],
+  // ...
+})
+```
+
+On Vercel, the middleware runs before the tunnel route. The
+[Supabase middleware](/docs/core-framework/data-management/supabase#nextjs-middleware) redirects a
+request without a session to `/sign-in`, which drops every event from a signed-out page, the
+sign-in page included. Exclude the path from the matcher:
+
+```typescript title="middleware.ts"
+import { createMiddleware } from "@zeno-lib/supabase/next-middleware"
+
+export const middleware = createMiddleware()
+
+export const config = {
+  matcher: [
+    "/((?!monitoring|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
+}
+```
+
+`withSentryConfig`'s `tunnelRoute` option is deprecated in favour of this setup.

@@ -2,6 +2,7 @@ import {
   ArrowUpRight,
   Bot,
   Braces,
+  Bug,
   Component,
   Database,
   FlaskConical,
@@ -97,6 +98,15 @@ const PACKAGES: Entry[] = [
     icon: FlaskConical,
     label: "@zeno-lib/e2e",
     title: "Testing",
+  },
+  {
+    description:
+      "Sentry options shared by the browser, Node.js and edge, with each server error linked to its browser replay.",
+    domain: "q",
+    href: "/docs/production/monitoring/bug-tracking",
+    icon: Bug,
+    label: "@zeno-lib/sentry",
+    title: "Bug tracking",
   },
   {
     description:

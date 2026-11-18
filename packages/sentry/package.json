@@ -1,0 +1,54 @@
+{
+  "name": "@zeno-lib/sentry",
+  "version": "0.0.0",
+  "repository": {
+    "url": "https://github.com/zeno-lib/zeno.git",
+    "directory": "packages/sentry"
+  },
+  "type": "module",
+  "exports": {
+    "./before-send": {
+      "types": "./dist/before-send.d.mts",
+      "import": "./dist/before-send.mjs",
+      "default": "./dist/before-send.mjs"
+    },
+    "./options": {
+      "types": "./dist/options.d.mts",
+      "import": "./dist/options.mjs",
+      "default": "./dist/options.mjs"
+    },
+    "./request-error": {
+      "types": "./dist/request-error.d.mts",
+      "import": "./dist/request-error.mjs",
+      "default": "./dist/request-error.mjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "prepack": "tsdown",
+    "test": "vitest --run",
+    "test:watch": "vitest watch",
+    "types:check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@sentry/core": "^11.13.0",
+    "@sentry/nextjs": "^11.13.0",
+    "@types/node": "26.6.6",
+    "@zeno-lib/test": "workspace:*",
+    "@zeno-lib/typescript": "workspace:^",
+    "tsdown": "^0.23.7",
+    "typescript": "7.0.2",
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
+  },
+  "peerDependencies": {
+    "@sentry/nextjs": ">=11.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

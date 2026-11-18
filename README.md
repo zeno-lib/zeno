@@ -19,6 +19,7 @@ The repo holds these apps and packages:
 - `@zeno-lib/db`: Drizzle clients, schema helpers, the config preset and RLS
 - `@zeno-lib/schema`: Drizzle table to Zod schema helpers
 - `@zeno-lib/ai`: definitions as AI SDK tools and a Supabase OAuth-protected MCP endpoint
+- `@zeno-lib/sentry`: the Sentry setup a Next.js app shares across its browser, Node.js and edge configs
 - `@zeno-lib/e2e`: the Playwright preset, dependency verifier and API sign-in
 
 Every package and app is written in [TypeScript](https://www.typescriptlang.org/).
