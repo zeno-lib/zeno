@@ -1,3 +1,4 @@
+// biome-ignore-all lint/style/noExcessiveClassesPerFile: SessionRevokedError is the UnauthenticatedError the clients throw for a revoked session.
 // https://orm.drizzle.team/docs/rls#using-with-supabase
 import type { JwtPayload, SupabaseClient } from "@supabase/supabase-js"
 import type { AnyRelations, EmptyRelations } from "drizzle-orm"

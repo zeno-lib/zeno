@@ -15,7 +15,6 @@ import {
   type SupabaseToken,
 } from "../src/index"
 import { createRequestDb, UnauthenticatedError } from "../src/next"
-// biome-ignore lint/performance/noNamespaceImport: drizzle schema needs every table
 import * as schema from "./schema"
 import { posts } from "./schema"
 

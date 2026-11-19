@@ -165,6 +165,7 @@ const showOutcome = async (result: ToolResult) => {
       }
       return
     }
+    // biome-ignore-start lint/suspicious/noUnnecessaryConditions: Biome can't evaluate the Exclude<ProposalRefusal, "stale"> in ApprovalContent, so it misses these statuses.
     case "used":
       // Confirmed before, which may or may not have saved: never "not saved",
       // or the model proposes the change again.
@@ -178,6 +179,7 @@ const showOutcome = async (result: ToolResult) => {
     case "expired":
     case "wrong-user":
     case "invalid":
+    // biome-ignore-end lint/suspicious/noUnnecessaryConditions: see the start.
     case "failed":
       eyebrow.textContent = "Change not saved"
       say(content.message, "danger")

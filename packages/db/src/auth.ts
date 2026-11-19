@@ -4,7 +4,6 @@ import { sql } from "drizzle-orm"
 import { authUsers } from "./auth-schema.ts"
 import type { SessionRevocationContext } from "./clients.ts"
 
-// biome-ignore lint/performance/noBarrelFile: the entry re-exports the generated schema, which can't hold hand-written code.
 export { authSchema, authUsers } from "./auth-schema.ts"
 
 const UUID_PUNCTUATION = /[{}-]/gu

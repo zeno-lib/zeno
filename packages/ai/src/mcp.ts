@@ -23,7 +23,6 @@ import {
 } from "./mcp-writes.ts"
 
 export type { ProposalRefusal } from "./approval-protocol.ts"
-// biome-ignore lint/performance/noBarrelFile: the `./mcp` entry re-exports the types and errors its options and hooks use.
 export {
   type McpToolCall,
   type McpToolOutcome,

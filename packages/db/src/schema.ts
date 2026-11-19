@@ -56,7 +56,6 @@ import {
 
 // pg-core primitives without the `pg` prefix they repeat at every call site.
 // `table` is missing on purpose. Zeno's own is at the bottom of this file.
-// biome-ignore lint/performance/noBarrelFile: intentional public re-export surface
 export {
   isPgEnum as isEnum,
   isPgMaterializedView as isMaterializedView,

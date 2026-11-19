@@ -3,7 +3,6 @@ import { getTableColumns, getTableName } from "drizzle-orm"
 import { getTableConfig } from "drizzle-orm/pg-core"
 import { describe, expect, it } from "vitest"
 import { authSchema, authUsers } from "./auth-schema.ts"
-// biome-ignore lint/performance/noNamespaceImport: the point is what the whole barrel exports
 import * as schema from "./schema.ts"
 
 type DdlEntity = { entityType: string; schema?: string; name: string }

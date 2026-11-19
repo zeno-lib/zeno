@@ -1,4 +1,3 @@
-// biome-ignore lint/performance/noBarrelFile: public package entrypoint
 export {
   type CreateClientConfig,
   createAdminClient,
