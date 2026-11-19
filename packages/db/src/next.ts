@@ -22,7 +22,6 @@ import {
   type DefineQuery,
 } from "./define-action.ts"
 
-// biome-ignore lint/performance/noBarrelFile: `/next` is the one entry server actions import; the result types and error class belong on it.
 export {
   type ActionError,
   type ActionIssue,

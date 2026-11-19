@@ -15,11 +15,11 @@
   },
   "overrides": [
     {
-      "includes": ["**/vitest.config.*"],
-      "linter": {
-        "rules": {
-          "performance": {
-            "noBarrelFile": "off"
+      "includes": ["**/package.json"],
+      "assist": {
+        "actions": {
+          "source": {
+            "useSortedKeys": "off"
           }
         }
       }
@@ -61,9 +61,6 @@
             "noComponentHookFactories": "off",
             "noNestedComponentDefinitions": "off",
             "useExhaustiveDependencies": "off"
-          },
-          "performance": {
-            "noNamespaceImport": "off"
           },
           "security": {
             "noDangerouslySetInnerHtml": "off"

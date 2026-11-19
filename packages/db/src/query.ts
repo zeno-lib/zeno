@@ -31,7 +31,6 @@ import {
 import type { Page, PageInput } from "./pages.ts"
 
 export type { Page, PageInput } from "./pages.ts"
-// biome-ignore lint/performance/noBarrelFile: a page's type and mapper belong on the entry `findPage` is on.
 export { mapPage } from "./pages.ts"
 
 /**
