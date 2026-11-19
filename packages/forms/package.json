@@ -47,11 +47,11 @@
     "@zeno-lib/test": "workspace:^",
     "@zeno-lib/typescript": "workspace:^",
     "@zeno-lib/ui": "workspace:^",
-    "lucide-react": "^1.72.0",
+    "lucide-react": "^1.75.0",
     "tsdown": "^0.23.7",
     "typescript": "7.0.2",
     "vite": "8.3.8",
-    "vitest": "5.1.0",
+    "vitest": "5.1.1",
     "zod": "^4.6.7"
   },
   "peerDependencies": {
