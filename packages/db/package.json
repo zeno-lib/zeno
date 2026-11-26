@@ -71,9 +71,9 @@
     "types:check": "tsc --noEmit"
   },
   "devDependencies": {
-    "@supabase/supabase-js": "2.119.0",
-    "@types/node": "26.6.6",
-    "@types/react": "19.3.0",
+    "@supabase/supabase-js": "2.119.2",
+    "@types/node": "26.6.10",
+    "@types/react": "19.3.2",
     "@zeno-lib/schema": "workspace:*",
     "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
@@ -82,7 +82,7 @@
     "drizzle-orm": "1.0.0-rc.5",
     "postgres": "4.1.1",
     "react": "^19.3.1",
-    "supabase": "3.2.0",
+    "supabase": "3.4.0",
     "tsdown": "^0.23.7",
     "typescript": "7.0.2",
     "vite": "8.3.8",
