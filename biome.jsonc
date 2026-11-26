@@ -12,8 +12,8 @@
       "!**/packages/*/registry.json",
       "!**/*.svg",
       "!**/CHANGELOG.md",
-      "!**/skills/i-have-adhd",
-      "!**/skills/playwright-cli"
+      "!**/.agents/skills",
+      "!**/.claude/skills"
     ]
   },
   "overrides": [

@@ -167,7 +167,7 @@ export { config }
 For full control, call `updateSession(request, options?)` inside your own middleware:
 
 ```typescript title="middleware.ts"
-import { type NextRequest } from "next/server"
+import type { NextRequest } from "next/server"
 import { updateSession } from "@zeno-lib/supabase/next-middleware"
 
 export async function middleware(request: NextRequest) {
