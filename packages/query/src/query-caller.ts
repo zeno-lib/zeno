@@ -1,11 +1,11 @@
 import type { QueryClient } from "@tanstack/react-query"
 import { parse, stringify } from "devalue"
+import type { QueryMap } from "./query-map"
 import {
   findQuery,
   getBoundQueries,
   QUERY_CONTENT_TYPE,
   QUERY_MISSING_HEADER,
-  type QueryMap,
 } from "./query-map"
 
 export type { QueryMap } from "./query-map"

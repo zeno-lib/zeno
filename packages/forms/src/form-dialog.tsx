@@ -8,20 +8,23 @@ import {
 } from "@zeno-lib/forms/lib/focus-first-invalid"
 import { useIsFormDisabled } from "@zeno-lib/forms/lib/form-disabled"
 import { reportSubmitError } from "@zeno-lib/forms/lib/submit-error"
+import type { FormDialogController } from "@zeno-lib/forms/lib/use-form-dialog"
 import {
-  type FormDialogController,
   findFieldElement,
   useLeaveGuard,
 } from "@zeno-lib/forms/lib/use-form-dialog"
 import { useUnsavedChangesWarning } from "@zeno-lib/forms/lib/use-unsaved-changes-warning"
-import { type AnyFormApi, useSelector } from "@zeno-lib/forms/tanstack"
+import type { AnyFormApi } from "@zeno-lib/forms/tanstack"
+import { useSelector } from "@zeno-lib/forms/tanstack"
+import type {
+  ComponentType,
+  FormEvent,
+  KeyboardEvent,
+  ReactElement,
+  ReactNode,
+} from "react"
 import {
-  type ComponentType,
   createContext,
-  type FormEvent,
-  type KeyboardEvent,
-  type ReactElement,
-  type ReactNode,
   useContext,
   useId,
   useLayoutEffect,
@@ -50,7 +53,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Spinner } from "@/components/ui/spinner"
-import { FormError, type FormErrorProps } from "./fields/form-error"
+import type { FormErrorProps } from "./fields/form-error"
+import { FormError } from "./fields/form-error"
 
 type DiscardPromptText = {
   title?: ReactNode

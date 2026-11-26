@@ -1,9 +1,5 @@
-import {
-  type Folder,
-  findPath,
-  getPageTreeRoots,
-  type Item,
-} from "fumadocs-core/page-tree"
+import type { Folder, Item } from "fumadocs-core/page-tree"
+import { findPath, getPageTreeRoots } from "fumadocs-core/page-tree"
 import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared"
 import type { ReactNode } from "react"
 import { HeaderDocumentationItem } from "@/components/layout/header-documentation-item"

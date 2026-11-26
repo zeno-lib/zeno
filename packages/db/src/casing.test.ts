@@ -1,4 +1,5 @@
-import { getTableColumns, is, type SQL, sql } from "drizzle-orm"
+import type { SQL } from "drizzle-orm"
+import { getTableColumns, is, sql } from "drizzle-orm"
 import {
   bigint,
   getTableConfig,

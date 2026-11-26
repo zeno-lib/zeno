@@ -1,8 +1,8 @@
 "use client"
 
 import type { AnyFormApi } from "@tanstack/react-form"
-
-import { type StandardSchemaLike, toRequiredPathKey } from "./schema-required"
+import type { StandardSchemaLike } from "./schema-required"
+import { toRequiredPathKey } from "./schema-required"
 
 type ValidationMode = "change" | "blur" | "submit" | "blur-then-change"
 

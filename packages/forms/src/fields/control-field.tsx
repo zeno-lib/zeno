@@ -1,9 +1,7 @@
 "use client"
 
-import {
-  type FieldControlProps,
-  useFieldControl,
-} from "@zeno-lib/forms/lib/use-field-control"
+import type { FieldControlProps } from "@zeno-lib/forms/lib/use-field-control"
+import { useFieldControl } from "@zeno-lib/forms/lib/use-field-control"
 import type { ReactNode } from "react"
 import { FieldShell } from "./field-shell"
 

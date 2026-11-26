@@ -1,6 +1,7 @@
 "use client"
 
-import { type AnyFormApi, evaluate } from "@tanstack/react-form"
+import type { AnyFormApi } from "@tanstack/react-form"
+import { evaluate } from "@tanstack/react-form"
 import { useCallback, useLayoutEffect, useRef } from "react"
 
 // TanStack's `useForm` calls `formApi.update(options)` after every render. While

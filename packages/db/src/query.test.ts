@@ -1,14 +1,15 @@
-import { defineRelations, type SQL } from "drizzle-orm"
+import type { SQL } from "drizzle-orm"
+import { defineRelations } from "drizzle-orm"
 import { PgDialect, text } from "drizzle-orm/pg-core"
 import { drizzle } from "drizzle-orm/postgres-js"
 import { describe, expect, it } from "vitest"
+import type { QueryExecutor } from "./query.ts"
 import {
   definedValues,
   excludedSet,
   functionPermissionTables,
   maybeOne,
   one,
-  type QueryExecutor,
   selectFunctionPermissions,
 } from "./query.ts"
 import { primaryId, schema, table, view } from "./schema.ts"

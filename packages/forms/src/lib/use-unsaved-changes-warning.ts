@@ -1,6 +1,7 @@
 "use client"
 
-import { type AnyFormApi, useSelector } from "@tanstack/react-form"
+import type { AnyFormApi } from "@tanstack/react-form"
+import { useSelector } from "@tanstack/react-form"
 import { useEffect } from "react"
 
 type UnsavedChangesMode = "if-changed" | "if-touched"

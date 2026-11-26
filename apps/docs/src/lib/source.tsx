@@ -1,6 +1,7 @@
 import { docs } from "fumadocs-mdx:collections/server"
 import { cn } from "@zeno-lib/ui/lib/utils"
-import { type InferPageType, loader } from "fumadocs-core/source"
+import type { InferPageType } from "fumadocs-core/source"
+import { loader } from "fumadocs-core/source"
 import { lucideIconsPlugin } from "fumadocs-core/source/lucide-icons"
 
 // const badgeLabelMap = {

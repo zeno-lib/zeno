@@ -1,18 +1,7 @@
-import {
-  type ActionIssue,
-  type ActionResult,
-  FieldValidationError,
-  toActionError,
-} from "./action-result.ts"
-import {
-  describePage,
-  type Page,
-  type PageInput,
-  type PageLimits,
-  type PageOptions,
-  toPageLimits,
-  withPageSchema,
-} from "./pages.ts"
+import type { ActionIssue, ActionResult } from "./action-result.ts"
+import { FieldValidationError, toActionError } from "./action-result.ts"
+import type { Page, PageInput, PageLimits, PageOptions } from "./pages.ts"
+import { describePage, toPageLimits, withPageSchema } from "./pages.ts"
 
 /**
  * The slice of a schema `defineAction` needs: a throwing `parse`, plus the

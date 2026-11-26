@@ -10,7 +10,10 @@
       "!**/src/types.ts",
       "!**/supabase/migrations",
       "!**/packages/*/registry.json",
-      "!**/*.svg"
+      "!**/*.svg",
+      "!**/CHANGELOG.md",
+      "!**/skills/i-have-adhd",
+      "!**/skills/playwright-cli"
     ]
   },
   "overrides": [

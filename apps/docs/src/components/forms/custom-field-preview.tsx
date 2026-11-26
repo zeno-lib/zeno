@@ -13,7 +13,8 @@ import { Field, FieldGroup } from "@zeno-lib/ui/field"
 import { cn } from "@zeno-lib/ui/lib/utils"
 import { toast } from "@zeno-lib/ui/sonner"
 import { StarIcon } from "lucide-react"
-import { type ComponentProps, type KeyboardEvent, useRef } from "react"
+import type { ComponentProps, KeyboardEvent } from "react"
+import { useRef } from "react"
 import { z } from "zod"
 
 type StarRatingProps = Omit<ComponentProps<"div">, "onChange"> & {

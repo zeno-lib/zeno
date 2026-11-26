@@ -8,7 +8,8 @@ import {
   useIsFieldRequired,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
-import { type ComponentProps, type ReactNode, useId } from "react"
+import type { ComponentProps, ReactNode } from "react"
+import { useId } from "react"
 import {
   Field,
   FieldContent,

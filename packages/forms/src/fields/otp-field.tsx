@@ -9,7 +9,8 @@ import {
   useIsFieldRequiredBySchema,
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
-import { type ReactNode, useId } from "react"
+import type { ReactNode } from "react"
+import { useId } from "react"
 import {
   Field,
   FieldDescription,

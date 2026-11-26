@@ -68,14 +68,14 @@ The consumer-facing guide is
 
 The full list is in [package.json](package.json). The ones with a catch:
 
-| Command | Catch |
-|---|---|
-| `pnpm install` | Triggers `fumadocs-mdx` codegen through the docs app's `postinstall`. |
-| `pnpm test` | Depends on `build` and `lint`. Some specs (such as `@zeno-lib/db`'s RLS integration test) need a local Supabase, so start it first (`pnpm --filter @zeno-lib/db dev`). |
-| `pnpm e2e` | Needs `pnpm exec playwright install --with-deps` once in `packages/e2e/`. |
-| `pnpm registry:build` | Run after editing any registry-distributed source. CI checks the manifests are in sync. |
-| `pnpm changeset` | Add a release note for any change to a publishable package. |
-| `pnpm run ci` | The full pre-PR pipeline: `lint → types:check → build → test → e2e`. Bare `pnpm ci` is pnpm's built-in clean install, not this script. |
+| Command               | Catch                                                                                                                                                                  |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm install`        | Triggers `fumadocs-mdx` codegen through the docs app's `postinstall`.                                                                                                  |
+| `pnpm test`           | Depends on `build` and `lint`. Some specs (such as `@zeno-lib/db`'s RLS integration test) need a local Supabase, so start it first (`pnpm --filter @zeno-lib/db dev`). |
+| `pnpm e2e`            | Needs `pnpm exec playwright install --with-deps` once in `packages/e2e/`.                                                                                              |
+| `pnpm registry:build` | Run after editing any registry-distributed source. CI checks the manifests are in sync.                                                                                |
+| `pnpm changeset`      | Add a release note for any change to a publishable package.                                                                                                            |
+| `pnpm run ci`         | The full pre-PR pipeline: `lint → types:check → build → test → e2e`. Bare `pnpm ci` is pnpm's built-in clean install, not this script.                                 |
 
 Scope a command to one package with `pnpm turbo run <task> --filter <pkg-name>`.
 

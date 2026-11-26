@@ -11,7 +11,8 @@ import {
   renamePost,
   undescribedWrite,
 } from "./fixtures.test-utils.ts"
-import { type AgentWrite, createMcpRoute } from "./mcp.ts"
+import type { AgentWrite } from "./mcp.ts"
+import { createMcpRoute } from "./mcp.ts"
 import { toAiSdkTools } from "./tools.ts"
 
 type Context = typeof context

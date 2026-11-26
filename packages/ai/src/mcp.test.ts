@@ -16,14 +16,8 @@ import {
   retitlePost,
   titles,
 } from "./fixtures.test-utils.ts"
-import {
-  createMcpRoute,
-  type McpToolCall,
-  type McpWrites,
-  ProposalRefusedError,
-  ToolInputError,
-  type UsedProposal,
-} from "./mcp.ts"
+import type { McpToolCall, McpWrites, UsedProposal } from "./mcp.ts"
+import { createMcpRoute, ProposalRefusedError, ToolInputError } from "./mcp.ts"
 
 const METADATA_URL =
   "https://app.example.com/.well-known/oauth-protected-resource/mcp"

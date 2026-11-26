@@ -1,7 +1,7 @@
 "use client"
 
+import type { ActionResult } from "@zeno-lib/forms/create-form"
 import {
-  type ActionResult,
   Form,
   FormProvider,
   submitAction,

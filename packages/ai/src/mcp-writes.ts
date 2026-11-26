@@ -5,22 +5,15 @@ import {
 } from "@modelcontextprotocol/ext-apps/server"
 import type { CallToolResult, McpServer } from "@modelcontextprotocol/server"
 import type { ChangeDescription } from "@zeno-lib/db/next"
-import {
-  type AgentQuery,
-  type AgentTool,
-  type AgentWriteDefinition,
-  checkAgentTools,
-  formatChange,
-  schemaParts,
+import type {
+  AgentQuery,
+  AgentTool,
+  AgentWriteDefinition,
 } from "./agent-tools.ts"
+import { checkAgentTools, formatChange, schemaParts } from "./agent-tools.ts"
 import { cardHtml } from "./approval-card/html.ts"
-import {
-  APPLY_TOOL,
-  type ApprovalContent,
-  CARD_URI,
-  PROPOSAL_META_KEY,
-  type ProposalRefusal,
-} from "./approval-protocol.ts"
+import type { ApprovalContent, ProposalRefusal } from "./approval-protocol.ts"
+import { APPLY_TOOL, CARD_URI, PROPOSAL_META_KEY } from "./approval-protocol.ts"
 import type {
   CallReporting,
   CheckedInput,
@@ -28,11 +21,11 @@ import type {
   McpToolOutcome,
   Validate,
 } from "./mcp-call.ts"
+import type { Proposal } from "./proposal.ts"
 import {
   createProposalSeal,
   fromValues,
   MIN_SECRET_LENGTH,
-  type Proposal,
   startsFrom,
 } from "./proposal.ts"
 

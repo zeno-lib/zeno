@@ -1,11 +1,9 @@
-import {
-  type DehydrateOptions,
-  dehydrate,
-  QueryClient,
-} from "@tanstack/react-query"
+import type { DehydrateOptions } from "@tanstack/react-query"
+import { dehydrate, QueryClient } from "@tanstack/react-query"
 import type { ReactNode } from "react"
 import { PrefetchedQueries } from "./prefetched-queries"
-import { bindQueries, type QueryMap } from "./query-map"
+import type { QueryMap } from "./query-map"
+import { bindQueries } from "./query-map"
 
 export type QueryHydrationBoundaryProps = {
   children: ReactNode

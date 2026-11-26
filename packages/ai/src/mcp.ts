@@ -5,22 +5,12 @@ import {
   OAuthError,
   OAuthErrorCode,
 } from "@modelcontextprotocol/server"
-import {
-  type AgentQuery,
-  checkAgentTools,
-  schemaParts,
-  toJsonText,
-} from "./agent-tools.ts"
-import {
-  type CheckedInput,
-  createCallReporting,
-  type McpToolCall,
-} from "./mcp-call.ts"
-import {
-  type McpWriterContext,
-  type McpWrites,
-  prepareWrites,
-} from "./mcp-writes.ts"
+import type { AgentQuery } from "./agent-tools.ts"
+import { checkAgentTools, schemaParts, toJsonText } from "./agent-tools.ts"
+import type { CheckedInput, McpToolCall } from "./mcp-call.ts"
+import { createCallReporting } from "./mcp-call.ts"
+import type { McpWriterContext, McpWrites } from "./mcp-writes.ts"
+import { prepareWrites } from "./mcp-writes.ts"
 
 export type { ProposalRefusal } from "./approval-protocol.ts"
 export {

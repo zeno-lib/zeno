@@ -3,18 +3,20 @@
 import { describedBy } from "@zeno-lib/forms/lib/aria"
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import { useIsFormDisabled } from "@zeno-lib/forms/lib/form-disabled"
+import type {
+  ItemGroup,
+  ItemObject,
+  ItemOption,
+  ItemValue,
+  ValueComparator,
+} from "@zeno-lib/forms/lib/item-options"
 import {
   findOption,
-  type ItemGroup,
-  type ItemObject,
-  type ItemOption,
-  type ItemValue,
   isItemGroup,
   isSameValue,
   itemLabel,
   itemValue,
   toItemList,
-  type ValueComparator,
   valueKey,
 } from "@zeno-lib/forms/lib/item-options"
 import {
@@ -24,7 +26,8 @@ import {
   useIsInvalid,
 } from "@zeno-lib/forms/lib/use-is-invalid"
 import { XIcon } from "lucide-react"
-import { type ReactNode, useId, useMemo } from "react"
+import type { ReactNode } from "react"
+import { useId, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Combobox,

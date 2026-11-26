@@ -1,18 +1,19 @@
 import { randomUUID } from "node:crypto"
-import { createClient, type SupabaseClient } from "@supabase/supabase-js"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import { createClient } from "@supabase/supabase-js"
 import { createRlsTestHarness, idsSeen } from "@zeno-lib/test/supabase"
-import { defineRelations, eq, inArray, type SQL, sql } from "drizzle-orm"
+import type { SQL } from "drizzle-orm"
+import { defineRelations, eq, inArray, sql } from "drizzle-orm"
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 import { authUserRevocation } from "../src/auth"
+import type { SessionRevocationContext, SupabaseToken } from "../src/index"
 import {
   createAdminClient,
   createAnonClient,
   createAuthClient,
   createServiceClient,
   createSupabaseClient,
-  type SessionRevocationContext,
   SessionRevokedError,
-  type SupabaseToken,
 } from "../src/index"
 import { createRequestDb, UnauthenticatedError } from "../src/next"
 import * as schema from "./schema"

@@ -52,9 +52,9 @@
  * two inside the section dropdown's trigger are a control's label rather than
  * wayfinding, so they are excluded instead of restyled.
  */
-#nd-sidebar p:not(button p),
+#nd-toc h3,
 #nd-toc > div > p,
-#nd-toc h3 {
+#nd-sidebar p:not(button p) {
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 0.6875rem;
   text-transform: uppercase;
