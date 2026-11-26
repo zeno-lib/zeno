@@ -1,13 +1,7 @@
 "use client"
 
-import {
-  type ChangeEvent,
-  type ClipboardEvent,
-  useLayoutEffect,
-  useReducer,
-  useRef,
-  useState,
-} from "react"
+import type { ChangeEvent, ClipboardEvent } from "react"
+import { useLayoutEffect, useReducer, useRef, useState } from "react"
 
 import {
   formatNumber,

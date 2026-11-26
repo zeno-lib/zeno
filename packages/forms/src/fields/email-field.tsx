@@ -1,4 +1,5 @@
-import { InputField, type InputFieldProps } from "./input-field"
+import type { InputFieldProps } from "./input-field"
+import { InputField } from "./input-field"
 
 type EmailFieldProps = Omit<InputFieldProps, "inputMode" | "type">
 

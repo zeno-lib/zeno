@@ -15,12 +15,8 @@ import type {
   WithFormProps,
 } from "@tanstack/react-form"
 import { createFormHook } from "@tanstack/react-form"
-import {
-  type ComponentProps,
-  type PropsWithChildren,
-  type ReactNode,
-  useMemo,
-} from "react"
+import type { ComponentProps, PropsWithChildren, ReactNode } from "react"
+import { useMemo } from "react"
 import { applyValidationError } from "./lib/apply-validation-error"
 import { fieldContext, formContext } from "./lib/contexts"
 import { withDefaultProps } from "./lib/default-props"
@@ -31,20 +27,18 @@ import {
   extractZodDefaults,
   pickSchemaShape,
 } from "./lib/schema-defaults"
-import {
-  getRequiredPaths,
-  type StandardSchemaLike,
-} from "./lib/schema-required"
+import type { StandardSchemaLike } from "./lib/schema-required"
+import { getRequiredPaths } from "./lib/schema-required"
 import { setSubmitError } from "./lib/submit-error"
 import type { FieldControlProps } from "./lib/use-field-control"
 import { useRebasedDefaultValues } from "./lib/use-rebased-default-values"
 import { useUnsavedChangesWarning } from "./lib/use-unsaved-changes-warning"
 import { ValidationError } from "./lib/validation-error"
 import { blurThenChangeLogic } from "./lib/validation-logic"
+import type { ValidationMode } from "./lib/validation-modes"
 import {
   DEFAULT_VALIDATION_MODE,
   setFormZenoState,
-  type ValidationMode,
 } from "./lib/validation-modes"
 
 // Structural shape of a Standard Schema (Zod, Valibot, ArkType, …). Avoids a

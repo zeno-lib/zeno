@@ -1,13 +1,13 @@
 "use client"
 
-import { type AnyFieldApi, useSelector } from "@tanstack/react-form"
-
+import type { AnyFieldApi } from "@tanstack/react-form"
+import { useSelector } from "@tanstack/react-form"
+import type { ValidationMode } from "./validation-modes"
 import {
   getFormHideFieldErrors,
   getFormValidationMode,
   isFieldRequired,
   isFieldRequiredBySchema,
-  type ValidationMode,
 } from "./validation-modes"
 
 type ErrorSourceMap = Record<string, "field" | "form" | undefined>

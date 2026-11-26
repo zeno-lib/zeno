@@ -1,40 +1,36 @@
 // https://orm.drizzle.team/docs/rls#using-with-supabase  (re-exported roles, authUid, realtimeMessages)
+import type { BuildColumn } from "drizzle-orm"
+import { Column, getColumnTable, getTableName, is, sql } from "drizzle-orm"
+import type {
+  AnyPgColumn,
+  AnyPgColumnBuilder,
+  ExtraConfigColumn,
+  HasIdentity,
+  PgBigInt53Builder,
+  PgBigInt64Builder,
+  PgBuildColumns,
+  PgBuildExtraConfigColumns,
+  PgIntegerBuilder,
+  PgPolicyConfig,
+  PgSchema,
+  PgTableExtraConfig,
+  PgTableExtraConfigValue,
+  PgTableFnInternal,
+  PgTableWithColumns,
+  PgTimestampBuilder,
+  PgTimestampStringBuilder,
+  PgUUIDBuilder,
+  Precision,
+  ReferenceConfig,
+  SetHasDefault,
+  SetIsPrimaryKey,
+  SetNotNull,
+} from "drizzle-orm/pg-core"
 import {
-  type BuildColumn,
-  Column,
-  getColumnTable,
-  getTableName,
-  is,
-  sql,
-} from "drizzle-orm"
-import {
-  type AnyPgColumn,
-  type AnyPgColumnBuilder,
   bigint,
-  type ExtraConfigColumn,
-  type HasIdentity,
   integer,
   numeric,
-  type PgBigInt53Builder,
-  type PgBigInt64Builder,
-  type PgBuildColumns,
-  type PgBuildExtraConfigColumns,
-  type PgIntegerBuilder,
-  type PgPolicyConfig,
-  type PgSchema,
-  type PgTableExtraConfig,
-  type PgTableExtraConfigValue,
-  type PgTableFnInternal,
-  type PgTableWithColumns,
-  type PgTimestampBuilder,
-  type PgTimestampStringBuilder,
-  type PgUUIDBuilder,
-  type Precision,
   pgPolicy,
-  type ReferenceConfig,
-  type SetHasDefault,
-  type SetIsPrimaryKey,
-  type SetNotNull,
   smallint,
   text,
   timestamp,
@@ -47,10 +43,10 @@ import { authenticatedRole, authUid } from "drizzle-orm/supabase"
 import type { GetZodType } from "drizzle-orm/zod"
 import type { z } from "zod"
 import { authUsers } from "./auth-schema.ts"
+import type { FunctionPolicyOperation } from "./function-names.ts"
 import {
   DEFAULT_FUNCTION_PREFIX,
   FUNCTION_POLICY_OPERATIONS,
-  type FunctionPolicyOperation,
   functionPolicyName,
 } from "./function-names.ts"
 

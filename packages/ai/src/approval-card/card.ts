@@ -1,20 +1,17 @@
 // The approval card's script, bundled into the card's HTML at build time. It
 // runs in the host's sandboxed iframe: every value is set as text, never as
 // HTML, because the entity and the values come from the database.
+import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps"
 import {
   App,
   applyDocumentTheme,
   applyHostFonts,
   applyHostStyleVariables,
-  type McpUiHostContext,
 } from "@modelcontextprotocol/ext-apps"
 import type { ChangeDescription } from "@zeno-lib/db/next"
 import { formatValue, singleLine } from "../agent-tools.ts"
-import {
-  APPLY_TOOL,
-  type ApprovalContent,
-  PROPOSAL_META_KEY,
-} from "../approval-protocol.ts"
+import type { ApprovalContent } from "../approval-protocol.ts"
+import { APPLY_TOOL, PROPOSAL_META_KEY } from "../approval-protocol.ts"
 
 type ToolResult = {
   readonly content?: readonly {

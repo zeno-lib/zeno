@@ -1,7 +1,8 @@
 "use client"
 
 import type { AnyFieldMeta } from "@tanstack/react-form"
-import { type ReactNode, useCallback, useId } from "react"
+import type { ReactNode } from "react"
+import { useCallback, useId } from "react"
 
 import { describedBy } from "./aria"
 import { useFieldContext } from "./contexts"

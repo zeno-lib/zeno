@@ -1,7 +1,7 @@
-import { type ModelMessage, type Tool, type ToolApprovalStatus, tool } from "ai"
+import type { ModelMessage, Tool, ToolApprovalStatus } from "ai"
+import { tool } from "ai"
+import type { AgentTool, AgentWriteDefinition } from "./agent-tools.ts"
 import {
-  type AgentTool,
-  type AgentWriteDefinition,
   approvedFrom,
   checkAgentTools,
   formatChange,

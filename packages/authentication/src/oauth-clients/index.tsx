@@ -1,7 +1,8 @@
 "use client"
 
 import type { OAuthClientTokenEndpointAuthMethod } from "@supabase/supabase-js"
-import { type FormEvent, useCallback, useEffect, useState } from "react"
+import type { FormEvent } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import {
   AlertDialog,
@@ -28,11 +29,10 @@ import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
+import type { OAuthClientSummary, OAuthClientsResult } from "./actions"
 import {
   deleteOAuthClient,
   listOAuthClients,
-  type OAuthClientSummary,
-  type OAuthClientsResult,
   registerOAuthClient,
   rotateOAuthClientSecret,
 } from "./actions"

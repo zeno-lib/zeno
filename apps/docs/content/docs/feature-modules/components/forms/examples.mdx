@@ -1288,7 +1288,8 @@ What `submitAction(submit, action, options?)` does:
 ```tsx lineNumbers
 "use client"
 
-import { type ActionResult, Form, FormProvider, submitAction, useForm } from "@zeno-lib/forms/create-form"
+import type { ActionResult } from "@zeno-lib/forms/create-form"
+import { Form, FormProvider, submitAction, useForm } from "@zeno-lib/forms/create-form"
 import { FieldGroup } from "@zeno-lib/ui/field"
 import { z } from "zod"
 

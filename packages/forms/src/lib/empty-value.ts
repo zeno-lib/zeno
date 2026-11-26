@@ -2,7 +2,8 @@ import type { AnyFieldApi } from "@tanstack/react-form"
 
 import { toFieldName } from "./action-result"
 import { extractZodDefaultAt } from "./schema-defaults"
-import { type StandardSchemaLike, validateSync } from "./schema-required"
+import type { StandardSchemaLike } from "./schema-required"
+import { validateSync } from "./schema-required"
 import { getFormSchema } from "./validation-modes"
 
 // A field's empty value is the first one its schema accepts of `null`,

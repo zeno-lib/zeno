@@ -1,6 +1,7 @@
 // https://orm.drizzle.team/docs/drizzle-config-file
 // https://orm.drizzle.team/docs/rls#migrations  (entities.roles.provider: "supabase")
-import { type Config, defineConfig } from "drizzle-kit"
+import type { Config } from "drizzle-kit"
+import { defineConfig } from "drizzle-kit"
 import { moveGeneratedSqlAfterGenerate } from "./move-generated-sql.ts"
 
 /**

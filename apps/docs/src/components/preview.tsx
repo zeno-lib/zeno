@@ -2,15 +2,8 @@
 
 import { Button } from "@zeno-lib/ui/button"
 import { cn } from "@zeno-lib/ui/lib/utils"
-import {
-  Children,
-  type ComponentProps,
-  isValidElement,
-  type ReactNode,
-  useEffect,
-  useRef,
-  useState,
-} from "react"
+import type { ComponentProps, ReactNode } from "react"
+import { Children, isValidElement, useEffect, useRef, useState } from "react"
 
 function isShikiBlock(child: ReactNode) {
   if (!isValidElement(child)) {

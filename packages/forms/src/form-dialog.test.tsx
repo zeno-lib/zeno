@@ -7,7 +7,8 @@ import {
   within,
 } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
-import { type ReactNode, StrictMode, useState } from "react"
+import type { ReactNode } from "react"
+import { StrictMode, useState } from "react"
 import {
   afterEach,
   beforeEach,
@@ -19,14 +20,12 @@ import {
 } from "vitest"
 import { z } from "zod"
 import { useForm } from "./create-form"
-import {
-  type DiscardPromptText,
-  FormDialog,
-  FormDialogProvider,
-} from "./form-dialog"
+import type { DiscardPromptText } from "./form-dialog"
+import { FormDialog, FormDialogProvider } from "./form-dialog"
 import type { ActionResult } from "./lib/action-result"
 import { submitAction } from "./lib/submit-action"
-import { type FormDialogController, useFormDialog } from "./lib/use-form-dialog"
+import type { FormDialogController } from "./lib/use-form-dialog"
+import { useFormDialog } from "./lib/use-form-dialog"
 
 const NAME = /Name/u
 const EMAIL = /Email/u

@@ -4,7 +4,8 @@ import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import { getEmptyValue } from "@zeno-lib/forms/lib/empty-value"
 import { getFieldHints } from "@zeno-lib/forms/lib/field-hints"
 import { useFormattedNumber } from "@zeno-lib/forms/lib/use-formatted-number"
-import { InputField, type InputFieldProps } from "./input-field"
+import type { InputFieldProps } from "./input-field"
+import { InputField } from "./input-field"
 
 type YearFieldProps = Omit<
   InputFieldProps,

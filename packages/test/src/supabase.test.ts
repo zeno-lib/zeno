@@ -1,10 +1,9 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js"
 import { describe, expect, expectTypeOf, it, vi } from "vitest"
+import type { HarnessAdminClient, HarnessClient } from "./supabase"
 import {
   createRlsTestHarness,
   deleteAuthUser,
-  type HarnessAdminClient,
-  type HarnessClient,
   idsSeen,
   isRetryableAuthError,
   signInAs,

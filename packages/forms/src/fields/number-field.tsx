@@ -3,7 +3,8 @@
 import { useFieldContext } from "@zeno-lib/forms/lib/contexts"
 import { getEmptyValue } from "@zeno-lib/forms/lib/empty-value"
 import type { ChangeEvent } from "react"
-import { InputField, type InputFieldProps } from "./input-field"
+import type { InputFieldProps } from "./input-field"
+import { InputField } from "./input-field"
 
 type NumberFieldProps = Omit<InputFieldProps, "onChange" | "type" | "value">
 

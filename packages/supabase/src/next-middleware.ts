@@ -1,6 +1,7 @@
 // https://supabase.com/docs/guides/auth/server-side/nextjs
 import { createServerClient } from "@supabase/ssr"
-import { type NextRequest, NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
+import { NextResponse } from "next/server"
 import { requireSupabaseEnv } from "./env"
 
 export type UpdateSessionOptions = {

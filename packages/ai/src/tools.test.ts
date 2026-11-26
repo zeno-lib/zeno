@@ -1,4 +1,5 @@
-import { generateText, type ModelMessage, type ToolApprovalResponse } from "ai"
+import type { ModelMessage, ToolApprovalResponse } from "ai"
+import { generateText } from "ai"
 import { MockLanguageModelV4 } from "ai/test"
 import { beforeEach, describe, expect, it } from "vitest"
 import {
@@ -12,7 +13,8 @@ import {
   titles,
   undescribedWrite,
 } from "./fixtures.test-utils.ts"
-import { type AiSdkTools, toAiSdkTools } from "./tools.ts"
+import type { AiSdkTools } from "./tools.ts"
+import { toAiSdkTools } from "./tools.ts"
 
 const usage = {
   inputTokens: { cacheRead: 0, cacheWrite: 0, noCache: 1, total: 1 },

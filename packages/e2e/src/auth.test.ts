@@ -1,11 +1,7 @@
 import type { APIRequestContext, Page } from "@playwright/test"
 import { describe, expect, it, vi } from "vitest"
-import {
-  type ApiSession,
-  sessionCookieValues,
-  signInViaApi,
-  supabaseStorageKey,
-} from "./auth"
+import type { ApiSession } from "./auth"
+import { sessionCookieValues, signInViaApi, supabaseStorageKey } from "./auth"
 
 // Fakes the Playwright boundary (page, context, request) with only the calls
 // the helper makes; a real browser run is the e2e suite's job.

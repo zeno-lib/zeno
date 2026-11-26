@@ -1,9 +1,7 @@
 "use client"
 
-import {
-  isAuthSessionMissingError,
-  type OAuthAuthorizationDetails,
-} from "@supabase/supabase-js"
+import type { OAuthAuthorizationDetails } from "@supabase/supabase-js"
+import { isAuthSessionMissingError } from "@supabase/supabase-js"
 import { createClient } from "@zeno-lib/supabase/next-client"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"

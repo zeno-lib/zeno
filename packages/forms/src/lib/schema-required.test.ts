@@ -1,11 +1,7 @@
 import { describe, expect, test } from "vitest"
 import { z } from "zod"
-
-import {
-  getRequiredPaths,
-  type StandardSchemaLike,
-  toRequiredPathKey,
-} from "./schema-required"
+import type { StandardSchemaLike } from "./schema-required"
+import { getRequiredPaths, toRequiredPathKey } from "./schema-required"
 
 describe("getRequiredPaths", () => {
   test("plain required fields appear in the set", () => {

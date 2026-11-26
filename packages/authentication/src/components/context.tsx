@@ -2,15 +2,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
-import {
-  createContext,
-  type Dispatch,
-  type ReactNode,
-  type SetStateAction,
-  useCallback,
-  useContext,
-  useState,
-} from "react"
+import type { Dispatch, ReactNode, SetStateAction } from "react"
+import { createContext, useCallback, useContext, useState } from "react"
 import { toast } from "sonner"
 import { safeNextPath } from "../confirm/safe-next-path"
 

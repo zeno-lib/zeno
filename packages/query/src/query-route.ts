@@ -1,9 +1,9 @@
 import { parse, stringify } from "devalue"
+import type { QueryMap } from "./query-map"
 import {
   findQuery,
   QUERY_CONTENT_TYPE,
   QUERY_MISSING_HEADER,
-  type QueryMap,
 } from "./query-map"
 
 export type { QueryMap } from "./query-map"

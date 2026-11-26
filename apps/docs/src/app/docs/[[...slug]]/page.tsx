@@ -1,6 +1,7 @@
 import { cn } from "@zeno-lib/ui/lib/utils"
 import Link from "fumadocs-core/link"
-import { findSiblings, type Item } from "fumadocs-core/page-tree"
+import type { Item } from "fumadocs-core/page-tree"
+import { findSiblings } from "fumadocs-core/page-tree"
 import {
   DocsBody,
   DocsDescription,

@@ -6,15 +6,14 @@ import {
 } from "@tanstack/react-query"
 import { cleanup, render, screen } from "@zeno-lib/test/testing-library"
 import userEvent from "@zeno-lib/test/user-event"
-import { Component, type ReactNode } from "react"
+import type { ReactNode } from "react"
+import { Component } from "react"
 import { renderToString } from "react-dom/server"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { PrefetchedQueries } from "./prefetched-queries"
 import { QueryHydrationBoundary } from "./query-hydration-boundary"
-import {
-  QuerySuspense,
-  type QuerySuspenseErrorFallbackProps,
-} from "./query-suspense"
+import type { QuerySuspenseErrorFallbackProps } from "./query-suspense"
+import { QuerySuspense } from "./query-suspense"
 import { QuerySuspenseLoading } from "./query-suspense-loading"
 
 const KEY = ["greeting"]

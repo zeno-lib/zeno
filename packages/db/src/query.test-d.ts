@@ -1,14 +1,11 @@
 import { defineRelations } from "drizzle-orm"
-import {
-  bigint,
-  type PgAsyncDatabase,
-  type PgAsyncTransaction,
-  text,
-} from "drizzle-orm/pg-core"
+import type { PgAsyncDatabase, PgAsyncTransaction } from "drizzle-orm/pg-core"
+import { bigint, text } from "drizzle-orm/pg-core"
 import type { PostgresJsQueryResultHKT } from "drizzle-orm/postgres-js"
 import { expectTypeOf, test } from "vitest"
 import type { DrizzleClient } from "./clients.ts"
-import { type QueryExecutor, syncRows } from "./query.ts"
+import type { QueryExecutor } from "./query.ts"
+import { syncRows } from "./query.ts"
 import { primaryId, table } from "./schema.ts"
 
 const posts = table("posts", { id: primaryId("sequential") })

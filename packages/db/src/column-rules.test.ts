@@ -5,9 +5,9 @@ import {
 } from "@zeno-lib/schema"
 import { generateDrizzleJson } from "drizzle-kit/api-postgres"
 import { sql } from "drizzle-orm"
+import type { ExtraConfigColumn } from "drizzle-orm/pg-core"
 import {
   bigint,
-  type ExtraConfigColumn,
   index,
   pgEnum,
   primaryKey,

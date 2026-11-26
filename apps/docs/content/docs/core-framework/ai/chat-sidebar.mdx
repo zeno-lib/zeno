@@ -22,7 +22,8 @@ exactly.
 ```typescript title="app/api/chat/route.ts"
 import { anthropic } from "@ai-sdk/anthropic"
 import { toAiSdkTools } from "@zeno-lib/ai/tools"
-import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from "ai"
+import type { UIMessage } from "ai"
+import { convertToModelMessages, stepCountIs, streamText } from "ai"
 import { agentTools } from "@/app/agent-tools"
 import { getRequestContext, withVia } from "@/lib/server-db"
 

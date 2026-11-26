@@ -1,7 +1,8 @@
 /** biome-ignore-all lint/suspicious/noDoubleEquals: shadcn */
 "use client"
 
-import { cva, type VariantProps } from "class-variance-authority"
+import type { VariantProps } from "class-variance-authority"
+import { cva } from "class-variance-authority"
 import { useMemo } from "react"
 import { cn } from "../lib/utils"
 import { Label } from "./label"
