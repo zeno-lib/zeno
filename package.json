@@ -28,11 +28,11 @@
     "@changesets/cli": "^3.0.3",
     "@typescript/typescript6": "^6.0.2",
     "tsx": "^4.23.15",
-    "turbo": "2.11.12",
+    "turbo": "2.11.13",
     "typescript": "7.0.2",
     "ultracite": "8.3.1"
   },
-  "packageManager": "pnpm@12.21.0",
+  "packageManager": "pnpm@12.23.0",
   "engines": {
     "node": "24.x"
   }
