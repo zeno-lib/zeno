@@ -1,5 +1,11 @@
 # @zeno-lib/test
 
+## 0.2.2
+
+### Patch Changes
+
+- 0948d79: Update `devalue` to 6.0.4 (`@zeno-lib/query`) and `@testing-library/user-event` to 14.6.13 (`@zeno-lib/test`).
+
 ## 0.2.1
 
 ### Patch Changes
