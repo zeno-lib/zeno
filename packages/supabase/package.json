@@ -51,8 +51,8 @@
   },
   "devDependencies": {
     "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.119.0",
-    "@types/node": "26.6.6",
+    "@supabase/supabase-js": "^2.119.2",
+    "@types/node": "26.6.10",
     "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
     "next": "^16.4.6",

@@ -55,12 +55,12 @@
     "types:check": "tsc --noEmit"
   },
   "dependencies": {
-    "devalue": "^6.0.3"
+    "devalue": "^6.0.4"
   },
   "devDependencies": {
-    "@tanstack/react-query": "^5.108.0",
-    "@types/node": "26.6.6",
-    "@types/react": "19.3.0",
+    "@tanstack/react-query": "^5.108.4",
+    "@types/node": "26.6.10",
+    "@types/react": "19.3.2",
     "@types/react-dom": "19.3.0",
     "@zeno-lib/test": "workspace:^",
     "@zeno-lib/typescript": "workspace:^",

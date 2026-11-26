@@ -41,7 +41,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",
-    "@types/node": "^26.6.6",
+    "@types/node": "^26.6.10",
     "@zeno-lib/docs": "workspace:*",
     "@zeno-lib/test": "workspace:*",
     "@zeno-lib/typescript": "workspace:^",
